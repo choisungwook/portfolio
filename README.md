@@ -169,6 +169,7 @@
 - [Claude, Codex, Kiro 사용량을 보여주는 macOS 메뉴바 앱 (akbun-ai-useage)](./product/akbun-ai-useage/) (26.9.23)
 - [사진 카탈로그와 초보자용 자동 보정, AI용 CLI를 갖춘 macOS 사진 편집 앱 (akbun-makephoto)](./product/akbun-makephoto/) (26.10.31)
 - [사람과 AI agent가 함께 편집하는 영상 스토리보드 도구 (akbun-storyboard)](./product/akbun-storyboard/) (26.11.15)
+- [여러 Claude 세션이 태스크를 병렬로 처리하는 개인용 에이전트 태스크 큐 (akbun-taskq)](./product/akbun-taskq/) (26.11.15)
 
 ## Dockerfile
 

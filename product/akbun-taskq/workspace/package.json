@@ -1,0 +1,30 @@
+{
+  "name": "akbun-taskq",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Personal agent task queue",
+  "bin": {
+    "taskq": "bin/taskq"
+  },
+  "engines": {
+    "node": ">=24"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "build": "tsc --noEmit",
+    "test": "node --test \"test/**/*.test.ts\"",
+    "start": "node src/cli/main.ts run",
+    "test:critical": "node --test --test-name-pattern=\"\\\\[critical\\\\]\" \"test/**/*.test.ts\"",
+    "demo": "node scripts/demo.ts"
+  },
+  "dependencies": {
+    "@anthropic-ai/claude-agent-sdk": "^0.3.325",
+    "@hono/node-server": "^1.19.0",
+    "hono": "^4.10.0"
+  },
+  "devDependencies": {
+    "@types/node": "^24.10.0",
+    "typescript": "^5.9.3"
+  }
+}

@@ -1,0 +1,17 @@
+{
+  "provider": "bedrock",
+  "awsRegion": "us-east-1",
+  "inferenceProfile": "example-readonly",
+  "maxConcurrent": 3,
+  "staleTtlSec": 300,
+  "heartbeatSec": 30,
+  "pollSec": 2,
+  "port": 4517,
+  "maxTurns": 60,
+  "maxBudgetUsd": 5,
+  "autoMode": true,
+  "sandbox": { "enabled": true, "allowedDomains": [], "allowWrite": [] },
+  "prodLockKeys": [],
+  "trustedRepos": [],
+  "retrospect": true
+}

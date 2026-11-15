@@ -1,0 +1,51 @@
+/* Board, graph, proposals and search results. Cards sit on the stage; separation comes from background and shadow. */
+.board-columns {
+  display: grid; grid-auto-flow: column; grid-auto-columns: minmax(190px, 1fr); gap: 8px; overflow-x: auto; align-items: start;
+  background: var(--stage); border-radius: 12px; padding: 8px;
+}
+.board-col { background: var(--panel); border-radius: 10px; box-shadow: var(--shadow-1); padding: 8px; min-height: 120px; }
+.board-col h3 { margin-top: 2px; font-size: 13px; }
+.board-col.collapsed summary { cursor: pointer; font-weight: 600; padding: 4px 0; }
+.cards { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+.card {
+  display: flex; flex-direction: column; gap: 2px; width: 100%; text-align: left;
+  background: var(--panel-soft); box-shadow: var(--shadow-1), inset 3px 0 0 var(--bar, var(--muted));
+}
+.card:hover:not(:disabled) { background: var(--hover); }
+.board-col[data-column="ready"] .card { --bar: var(--muted); }
+.board-col[data-column="running"] .card { --bar: var(--running); }
+.board-col[data-column="needs_approval"] .card { --bar: var(--needs-approval); }
+.board-col[data-column="needs_auth"] .card { --bar: var(--needs-auth); }
+.board-col[data-column="review"] .card { --bar: var(--review); }
+.board-col[data-column="done"] .card { --bar: var(--done); }
+.board-col[data-column="failed"] .card { --bar: var(--failed); }
+.board-col[data-column="draft"] .card { --bar: var(--border); }
+.card-title { font-weight: 600; overflow-wrap: anywhere; }
+.card .badge { align-self: flex-start; }
+
+.graph-wrap { overflow: auto; background: var(--stage); border-radius: 12px; padding: 8px; max-height: 70vh; }
+.graph-wrap svg { display: block; }
+.node { cursor: pointer; }
+.node:focus-visible { outline: none; }
+.node:focus-visible .node-box { stroke: var(--accent); stroke-width: 3; }
+.node-box { fill: var(--panel); stroke: var(--border); stroke-width: 1.5; }
+.node.status-ready .node-box { stroke: var(--muted); }
+.node.status-running .node-box { fill: color-mix(in srgb, var(--running) 14%, var(--panel)); stroke: var(--running); }
+.node.status-needs_approval .node-box { fill: color-mix(in srgb, var(--needs-approval) 16%, var(--panel)); stroke: var(--needs-approval); }
+.node.status-needs_auth .node-box { fill: color-mix(in srgb, var(--needs-auth) 14%, var(--panel)); stroke: var(--needs-auth); }
+.node.status-review .node-box { fill: color-mix(in srgb, var(--review) 14%, var(--panel)); stroke: var(--review); }
+.node.status-done .node-box { fill: color-mix(in srgb, var(--done) 14%, var(--panel)); stroke: var(--done); }
+.node.status-failed .node-box { fill: color-mix(in srgb, var(--failed) 14%, var(--panel)); stroke: var(--failed); }
+.node.status-draft .node-box { stroke: var(--muted); stroke-dasharray: 4 3; }
+.node.emphasis .node-box { stroke-width: 4; }
+.node-title { font-size: 13px; font-weight: 600; fill: var(--fg); }
+.node-status { font-size: 12px; fill: var(--muted); }
+.edge { fill: none; stroke: var(--muted); stroke-width: 1.5; }
+.edge-discovered_from { stroke-dasharray: 6 4; }
+.arrow-head { fill: var(--muted); }
+
+.proposal { background: var(--panel); border-radius: 10px; box-shadow: var(--shadow-1); padding: 10px 14px; margin-bottom: 10px; }
+.proposal h3 { margin-top: 0; }
+
+.search-list { list-style: none; padding: 0; margin: 0; display: grid; gap: 10px; }
+.search-list li { padding-top: 2px; }

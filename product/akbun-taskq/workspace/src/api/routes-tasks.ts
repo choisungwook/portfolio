@@ -1,0 +1,91 @@
+import type { Hono } from 'hono'
+import { createFromInput, getTask, listTasks, moveStatus, patchData, setPriority } from '../db/tasks.ts'
+import type { Context } from 'hono'
+import { ApprovalError, decideApproval } from '../db/approvals.ts'
+import { taskDetail } from '../db/detail.ts'
+import { parseTaskInput, parseTaskPatch } from '../validate.ts'
+import { hasAccessSkill } from '../skills/registry.ts'
+import { HttpError, optionalJson, readJson, requireOk, type ApiDeps } from './http.ts'
+import { OperatorError, requestCancel, retryTask } from '../db/operator.ts'
+import { enumParam, TASK_STATUSES } from './params.ts'
+
+export function registerTaskRoutes(api: Hono, { db, config }: ApiDeps): void {
+  api.get('/tasks', (c) => c.json(listTasks(db, enumParam(c.req.query('status'), 'status', TASK_STATUSES))))
+
+  api.post('/tasks', async (c) => {
+    const input = requireOk(parseTaskInput(await readJson(c), (name) => hasAccessSkill(db, name)))
+    try {
+      return c.json(createFromInput(db, input), 201)
+    } catch (error) {
+      throw new HttpError(400, error instanceof Error ? error.message : String(error))
+    }
+  })
+
+  api.get('/tasks/:id', (c) => {
+    const detail = taskDetail(db, c.req.param('id'))
+    return detail ? c.json(detail) : c.json({ error: 'task not found' }, 404)
+  })
+
+  api.patch('/tasks/:id', async (c) => {
+    const id = c.req.param('id')
+    const patch = requireOk(parseTaskPatch(await readJson(c), (name) => hasAccessSkill(db, name)))
+    const task = getTask(db, id)
+    if (!task) return c.json({ error: 'task not found' }, 404)
+    if (patch.status === 'ready' && !moveStatus(db, id, 'draft', 'ready')) throw new HttpError(409, 'only draft tasks can be made ready')
+    if (patch.priority !== undefined) setPriority(db, id, patch.priority)
+    if (Object.keys(patch.data).length > 0) patchData(db, id, patch.data)
+    return c.json(getTask(db, id))
+  })
+
+  api.post('/tasks/:id/approve', async (c) => c.json(await decide(c, db, true)))
+  api.post('/tasks/:id/deny', async (c) => c.json(await decide(c, db, false)))
+
+  api.post('/tasks/:id/resume', (c) => {
+    const id = c.req.param('id')
+    if (!moveStatus(db, id, 'needs_auth', 'ready')) throw new HttpError(409, 'task is not waiting for login')
+    return c.json(getTask(db, id))
+  })
+
+  api.post('/tasks/:id/done', (c) => {
+    const id = c.req.param('id')
+    if (!moveStatus(db, id, 'review', 'done')) throw new HttpError(409, 'task is not in review')
+    return c.json(getTask(db, id))
+  })
+
+  // A running task stops when its runner polls the marker. A needs_auth task, or one with no live runner, ends here.
+  api.post('/tasks/:id/cancel', (c) => {
+    const id = c.req.param('id')
+    if (!getTask(db, id)) return c.json({ error: 'task not found' }, 404)
+    try {
+      return c.json(requestCancel(db, config, id))
+    } catch (error) {
+      if (error instanceof OperatorError) throw new HttpError(409, error.message)
+      throw error
+    }
+  })
+
+  // Only a failed task can be retried. draft: true puts it back as a draft. resume: true keeps its session.
+  api.post('/tasks/:id/retry', async (c) => {
+    const id = c.req.param('id')
+    if (!getTask(db, id)) return c.json({ error: 'task not found' }, 404)
+    const body = await optionalJson(c)
+    const options = { draft: body.draft === true, resume: body.resume === true }
+    if (!retryTask(db, id, options)) throw new HttpError(409, 'only failed tasks can be retried')
+    return c.json(getTask(db, id))
+  })
+}
+
+// The body names the request the user saw. Anything but the task's open request is a 409.
+async function decide(c: Context, db: ApiDeps['db'], approve: boolean) {
+  const id = c.req.param('id') as string
+  const body = await readJson(c)
+  const requestId = typeof body === 'object' && body !== null ? (body as { request_id?: unknown }).request_id : undefined
+  if (typeof requestId !== 'string' || requestId === '') throw new HttpError(400, 'request_id is required')
+  try {
+    decideApproval(db, id, requestId, approve)
+  } catch (error) {
+    if (error instanceof ApprovalError) throw new HttpError(409, error.message)
+    throw error
+  }
+  return getTask(db, id)
+}

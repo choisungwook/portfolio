@@ -1,0 +1,50 @@
+import type { Context } from 'hono'
+import type { Db } from '../db/open.ts'
+import type { Config } from '../config.ts'
+
+export interface ApiDeps {
+  db: Db
+  config: Config
+}
+
+export class HttpError extends Error {
+  readonly status: number
+
+  constructor(status: number, message: string) {
+    super(message)
+    this.status = status
+  }
+}
+
+export async function readJson(c: Context): Promise<unknown> {
+  try {
+    return await c.req.json()
+  } catch {
+    throw new HttpError(400, 'body must be JSON')
+  }
+}
+
+// A body that may be empty. Anything present must be a JSON object.
+export async function optionalJson(c: Context): Promise<Record<string, unknown>> {
+  const text = await c.req.text()
+  if (text.trim() === '') return {}
+  let value: unknown
+  try {
+    value = JSON.parse(text)
+  } catch {
+    throw new HttpError(400, 'body must be JSON')
+  }
+  if (typeof value !== 'object' || value === null || Array.isArray(value)) throw new HttpError(400, 'body must be a JSON object')
+  return value as Record<string, unknown>
+}
+
+export function requireOk<T>(result: { ok: true; value: T } | { ok: false; error: string }): T {
+  if (!result.ok) throw new HttpError(400, result.error)
+  return result.value
+}
+
+export function idParam(value: string): number {
+  const id = Number(value)
+  if (!Number.isInteger(id) || id < 1) throw new HttpError(400, 'id must be a positive integer')
+  return id
+}

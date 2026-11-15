@@ -1,0 +1,138 @@
+/* Calendar: toolbar, Day/Week time grid, Month grid, and the outcome colors shared with other views.
+   Colors come only from the tokens in base.css. */
+.cal-toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 14px; }
+.cal-nav { display: inline-flex; align-items: center; gap: 6px; }
+.cal-today { box-shadow: inset 0 0 0 1px var(--border); padding: 5px 14px; }
+.cal-arrow {
+  width: 32px; height: 32px; padding: 0; border-radius: 999px;
+  display: inline-flex; align-items: center; justify-content: center;
+}
+.cal-arrow svg { display: block; }
+.cal-label { margin: 0; flex: 1 1 auto; min-width: 0; font-size: 20px; font-weight: 600; }
+.cal-views { margin-left: auto; }
+.cal-filters { display: flex; flex-wrap: wrap; gap: 12px; margin: 10px 0; align-items: center; font-size: 12px; color: var(--muted); }
+.cal-filters label { display: inline-flex; gap: 6px; align-items: center; }
+
+.day-summary { background: var(--panel); border-radius: 12px; box-shadow: var(--shadow-1); padding: 8px 14px; margin-bottom: 10px; }
+.summary-strip { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 18px; }
+.facts-inline { display: flex; flex-wrap: wrap; gap: 4px 16px; margin: 0; }
+.facts-inline div { display: inline-flex; gap: 6px; align-items: baseline; }
+.facts-inline dt { color: var(--muted); }
+.facts-inline dd { margin: 0; font-weight: 600; }
+.summary-more { margin-top: 6px; }
+.summary-more summary { cursor: pointer; color: var(--accent); }
+.summary-more ol { margin: 4px 0 0; padding-left: 20px; }
+
+.facts { display: grid; grid-template-columns: max-content 1fr; gap: 2px 12px; margin: 6px 0; }
+.facts dt { color: var(--muted); }
+.facts dd { margin: 0; }
+
+/* Each outcome sets --ink (its color) and --tint (a light wash of it on the panel). */
+.outcome-done { --ink: var(--done); --tint: color-mix(in srgb, var(--done) 16%, var(--panel)); }
+.outcome-failed { --ink: var(--failed); --tint: color-mix(in srgb, var(--failed) 16%, var(--panel)); }
+.outcome-needs_approval { --ink: var(--needs-approval); --tint: color-mix(in srgb, var(--needs-approval) 18%, var(--panel)); }
+.outcome-needs_auth { --ink: var(--needs-auth); --tint: color-mix(in srgb, var(--needs-auth) 16%, var(--panel)); }
+.outcome-review { --ink: var(--review); --tint: color-mix(in srgb, var(--review) 16%, var(--panel)); }
+.outcome-stale { --ink: var(--stale); --tint: var(--control); }
+.outcome-running { --ink: var(--running); --tint: color-mix(in srgb, var(--running) 16%, var(--panel)); }
+.outcome-text { font-weight: 600; color: var(--ink); }
+
+/* Time grid: one scroll container, so the day header sticks while the hours scroll. */
+.time-grid {
+  --hour-px: 48px;
+  position: relative; height: min(72vh, 780px); min-height: 320px; overflow: auto;
+  background: var(--panel); border: 1px solid var(--border); border-radius: 12px;
+}
+.time-head { position: sticky; top: 0; z-index: 4; display: grid; background: var(--panel); border-bottom: 1px solid var(--border); }
+.time-body { position: relative; display: grid; }
+.gutter { position: sticky; left: 0; z-index: 3; background: var(--panel); }
+.time-head .gutter { z-index: 5; }
+.hours { position: relative; width: 56px; }
+.hour-label {
+  position: absolute; right: 8px; transform: translateY(-50%); font-size: 11px; color: var(--muted); white-space: nowrap;
+}
+.hour-label.first { transform: none; }
+
+.day-head {
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px;
+  min-height: 0; padding: 6px 4px; border-radius: 0; background: transparent;
+}
+.day-head + .day-head { border-left: 1px solid var(--border); }
+.day-head:hover:not(:disabled) { background: var(--hover); }
+.dow { font-size: 11px; color: var(--muted); }
+.dom {
+  display: inline-flex; align-items: center; justify-content: center; width: 30px; height: 30px; border-radius: 50%;
+  font-size: 18px; font-weight: 400;
+}
+.dom.today { background: var(--accent); color: var(--on-accent); font-weight: 600; }
+
+.day-col {
+  position: relative; background-color: var(--panel);
+  background-image: repeating-linear-gradient(to bottom, var(--border) 0 1px, transparent 1px var(--hour-px));
+}
+.day-col + .day-col { border-left: 1px solid var(--border); }
+.day-col.weekend { background-color: var(--panel-soft); }
+.day-col.today { background-color: color-mix(in srgb, var(--accent) 6%, var(--panel)); }
+
+/* Current time: 2 px line in the danger color with a dot at its left end. */
+.now-line { position: absolute; left: 0; right: 0; height: 0; border-top: 2px solid var(--danger); z-index: 3; pointer-events: none; }
+.now-line::before {
+  content: ""; position: absolute; left: -4px; top: -3px; width: 8px; height: 8px; border-radius: 50%; background: var(--danger);
+}
+
+.block {
+  position: absolute; z-index: 1; display: flex; flex-direction: column; overflow: hidden; min-height: 0; margin: 0;
+  text-align: left; padding: 1px 6px 1px 8px; border-radius: var(--radius-s); background: var(--tint);
+  box-shadow: inset 3px 0 0 var(--ink); font-size: 12px; line-height: 14px; color: var(--fg);
+}
+.block > span { display: block; flex-shrink: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.block-title { font-weight: 600; }
+.block-time, .block-type { color: var(--muted); }
+.block.outcome-stale { outline: 1px dashed var(--ink); outline-offset: -1px; }
+.block:hover:not(:disabled) { background: color-mix(in srgb, var(--ink) 22%, var(--panel)); }
+.block:focus-visible { box-shadow: inset 3px 0 0 var(--ink), 0 0 0 2px var(--panel), 0 0 0 4px var(--accent); }
+
+/* Waiting time: hatched over the column so it reads without color. Above blocks, but click-through. */
+.wait {
+  position: absolute; z-index: 2; pointer-events: none; border-radius: var(--radius-s);
+  background: repeating-linear-gradient(135deg, transparent 0 6px, color-mix(in srgb, var(--fg) 26%, transparent) 6px 8px);
+}
+.wait-approval { box-shadow: inset 0 0 0 1px var(--needs-approval); }
+.wait-auth { box-shadow: inset 0 0 0 1px var(--needs-auth); }
+
+/* Month: six weeks, hairlines drawn by the 1 px gaps on the --border background. */
+.month-grid {
+  display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 1px;
+  background: var(--border); border: 1px solid var(--border); border-radius: 12px; overflow: hidden;
+}
+.weekday { padding: 6px; font-size: 12px; color: var(--muted); text-align: center; background: var(--panel); }
+.month-cell {
+  display: flex; flex-direction: column; gap: 3px; min-width: 0; min-height: 104px; padding: 4px 5px;
+  background: var(--panel); font-size: 12px;
+}
+.month-cell.outside { background: var(--panel-soft); }
+.month-cell.outside .date-button { color: var(--muted); }
+.month-head { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; min-height: 26px; }
+.date-button { min-height: 24px; min-width: 24px; padding: 0 6px; border-radius: 999px; font-size: 12px; font-weight: 600; }
+.date-button.today { background: var(--accent); color: var(--on-accent); }
+.chip {
+  display: flex; align-items: center; gap: 4px; width: 100%; min-height: 0; padding: 1px 4px;
+  border-radius: var(--radius-s); background: var(--tint); font-size: 11px; line-height: 15px; text-align: left; overflow: hidden;
+}
+.chip .dot { flex: none; width: 6px; height: 6px; border-radius: 50%; background: var(--ink); }
+.chip-time { flex: none; color: var(--muted); }
+.chip-title { min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.month-more { min-height: 0; padding: 1px 4px; font-size: 11px; color: var(--accent); text-align: left; }
+.flag { font-size: 11px; font-weight: 600; }
+.flag.failed { color: var(--failed); }
+.flag.critical { color: var(--danger); }
+
+@media (max-width: 640px) {
+  .time-grid { height: min(60vh, 560px); }
+  .month-cell { min-height: 76px; }
+  .chip-time { display: none; }
+  .cal-views { margin-left: 0; }
+}
+
+/* The shared button rule sets a min-height; a short block must keep the height the layout gives it. */
+.block { min-height: 0; }

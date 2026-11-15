@@ -1,0 +1,82 @@
+// Thin fetch wrapper. Every request carries the token. Mutations send application/json with a JSON body ({} when empty).
+import { requestRefresh } from './refresh.js'
+import { area } from './dom.js'
+import { authLost, getToken } from './token.js'
+
+const NO_TOKEN = 'Open the URL printed by taskq run to continue.'
+
+// status is the HTTP status, 0 when the server cannot be reached.
+export class ApiError extends Error {
+  constructor(message, status = 0) {
+    super(message)
+    this.status = status
+  }
+}
+
+async function request(method, path, body) {
+  const token = getToken()
+  if (token === null) {
+    authLost()
+    throw new ApiError(NO_TOKEN, 401)
+  }
+  const init = { method, headers: { 'x-taskq-token': token } }
+  if (method !== 'GET') {
+    init.headers['content-type'] = 'application/json'
+    init.body = JSON.stringify(body ?? {})
+  }
+  let res
+  try {
+    res = await fetch(`/api${path}`, init)
+  } catch {
+    throw new ApiError('server not reachable')
+  }
+  if (res.status === 401) {
+    authLost()
+    throw new ApiError(NO_TOKEN, 401)
+  }
+  const text = await res.text()
+  let data = null
+  try {
+    data = text ? JSON.parse(text) : null
+  } catch {
+    data = null
+  }
+  if (!res.ok) throw new ApiError(data?.error ?? `HTTP ${res.status}`, res.status)
+  return data
+}
+
+export const api = {
+  get: (path) => request('GET', path),
+  post: (path, body) => request('POST', path, body ?? {}),
+  patch: (path, body) => request('PATCH', path, body ?? {}),
+  del: (path, body) => request('DELETE', path, body ?? {}),
+}
+
+// Builds ?a=1&b=2 and skips empty values.
+export function qs(params) {
+  const search = new URLSearchParams()
+  for (const [key, value] of Object.entries(params)) {
+    if (value !== undefined && value !== null && value !== '') search.set(key, String(value))
+  }
+  const text = search.toString()
+  return text ? `?${text}` : ''
+}
+
+export function notify(message, isError = false) {
+  const node = area('notice')
+  node.textContent = message
+  node.dataset.kind = isError ? 'error' : 'ok'
+}
+
+// Runs a mutation, shows the server's error message on failure, and refreshes views on success.
+export async function mutate(fn, okMessage = '') {
+  try {
+    const result = await fn()
+    if (okMessage) notify(okMessage)
+    requestRefresh()
+    return result
+  } catch (error) {
+    notify(error instanceof Error ? error.message : String(error), true)
+    return undefined
+  }
+}
