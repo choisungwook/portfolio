@@ -14,6 +14,9 @@ generated: { by: claude-code, at: 2026-11-15T00:00:00Z }
 - shell은 daemon이 소유하므로 client가 닫혀도 계속 실행된다. 다른 client는 `sessions`로 목록을 받고 `attach`로 붙는다. `attach`는 그 session의 최근 출력 256 KiB를 `replay`로 돌려준다.
 - daemon은 client가 필요할 때 띄운다. 연결과 session이 모두 없는 상태가 10초 이어지면 스스로 종료한다.
 - desktop은 이번 변경에서 종료할 때 자기가 연 session을 닫는 기존 동작을 유지한다.
+- agent끼리의 통신은 core의 CLI가 맡는다. `run`으로 이름 붙은 shell을 띄우고 `send`로 글을 입력하고 `read`로 화면을 읽고 `wait`로 작업이 멈출 때까지 기다린다. shell은 `AKBUN_TERMINAL_SESSION`으로 자기 id를 알고, 그 안에서 띄운 shell은 자식이 된다.
+- agent 목록은 `sessions` 응답에서 `agent`가 있는 항목이다. client는 걸러서 그리기만 한다.
+- 상태 판정은 daemon이 2초마다 직접 한다. client의 `detect`는 그 결과를 읽는다.
 
 ## 이유
 
@@ -25,8 +28,17 @@ generated: { by: claude-code, at: 2026-11-15T00:00:00Z }
 - tree를 바꾼 연결 외의 연결에는 `state` 이벤트를 보낸다. 변경 응답이 요청한 쪽에만 가면 두 client의 project 목록이 달라진다.
 - 출력 바이트는 여전히 JSON 배열이다. in-process일 때도 같은 인코딩을 거쳤으므로 느려지지 않았고, 바꾸면 Swift decoder까지 함께 고쳐야 해서 이번 범위에서 뺐다.
 
+## 이유: agent 통신
+
+- 통신을 client가 아니라 core에 둔 이유: agent는 화면 없이 shell 안에서 CLI만 실행한다. client가 닫혀 있어도 agent끼리 일을 주고받아야 하므로 창에 묶인 기능이면 안 된다.
+- 자식의 상태가 바뀔 때 부모 터미널에 알림을 자동으로 입력하지 않는다. 사람이 입력하던 줄에 글이 섞이는 문제를 다루려면 입력 중 여부를 판정해야 하는데 이번 범위에서 뺐다. 자식이 `send`로 보고한다.
+- `send`가 `<akbun from="3 lead">`로 감싸는 이유: 받은 agent가 사용자의 지시와 다른 agent의 글을 구분하고, 답할 대상의 id를 알아야 한다.
+- `wait`는 `send` 직후 4초 동안은 idle 판정으로 끝내지 않는다. agent가 작업 표시를 화면에 그리기 전에 판정하면 `send; wait`가 바로 반환된다.
+- 판정을 daemon이 직접 하는 이유: `wait`와 `ls`는 어떤 client도 `detect`를 부르지 않을 때도 최신 상태가 필요하다.
+
 ## 남은 것
 
 - desktop이 재실행될 때 살아 있는 session에 다시 붙는 동작. `sessions`와 `attach`는 이미 있으므로 `TerminalWindowController`가 workspace별로 tab을 복원하면 된다.
 - desktop이 `state` 이벤트를 받아 사이드바를 갱신하는 동작. 지금은 tui에서 바꾼 project가 desktop을 다시 열어야 표시된다.
+- desktop의 agent 목록 화면. tui에만 있다.
 - Windows. socket이 Unix domain이라 지원하지 않는다.
