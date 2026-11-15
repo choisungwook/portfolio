@@ -82,6 +82,17 @@ pub struct TreeStore {
 }
 
 impl TreeStore {
+    /// Whether `directory` is the one this store already holds. Loading it again
+    /// would replace what another client has since changed with what was last
+    /// written, so callers ask first.
+    pub fn is_loaded(&self, directory: &str) -> bool {
+        self.directory.as_deref() == Some(Path::new(directory))
+    }
+
+    pub fn state(&self) -> TreeState {
+        self.state.clone()
+    }
+
     pub fn load(&mut self, directory: &str) -> Result<TreeState, String> {
         let directory = PathBuf::from(directory);
         fs::create_dir_all(&directory).map_err(|error| error.to_string())?;

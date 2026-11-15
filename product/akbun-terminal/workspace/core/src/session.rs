@@ -15,13 +15,29 @@ use portable_pty::{CommandBuilder, MasterPty, PtySize, native_pty_system};
 use crate::protocol::Event;
 use crate::screen::Screen;
 
-pub struct Session {
-    id: u32,
+/// What a session is started with, besides where it draws.
+#[derive(Default)]
+pub struct Launch {
     /// Which workspace this shell is judged under. None when the shell that
     /// spawned it does not track workspaces.
+    pub workspace: Option<u64>,
+    pub name: Option<String>,
+    pub parent: Option<u32>,
+    /// argv run instead of the login shell. Empty means the shell itself.
+    pub command: Vec<String>,
+}
+
+pub struct Session {
+    id: u32,
     workspace: Option<u64>,
+    name: Option<String>,
+    parent: Option<u32>,
+    cwd: String,
+    size: Mutex<(u16, u16)>,
     master: Box<dyn MasterPty + Send>,
-    writer: Box<dyn Write + Send>,
+    /// Shared so a slow typed message can write without holding the table of
+    /// sessions for its whole duration.
+    writer: Arc<Mutex<Box<dyn Write + Send>>>,
     child: Arc<Mutex<Box<dyn portable_pty::Child + Send + Sync>>>,
     /// The interpreted screen, kept up to date on the reader thread so that
     /// detection never sits on the path that draws output.
@@ -33,7 +49,7 @@ impl Session {
     /// `events` from a reader thread.
     pub fn spawn(
         id: u32,
-        workspace: Option<u64>,
+        launch: Launch,
         cwd: &str,
         cols: u16,
         rows: u16,
@@ -52,7 +68,15 @@ impl Session {
         // A login shell reads the user's profile, which is the point of wrapping
         // the terminal at all; without it the aliases and PATH are not theirs.
         command.arg("-l");
-        command.cwd(if cwd.is_empty() { home_dir() } else { cwd.to_string() });
+        if !launch.command.is_empty() {
+            // Through the login shell rather than directly, so the program is
+            // found on the user's PATH. `--` fills `$0`, leaving argv as `$@`.
+            command.args(["-c", r#"exec "$@""#, "--"]);
+            command.args(&launch.command);
+        }
+        let cwd = if cwd.is_empty() { home_dir() } else { cwd.to_string() };
+        command.cwd(&cwd);
+        command.env("AKBUN_TERMINAL_SESSION", id.to_string());
         // A GUI app is launched by launchd, not by a terminal, so it inherits no
         // TERM. Without it the shell and everything under it think they are on a
         // dumb terminal: `clear` refuses to run and full screen programs draw
@@ -94,9 +118,13 @@ impl Session {
 
         Ok(Self {
             id,
-            workspace,
+            workspace: launch.workspace,
+            name: launch.name,
+            parent: launch.parent,
+            cwd,
+            size: Mutex::new((cols, rows)),
             master: pty.master,
-            writer,
+            writer: Arc::new(Mutex::new(writer)),
             child: Arc::new(Mutex::new(child)),
             screen,
         })
@@ -108,6 +136,38 @@ impl Session {
 
     pub fn workspace(&self) -> Option<u64> {
         self.workspace
+    }
+
+    pub fn name(&self) -> Option<&str> {
+        self.name.as_deref()
+    }
+
+    pub fn set_name(&mut self, name: Option<String>) {
+        self.name = name;
+    }
+
+    pub fn parent(&self) -> Option<u32> {
+        self.parent
+    }
+
+    pub fn cwd(&self) -> &str {
+        &self.cwd
+    }
+
+    pub fn size(&self) -> (u16, u16) {
+        self.size.lock().map(|size| *size).unwrap_or((0, 0))
+    }
+
+    /// Whether the program in this shell has asked for bracketed paste.
+    pub fn bracketed_paste(&self) -> bool {
+        self.screen
+            .lock()
+            .map(|screen| screen.bracketed_paste())
+            .unwrap_or(false)
+    }
+
+    pub fn writer(&self) -> Arc<Mutex<Box<dyn Write + Send>>> {
+        Arc::clone(&self.writer)
     }
 
     /// The shell's pid, which is the root of the tree an agent runs somewhere in.
@@ -123,9 +183,8 @@ impl Session {
             .unwrap_or_default()
     }
 
-    pub fn write(&mut self, bytes: &[u8]) -> Result<(), String> {
-        self.writer.write_all(bytes).map_err(|error| error.to_string())?;
-        self.writer.flush().map_err(|error| error.to_string())
+    pub fn write(&self, bytes: &[u8]) -> Result<(), String> {
+        write_all(&self.writer, bytes)
     }
 
     /// A shell that is not told the new size keeps drawing at the old one, so
@@ -133,6 +192,9 @@ impl Session {
     pub fn resize(&self, cols: u16, rows: u16) -> Result<(), String> {
         if let Ok(mut screen) = self.screen.lock() {
             screen.resize(cols, rows);
+        }
+        if let Ok(mut size) = self.size.lock() {
+            *size = (cols, rows);
         }
         self.master
             .resize(PtySize {
@@ -158,6 +220,13 @@ impl Drop for Session {
     fn drop(&mut self) {
         self.kill();
     }
+}
+
+/// Writes through a shared writer handle, as `Session::write` does.
+pub fn write_all(writer: &Mutex<Box<dyn Write + Send>>, bytes: &[u8]) -> Result<(), String> {
+    let mut writer = writer.lock().map_err(|_| "session writer is poisoned".to_string())?;
+    writer.write_all(bytes).map_err(|error| error.to_string())?;
+    writer.flush().map_err(|error| error.to_string())
 }
 
 fn login_shell() -> String {

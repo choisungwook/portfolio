@@ -17,7 +17,17 @@ use crate::tree::{TreeState, WorkspaceStatus};
 /// Bumped only when an existing field changes meaning or disappears. Adding an
 /// optional field or a new command variant does not need a bump, because both
 /// sides ignore what they do not know.
-pub const PROTOCOL_VERSION: u32 = 2;
+///
+/// 3 is the first version spoken over a socket: replies and events are wrapped
+/// in a frame (see [`Frame`]) and sessions outlive the connection that made
+/// them.
+pub const PROTOCOL_VERSION: u32 = 3;
+
+/// The product version, compiled in from the one file that owns it. Reported in
+/// the handshake so a client can say which build it is talking to.
+pub fn product_version() -> &'static str {
+    include_str!("../../VERSION").trim()
+}
 
 /// What the shell sends in.
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -42,6 +52,55 @@ pub enum Command {
         rows: u16,
         #[serde(default)]
         workspace: Option<u64>,
+        /// A handle other sessions can address this one by. Unique among live
+        /// sessions; see `valid_session_name` for what it may contain.
+        #[serde(default)]
+        name: Option<String>,
+        /// argv to run instead of the login shell. It still goes through the
+        /// login shell so PATH is the user's. Empty means the shell itself.
+        #[serde(default)]
+        command: Vec<String>,
+        /// The session that started this one. A child with no workspace of its
+        /// own takes its parent's.
+        #[serde(default)]
+        parent: Option<u32>,
+    },
+    /// Every live shell.
+    Sessions,
+    /// Starts delivering a session's `output` and `exited` events to this
+    /// connection, after replaying what it already printed.
+    Attach {
+        session: u32,
+    },
+    /// Stops delivering a session's events to this connection.
+    Detach {
+        session: u32,
+    },
+    /// Ends every shell and the daemon.
+    Shutdown,
+    /// Types `text` into a session and presses return. With `from` the text is
+    /// wrapped so the receiver can tell who to answer.
+    Send {
+        session: u32,
+        text: String,
+        #[serde(default)]
+        from: Option<u32>,
+    },
+    /// What a session shows on screen right now.
+    Read {
+        session: u32,
+    },
+    /// Blocks this connection until the session stops working, exits, or the
+    /// timeout (default 180 seconds) passes.
+    Wait {
+        session: u32,
+        #[serde(default)]
+        timeout_secs: Option<u64>,
+    },
+    /// An empty name removes the session's name.
+    RenameSession {
+        session: u32,
+        name: String,
     },
     /// Keystrokes on their way to the shell.
     Write {
@@ -187,8 +246,29 @@ pub enum Command {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(tag = "type", rename_all = "snake_case")]
 pub enum Response {
-    Hello { protocol: u32 },
+    /// `version` is the product version of the core. Absent from cores that
+    /// predate it, so decoders treat it as optional.
+    Hello {
+        protocol: u32,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        version: Option<String>,
+    },
     Spawned { session: u32 },
+    Sessions { sessions: Vec<SessionInfo> },
+    /// `replay` is the retained tail of the session's raw output, in chunks, so
+    /// a new view can draw what is already there. Every `output` event that
+    /// follows on this connection starts exactly where the replay ends.
+    Attached {
+        session: u32,
+        cols: u16,
+        rows: u16,
+        replay: Vec<Vec<u8>>,
+    },
+    Text { text: String },
+    Waited {
+        reason: WaitReason,
+        status: WorkspaceStatus,
+    },
     Ok,
     State { state: TreeState },
     Entries { entries: Vec<Entry> },
@@ -207,6 +287,31 @@ pub enum Response {
     /// Absent when the click did not land on something this core will open.
     Url { url: Option<String> },
     Error { message: String },
+}
+
+/// One live shell, as `sessions` lists it.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct SessionInfo {
+    pub session: u32,
+    pub name: Option<String>,
+    pub parent: Option<u32>,
+    pub workspace: Option<u64>,
+    pub cwd: String,
+    pub cols: u16,
+    pub rows: u16,
+    /// The name of the rule whose process runs under this shell, if any.
+    #[serde(default)]
+    pub agent: Option<String>,
+    pub status: WorkspaceStatus,
+}
+
+/// Why a `wait` came back.
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum WaitReason {
+    Stopped,
+    Exited,
+    Timeout,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -245,6 +350,66 @@ pub enum Event {
     Output { session: u32, bytes: Vec<u8> },
     /// The shell process ended, so the view can stop accepting keys.
     Exited { session: u32 },
+    /// The project tree after another connection changed it, so two clients do
+    /// not drift apart. Never sent to the connection that made the change.
+    State { state: TreeState },
+}
+
+/// What the daemon writes on a socket, one per line. Replies answer requests in
+/// the order they were made; events arrive at any time between them.
+#[derive(Debug, Clone, PartialEq, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum Frame {
+    Reply(Response),
+    Event(Event),
+}
+
+impl Command {
+    /// Whether a successful run changes the project tree, which is what other
+    /// connections are told about. `LoadState` is left out on purpose: it
+    /// reads rather than edits, and a second client loading the directory the
+    /// first already has changes nothing for anyone.
+    pub fn mutates_tree(&self) -> bool {
+        matches!(
+            self,
+            Command::CreateProject { .. }
+                | Command::CreateWorkspace { .. }
+                | Command::RenameProject { .. }
+                | Command::DeleteProject { .. }
+                | Command::RenameWorkspace { .. }
+                | Command::DeleteWorkspace { .. }
+                | Command::SetTheme { .. }
+                | Command::SetShortcut { .. }
+                | Command::ResetShortcuts
+        )
+    }
+}
+
+/// A reply as it goes on the wire.
+pub fn reply_line(response: &Response) -> String {
+    match serde_json::to_string(response) {
+        Ok(json) => format!(r#"{{"reply":{json}}}"#),
+        Err(error) => format!(r#"{{"reply":{{"type":"error","message":"failed to encode response: {error}"}}}}"#),
+    }
+}
+
+/// An event as it goes on the wire. `None` only if it cannot be encoded, which
+/// means there is nothing to deliver.
+pub fn event_line(event: &Event) -> Option<String> {
+    serde_json::to_string(event)
+        .ok()
+        .map(|json| format!(r#"{{"event":{json}}}"#))
+}
+
+/// Names that are safe to type on a command line and cannot be mistaken for a
+/// session id, because the CLI accepts either.
+pub fn valid_session_name(name: &str) -> bool {
+    !name.is_empty()
+        && name.len() <= 64
+        && name
+            .chars()
+            .all(|c| c.is_ascii_alphanumeric() || matches!(c, '-' | '_' | '.'))
+        && name.parse::<u32>().is_err()
 }
 
 /// Reads an envelope, rejecting a version this build does not implement.
@@ -264,8 +429,171 @@ mod tests {
     use super::*;
 
     #[test]
+    fn v3_commands_and_replies_keep_their_wire_names() {
+        // The desktop client decodes these strings and is compiled apart from
+        // this crate, so a rename has to fail here.
+        let json = r#"{"v":3,"command":{"type":"attach","session":4}}"#;
+        assert!(matches!(
+            parse_request(json),
+            Ok(Command::Attach { session: 4 })
+        ));
+        for (json, name) in [
+            (r#"{"v":3,"command":{"type":"sessions"}}"#, "sessions"),
+            (r#"{"v":3,"command":{"type":"shutdown"}}"#, "shutdown"),
+            (r#"{"v":3,"command":{"type":"detach","session":1}}"#, "detach"),
+            (r#"{"v":3,"command":{"type":"read","session":1}}"#, "read"),
+        ] {
+            assert!(parse_request(json).is_ok(), "{name}");
+        }
+
+        let response = serde_json::to_string(&Response::Hello {
+            protocol: 3,
+            version: Some("0.15.1".to_string()),
+        })
+        .unwrap();
+        assert_eq!(response, r#"{"type":"hello","protocol":3,"version":"0.15.1"}"#);
+        // A core without the field still decodes.
+        let old: Response = serde_json::from_str(r#"{"type":"hello","protocol":2}"#).unwrap();
+        assert_eq!(
+            old,
+            Response::Hello {
+                protocol: 2,
+                version: None
+            }
+        );
+
+        let response = serde_json::to_string(&Response::Attached {
+            session: 1,
+            cols: 80,
+            rows: 24,
+            replay: vec![vec![104, 105], vec![10]],
+        })
+        .unwrap();
+        assert_eq!(
+            response,
+            r#"{"type":"attached","session":1,"cols":80,"rows":24,"replay":[[104,105],[10]]}"#
+        );
+
+        let response = serde_json::to_string(&Response::Sessions {
+            sessions: vec![SessionInfo {
+                session: 2,
+                name: Some("review".to_string()),
+                parent: Some(1),
+                workspace: None,
+                cwd: "/tmp".to_string(),
+                cols: 80,
+                rows: 24,
+                agent: Some("Claude Code".to_string()),
+                status: WorkspaceStatus::Running,
+            }],
+        })
+        .unwrap();
+        assert_eq!(
+            response,
+            r#"{"type":"sessions","sessions":[{"session":2,"name":"review","parent":1,"workspace":null,"cwd":"/tmp","cols":80,"rows":24,"agent":"Claude Code","status":"running"}]}"#
+        );
+
+        let response = serde_json::to_string(&Response::Waited {
+            reason: WaitReason::Timeout,
+            status: WorkspaceStatus::NeedsAttention,
+        })
+        .unwrap();
+        assert_eq!(
+            response,
+            r#"{"type":"waited","reason":"timeout","status":"needs_attention"}"#
+        );
+        let response = serde_json::to_string(&Response::Text {
+            text: "hi".to_string(),
+        })
+        .unwrap();
+        assert_eq!(response, r#"{"type":"text","text":"hi"}"#);
+    }
+
+    #[test]
+    fn agent_commands_read_with_their_optional_fields_absent() {
+        let json = r#"{"v":3,"command":{"type":"spawn","cwd":"","cols":80,"rows":24,"name":"a","command":["sh","-c","true"],"parent":2}}"#;
+        match parse_request(json).expect("should parse") {
+            Command::Spawn {
+                name,
+                command,
+                parent,
+                ..
+            } => {
+                assert_eq!(name.as_deref(), Some("a"));
+                assert_eq!(command, ["sh", "-c", "true"]);
+                assert_eq!(parent, Some(2));
+            }
+            other => panic!("unexpected command: {other:?}"),
+        }
+        let json = r#"{"v":3,"command":{"type":"send","session":2,"text":"hi"}}"#;
+        assert!(matches!(
+            parse_request(json),
+            Ok(Command::Send { from: None, .. })
+        ));
+        let json = r#"{"v":3,"command":{"type":"wait","session":2}}"#;
+        assert!(matches!(
+            parse_request(json),
+            Ok(Command::Wait {
+                timeout_secs: None,
+                ..
+            })
+        ));
+        let json = r#"{"v":3,"command":{"type":"rename_session","session":2,"name":"x"}}"#;
+        assert!(matches!(parse_request(json), Ok(Command::RenameSession { .. })));
+    }
+
+    #[test]
+    fn frames_wrap_replies_and_events_one_per_line() {
+        let line = reply_line(&Response::Ok);
+        assert_eq!(line, r#"{"reply":{"type":"ok"}}"#);
+        assert_eq!(
+            serde_json::from_str::<Frame>(&line).unwrap(),
+            Frame::Reply(Response::Ok)
+        );
+
+        let line = event_line(&Event::Output {
+            session: 1,
+            bytes: vec![65],
+        })
+        .unwrap();
+        assert_eq!(line, r#"{"event":{"type":"output","session":1,"bytes":[65]}}"#);
+        assert_eq!(
+            serde_json::from_str::<Frame>(&line).unwrap(),
+            Frame::Event(Event::Output {
+                session: 1,
+                bytes: vec![65]
+            })
+        );
+
+        let line = event_line(&Event::State {
+            state: TreeState::default(),
+        })
+        .unwrap();
+        assert_eq!(
+            line,
+            r#"{"event":{"type":"state","state":{"schema_version":1,"projects":[]}}}"#
+        );
+        assert!(!line.contains('\n'));
+    }
+
+    #[test]
+    fn session_names_cannot_be_mistaken_for_ids() {
+        assert!(valid_session_name("reviewer-2"));
+        assert!(!valid_session_name("12"));
+        assert!(!valid_session_name(""));
+        assert!(!valid_session_name("has space"));
+    }
+
+    #[test]
+    fn only_tree_edits_count_as_mutations() {
+        assert!(Command::SetTheme { name: "x".into() }.mutates_tree());
+        assert!(!Command::LoadState { directory: "/x".into() }.mutates_tree());
+        assert!(!Command::Detect.mutates_tree());
+    }
+
+    #[test]
     fn reads_a_command_at_the_current_version() {
-        let json = r#"{"v":2,"command":{"type":"spawn","cwd":"/tmp","cols":80,"rows":24}}"#;
+        let json = r#"{"v":3,"command":{"type":"spawn","cwd":"/tmp","cols":80,"rows":24}}"#;
         match parse_request(json).expect("should parse") {
             Command::Spawn { cwd, cols, rows, .. } => {
                 assert_eq!(cwd, "/tmp");
@@ -286,7 +614,7 @@ mod tests {
     fn an_unknown_field_does_not_break_an_old_core() {
         // Forward compatibility in the direction that matters: a newer shell
         // adding a field must not stop an installed core from working.
-        let json = r#"{"v":2,"command":{"type":"hello"},"sent_at":"2026-08-19"}"#;
+        let json = r#"{"v":3,"command":{"type":"hello"},"sent_at":"2026-08-19"}"#;
         assert!(parse_request(json).is_ok());
     }
 
@@ -314,7 +642,7 @@ mod tests {
     fn a_spawn_without_a_workspace_still_reads() {
         // The field was added after the first release, so an older shell has to
         // keep working against a newer core.
-        let json = r#"{"v":2,"command":{"type":"spawn","cwd":"","cols":80,"rows":24}}"#;
+        let json = r#"{"v":3,"command":{"type":"spawn","cwd":"","cols":80,"rows":24}}"#;
         match parse_request(json).expect("should parse") {
             Command::Spawn { workspace, .. } => assert_eq!(workspace, None),
             other => panic!("unexpected command: {other:?}"),
@@ -340,7 +668,7 @@ mod tests {
         );
         // The tab a click cleared travels with the workspace, and an older shell
         // that names neither still parses.
-        let json = r#"{"v":2,"command":{"type":"clear_status","workspace":3}}"#;
+        let json = r#"{"v":3,"command":{"type":"clear_status","workspace":3}}"#;
         match parse_request(json).expect("should parse") {
             Command::ClearStatus { session, .. } => assert_eq!(session, None),
             other => panic!("unexpected command: {other:?}"),
@@ -381,7 +709,7 @@ mod tests {
             r#"{"type":"matches","matches":[{"path":"/tmp/a/b.rs","relative":"a/b.rs","score":42,"positions":[0,2]}]}"#
         );
 
-        let json = r#"{"v":2,"command":{"type":"set_shortcut","command":"save","key":"cmd+shift+s"}}"#;
+        let json = r#"{"v":3,"command":{"type":"set_shortcut","command":"save","key":"cmd+shift+s"}}"#;
         match parse_request(json).expect("should parse") {
             Command::SetShortcut { command, key } => {
                 assert_eq!((command.as_str(), key.as_str()), ("save", "cmd+shift+s"));
@@ -389,7 +717,7 @@ mod tests {
             other => panic!("unexpected command: {other:?}"),
         }
         // The limit is optional, so a shell that does not send one still asks.
-        let json = r#"{"v":2,"command":{"type":"find_files","root":"/tmp","query":"ap"}}"#;
+        let json = r#"{"v":3,"command":{"type":"find_files","root":"/tmp","query":"ap"}}"#;
         match parse_request(json).expect("should parse") {
             Command::FindFiles { root, query, limit } => {
                 assert_eq!((root.as_str(), query.as_str(), limit), ("/tmp", "ap", None));
@@ -416,7 +744,7 @@ mod tests {
             response,
             r#"{"type":"git","status":{"repository":true,"entries":[{"path":"/tmp/a.txt","status":"untracked","stage":"unstaged"}]}}"#
         );
-        let json = r#"{"v":2,"command":{"type":"git_status","path":"/tmp"}}"#;
+        let json = r#"{"v":3,"command":{"type":"git_status","path":"/tmp"}}"#;
         assert!(matches!(parse_request(json), Ok(Command::GitStatus { .. })));
     }
 
@@ -437,7 +765,7 @@ mod tests {
             response,
             r#"{"type":"hits","hits":[{"path":"/p/a.rs","relative":"a.rs","line":2,"text":"let x = 1;","column":4,"length":1}]}"#
         );
-        let json = r#"{"v":2,"command":{"type":"search_text","root":"/p","query":"x"}}"#;
+        let json = r#"{"v":3,"command":{"type":"search_text","root":"/p","query":"x"}}"#;
         match parse_request(json).expect("should parse") {
             Command::SearchText { limit, .. } => assert_eq!(limit, None),
             other => panic!("unexpected command: {other:?}"),
@@ -464,7 +792,7 @@ mod tests {
             response,
             r#"{"type":"git_log","log":{"repository":true,"commits":[{"hash":"abc","parents":["def"],"author":"A","date":"2026-08-23 10:00","refs":["HEAD -> main"],"subject":"message"}]}}"#
         );
-        let json = r#"{"v":2,"command":{"type":"git_log","path":"/tmp"}}"#;
+        let json = r#"{"v":3,"command":{"type":"git_log","path":"/tmp"}}"#;
         assert!(matches!(parse_request(json), Ok(Command::GitLog { .. })));
     }
 
@@ -511,20 +839,20 @@ mod tests {
             working,
             r#"{"type":"git_working","working":{"repository":true,"staged":[],"unstaged":[],"stash":[{"name":"stash@{0}","subject":"WIP"}]}}"#
         );
-        let json = r#"{"v":2,"command":{"type":"git_show","path":"/tmp","hash":"abc"}}"#;
+        let json = r#"{"v":3,"command":{"type":"git_show","path":"/tmp","hash":"abc"}}"#;
         assert!(matches!(parse_request(json), Ok(Command::GitShow { .. })));
-        let json = r#"{"v":2,"command":{"type":"git_working","path":"/tmp"}}"#;
+        let json = r#"{"v":3,"command":{"type":"git_working","path":"/tmp"}}"#;
         assert!(matches!(parse_request(json), Ok(Command::GitWorking { .. })));
     }
 
     #[test]
     fn reads_rename_and_delete_commands() {
-        let json = r#"{"v":2,"command":{"type":"delete_workspace","workspace":4}}"#;
+        let json = r#"{"v":3,"command":{"type":"delete_workspace","workspace":4}}"#;
         match parse_request(json).expect("should parse") {
             Command::DeleteWorkspace { workspace } => assert_eq!(workspace, 4),
             other => panic!("unexpected command: {other:?}"),
         }
-        let json = r#"{"v":2,"command":{"type":"rename_project","project":2,"name":"New"}}"#;
+        let json = r#"{"v":3,"command":{"type":"rename_project","project":2,"name":"New"}}"#;
         match parse_request(json).expect("should parse") {
             Command::RenameProject { project, name } => {
                 assert_eq!((project, name.as_str()), (2, "New"));
@@ -535,7 +863,7 @@ mod tests {
 
     #[test]
     fn reads_tree_mutation_commands() {
-        let json = r#"{"v":2,"command":{"type":"create_workspace","project":3,"name":"Server"}}"#;
+        let json = r#"{"v":3,"command":{"type":"create_workspace","project":3,"name":"Server"}}"#;
         match parse_request(json).expect("should parse") {
             Command::CreateWorkspace { project, name } => {
                 assert_eq!(project, 3);

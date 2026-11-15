@@ -7,8 +7,12 @@
 pub mod agent;
 pub mod app;
 pub mod browse;
+pub mod client;
+pub mod daemon;
 pub mod git;
 pub mod grep;
+pub mod hub;
+pub mod paths;
 pub mod protocol;
 pub mod screen;
 pub mod search;
@@ -21,6 +25,7 @@ pub mod url;
 pub use agent::Rule;
 pub use app::App;
 pub use browse::Entry;
+pub use client::Client;
 pub use git::{
     FileStatus, GitCommit, GitCommitDetail, GitDiffFile, GitEntry, GitLog, GitStashEntry,
     GitStatus, GitWorking,

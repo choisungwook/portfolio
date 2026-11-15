@@ -8,7 +8,7 @@ use std::time::{Duration, Instant};
 use akbun_terminal_core::App;
 
 fn dispatch(app: &App, command: &str) -> String {
-    app.dispatch(&format!(r#"{{"v":2,"command":{command}}}"#))
+    app.dispatch(&format!(r#"{{"v":3,"command":{command}}}"#))
 }
 
 /// Collects output events until `needle` shows up or the deadline passes.
@@ -52,8 +52,9 @@ fn answers_the_handshake_with_its_protocol_version() {
     assert_eq!(
         response,
         format!(
-            r#"{{"type":"hello","protocol":{}}}"#,
-            akbun_terminal_core::PROTOCOL_VERSION
+            r#"{{"type":"hello","protocol":{},"version":"{}"}}"#,
+            akbun_terminal_core::PROTOCOL_VERSION,
+            akbun_terminal_core::protocol::product_version()
         )
     );
 }

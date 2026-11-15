@@ -33,7 +33,18 @@ impl Screen {
     /// redraws after a resize anyway, so carrying the old contents across only
     /// risks reading half of one layout and half of another.
     pub fn resize(&mut self, cols: u16, rows: u16) {
+        let paste = self.grid.bracketed_paste;
         self.grid = Grid::new(cols, rows);
+        // A mode is the program's setting, not part of the picture, so a resize
+        // does not undo it.
+        self.grid.bracketed_paste = paste;
+    }
+
+    /// Whether the program asked to receive pasted text wrapped in markers.
+    /// Text typed on its behalf has to follow that, or a TUI reads each line
+    /// break as a keypress and submits half a message.
+    pub fn bracketed_paste(&self) -> bool {
+        self.grid.bracketed_paste
     }
 
     /// The visible text, one row per line and trailing blanks removed.
@@ -56,6 +67,7 @@ struct Grid {
     cells: Vec<Vec<char>>,
     row: usize,
     col: usize,
+    bracketed_paste: bool,
 }
 
 impl Grid {
@@ -68,6 +80,7 @@ impl Grid {
             cells: vec![vec![' '; cols]; rows],
             row: 0,
             col: 0,
+            bracketed_paste: false,
         }
     }
 
@@ -131,7 +144,13 @@ impl Perform for Grid {
         self.col = self.col.min(self.cols.saturating_sub(1));
     }
 
-    fn csi_dispatch(&mut self, params: &Params, _intermediates: &[u8], _ignore: bool, action: char) {
+    fn csi_dispatch(&mut self, params: &Params, intermediates: &[u8], _ignore: bool, action: char) {
+        if intermediates == [b'?'] && matches!(action, 'h' | 'l') {
+            if params.iter().any(|values| values.first() == Some(&2004)) {
+                self.bracketed_paste = action == 'h';
+            }
+            return;
+        }
         match action {
             'A' => self.row = self.row.saturating_sub(Grid::first(params, 1)),
             'B' | 'e' => self.row = (self.row + Grid::first(params, 1)).min(self.rows - 1),
@@ -221,6 +240,18 @@ mod tests {
         let mut screen = Screen::new(8, 2);
         screen.feed(b"one\r\ntwo\r\nthree");
         assert_eq!(screen.text(), "two\nthree");
+    }
+
+    #[test]
+    fn remembers_whether_the_program_wants_bracketed_paste() {
+        let mut screen = Screen::new(20, 4);
+        assert!(!screen.bracketed_paste());
+        screen.feed(b"\x1b[?2004h");
+        assert!(screen.bracketed_paste());
+        screen.resize(30, 5);
+        assert!(screen.bracketed_paste());
+        screen.feed(b"\x1b[?25l\x1b[?2004l");
+        assert!(!screen.bracketed_paste());
     }
 
     #[test]

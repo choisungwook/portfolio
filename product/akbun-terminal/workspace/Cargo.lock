@@ -6,6 +6,7 @@ version = 4
 name = "akbun-terminal-core"
 version = "0.0.0"
 dependencies = [
+ "libc",
  "portable-pty",
  "serde",
  "serde_json",

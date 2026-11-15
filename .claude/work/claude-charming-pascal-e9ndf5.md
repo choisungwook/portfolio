@@ -6,7 +6,7 @@
 ## 실행 계획
 
 - [x] 1. 디렉터리 재배치: `workspace/core` 단일 crate, `workspace/desktop`으로 Swift package 이동, ffi crate와 C 헤더 삭제
-- [ ] 2. core: socket daemon, event hub, client 라이브러리, protocol v3, CLI
+- [x] 2. core: socket daemon, event hub, client 라이브러리, protocol v3, CLI
 - [x] 3. desktop: CoreBridge를 socket client로 교체, Package.swift와 scripts 갱신
 - [ ] 4. tui: ratatui client 신규 작성
 - [ ] 5. release workflow, VERSION 0.16.0, README, wiki, knowledge 갱신
