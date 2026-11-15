@@ -1,15 +1,16 @@
 // swift-tools-version: 6.0
 import PackageDescription
 
-// Three layers, in the order they are expected to outlive each other.
+// Two products, in the order they are expected to outlive each other.
 //
-// CAkbunTerminalCore is the hand written header over the Rust static library.
-// AkbunTerminalCore is the Swift side of the protocol and carries no AppKit, so
-// the boundary can be tested without opening a window. The executable is the
-// shell: windows, views, menus, and nothing else.
+// The daemon (akbun-terminal-core, built by Cargo one directory up) owns the
+// shells, the project tree and agent status, and draws nothing. This package is
+// its Swift client. AkbunTerminalCore is the socket and protocol side and
+// carries no AppKit, so it can be tested against a real daemon without opening a
+// window. The executable is the shell: windows, views, menus, and nothing else.
 //
-// The static library has to exist before `swift build` runs. scripts/build-core.sh
-// produces it, and scripts/bundle.sh calls that first.
+// Nothing here links against Rust. The daemon binary has to exist before the
+// tests run and before bundling; scripts/build-core.sh produces it.
 let package = Package(
   name: "akbun-terminal",
   platforms: [.macOS(.v14)],
@@ -22,15 +23,7 @@ let package = Package(
     .package(url: "https://github.com/smittytone/HighlighterSwift", from: "3.1.0")
   ],
   targets: [
-    .systemLibrary(name: "CAkbunTerminalCore", path: "Sources/CAkbunTerminalCore"),
-    .target(
-      name: "AkbunTerminalCore",
-      dependencies: ["CAkbunTerminalCore"],
-      linkerSettings: [
-        // Relative to the package directory, which is where both scripts build from.
-        .unsafeFlags(["-Lcore/target/release", "-lakbun_terminal_ffi"])
-      ]
-    ),
+    .target(name: "AkbunTerminalCore"),
     .executableTarget(
       name: "akbun-terminal",
       dependencies: [

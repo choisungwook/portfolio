@@ -1,6 +1,6 @@
 import Foundation
 
-/// The Swift half of the protocol in core/crates/core/src/protocol.rs.
+/// The Swift half of the protocol in core/src/protocol.rs.
 ///
 /// The two halves are not compiled together, so the wire names are the contract.
 /// `ProtocolTests` pins the encoded shape here and a Rust test pins it there; a
@@ -8,11 +8,13 @@ import Foundation
 public enum CoreProtocol {
   /// Must match `PROTOCOL_VERSION` on the Rust side. A mismatch is reported by
   /// the core as an error rather than parsed as something else.
-  public static let version: UInt32 = 2
+  public static let version: UInt32 = 3
 }
 
 public enum CoreCommand: Encodable {
   case hello
+  /// Asks the daemon to end every shell and exit.
+  case shutdown
   case spawn(cwd: String, cols: UInt16, rows: UInt16, workspace: UInt64?)
   case write(session: UInt32, bytes: [UInt8])
   case resize(session: UInt32, cols: UInt16, rows: UInt16)
@@ -60,6 +62,8 @@ public enum CoreCommand: Encodable {
     switch self {
     case .hello:
       try container.encode("hello", forKey: .type)
+    case .shutdown:
+      try container.encode("shutdown", forKey: .type)
     case .spawn(let cwd, let cols, let rows, let workspace):
       try container.encode("spawn", forKey: .type)
       try container.encode(cwd, forKey: .cwd)
@@ -166,8 +170,8 @@ public enum CoreCommand: Encodable {
   }
 }
 
-/// The envelope. Every call carries the version, which is what lets this move
-/// from a function call to a socket later without a second format.
+/// The envelope. Every call carries the version, so a daemon left over from
+/// another build can refuse it instead of misreading it.
 public struct CoreRequest: Encodable {
   public let v: UInt32
   public let command: CoreCommand
@@ -179,7 +183,8 @@ public struct CoreRequest: Encodable {
 }
 
 public enum CoreResponse: Equatable, Sendable {
-  case hello(protocol: UInt32)
+  /// `version` is the product version of the daemon, absent from older ones.
+  case hello(protocol: UInt32, version: String? = nil)
   case spawned(session: UInt32)
   case ok
   case state(CoreTreeState)
@@ -557,7 +562,7 @@ public enum CoreEvent: Equatable, Sendable {
 
 extension CoreResponse: Decodable {
   private enum Key: String, CodingKey {
-    case type, `protocol`, session, state, message, entries, text, themes
+    case type, `protocol`, version, session, state, message, entries, text, themes
     case statuses, url, status, shortcuts, matches, log, hits, detail, working
   }
 
@@ -565,7 +570,9 @@ extension CoreResponse: Decodable {
     let container = try decoder.container(keyedBy: Key.self)
     switch try container.decode(String.self, forKey: .type) {
     case "hello":
-      self = .hello(protocol: try container.decode(UInt32.self, forKey: .protocol))
+      self = .hello(
+        protocol: try container.decode(UInt32.self, forKey: .protocol),
+        version: try container.decodeIfPresent(String.self, forKey: .version))
     case "spawned":
       self = .spawned(session: try container.decode(UInt32.self, forKey: .session))
     case "ok":

@@ -1,17 +1,20 @@
-import CAkbunTerminalCore
 import Foundation
 
-/// The only place in the app that touches the C surface.
+/// The app's client of the core daemon, and the only place that talks to its
+/// socket.
 ///
-/// Every string the core hands over is freed here, which keeps the whole
-/// ownership rule in one file instead of repeated at each call site. Nothing
-/// above this type ever sees a pointer.
+/// The daemon owns the shells, so closing the app does not end them by itself.
+/// Every call stays synchronous (the shell calls it from the main thread and
+/// expects an answer back), and what the daemon pushes between answers is
+/// queued here until the caller asks for it with `drainEvents`.
 public final class CoreBridge {
   public enum Failure: LocalizedError {
     case cannotStart
     case protocolMismatch(core: UInt32, shell: UInt32)
     case core(String)
     case unexpected(CoreResponse)
+    case disconnected
+    case timedOut
 
     public var errorDescription: String? {
       switch self {
@@ -23,46 +26,119 @@ public final class CoreBridge {
         message
       case .unexpected(let response):
         "Unexpected reply from the core: \(response)"
+      case .disconnected:
+        "The connection to the core was lost"
+      case .timedOut:
+        "The core did not answer in time"
       }
     }
   }
 
-  /// The header declares AkbunCore as an incomplete type, so it arrives in Swift
-  /// as an opaque pointer and cannot be dereferenced by accident.
-  private let handle: OpaquePointer
-  private let encoder = JSONEncoder()
-  private let decoder = JSONDecoder()
+  /// Long enough for the slowest honest command (a project-wide text search, a
+  /// git log of a big repository), short enough that a wedged daemon does not
+  /// freeze the window forever.
+  private static let replyTimeout: TimeInterval = 30
 
-  public init() throws {
-    guard let handle = akbun_core_new() else { throw Failure.cannotStart }
-    self.handle = handle
+  private let socketPath: String
+  private let daemon: String
+  private let environment: [String: String]
+  private var connection: CoreConnection
+  /// Requests go one at a time: a reply carries no id, so it belongs to
+  /// whichever request is outstanding.
+  private let requestLock = NSLock()
+  private let encoder = JSONEncoder()
+
+  /// Connects to the daemon at the default socket, starting the bundled one when
+  /// nothing answers.
+  public convenience init() throws {
+    try self.init(
+      socketPath: CoreDaemon.defaultSocketPath(),
+      daemon: CoreDaemon.defaultBinaryPath(),
+      environment: [:]
+    )
   }
 
+  /// For tests, which bring their own daemon on a private socket. `environment`
+  /// is added to what the daemon inherits, so a test can point it at a temp data
+  /// directory without touching the test process's own environment.
+  public init(socketPath: String, daemon: String, environment: [String: String] = [:]) throws {
+    self.socketPath = socketPath
+    self.daemon = daemon
+    self.environment = environment
+    self.connection = try CoreDaemon.connectStarting(
+      socketPath: socketPath, daemon: daemon, environment: environment)
+  }
+
+  /// Closes the socket only. The daemon and its shells are meant to outlive this
+  /// object; ending a shell is an explicit `close` command.
   deinit {
-    akbun_core_free(handle)
+    connection.hangUp()
   }
 
   /// Runs the handshake. Called before anything else so a version mismatch shows
   /// up at launch instead of as a terminal that quietly does nothing.
+  ///
+  /// A daemon left running by the previous version of the app is the usual
+  /// mismatch. It is asked to shut down and the bundled one takes its place, so
+  /// an update is not stuck behind it.
   public func handshake() throws {
-    let response = try send(.hello)
-    guard case .hello(let version) = response else { throw Failure.unexpected(response) }
-    guard version == CoreProtocol.version else {
-      throw Failure.protocolMismatch(core: version, shell: CoreProtocol.version)
+    requestLock.lock()
+    defer { requestLock.unlock() }
+
+    guard let first = try hello() else { return }
+    // Best effort: a daemon too old to understand the command cannot be asked,
+    // and the wait below then reports the original mismatch.
+    _ = try? exchange(.shutdown)
+    connection.hangUp()
+    guard CoreDaemon.waitUntilGone(socketPath: socketPath) else { throw first.failure }
+    connection = try CoreDaemon.connectStarting(
+      socketPath: socketPath, daemon: daemon, environment: environment)
+    if let still = try hello() {
+      throw still.failure
+    }
+  }
+
+  /// `nil` when the daemon speaks this build's protocol.
+  private func hello() throws -> Mismatch? {
+    let response = try exchange(.hello)
+    switch response {
+    case .hello(let version, _):
+      return version == CoreProtocol.version ? nil : .protocolVersion(version)
+    case .error(let message):
+      // A daemon on another protocol may refuse the envelope instead of
+      // answering the handshake.
+      return .refused(message)
+    default:
+      throw Failure.unexpected(response)
+    }
+  }
+
+  private enum Mismatch {
+    case protocolVersion(UInt32)
+    case refused(String)
+
+    var failure: Failure {
+      switch self {
+      case .protocolVersion(let version):
+        .protocolMismatch(core: version, shell: CoreProtocol.version)
+      case .refused(let message):
+        .core(message)
+      }
     }
   }
 
   @discardableResult
   public func send(_ command: CoreCommand) throws -> CoreResponse {
-    let json = String(decoding: try encoder.encode(CoreRequest(command)), as: UTF8.self)
-    let reply: String = try json.withCString { request in
-      guard let raw = akbun_core_dispatch(handle, request) else {
-        throw Failure.core("the core returned no reply")
-      }
-      defer { akbun_core_string_free(raw) }
-      return String(cString: raw)
-    }
-    return try decoder.decode(CoreResponse.self, from: Data(reply.utf8))
+    requestLock.lock()
+    defer { requestLock.unlock() }
+    return try exchange(command)
+  }
+
+  /// One request and its reply. The caller holds `requestLock`.
+  private func exchange(_ command: CoreCommand) throws -> CoreResponse {
+    var line = try encoder.encode(CoreRequest(command))
+    line.append(0x0A)
+    return try connection.request(line, timeout: Self.replyTimeout)
   }
 
   /// `send` for commands whose only interesting outcome is failure.
@@ -224,21 +300,14 @@ public final class CoreBridge {
     return url
   }
 
-  /// Everything the core has queued since the last call.
+  /// Everything the core has pushed since the last call.
   ///
-  /// Draining on demand is what keeps drawing on one thread: the core never calls
-  /// back, so events surface wherever the caller chose to ask, which for the
-  /// shell is the main run loop. The limit stops a noisy session from holding the
-  /// loop for a whole frame.
+  /// Draining on demand is what keeps drawing on one thread: a background thread
+  /// reads the socket, but events surface wherever the caller chose to ask, which
+  /// for the shell is the main run loop. The limit stops a noisy session from
+  /// holding the loop for a whole frame. Event types this build does not know,
+  /// such as the daemon's `state` broadcast, never reach the queue.
   public func drainEvents(limit: Int = 512) -> [CoreEvent] {
-    var events: [CoreEvent] = []
-    while events.count < limit {
-      guard let raw = akbun_core_poll_event(handle) else { break }
-      defer { akbun_core_string_free(raw) }
-      guard let event = try? decoder.decode(CoreEvent.self, from: Data(String(cString: raw).utf8))
-      else { continue }
-      events.append(event)
-    }
-    return events
+    connection.takeEvents(limit: limit)
   }
 }

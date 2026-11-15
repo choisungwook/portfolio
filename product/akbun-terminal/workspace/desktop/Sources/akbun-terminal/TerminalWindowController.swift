@@ -1047,8 +1047,9 @@ final class TerminalWindowController: NSWindowController, NSWindowDelegate, NSSp
     return true
   }
 
-  /// Ends every shell. The core also clears sessions when it is freed; doing it
-  /// here means a closed window does not leave one running until quit.
+  /// Ends every shell this window opened. The daemon keeps its shells when a
+  /// client goes away, so this is what stops them; a shell that already exited
+  /// is gone from the daemon and its `close` is an ignored error.
   func closeSessions() {
     drain?.invalidate()
     drain = nil

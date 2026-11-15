@@ -1,13 +1,17 @@
 #!/bin/bash
-# Builds the Rust core as a static library for the Swift package to link.
+# Builds the Rust daemon (and the tui, once it exists) for the app to bundle.
 #
-# swift build cannot do this itself, so it runs first. The link path in
-# Package.swift is core/target/release, which is why the release profile is used
-# even for a test run: one path keeps the package file free of build modes.
+# The Cargo workspace is one directory above this package, so the binaries land
+# in workspace/target/release. The tests locate the daemon there too, which is
+# why the release profile is used even for a test run.
 set -euo pipefail
 
-cd "$(dirname "$0")/.."
+cd "$(dirname "$0")/../.."
 
-cargo build --release --manifest-path core/Cargo.toml
+if [ -f tui/Cargo.toml ]; then
+  cargo build --release --workspace
+else
+  cargo build --release
+fi
 
-echo "core/target/release/libakbun_terminal_ffi.a"
+echo "target/release/akbun-terminal-core"

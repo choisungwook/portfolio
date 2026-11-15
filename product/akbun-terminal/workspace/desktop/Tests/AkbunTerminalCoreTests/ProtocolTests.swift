@@ -13,39 +13,40 @@ struct ProtocolTests {
   }
 
   @Test func everyRequestCarriesTheProtocolVersion() throws {
-    #expect(try json(.hello) == #"{"command":{"type":"hello"},"v":2}"#)
+    #expect(try json(.hello) == #"{"command":{"type":"hello"},"v":3}"#)
+    #expect(try json(.shutdown) == #"{"command":{"type":"shutdown"},"v":3}"#)
   }
 
   @Test func spawnNamesTheFieldsTheCoreReads() throws {
     let encoded = try json(.spawn(cwd: "/tmp", cols: 80, rows: 24, workspace: 7))
     #expect(
       encoded
-        == #"{"command":{"cols":80,"cwd":"\/tmp","rows":24,"type":"spawn","workspace":7},"v":2}"#)
+        == #"{"command":{"cols":80,"cwd":"\/tmp","rows":24,"type":"spawn","workspace":7},"v":3}"#)
   }
 
   @Test func spawnWithoutAWorkspaceLeavesTheFieldOut() throws {
     let encoded = try json(.spawn(cwd: "", cols: 80, rows: 24, workspace: nil))
-    #expect(encoded == #"{"command":{"cols":80,"cwd":"","rows":24,"type":"spawn"},"v":2}"#)
+    #expect(encoded == #"{"command":{"cols":80,"cwd":"","rows":24,"type":"spawn"},"v":3}"#)
   }
 
   @Test func agentAndLinkCommandsKeepTheirWireNames() throws {
     #expect(
       try json(.loadRules(directory: "/tmp/agents"))
-        == #"{"command":{"directory":"\/tmp\/agents","type":"load_rules"},"v":2}"#)
-    #expect(try json(.detect) == #"{"command":{"type":"detect"},"v":2}"#)
+        == #"{"command":{"directory":"\/tmp\/agents","type":"load_rules"},"v":3}"#)
+    #expect(try json(.detect) == #"{"command":{"type":"detect"},"v":3}"#)
     #expect(
       try json(.clearStatus(workspace: 4, session: nil))
-        == #"{"command":{"type":"clear_status","workspace":4},"v":2}"#)
+        == #"{"command":{"type":"clear_status","workspace":4},"v":3}"#)
     // The tab that was looked at rides along, so the other tabs keep their bell.
     #expect(
       try json(.clearStatus(workspace: 4, session: 9))
-        == #"{"command":{"session":9,"type":"clear_status","workspace":4},"v":2}"#)
+        == #"{"command":{"session":9,"type":"clear_status","workspace":4},"v":3}"#)
     #expect(
       try json(.searchText(root: "/p", query: "todo", limit: nil))
-        == #"{"command":{"query":"todo","root":"\/p","type":"search_text"},"v":2}"#)
+        == #"{"command":{"query":"todo","root":"\/p","type":"search_text"},"v":3}"#)
     #expect(
       try json(.urlAt(line: "see https://a.example", column: 6))
-        == #"{"command":{"column":6,"line":"see https:\/\/a.example","type":"url_at"},"v":2}"#)
+        == #"{"command":{"column":6,"line":"see https:\/\/a.example","type":"url_at"},"v":3}"#)
   }
 
   @Test func readsWhatTheCoreJudgedAndWhatItWillOpen() throws {
@@ -103,20 +104,20 @@ struct ProtocolTests {
 
   @Test func writeSendsBytesNotText() throws {
     let encoded = try json(.write(session: 3, bytes: [104, 105]))
-    #expect(encoded == #"{"command":{"bytes":[104,105],"session":3,"type":"write"},"v":2}"#)
+    #expect(encoded == #"{"command":{"bytes":[104,105],"session":3,"type":"write"},"v":3}"#)
   }
 
   @Test func fileAndThemeCommandsKeepTheirWireNames() throws {
     #expect(
       try json(.readDirectory(path: "/tmp"))
-        == #"{"command":{"path":"\/tmp","type":"read_directory"},"v":2}"#)
+        == #"{"command":{"path":"\/tmp","type":"read_directory"},"v":3}"#)
     #expect(
       try json(.writeFile(path: "/tmp/a.md", text: "hi"))
-        == #"{"command":{"path":"\/tmp\/a.md","text":"hi","type":"write_file"},"v":2}"#)
-    #expect(try json(.themes) == #"{"command":{"type":"themes"},"v":2}"#)
+        == #"{"command":{"path":"\/tmp\/a.md","text":"hi","type":"write_file"},"v":3}"#)
+    #expect(try json(.themes) == #"{"command":{"type":"themes"},"v":3}"#)
     #expect(
       try json(.setTheme(name: "Nord"))
-        == #"{"command":{"name":"Nord","type":"set_theme"},"v":2}"#)
+        == #"{"command":{"name":"Nord","type":"set_theme"},"v":3}"#)
   }
 
   @Test func readsADirectoryListing() throws {
@@ -150,22 +151,22 @@ struct ProtocolTests {
   @Test func renameAndDeleteKeepTheirWireNames() throws {
     #expect(
       try json(.renameProject(project: 2, name: "New"))
-        == #"{"command":{"name":"New","project":2,"type":"rename_project"},"v":2}"#)
+        == #"{"command":{"name":"New","project":2,"type":"rename_project"},"v":3}"#)
     #expect(
       try json(.deleteProject(project: 2))
-        == #"{"command":{"project":2,"type":"delete_project"},"v":2}"#)
+        == #"{"command":{"project":2,"type":"delete_project"},"v":3}"#)
     #expect(
       try json(.renameWorkspace(workspace: 5, name: "Web"))
-        == #"{"command":{"name":"Web","type":"rename_workspace","workspace":5},"v":2}"#)
+        == #"{"command":{"name":"Web","type":"rename_workspace","workspace":5},"v":3}"#)
     #expect(
       try json(.deleteWorkspace(workspace: 5))
-        == #"{"command":{"type":"delete_workspace","workspace":5},"v":2}"#)
+        == #"{"command":{"type":"delete_workspace","workspace":5},"v":3}"#)
   }
 
   @Test func readsWhatGitMakesOfAFolder() throws {
     #expect(
       try json(.gitStatus(path: "/p"))
-        == #"{"command":{"path":"\/p","type":"git_status"},"v":2}"#)
+        == #"{"command":{"path":"\/p","type":"git_status"},"v":3}"#)
     let found = #"""
       {"type":"git","status":{"repository":true,"entries":[
       {"path":"/p/src","status":"modified"},{"path":"/p/new.txt","status":"untracked"}]}}
@@ -216,7 +217,7 @@ struct ProtocolTests {
   @Test func readsTheGitTree() throws {
     #expect(
       try json(.gitLog(path: "/p"))
-        == #"{"command":{"path":"\/p","type":"git_log"},"v":2}"#)
+        == #"{"command":{"path":"\/p","type":"git_log"},"v":3}"#)
     let json = #"{"type":"git_log","log":{"repository":true,"commits":[{"hash":"abc","parents":["def"],"author":"A","date":"2026-08-23 10:00","refs":["HEAD -> main"],"subject":"message"}]}}"#
     guard case .gitLog(let log) = try JSONDecoder().decode(
       CoreResponse.self, from: Data(json.utf8))
@@ -233,7 +234,7 @@ struct ProtocolTests {
   @Test func readsWhatOneCommitDid() throws {
     #expect(
       try json(.gitShow(path: "/p", hash: "abc1234"))
-        == #"{"command":{"hash":"abc1234","path":"\/p","type":"git_show"},"v":2}"#)
+        == #"{"command":{"hash":"abc1234","path":"\/p","type":"git_show"},"v":3}"#)
     let json =
       #"{"type":"git_detail","detail":{"commit":{"hash":"abc","parents":[],"author":"A","date":"2026-09-13 10:00","refs":[],"subject":"message"},"body":"why","files":[{"path":"a.txt","status":"modified","additions":2,"deletions":1,"patch":"@@ -1 +1,2 @@"}]}}"#
     guard case .gitDetail(let detail) = try JSONDecoder().decode(
@@ -260,7 +261,7 @@ struct ProtocolTests {
   @Test func readsWhatIsWaitingInTheRepository() throws {
     #expect(
       try json(.gitWorking(path: "/p"))
-        == #"{"command":{"path":"\/p","type":"git_working"},"v":2}"#)
+        == #"{"command":{"path":"\/p","type":"git_working"},"v":3}"#)
     let json =
       #"{"type":"git_working","working":{"repository":true,"staged":[{"path":"/p/a.txt","status":"added","stage":"staged"}],"unstaged":[{"path":"/p/a.txt","status":"modified","stage":"unstaged"}],"stash":[{"name":"stash@{0}","subject":"WIP on main"}]}}"#
     guard case .gitWorking(let working) = try JSONDecoder().decode(
@@ -319,13 +320,13 @@ struct ProtocolTests {
   @Test func treeCommandsKeepTheirWireNames() throws {
     #expect(
       try json(.loadState(directory: "/tmp/app"))
-        == #"{"command":{"directory":"\/tmp\/app","type":"load_state"},"v":2}"#)
+        == #"{"command":{"directory":"\/tmp\/app","type":"load_state"},"v":3}"#)
     #expect(
       try json(.createProject(name: "Demo", path: nil))
-        == #"{"command":{"name":"Demo","type":"create_project"},"v":2}"#)
+        == #"{"command":{"name":"Demo","type":"create_project"},"v":3}"#)
     #expect(
       try json(.createWorkspace(project: 7, name: "Server"))
-        == #"{"command":{"name":"Server","project":7,"type":"create_workspace"},"v":2}"#)
+        == #"{"command":{"name":"Server","project":7,"type":"create_workspace"},"v":3}"#)
   }
 
   @Test func decodesTheResponsesTheCoreSends() throws {
@@ -333,6 +334,10 @@ struct ProtocolTests {
     #expect(
       try decoder.decode(CoreResponse.self, from: Data(#"{"type":"hello","protocol":1}"#.utf8))
         == .hello(protocol: 1))
+    #expect(
+      try decoder.decode(
+        CoreResponse.self, from: Data(#"{"type":"hello","protocol":3,"version":"0.16.0"}"#.utf8))
+        == .hello(protocol: 3, version: "0.16.0"))
     #expect(
       try decoder.decode(CoreResponse.self, from: Data(#"{"type":"spawned","session":7}"#.utf8))
         == .spawned(session: 7))
@@ -370,17 +375,17 @@ struct ProtocolTests {
   }
 
   @Test func namesTheFieldsTheSettingsWindowAndThePaletteSend() throws {
-    #expect(try json(.shortcuts) == #"{"command":{"type":"shortcuts"},"v":2}"#)
+    #expect(try json(.shortcuts) == #"{"command":{"type":"shortcuts"},"v":3}"#)
     #expect(
       try json(.setShortcut(command: "save", key: "cmd+shift+s"))
-        == #"{"command":{"command":"save","key":"cmd+shift+s","type":"set_shortcut"},"v":2}"#)
+        == #"{"command":{"command":"save","key":"cmd+shift+s","type":"set_shortcut"},"v":3}"#)
     #expect(
       try json(.findFiles(root: "/p", query: "app", limit: 60))
-        == #"{"command":{"limit":60,"query":"app","root":"\/p","type":"find_files"},"v":2}"#)
+        == #"{"command":{"limit":60,"query":"app","root":"\/p","type":"find_files"},"v":3}"#)
     // The limit is optional, so a caller with no opinion leaves it out.
     #expect(
       try json(.findFiles(root: "/p", query: "app", limit: nil))
-        == #"{"command":{"query":"app","root":"\/p","type":"find_files"},"v":2}"#)
+        == #"{"command":{"query":"app","root":"\/p","type":"find_files"},"v":3}"#)
   }
 
   @Test func decodesShortcutsAndFileMatches() throws {
