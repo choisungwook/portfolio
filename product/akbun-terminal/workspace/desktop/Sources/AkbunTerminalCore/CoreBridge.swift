@@ -43,6 +43,10 @@ public final class CoreBridge {
   private let daemon: String
   private let environment: [String: String]
   private var connection: CoreConnection
+  /// The product version the daemon is expected to report. `nil` skips the
+  /// comparison, which is what tests and an unbundled run (no version to read)
+  /// want. Set before `handshake`.
+  public var expectedVersion: String?
   /// Requests go one at a time: a reply carries no id, so it belongs to
   /// whichever request is outstanding.
   private let requestLock = NSLock()
@@ -94,16 +98,25 @@ public final class CoreBridge {
     connection = try CoreDaemon.connectStarting(
       socketPath: socketPath, daemon: daemon, environment: environment)
     if let still = try hello() {
+      // The protocol check is what guards correctness, so a product version that
+      // still differs after one relaunch is tolerated rather than fatal.
+      if case .productVersion = still { return }
       throw still.failure
     }
   }
 
-  /// `nil` when the daemon speaks this build's protocol.
+  /// `nil` when the daemon speaks this build's protocol and, if a version is
+  /// expected, reports that version.
   private func hello() throws -> Mismatch? {
     let response = try exchange(.hello)
     switch response {
-    case .hello(let version, _):
-      return version == CoreProtocol.version ? nil : .protocolVersion(version)
+    case .hello(let version, let product):
+      if version != CoreProtocol.version { return .protocolVersion(version) }
+      // A daemon that reports no version is older than the field, not different.
+      if let expected = expectedVersion, let product, product != expected {
+        return .productVersion(core: product, shell: expected)
+      }
+      return nil
     case .error(let message):
       // A daemon on another protocol may refuse the envelope instead of
       // answering the handshake.
@@ -115,12 +128,15 @@ public final class CoreBridge {
 
   private enum Mismatch {
     case protocolVersion(UInt32)
+    case productVersion(core: String, shell: String)
     case refused(String)
 
     var failure: Failure {
       switch self {
       case .protocolVersion(let version):
         .protocolMismatch(core: version, shell: CoreProtocol.version)
+      case .productVersion(let core, let shell):
+        .core("The core is version \(core) and this app is version \(shell)")
       case .refused(let message):
         .core(message)
       }
@@ -152,7 +168,9 @@ public final class CoreBridge {
   }
 
   public func spawn(cwd: String, cols: UInt16, rows: UInt16, workspace: UInt64?) throws -> UInt32 {
-    let response = try send(.spawn(cwd: cwd, cols: cols, rows: rows, workspace: workspace))
+    // Owned, so a crashed or force-quit app leaves no shells behind.
+    let response = try send(
+      .spawn(cwd: cwd, cols: cols, rows: rows, workspace: workspace, owned: true))
     switch response {
     case .spawned(let session): return session
     case .error(let message): throw Failure.core(message)

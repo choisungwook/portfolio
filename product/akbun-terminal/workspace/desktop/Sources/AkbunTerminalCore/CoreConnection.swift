@@ -241,8 +241,9 @@ enum CoreDaemon {
   /// posix_spawn with a new session rather than `Process`: the daemon must keep
   /// its shells when the app quits or its terminal closes, and a child left in
   /// the app's session and process group would receive the signals sent to
-  /// either. stdin, stdout and stderr go to /dev/null, so nothing is held open
-  /// on the app's behalf, and the daemon writes its own log. The pid is only
+  /// either. stdin goes to /dev/null. The daemon only logs with eprintln, so
+  /// stdout and stderr are appended to `core.log` beside the socket; otherwise a
+  /// failed start would leave no trace. The pid is only
   /// reaped (from a detached thread, so a daemon that exits first leaves no
   /// zombie); the app never waits for it to end and never signals it.
   private static func launch(
@@ -252,8 +253,21 @@ enum CoreDaemon {
     posix_spawn_file_actions_init(&actions)
     defer { posix_spawn_file_actions_destroy(&actions) }
     posix_spawn_file_actions_addopen(&actions, 0, "/dev/null", O_RDONLY, 0)
-    posix_spawn_file_actions_addopen(&actions, 1, "/dev/null", O_WRONLY, 0)
-    posix_spawn_file_actions_addopen(&actions, 2, "/dev/null", O_WRONLY, 0)
+    // The daemon binds its socket in this directory, but it may not exist yet on
+    // a first run. A log that cannot be had falls back to /dev/null rather than
+    // stopping the daemon from starting.
+    let directory = (socketPath as NSString).deletingLastPathComponent
+    let logPath: String
+    do {
+      try FileManager.default.createDirectory(
+        atPath: directory, withIntermediateDirectories: true,
+        attributes: [.posixPermissions: 0o700])
+      logPath = directory + "/core.log"
+    } catch {
+      logPath = "/dev/null"
+    }
+    posix_spawn_file_actions_addopen(&actions, 1, logPath, O_WRONLY | O_CREAT | O_APPEND, 0o600)
+    posix_spawn_file_actions_addopen(&actions, 2, logPath, O_WRONLY | O_CREAT | O_APPEND, 0o600)
 
     var attributes: posix_spawnattr_t?
     posix_spawnattr_init(&attributes)

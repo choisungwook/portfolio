@@ -15,7 +15,9 @@ public enum CoreCommand: Encodable {
   case hello
   /// Asks the daemon to end every shell and exit.
   case shutdown
-  case spawn(cwd: String, cols: UInt16, rows: UInt16, workspace: UInt64?)
+  /// `owned`: the daemon ends the shell when the connection that spawned it goes
+  /// away. Defaults to true so every call site gets it.
+  case spawn(cwd: String, cols: UInt16, rows: UInt16, workspace: UInt64?, owned: Bool = true)
   case write(session: UInt32, bytes: [UInt8])
   case resize(session: UInt32, cols: UInt16, rows: UInt16)
   case close(session: UInt32)
@@ -54,7 +56,7 @@ public enum CoreCommand: Encodable {
 
   private enum Key: String, CodingKey {
     case type, cwd, cols, rows, session, bytes, directory, name, path, project, text
-    case workspace, line, column, command, key, root, query, limit, hash
+    case workspace, line, column, command, key, root, query, limit, hash, owned
   }
 
   public func encode(to encoder: Encoder) throws {
@@ -64,12 +66,13 @@ public enum CoreCommand: Encodable {
       try container.encode("hello", forKey: .type)
     case .shutdown:
       try container.encode("shutdown", forKey: .type)
-    case .spawn(let cwd, let cols, let rows, let workspace):
+    case .spawn(let cwd, let cols, let rows, let workspace, let owned):
       try container.encode("spawn", forKey: .type)
       try container.encode(cwd, forKey: .cwd)
       try container.encode(cols, forKey: .cols)
       try container.encode(rows, forKey: .rows)
       try container.encodeIfPresent(workspace, forKey: .workspace)
+      try container.encode(owned, forKey: .owned)
     case .write(let session, let bytes):
       try container.encode("write", forKey: .type)
       try container.encode(session, forKey: .session)

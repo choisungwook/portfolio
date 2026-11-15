@@ -21,12 +21,20 @@ struct ProtocolTests {
     let encoded = try json(.spawn(cwd: "/tmp", cols: 80, rows: 24, workspace: 7))
     #expect(
       encoded
-        == #"{"command":{"cols":80,"cwd":"\/tmp","rows":24,"type":"spawn","workspace":7},"v":3}"#)
+        == #"{"command":{"cols":80,"cwd":"\/tmp","owned":true,"rows":24,"type":"spawn","workspace":7},"v":3}"#
+    )
   }
 
   @Test func spawnWithoutAWorkspaceLeavesTheFieldOut() throws {
     let encoded = try json(.spawn(cwd: "", cols: 80, rows: 24, workspace: nil))
-    #expect(encoded == #"{"command":{"cols":80,"cwd":"","rows":24,"type":"spawn"},"v":3}"#)
+    #expect(
+      encoded == #"{"command":{"cols":80,"cwd":"","owned":true,"rows":24,"type":"spawn"},"v":3}"#)
+  }
+
+  @Test func spawnIsOwnedUnlessToldOtherwise() throws {
+    let encoded = try json(.spawn(cwd: "", cols: 80, rows: 24, workspace: nil, owned: false))
+    #expect(
+      encoded == #"{"command":{"cols":80,"cwd":"","owned":false,"rows":24,"type":"spawn"},"v":3}"#)
   }
 
   @Test func agentAndLinkCommandsKeepTheirWireNames() throws {

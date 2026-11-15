@@ -24,6 +24,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, @preconcurrency
 
     do {
       let core = try CoreBridge()
+      // Only a bundle carries a version; an unbundled run leaves it nil and the
+      // bridge skips the comparison. It makes a daemon from before a self-update
+      // restart instead of serving the new app for its idle grace.
+      core.expectedVersion =
+        Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String
       try core.handshake()
       let controller = TerminalWindowController(core: core)
       try controller.start()
