@@ -1,6 +1,6 @@
 # Amazon Bedrock AgentCore Memory 핸즈온
 
-ChatGPT처럼 채팅창이 여러 개인 서비스가 무엇을 어디에 기억하는지 AgentCore Memory로 실험하는 핸즈온입니다. 모델은 맥북의 Ollama(`qwen2.5:3b`)로 돌리고, OpenAI 호환 backend가 단기 메모리로 채팅창 대화를 유지하며 장기 메모리로 채팅창을 넘나드는 사실과 선호를 꺼냅니다. 모든 실습은 서울 리전(ap-northeast-2)에서 실행했습니다.
+ChatGPT처럼 다중 채팅창을 제공하는 서비스가 대화 맥락과 사용자 정보를 어디에 저장하고 조회하는지 Amazon Bedrock AgentCore Memory로 검증하는 핸즈온입니다. 추론 모델은 로컬 Ollama(`qwen2.5:3b`)로 실행하고, OpenAI 호환 backend가 단기 메모리로 채팅창 대화를 유지하며 장기 메모리로 채팅창을 넘나드는 사실과 선호를 검색해 프롬프트에 반영합니다. 모든 실습은 서울 리전(`ap-northeast-2`)에서 진행했습니다.
 
 ## 문서
 
@@ -14,7 +14,7 @@ ChatGPT처럼 채팅창이 여러 개인 서비스가 무엇을 어디에 기억
 | 5 | [5-query-memory.md](./docs/5-query-memory.md) | SQL SELECT 대응표. AWS CLI로 목록, 조건, 집계, 단건, 의미 검색. 콘솔 확인 |
 | 6 | [6-other-use-cases.md](./docs/6-other-use-cases.md) | IngestData로 CRM JSON 적재, 민감 event 추출 제외, episode와 reflection, 사용자 기억 삭제 |
 | 7 | [7-cost.md](./docs/7-cost.md) | 과금 구조, 이 핸즈온 비용(약 0.04 USD), 사용자 1,000명 규모 추정, 정리 |
-| - | [troubleshooting.md](./docs/troubleshooting.md) | 실습 중 겪은 문제 |
+| - | [troubleshooting.md](./docs/troubleshooting.md) | 실습 중 발생하는 주요 문제와 해결 방법 |
 
 ## 디렉터리
 

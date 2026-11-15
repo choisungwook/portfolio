@@ -8,15 +8,15 @@
 | 쓰는 도구 | 채팅 frontend(`http://localhost:8080`), `scripts/chat.py`, `list-sessions`, `list-actors` |
 | 입력 | actor `jiwoo`의 채팅창 3개, actor `minho`의 채팅창 1개 |
 | 작업 | 1. 추출 전에 새 채팅창 열기 2. 추출 완료 대기 3. 추출 후 새 채팅창 열기 4. 다른 사용자로 같은 질문 5. 채팅창과 사용자 목록 조회 6. 화면에서 확인 |
-| 달성할 것 | "새 채팅창이 나를 기억하는 시점"과 "다른 사용자에게는 보이지 않는 경계"를 숫자로 확인 |
+| 달성할 것 | "새 채팅창이 사용자를 기억하는 시점"과 "다른 사용자에게는 보이지 않는 경계"를 수치와 경계 동작으로 검증 |
 
 ## 채팅창은 session, 사용자는 actor다
 
-ChatGPT 왼쪽 사이드바의 채팅 목록을 AgentCore Memory로 옮기면 채팅창 하나가 session 하나이고, 로그인한 사람이 actor입니다. 이 핸즈온의 backend는 OpenAI 요청의 `user` 필드를 actorId로, `X-Session-Id` 헤더를 sessionId로 씁니다. frontend는 사이드바를 그릴 때 `ListSessions`로 그 actor의 session 목록을 가져오고, 채팅창을 클릭하면 `ListEvents`로 대화를 다시 그립니다.
+ChatGPT 좌측 사이드바의 채팅 목록을 AgentCore Memory로 옮기면 채팅창 하나가 session 하나이고, 로그인한 사용자가 actor에 해당합니다. 이 핸즈온의 backend는 OpenAI 요청의 `user` 필드를 `actorId`로, `X-Session-Id` 헤더를 `sessionId`로 사용합니다. frontend는 사이드바를 렌더링할 때 `ListSessions`로 해당 actor의 session 목록을 조회하고, 채팅창을 클릭하면 `ListEvents`로 대화를 복원합니다.
 
-두 메모리는 경계가 다릅니다. 단기 메모리는 `actorId + sessionId` 단위라서 채팅창 A의 대화는 채팅창 B에 보이지 않습니다. 장기 메모리는 namespace 단위인데, 이 핸즈온은 facts와 preferences의 namespace를 `/actor/{actorId}/facts/`처럼 session 없이 정했기 때문에 같은 사용자의 모든 채팅창이 이 record를 공유합니다. 반대로 summaries는 `/actor/{actorId}/summaries/{sessionId}/`라서 채팅창마다 따로 쌓입니다. 즉 "채팅창끼리 무엇을 공유할지"는 서비스가 아니라 namespace 템플릿이 정합니다.
+두 메모리는 격리 경계가 다릅니다. 단기 메모리는 `actorId + sessionId` 단위라서 채팅창 A의 대화는 채팅창 B에서 조회되지 않습니다. 장기 메모리는 namespace 단위인데, 이 핸즈온은 `facts`와 `preferences`의 namespace를 `/actor/{actorId}/facts/`처럼 session 없이 정의했기 때문에 같은 사용자의 모든 채팅창이 이 record를 공유합니다. 반대로 `summaries`는 `/actor/{actorId}/summaries/{sessionId}/`이므로 채팅창마다 별도로 누적됩니다. 즉 "채팅창 간에 무엇을 공유할지"는 애플리케이션 로직이 아니라 namespace 템플릿이 결정합니다.
 
-중요한 점은 장기 메모리가 즉시 생기지 않는다는 것입니다. event가 저장된 뒤 비동기 추출이 끝나야 record가 생기므로, 대화 직후에 연 새 채팅창은 아직 사용자를 모릅니다. 이 시나리오에서 그 지연을 직접 잽니다.
+중요한 점은 장기 메모리가 즉시 생성되지 않는다는 것입니다. event가 저장된 뒤 비동기 추출이 완료되어야 record가 생성되므로, 대화 직후에 연 새 채팅창은 아직 사용자를 알지 못합니다. 이 시나리오에서는 그 추출 지연을 직접 측정합니다.
 
 ### 용어
 
@@ -72,7 +72,7 @@ flowchart LR
 
 ## 실습
 
-[시나리오 2](./2-short-term-memory.md)에서 채팅창 1에 대화 4턴을 남긴 직후에 이어서 실행합니다. 2단계의 대기는 시나리오 2의 마지막 질문을 보낸 시각부터 잽니다.
+[시나리오 2](./2-short-term-memory.md)에서 채팅창 1에 대화 4턴을 남긴 직후에 이어서 실행합니다. 2단계의 대기 시간은 시나리오 2의 마지막 질문을 보낸 시각부터 측정합니다. 먼저 workspace 디렉터리로 이동해 환경 변수를 불러옵니다.
 
 ```bash
 cd aws/bedrock/agentcore-memory
@@ -88,22 +88,26 @@ export AWS_PAGER=""
 uv run -q scripts/chat.py --user jiwoo "다음 주 작업 전에 체크할 것 알려줘"
 ```
 
+실행 결과는 다음과 같습니다.
+
 ```text
 session: chat-99102af2c906
 answer : 작업이 있다면 우선적으로 먼저 진행을 검토하는 것은 다음 주도 중요합니다. ... 필요한 작업의 절차나 간단한 시간 기준 등을 추가적으로 알려주실 수 있다면 더 도움이 될 것 같습니다.
 memory : short_term_messages=0 long_term_records=0
 ```
 
-새 채팅창이라 단기 메모리가 0이고, 장기 메모리도 아직 추출되지 않아 0입니다. 모델은 "다음 주 작업"이 PostgreSQL 업그레이드라는 것을 모르고 일반론으로 답합니다. 채팅창 1의 대화는 이 채팅창에 넘어오지 않습니다.
+새 채팅창이라 단기 메모리가 0이고, 장기 메모리도 아직 추출되지 않아 0입니다. 모델은 "다음 주 작업"이 PostgreSQL 업그레이드라는 것을 알지 못해 일반론으로 답합니다. 채팅창 1의 대화는 이 채팅창으로 넘어오지 않습니다.
 
 ### 2. 장기 메모리 추출 완료 대기
 
-facts namespace에 record가 생길 때까지 15초마다 개수를 셉니다.
+`facts` namespace에 record가 생성될 때까지 15초 간격으로 개수를 폴링합니다.
 
 ```bash
 until [ "$(aws bedrock-agentcore list-memory-records --memory-id "$MEMORY_ID" --namespace /actor/jiwoo/facts/ \
   --query 'length(memoryRecordSummaries)' --output text)" -gt 0 ]; do date -u +%T; sleep 15; done; date -u +%T
 ```
+
+실행 결과는 다음과 같습니다.
 
 ```text
 15:33:21
@@ -122,6 +126,8 @@ until [ "$(aws bedrock-agentcore list-memory-records --memory-id "$MEMORY_ID" --
 ```bash
 uv run -q scripts/chat.py --user jiwoo "다음 주 작업 전에 체크할 것 알려줘"
 ```
+
+실행 결과는 다음과 같습니다.
 
 ```text
 session: chat-fa349bffe7ee
@@ -148,6 +154,8 @@ actor만 `minho`로 바꿔 같은 질문을 보냅니다.
 uv run -q scripts/chat.py --user minho "다음 주 작업 전에 체크할 것 알려줘"
 ```
 
+실행 결과는 다음과 같습니다.
+
 ```text
 session: chat-916bf443d6c3
 answer : 다음 주의 작업 검토 항목은 다음과 같습니다:
@@ -162,11 +170,13 @@ memory : short_term_messages=0 long_term_records=0
 
 ### 5. 채팅창과 사용자 목록 조회
 
-사이드바가 쓰는 API를 CLI로 호출해 `jiwoo`의 채팅창 목록을 봅니다.
+사이드바가 사용하는 API를 CLI로 호출해 `jiwoo`의 채팅창 목록을 조회합니다.
 
 ```bash
 aws bedrock-agentcore list-sessions --memory-id "$MEMORY_ID" --actor-id jiwoo --output table
 ```
+
+실행 결과는 다음과 같습니다.
 
 ```text
 || actorId |             createdAt              |      sessionId      ||
@@ -176,17 +186,19 @@ aws bedrock-agentcore list-sessions --memory-id "$MEMORY_ID" --actor-id jiwoo --
 ||  jiwoo  |  2026-11-14T00:34:50.146000+09:00  |  chat-fa349bffe7ee  ||
 ```
 
-세 채팅창이 모두 보입니다. 목록 순서는 생성 시각과 일치하지 않을 수 있어 backend가 `createdAt` 기준 최신순으로 다시 정렬합니다. memory 전체의 사용자 목록은 `list-actors`로 봅니다.
+세 채팅창이 모두 조회됩니다. API 응답 순서는 생성 시각과 일치하지 않을 수 있어 backend가 `createdAt` 기준 최신순으로 재정렬합니다. memory 전체의 사용자 목록은 `list-actors`로 조회합니다.
 
 ```bash
 aws bedrock-agentcore list-actors --memory-id "$MEMORY_ID" --query 'actorSummaries[].actorId' --output text
 ```
 
+실행 결과는 다음과 같습니다.
+
 ```text
 alice bob jiwoo minho
 ```
 
-`alice`와 `bob`은 문서를 쓰기 전 검증에 쓴 actor로, event를 모두 지운 뒤에도 목록에 남아 있습니다. event를 지워도 actor와 session 목록에서는 사라지지 않는다는 점은 [troubleshooting.md](./troubleshooting.md)에 정리했습니다. 처음 실습하는 독자에게는 `jiwoo`, `minho`만 보입니다.
+예제 출력의 `alice`와 `bob`은 이전 테스트에서 생성된 actor로, event를 모두 삭제한 뒤에도 목록에 남아 있습니다. event를 삭제해도 actor와 session 목록에서는 사라지지 않는 특성은 [troubleshooting.md](./troubleshooting.md)에 정리했습니다. 처음 실습하는 환경에서는 `jiwoo`와 `minho`만 표시됩니다.
 
 ### 6. 채팅 화면에서 확인
 
