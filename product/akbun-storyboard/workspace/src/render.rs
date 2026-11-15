@@ -160,7 +160,11 @@ fn narration(p: &Value) -> String {
 
 /// Shot list for a spreadsheet. A BOM makes Excel read Korean text as UTF-8.
 fn csv(store: &Store, p: &Value) -> String {
-    let q = |t: String| if t.contains([',', '"', '\n']) { format!("\"{}\"", t.replace('"', "\"\"")) } else { t };
+    // A leading = + - @ makes spreadsheets run the cell as a formula; a quote keeps it text.
+    let q = |t: String| {
+        let t = if t.starts_with(['=', '+', '-', '@']) { format!("'{t}") } else { t };
+        if t.contains([',', '"', '\n']) { format!("\"{}\"", t.replace('"', "\"\"")) } else { t }
+    };
     let mut o = String::from("\u{FEFF}scene,part,start,end,seconds,shot,move,source,screen,narration,voice,overlay,sfx,status,image\n");
     for sc in p["scenes"].as_array().cloned().unwrap_or_default() {
         let start = sc["start"].as_f64().unwrap_or(0.0);
@@ -194,5 +198,7 @@ mod tests {
         let csv = super::render(&s, pid, "csv").unwrap();
         assert!(csv.lines().nth(1).unwrap().contains("\"a, \"\"b\"\"\""), "{csv}");
         assert!(super::render(&s, pid, "pdf").is_err());
+        s.update(&SCENE, &json!({"id": sc["id"], "narration": "=HYPERLINK(1)"})).unwrap();
+        assert!(super::render(&s, pid, "csv").unwrap().contains(",'=HYPERLINK(1),"), "formula neutralized");
     }
 }

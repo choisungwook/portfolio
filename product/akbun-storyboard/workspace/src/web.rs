@@ -86,8 +86,10 @@ fn handle(store: &Store, req: &mut Request, token: Option<&str>) -> Reply {
         }
         None => {
             // Loopback mode: refuse other Host names so a DNS rebinding page cannot reach the API.
+            // Exact name without the port: a prefix match would let localhost.attacker.example through.
             let h = header(req, "Host").unwrap_or_default();
-            if !(h.starts_with("127.0.0.1") || h.starts_with("localhost") || h.starts_with("[::1]")) {
+            let name = if h.starts_with('[') { h.split_inclusive(']').next().unwrap_or("") } else { h.split(':').next().unwrap_or("") };
+            if !matches!(name, "127.0.0.1" | "localhost" | "[::1]") {
                 return reply(403, "text/plain", "bad host");
             }
         }
@@ -101,13 +103,19 @@ fn handle(store: &Store, req: &mut Request, token: Option<&str>) -> Reply {
             "name": o.name, "description": o.description, "inputSchema": o.schema
         })).collect::<Vec<_>>()))),
         (Method::Get, p) if p.starts_with("/media/") => media(store, &p[7..]),
+        (Method::Get, "/api/project.zip") => match query(&url, "id").and_then(|v| v.parse().ok()).map(|id| store.project_zip(id)) {
+            Some(Ok(bytes)) => reply(200, "application/zip", bytes),
+            Some(Err(e)) => json_reply(Err(e)),
+            None => reply(400, "text/plain", "id is required"),
+        },
         (Method::Post, p) if p.starts_with("/api/") => {
             // A custom header forces a CORS preflight we never answer, so other sites cannot POST here.
             if header(req, "X-Storyboard").is_none() {
                 return reply(403, "text/plain", "missing X-Storyboard header");
             }
             let mut body = vec![];
-            if req.as_reader().take(64 << 20).read_to_end(&mut body).is_err() {
+            // A project zip with its images can be a few hundred MB.
+            if req.as_reader().take(1 << 30).read_to_end(&mut body).is_err() {
                 return reply(400, "text/plain", "bad body");
             }
             post(store, p, &url, &body)
@@ -122,6 +130,9 @@ fn post(store: &Store, path: &str, url: &str, body: &[u8]) -> Reply {
     if let Some(name) = path.strip_prefix("/api/op/") {
         let args = if body.is_empty() { Ok(json!({})) } else { serde_json::from_slice(body) };
         return json_reply(args.map_err(Into::into).and_then(|a| ops::call(store, name, &a)));
+    }
+    if path == "/api/project.zip" {
+        return json_reply(store.project_load_zip(body));
     }
     if path == "/api/media" {
         let name = query(url, "name").map(pct_decode).unwrap_or_else(|| "image".into());
@@ -221,6 +232,9 @@ mod tests {
         let host = "Host: 127.0.0.1";
         assert_eq!(req(&a, "GET", "/", &[host], b"").0, 200);
         assert_eq!(req(&a, "GET", "/api/rev", &["Host: evil.example"], b"").0, 403, "DNS rebinding host refused");
+        assert_eq!(req(&a, "GET", "/api/rev", &["Host: localhost.evil.example:4780"], b"").0, 403, "no prefix match");
+        assert_eq!(req(&a, "GET", "/api/rev", &["Host: 127.0.0.1.nip.io"], b"").0, 403, "no prefix match");
+        assert_eq!(req(&a, "GET", "/api/rev", &["Host: localhost:4780"], b"").0, 200);
         assert_eq!(req(&a, "POST", "/api/op/project_list", &[host], b"").0, 403, "POST without X-Storyboard refused");
         let ok = [host, "X-Storyboard: 1"];
         let (st, body) = req(&a, "POST", "/api/op/project_add", &ok, br#"{"title":"web"}"#);
@@ -230,6 +244,8 @@ mod tests {
         let (st, body) = req(&a, "POST", "/api/media?name=%EC%8A%A4.png&project_id=1", &ok, &[0x89, b'P', b'N', b'G', 0]);
         assert!(st == 200 && body.contains("스.png"), "{body}");
         assert_eq!(req(&a, "GET", "/media/1", &[host], b"").0, 200);
+        let (st, zip) = req(&a, "GET", "/api/project.zip?id=1", &[host], b"");
+        assert!(st == 200 && zip.contains("application/zip"), "{zip}");
     }
 
     #[test]

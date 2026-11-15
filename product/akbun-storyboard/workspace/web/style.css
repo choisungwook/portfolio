@@ -41,7 +41,21 @@ svg { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width:
 .btn.danger { color: var(--danger); }
 :focus-visible { outline: 2px solid var(--accent-soft); outline-offset: 1px; }
 
-.menubar { display: flex; align-items: center; gap: 10px; padding: 6px 12px; background: var(--panel); border-bottom: 1px solid var(--border); }
+/* Menu bar: the app's own File/Edit/Export/View, as in akbun-makepresentation. */
+#menubar { display: flex; gap: 2px; padding: 2px 8px; background: var(--panel); border-bottom: 1px solid var(--border); }
+#menubar .menu { position: relative; }
+.menu-title, .menubar-command { border: 0; background: transparent; padding: 3px 10px; border-radius: var(--radius-s); cursor: default; }
+.menu-title:hover, .menu-title[aria-expanded="true"], .menubar-command:hover { background: var(--hover); }
+.menu-panel { position: absolute; top: calc(100% + 2px); left: 0; z-index: 30; width: max-content; min-width: 220px; max-width: 340px; padding: 5px;
+  border: 1px solid var(--border); border-radius: 10px; background: color-mix(in srgb, var(--panel) 94%, transparent);
+  -webkit-backdrop-filter: blur(20px); backdrop-filter: blur(20px); box-shadow: var(--shadow-2); }
+.menu-panel[hidden] { display: none; }
+.menu-panel button { position: relative; display: flex; align-items: center; width: 100%; height: 28px; padding: 0 8px 0 24px; border: 0; border-radius: 6px; background: transparent; text-align: left; white-space: nowrap; }
+.menu-panel button:hover:not(:disabled), .menu-panel button:focus-visible { background: var(--accent); color: var(--on-accent); outline: none; }
+.menu-panel button:disabled { opacity: .4; }
+.menu-panel button.checked::before { content: "✓"; position: absolute; left: 9px; }
+.menu-panel hr { margin: 5px 8px; border: 0; border-top: 1px solid var(--border); }
+.titlebar { display: flex; align-items: center; gap: 10px; padding: 6px 12px; background: var(--panel); border-bottom: 1px solid var(--border); }
 .brand { font-weight: 600; }
 .title-input { border: 0; background: transparent; font-weight: 600; font-size: 14px; padding: 4px 6px; border-radius: var(--radius-s); min-width: 120px; width: 40ch; }
 .title-input:hover, .title-input:focus { background: var(--control); outline: none; }
@@ -52,14 +66,6 @@ svg { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width:
 body.no-sidebar .sidebar { display: none; }
 #btn-sidebar-open { display: none; background: var(--panel); border-radius: 999px; box-shadow: var(--shadow-1); padding: 7px; }
 body.no-sidebar #btn-sidebar-open { display: inline-grid; }
-.menu { position: relative; }
-.menu > summary { list-style: none; }
-.menu > summary::-webkit-details-marker { display: none; }
-.menu-pop { position: absolute; right: 0; top: calc(100% + 4px); z-index: 20; background: var(--panel); border-radius: 12px; box-shadow: var(--shadow-2); padding: 5px; min-width: 230px; display: grid; }
-.menu-pop button { border: 0; background: transparent; text-align: left; height: 28px; padding: 0 10px; border-radius: var(--radius); cursor: pointer; }
-.menu-pop button:hover { background: var(--accent); color: var(--on-accent); }
-.menu-pop .danger { color: var(--danger); }
-.menu-pop hr { border: 0; border-top: 1px solid var(--border); margin: 4px 2px; width: auto; }
 .size { color: var(--muted); font-size: 11px; font-variant-numeric: tabular-nums; }
 .storage td.num { text-align: right; }
 #project-list { list-style: none; margin: 0; padding: 0; }

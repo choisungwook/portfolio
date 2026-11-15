@@ -72,14 +72,14 @@ pub fn list() -> Vec<Op> {
         ),
         op(
             "project_save",
-            "Save a project to a folder (project.json plus media/) with everything: comments, ideas, statuses, sound effects.",
-            json!({"id": {"type": "integer"}, "path": {"type": "string", "description": "Absolute folder path"}}),
+            "Save a whole project with its images: project.json plus media/, including comments, ideas, statuses and sound effects. A path ending in .zip writes one zip file (best for moving or backing up); any other path is a folder.",
+            json!({"id": {"type": "integer"}, "path": {"type": "string", "description": "Absolute .zip file or folder path"}}),
             &["id", "path"],
         ),
         op(
             "project_load",
-            "Open a folder written by project_save as a new project.",
-            json!({"path": {"type": "string", "description": "Absolute folder or project.json path"}}),
+            "Open a project zip or folder written by project_save as a new project, images included.",
+            json!({"path": {"type": "string", "description": "Absolute .zip, folder or project.json path"}}),
             &["path"],
         ),
         op("settings_get", "Show the data folder and the image folder (media_root).", json!({}), &[]),

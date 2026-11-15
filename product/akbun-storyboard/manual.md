@@ -72,7 +72,7 @@ akbun-storyboard serve --open
 | 프로젝트, 씬, 댓글 등 모든 글 | `~/.akbun-storyboard/storyboard.db` (Windows: `C:\Users\<이름>\.akbun-storyboard\`) |
 | 스케치와 사진 파일 | `~/.akbun-storyboard/media/` |
 
-이미지 폴더는 설정(톱니바퀴)에서 다른 곳으로 바꿀 수 있다. 시나리오 9를 본다. 데이터 폴더 전체를 바꾸고 싶으면 실행할 때 `--data` 옵션을 준다.
+이미지 폴더는 맨 위 메뉴 막대의 Settings에서 다른 곳으로 바꿀 수 있다. 시나리오 9를 본다. 데이터 폴더 전체를 바꾸고 싶으면 실행할 때 `--data` 옵션을 준다.
 
 ```bash
 akbun-storyboard --data /Volumes/Work/storyboard serve --open
@@ -80,12 +80,21 @@ akbun-storyboard --data /Volumes/Work/storyboard serve --open
 
 ## 화면 구성과 용어
 
-화면은 왼쪽부터 프로젝트 목록, 가운데 작업 영역, 오른쪽 인스펙터로 나뉜다.
+맨 위에 메뉴 막대(File, Edit, Export, View, Settings)가 있고, 그 아래 제목 줄, 다시 그 아래가 왼쪽부터 프로젝트 목록, 가운데 작업 영역, 오른쪽 인스펙터다.
+
+| 메뉴 | 들어 있는 것 |
+|---|---|
+| File | 새 프로젝트, 프로젝트 열기·저장(.zip), storyboard.json 가져오기, 설정, 프로젝트 삭제 |
+| Edit | 씬 추가, 선택한 씬 삭제, 배경음악·효과음·아이디어 추가 |
+| Export | 보드 전체 Markdown(AI용), 클립보드 복사, 내레이션 대본, 촬영 목록 CSV, storyboard.json, 프로젝트 zip |
+| View | Board, Script, Music, Ideas, Comments 전환, 프로젝트 목록·인스펙터 보이기 |
+| Settings | 이미지 폴더와 디스크 용량 |
+
+메뉴 제목을 누르면 열리고, 열린 상태에서 옆 제목으로 마우스를 옮기면 그 메뉴로 바뀐다. 바깥을 누르거나 Esc를 누르면 닫힌다.
 
 | 위치 | 이름 | 하는 일 |
 |---|---|---|
-| 맨 위 왼쪽 | 프로젝트 제목 | 눌러서 바로 이름을 바꾼다. 옆의 Saved는 저장 상태다 |
-| 맨 위 오른쪽 | Project 메뉴, Export 메뉴, 톱니바퀴 | 프로젝트 만들기·열기·저장·가져오기·삭제, 보드 전체 추출, 설정 |
+| 제목 줄 | 프로젝트 제목 | 눌러서 바로 이름을 바꾼다. 옆의 Saved는 저장 상태다 |
 | 왼쪽 | 프로젝트 목록 | 프로젝트별 씬 수, 길이, 이미지 용량, 열린 댓글 수. 위쪽 아이콘으로 접고 편다 |
 | 가운데 위 | 보기 탭 | Board, Script, Music, Ideas, Comments |
 | 가운데 위 | 통계 | 씬 수, 전체 길이, 이미지 용량 |
@@ -121,7 +130,7 @@ akbun-storyboard --data /Volumes/Work/storyboard serve --open
 
 영상 아이디어만 있고 아무것도 없는 상태에서 시작하는 흐름이다.
 
-1. 맨 위 Project 메뉴에서 New project를 누른다. 왼쪽 목록의 + 아이콘도 같다. Hook, Body, Wrap-up 세 파트가 있는 빈 프로젝트가 생긴다.
+1. File > New project를 누른다. 왼쪽 목록의 + 아이콘도 같다. Hook, Body, Wrap-up 세 파트가 있는 빈 프로젝트가 생긴다.
 2. 맨 위 제목 칸을 눌러 영상 제목을 적는다.
 3. 아무 씬도 선택하지 않은 상태(Esc)에서 인스펙터에 Core message(핵심 메시지 한 문장)와 Status를 적는다. 시청자, 의도 같은 기획 정보는 Plan 섹션에 있다.
 4. 파트 이름을 바꾸거나 더하려면 Parts 섹션을 펼친다. 왼쪽 칸은 짧은 키(씬이 이 키로 파트를 가리킨다), 오른쪽 칸은 화면에 보이는 제목이다.
@@ -146,11 +155,11 @@ akbun-storyboard --data /Volumes/Work/storyboard serve --open
 
 akbun-youtube-storyboard 스킬이 만든 `storyboard.json`과 `sketches/cut_NN.png`를 가져와 화면에서 고치고, 고친 결과를 다시 스킬에 넘기는 흐름이다. pptx는 읽기 좋지만 한 씬만 고치기 어렵다. 고치는 일은 여기서 하고, pptx는 스킬이 다시 만들게 한다.
 
-1. Project 메뉴에서 Import storyboard.json…을 누른다.
+1. File > Import storyboard.json…을 누른다.
 2. `storyboard.json`의 절대 경로를 넣는다. 예: `/Users/me/storyboard-output/cdp-tistory/storyboard.json`. 같은 폴더의 `sketches/cut_01.png`부터 순서대로 씬 이미지로 붙는다.
 3. 새 프로젝트가 생기고 Board에 파트별로 씬 카드가 보인다.
 4. 화면에서 내레이션, 길이, 순서, 스케치를 고친다.
-5. 다 고쳤으면 Export 메뉴에서 storyboard.json for the storyboard skills…를 누르고 내보낼 경로를 넣는다. 그 경로에 `storyboard.json`이, 옆의 `sketches/`에 이미지가 써진다. 경로를 비우고 OK를 누르면 JSON 파일만 내려받는다.
+5. 다 고쳤으면 Export > storyboard.json for the storyboard skills…를 누르고 내보낼 경로를 넣는다. 그 경로에 `storyboard.json`이, 옆의 `sketches/`에 이미지가 써진다. 경로를 비우고 OK를 누르면 JSON 파일만 내려받는다.
 6. 스킬에서 그 `storyboard.json`으로 `build`를 다시 돌려 pptx를 새로 만든다.
 
 가져온 뒤 내보내면 원래 파일과 같은 형식이 나온다. 다만 댓글, 상태, 아이디어, 효과음(SFX) 항목은 스킬 형식에 없으므로 내보내지 않는다. 이것까지 보관하려면 시나리오 8의 "프로젝트 저장"을 쓴다.
@@ -318,22 +327,36 @@ AI가 지운 것을 되돌리는 기능은 없다. 중요한 작업 전에는 �
 
 ## 시나리오 8. 프로젝트 저장, 열기, 삭제, 다른 컴퓨터로 옮기기
 
-모든 변경은 자동으로 데이터베이스에 저장된다. 여기서 말하는 저장은 프로젝트를 폴더로 꺼내 백업하거나 다른 컴퓨터로 옮기는 일이다.
+모든 변경은 자동으로 데이터베이스에 저장된다. 여기서 말하는 저장은 프로젝트를 zip 파일 하나로 꺼내 백업하거나 다른 컴퓨터로 옮기는 일이다. zip 안에는 `project.json`(기획 정보, 파트, 씬, 음악·효과음, 아이디어, 댓글, 상태)과 `media/`(씬과 아이디어에 붙은 모든 이미지)가 들어 있어서, 열면 이미지까지 그대로 돌아온다.
 
-| 하고 싶은 일 | Project 메뉴 | 결과 |
+| 하고 싶은 일 | 메뉴 | 결과 |
 |---|---|---|
-| 백업, 다른 컴퓨터로 옮기기 | Save project to folder… | 폴더에 `project.json`과 `media/`가 생긴다. 댓글, 아이디어, 상태, 효과음까지 모두 들어 있다 |
-| 백업한 프로젝트 열기 | Open project folder… | 그 폴더를 새 프로젝트로 연다. 기존 프로젝트를 덮어쓰지 않는다 |
-| 스킬과 주고받기 | Import storyboard.json…, Export 메뉴의 storyboard.json… | 시나리오 2 참고 |
-| 프로젝트 지우기 | Delete project… | 확인 후 씬, 댓글, 그 프로젝트만 쓰던 이미지 파일까지 지운다. 되돌릴 수 없다 |
+| 백업, 다른 컴퓨터로 옮기기 | File > Save project (.zip) | 브라우저 다운로드 폴더에 `<제목>.zip`이 저장된다. Export > Project with images (.zip)도 같다 |
+| 백업한 프로젝트 열기 | File > Open project (.zip)… | 파일 선택 창에서 zip을 고르면 새 프로젝트로 열린다. 기존 프로젝트를 덮어쓰지 않는다 |
+| 스킬과 주고받기 | File > Import storyboard.json…, Export > storyboard.json… | 시나리오 2 참고 |
+| 프로젝트 지우기 | File > Delete project… | 확인 후 씬, 댓글, 그 프로젝트만 쓰던 이미지 파일까지 지운다. 되돌릴 수 없다 |
 
 다른 컴퓨터로 옮기는 순서는 다음과 같다.
 
-1. 원래 컴퓨터에서 Save project to folder…로 폴더(예: `/Users/me/Desktop/my-video`)에 저장한다.
-2. 그 폴더를 통째로 새 컴퓨터로 복사한다.
-3. 새 컴퓨터에서 Open project folder…에 복사한 폴더 경로를 넣는다.
+1. 원래 컴퓨터에서 File > Save project (.zip)을 누른다. 다운로드 폴더에 zip이 생긴다.
+2. zip 파일을 AirDrop, USB, 클라우드 등으로 새 컴퓨터에 옮긴다.
+3. 새 컴퓨터에서 akbun-storyboard를 켜고 File > Open project (.zip)…으로 그 파일을 고른다.
 
-저장·열기에 넣은 경로는 브라우저가 기억해서 다음에 기본값으로 보여 준다. 프로젝트 사이를 오갈 때는 왼쪽 목록에서 고르면 된다. 프로젝트 목록을 숨기려면 목록 위쪽의 패널 아이콘을 누르고, 다시 펼치려면 가운데 위 맨 왼쪽 아이콘을 누른다.
+zip은 이미지 크기만큼 크다. 이미지가 이미 압축된 형식(png, jpg)이라 zip으로 더 줄지 않으며, 40씬 프로젝트면 90MB 정도다. 1GB를 넘는 zip은 브라우저로 열 수 없으니 CLI를 쓴다.
+
+터미널에서는 경로가 `.zip`으로 끝나면 zip 하나로, 그 밖의 경로는 폴더로 저장한다. AI에게 "1번 프로젝트를 zip으로 백업해줘"라고 해도 같은 명령을 쓴다.
+
+```bash
+akbun-storyboard project_save id=1 path=/Users/me/Backups/my-video.zip
+```
+
+zip이나 폴더를 새 프로젝트로 여는 명령이다.
+
+```bash
+akbun-storyboard project_load path=/Users/me/Backups/my-video.zip
+```
+
+프로젝트 사이를 오갈 때는 왼쪽 목록에서 고르면 된다. 프로젝트 목록과 인스펙터는 View 메뉴나 각 패널의 아이콘으로 숨기고 펼친다.
 
 ## 시나리오 9. 디스크 용량 관리하기
 
@@ -344,11 +367,11 @@ AI가 만든 스케치는 한 장에 2~3MB라서 40씬 프로젝트 하나가 10
 | 왼쪽 프로젝트 목록 | 프로젝트별 이미지 용량 |
 | 가운데 위 통계 | 지금 프로젝트의 이미지 용량 |
 | 인스펙터 이미지 아래 | 이미지 한 장의 크기 |
-| 설정(톱니바퀴) Storage | 데이터베이스 크기, 전체 이미지 수와 용량, 쓰지 않는 이미지, 프로젝트별 용량 |
+| Settings의 Storage | 데이터베이스 크기, 전체 이미지 수와 용량, 쓰지 않는 이미지, 프로젝트별 용량 |
 
 ### 이미지 폴더를 다른 디스크로 옮기기
 
-1. 맨 위 톱니바퀴를 누른다.
+1. 메뉴 막대의 Settings(또는 File > Settings…)를 누른다.
 2. Image folder 칸에 새 폴더의 절대 경로를 넣는다. 예: `/Volumes/External/storyboard-media`. 폴더가 없으면 만들어진다.
 3. Save를 누른다. 기존 이미지 파일이 모두 새 폴더로 옮겨진다.
 4. 기본 위치로 되돌리려면 Default를 누른다. 이때도 파일이 다시 옮겨진다.
@@ -361,7 +384,7 @@ AI가 만든 스케치는 한 장에 2~3MB라서 40씬 프로젝트 하나가 10
 
 ## 시나리오 10. 보드 전체를 문서로 추출해 AI나 동료에게 넘기기
 
-보드에 쌓인 내용 전체를 한 문서로 꺼내는 방법이다. MCP를 연결하지 않은 AI(ChatGPT 웹, Gemini 웹 등)에 붙여 넣어 검토받거나, 녹음·촬영 준비물로 쓸 때 필요하다. 맨 위 Export 메뉴에 네 가지가 있다.
+보드에 쌓인 내용 전체를 한 문서로 꺼내는 방법이다. MCP를 연결하지 않은 AI(ChatGPT 웹, Gemini 웹 등)에 붙여 넣어 검토받거나, 녹음·촬영 준비물로 쓸 때 필요하다. 맨 위 Export 메뉴에 있다.
 
 | 메뉴 | 파일 | 쓰는 때 |
 |---|---|---|

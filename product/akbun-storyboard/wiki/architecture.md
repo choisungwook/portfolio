@@ -49,11 +49,12 @@ Ordered tables use a `pos` column renumbered on move. Deleting a project cascade
 
 - Live edits: an agent writes through MCP or the CLI, triggers bump `rev`, the browser's 2 second poll sees a new value and reloads the project. Panels with a focused input are not re-rendered until focus leaves, so typing is never interrupted.
 - Skill import: `project_import` maps `cuts` to scenes (`desc` to `description`, `answer_cut` to `answer_scene`) and attaches `sketches/cut_NN.png`. `project_export` reverses it; the two are tested to round-trip a real skill output exactly. Sound effect items are not exported because the skill format has no such list.
-- Project save/load: `project.json` is the full `project_get` tree plus a map from old media id to file name; load re-creates rows with new ids and remaps scene and media references.
+- Project save/load: `project_bundle` builds `project.json` (the full `project_get` tree plus a map from old media id to file name) and `media/<file>`. It is written as a zip (`GET /api/project.zip`, or `project_save` with a `.zip` path; images stored, JSON deflated) or as a folder. Loading reads entries by exact name, never extracting, so crafted paths cannot escape; it re-creates rows with new ids, remaps scene and media references, and deletes the image files it wrote if the transaction rolls back.
 - Images: the browser POSTs the raw file to `/api/media?name=&project_id=`; MCP and CLI use `media_add` with a path or base64. `media_view` over MCP returns the picture when it is 1 MB or less and the path otherwise.
 
 ## Security
 
 - `serve` binds 127.0.0.1 by default and rejects Host headers other than localhost, so a DNS rebinding page cannot reach the API.
+- The Host check compares the name without its port exactly, so `localhost.attacker.example` or `127.0.0.1.nip.io` do not pass.
 - Every POST needs an `X-Storyboard` header. A cross-site form cannot set it without a CORS preflight, which the server never answers.
 - `--host` other than loopback switches to token mode: the first URL carries a random token that becomes an HttpOnly cookie; requests without it get 403.

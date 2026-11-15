@@ -435,6 +435,10 @@ impl Store {
         if new != old {
             let mut st = self.conn.prepare("SELECT id, ext FROM media")?;
             let files: Vec<String> = st.query_map([], |r| Ok(format!("{}.{}", r.get::<_, i64>(0)?, r.get::<_, String>(1)?)))?.collect::<rusqlite::Result<_>>()?;
+            // Image files are named by id, so another folder's 1.png would be overwritten.
+            if let Some(f) = files.iter().find(|f| new.join(f).exists()) {
+                bail!("{} already has a file named {f}; choose an empty folder", new.display());
+            }
             for f in files {
                 let (from, to) = (old.join(&f), new.join(&f));
                 if from.exists() && std::fs::rename(&from, &to).is_err() {
@@ -524,6 +528,7 @@ impl Store {
         let text = std::fs::read_to_string(path).with_context(|| format!("read {}", path.display()))?;
         let d: Value = serde_json::from_str(&text)?;
         let dir = path.parent().unwrap_or(Path::new("."));
+        let mut written = vec![];
         self.conn.execute_batch("BEGIN")?;
         let r = (|| -> Result<i64> {
             let mut p = d.clone();
@@ -549,23 +554,17 @@ impl Store {
                 c["description"] = c["desc"].clone();
                 let sketch = dir.join("sketches").join(format!("cut_{:02}.png", i + 1));
                 if let Ok(bytes) = std::fs::read(&sketch) {
-                    c["media_id"] = self.media_add(&bytes, &format!("cut_{:02}.png", i + 1), Some(pid))?["id"].clone();
+                    let m = self.media_add(&bytes, &format!("cut_{:02}.png", i + 1), Some(pid))?["id"].clone();
+                    written.push(self.media_path(m.as_i64().unwrap())?);
+                    c["media_id"] = m;
                 }
                 self.add(&SCENE, &c)?;
             }
             Ok(pid)
         })();
-        match r {
-            Ok(pid) => {
-                self.conn.execute_batch("COMMIT")?;
-                let t = self.project_tree(pid)?;
-                Ok(json!({"id": pid, "title": t["title"], "scenes": t["scenes"].as_array().map_or(0, Vec::len)}))
-            }
-            Err(e) => {
-                self.conn.execute_batch("ROLLBACK")?;
-                Err(e)
-            }
-        }
+        let pid = self.finish_tx(r, &written)?;
+        let t = self.project_tree(pid)?;
+        Ok(json!({"id": pid, "title": t["title"], "scenes": t["scenes"].as_array().map_or(0, Vec::len)}))
     }
 
     /// Export back to the skill's storyboard.json shape. When `out` is a path,
@@ -638,34 +637,84 @@ impl Store {
 }
 
 impl Store {
-    /// Save a project to a folder: project.json with everything (comments,
-    /// ideas, statuses, sound effects) plus its images under media/.
-    pub fn project_save(&self, id: i64, dir: &Path) -> Result<Value> {
+    /// A project as files: project.json with everything (comments, ideas,
+    /// statuses, sound effects) and every image it uses under media/.
+    pub fn project_bundle(&self, id: i64) -> Result<Vec<(String, Vec<u8>)>> {
         let mut t = self.project_tree(id)?;
-        std::fs::create_dir_all(dir.join("media"))?;
         let mut files = Map::new();
+        let mut out = vec![];
         for m in t["media"].as_array().cloned().unwrap_or_default() {
             let mid = m["id"].as_i64().unwrap();
             let src = self.media_path(mid)?;
             let name = src.file_name().unwrap().to_string_lossy().to_string();
-            std::fs::copy(&src, dir.join("media").join(&name))?;
+            out.push((format!("media/{name}"), std::fs::read(&src).with_context(|| format!("read {}", src.display()))?));
             files.insert(mid.to_string(), json!(name));
         }
         t["media_files"] = Value::Object(files);
         t["format"] = json!("akbun-storyboard/1");
-        let out = dir.join("project.json");
-        std::fs::write(&out, serde_json::to_string_pretty(&t)?)?;
-        Ok(json!({"written": out.display().to_string(), "bytes": t["media_bytes"]}))
+        out.insert(0, ("project.json".into(), serde_json::to_vec_pretty(&t)?));
+        Ok(out)
     }
 
-    /// Open a folder written by project_save as a new project.
-    pub fn project_load(&self, path: &Path) -> Result<Value> {
-        let file = if path.is_dir() { path.join("project.json") } else { path.to_path_buf() };
-        let dir = file.parent().unwrap_or(Path::new("."));
-        let t: Value = serde_json::from_str(&std::fs::read_to_string(&file).with_context(|| format!("read {}", file.display()))?)?;
-        if t["format"] != "akbun-storyboard/1" {
-            bail!("{} is not an akbun-storyboard project (use project_import for storyboard.json)", file.display());
+    /// Zip of project_bundle. Images are stored, not deflated: png and jpg are
+    /// already compressed, so deflating them only costs time.
+    pub fn project_zip(&self, id: i64) -> Result<Vec<u8>> {
+        use zip::write::SimpleFileOptions;
+        let mut z = zip::ZipWriter::new(std::io::Cursor::new(Vec::new()));
+        for (name, bytes) in self.project_bundle(id)? {
+            let method = if name.ends_with(".json") { zip::CompressionMethod::Deflated } else { zip::CompressionMethod::Stored };
+            z.start_file(name, SimpleFileOptions::default().compression_method(method))?;
+            std::io::Write::write_all(&mut z, &bytes)?;
         }
+        Ok(z.finish()?.into_inner())
+    }
+
+    /// Save to `<name>.zip`, or to a folder for any other path.
+    pub fn project_save(&self, id: i64, path: &Path) -> Result<Value> {
+        if path.extension().is_some_and(|e| e.eq_ignore_ascii_case("zip")) {
+            let bytes = self.project_zip(id)?;
+            std::fs::write(path, &bytes)?;
+            return Ok(json!({"written": path.display().to_string(), "bytes": bytes.len()}));
+        }
+        for (name, bytes) in self.project_bundle(id)? {
+            let f = path.join(&name);
+            std::fs::create_dir_all(f.parent().unwrap())?;
+            std::fs::write(f, bytes)?;
+        }
+        Ok(json!({"written": path.join("project.json").display().to_string()}))
+    }
+
+    /// Open a project zip, folder or project.json as a new project.
+    pub fn project_load(&self, path: &Path) -> Result<Value> {
+        if path.is_file() && path.extension().is_some_and(|e| e.eq_ignore_ascii_case("zip")) {
+            return self.project_load_zip(&std::fs::read(path)?);
+        }
+        let file = if path.is_dir() { path.join("project.json") } else { path.to_path_buf() };
+        let dir = file.parent().unwrap_or(Path::new(".")).to_path_buf();
+        let json = std::fs::read(&file).with_context(|| format!("read {}", file.display()))?;
+        self.project_unbundle(&json, |name| Ok(std::fs::read(dir.join("media").join(name))?))
+    }
+
+    pub fn project_load_zip(&self, bytes: &[u8]) -> Result<Value> {
+        let z = std::cell::RefCell::new(zip::ZipArchive::new(std::io::Cursor::new(bytes)).context("not a zip file")?);
+        let read = |name: &str| -> Result<Vec<u8>> {
+            let mut z = z.borrow_mut();
+            let mut f = z.by_name(name).with_context(|| format!("{name} missing from the zip"))?;
+            let mut v = vec![];
+            std::io::Read::read_to_end(&mut f, &mut v)?;
+            Ok(v)
+        };
+        let json = read("project.json")?;
+        // Entries are looked up by exact name and never extracted, so a crafted path cannot escape.
+        self.project_unbundle(&json, |name| read(&format!("media/{name}")))
+    }
+
+    fn project_unbundle(&self, json: &[u8], media_file: impl Fn(&str) -> Result<Vec<u8>>) -> Result<Value> {
+        let t: Value = serde_json::from_slice(json).context("project.json is not valid JSON")?;
+        if t["format"] != "akbun-storyboard/1" {
+            bail!("not an akbun-storyboard project (use project_import for the skills' storyboard.json)");
+        }
+        let written = std::cell::RefCell::new(vec![]);
         self.conn.execute_batch("BEGIN")?;
         let r = (|| -> Result<i64> {
             let mut media = std::collections::HashMap::new();
@@ -675,8 +724,10 @@ impl Store {
                     return Ok(json!(n));
                 }
                 let Some(name) = t["media_files"][o.to_string()].as_str() else { return Ok(Value::Null) };
-                let bytes = std::fs::read(dir.join("media").join(name))?;
-                let n = self.media_add(&bytes, name, Some(pid))?["id"].as_i64().unwrap();
+                // Only the file name counts; "../x" in a hand-edited project.json reads nothing outside media/.
+                let name = Path::new(name).file_name().and_then(|n| n.to_str()).unwrap_or_default();
+                let n = self.media_add(&media_file(name)?, name, Some(pid))?["id"].as_i64().unwrap();
+                written.borrow_mut().push(self.media_path(n)?);
                 media.insert(o, n);
                 Ok(json!(n))
             };
@@ -719,13 +770,22 @@ impl Store {
             }
             Ok(pid)
         })();
+        self.finish_tx(r, &written.into_inner()).map(|pid| json!({"id": pid, "title": t["title"]}))
+    }
+
+    /// Commit, or roll back and delete the image files written meanwhile:
+    /// rolled-back rows would otherwise leave files nothing points to.
+    fn finish_tx(&self, r: Result<i64>, written: &[PathBuf]) -> Result<i64> {
         match r {
             Ok(pid) => {
                 self.conn.execute_batch("COMMIT")?;
-                Ok(json!({"id": pid, "title": t["title"]}))
+                Ok(pid)
             }
             Err(e) => {
                 self.conn.execute_batch("ROLLBACK")?;
+                for f in written {
+                    let _ = std::fs::remove_file(f);
+                }
                 Err(e)
             }
         }
@@ -837,6 +897,17 @@ mod tests {
         assert_eq!(t["comments"][0]["scene_id"], t["scenes"][0]["id"]);
         assert_eq!(t["music"][0]["type"], "sfx");
         assert_eq!(t["media_bytes"], 5);
+        let z = s.project_zip(pid).unwrap();
+        let zi = s.project_load_zip(&z).unwrap()["id"].as_i64().unwrap();
+        let zt = s.project_tree(zi).unwrap();
+        assert!(s.media_path(zt["scenes"][0]["media_id"].as_i64().unwrap()).unwrap().exists(), "zip carries images");
+        assert_eq!(zt["comments"][0]["scene_id"], zt["scenes"][0]["id"]);
+        assert!(s.project_load_zip(b"not a zip").is_err());
+        let busy = dir.join("busy");
+        std::fs::create_dir_all(&busy).unwrap();
+        std::fs::write(busy.join(s.media_path(1).unwrap().file_name().unwrap()), b"keep me").unwrap();
+        assert!(s.set_media_root(busy.to_str().unwrap()).is_err(), "never overwrite files in the target folder");
+        assert_eq!(std::fs::read(busy.join("1.png")).unwrap(), b"keep me");
         let root = dir.join("elsewhere");
         s.set_media_root(root.to_str().unwrap()).unwrap();
         assert!(s.media_path(t["scenes"][0]["media_id"].as_i64().unwrap()).unwrap().starts_with(&root));
@@ -868,6 +939,13 @@ mod tests {
         std::fs::create_dir_all(input.parent().unwrap().join("sketches")).unwrap();
         std::fs::write(&input, src.to_string()).unwrap();
         std::fs::write(input.parent().unwrap().join("sketches/cut_01.png"), [0x89, b'P', b'N', b'G']).unwrap();
+        let before = std::fs::read_dir(s.media_dir()).map(|d| d.count()).unwrap_or(0);
+        let bad = dir.join("bad").join("storyboard.json");
+        std::fs::create_dir_all(bad.parent().unwrap().join("sketches")).unwrap();
+        std::fs::write(bad.parent().unwrap().join("sketches/cut_01.png"), [0x89, b'P', b'N', b'G']).unwrap();
+        std::fs::write(&bad, json!({"cuts": [{"dur": 1}, {"dur": "x"}]}).to_string()).unwrap();
+        assert!(s.import_skill_json(&bad).is_err());
+        assert_eq!(std::fs::read_dir(s.media_dir()).map(|d| d.count()).unwrap_or(0), before, "failed import leaves no files");
         let r = s.import_skill_json(&input).unwrap();
         let pid = r["id"].as_i64().unwrap();
         assert_eq!(r["scenes"], 2);

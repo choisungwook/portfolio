@@ -43,7 +43,7 @@ akbun-storyboard comment_add '{"project_id":1,"scene_id":12,"author":"codex","bo
 
 ## Projects, files and disk
 
-- `project_save id=<n> path=/abs/folder` writes everything (comments, ideas, statuses, sound effects) to `project.json` plus `media/`. `project_load path=/abs/folder` opens it as a new project.
+- `project_save id=<n> path=/abs/backup.zip` writes one zip with `project.json` (comments, ideas, statuses, sound effects) and every image under `media/`. A path without `.zip` writes a folder instead. `project_load path=/abs/backup.zip` opens it as a new project, images included.
 - Images are files in the image folder (`settings_get`). The person may care about disk use: check `storage_info` before adding many images, and do not upload the same picture twice. Replacing or removing a scene image deletes the old file.
 
 ## Storyboard skill files

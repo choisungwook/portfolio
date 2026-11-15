@@ -11,7 +11,7 @@ A video storyboard tool that a person and AI agents edit together. One Rust bina
 - Ideas inbox for notes and photos, global or per project, that turn into scenes with one click
 - Comments on a scene or the project. Agents treat open comments as requests, resolve them and reply
 - Sketch import from an iPad or phone: open the board over the LAN, take a photo or pick a drawing, and attach it to a scene
-- Projects: create, open from and save to a folder, delete. Import and export the `storyboard.json` format of the akbun-youtube-storyboard skills, with `sketches/cut_NN.png`
+- Projects: create, save as one `.zip` with every image, open a `.zip` as a new project, delete. Import and export the `storyboard.json` format of the akbun-youtube-storyboard skills, with `sketches/cut_NN.png`
 - Export the whole board as Markdown for AI, a narration script, or a shot list CSV, from the Export menu or the `project_render` operation
 - Disk usage per project and per image, an image folder you choose in Settings, and cleanup of unused images. Replacing or deleting an image removes its file
 
@@ -28,6 +28,8 @@ A video storyboard tool that a person and AI agents edit together. One Rust bina
 [manual.md](manual.md) is the user manual, written by scenario: first run, building a storyboard from scratch, importing a skill storyboard, attaching iPad sketches, the script view, BGM and SFX, ideas, reviewing AI edits through comments, saving and moving projects, disk usage, exporting the whole board, the CLI, and troubleshooting. Start there.
 
 ## Quick start
+
+Menus sit in the app's own menu bar (File, Edit, Export, View, Settings).
 
 Download the archive for your platform from the [releases](https://github.com/choisungwook/portfolio/releases?q=akbun-storyboard), put `akbun-storyboard` on your PATH, and start the web UI:
 

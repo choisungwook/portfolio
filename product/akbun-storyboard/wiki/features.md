@@ -6,9 +6,12 @@ What a user can see and act on, by the name this wiki uses for it. Use these nam
 |---|---|---|
 | Project title | `#project-title` | Renames the open project |
 | Save state | `#save-state` | Editing, Saving, Saved, or the last error |
-| Project menu | `#project-menu` | New, open from folder, save to folder, import storyboard.json, delete |
-| Export menu | `#export-menu` | Full storyboard Markdown (download or copy), narration script, shot list CSV, storyboard.json |
-| Settings | `#btn-settings`, `#settings` | Image folder and disk usage, delete unused images |
+| Menu bar | `#menubar` | File, Edit, Export, View menus and Settings. Every item is a `data-command` routed by `COMMANDS` in `app.js` |
+| File menu | `[data-menu-panel="file"]` | New project, open and save a project `.zip`, import storyboard.json, settings, delete project |
+| Edit menu | `[data-menu-panel="edit"]` | Add or delete a scene, add BGM, SFX or an idea |
+| Export menu | `[data-menu-panel="export"]` | Full storyboard Markdown (download or copy), narration script, shot list CSV, storyboard.json, project zip |
+| View menu | `[data-menu-panel="view"]` | Switch view tabs; show or hide the project sidebar and the inspector (checkmarks show the state) |
+| Settings | `.menubar-command[data-command="settings"]`, `#settings` | Image folder and disk usage, delete unused images |
 | Project sidebar | `#sidebar`, `#project-list` | Projects with scene count, length, image size and open comments |
 | Sidebar toggle | `#btn-sidebar-close`, `#btn-sidebar-open` | Slides the project sidebar away and back; remembered |
 | View tabs | `#view-tabs` | Board, Script, Music, Ideas, Comments (with open count) |

@@ -472,62 +472,107 @@ async function newProject() {
 }
 $('#btn-new-project').addEventListener('click', newProject);
 
+const safeName = () => (S.p?.title || 'storyboard').replace(/[\\/:*?"<>|]+/g, '-').slice(0, 80);
+function download(data, name, type) {
+  el('a', { href: URL.createObjectURL(data instanceof Blob ? data : new Blob([data], { type })), download: name }).click();
+}
+// navigator.clipboard exists only on secure origins; the iPad LAN mode is plain http.
+async function copyText(text) {
+  if (navigator.clipboard) return navigator.clipboard.writeText(text);
+  const t = el('textarea', { value: text, style: 'position:fixed;opacity:0' });
+  document.body.append(t);
+  t.select();
+  const ok = document.execCommand('copy');
+  t.remove();
+  if (!ok) throw new Error('This browser blocked copying. Use Full storyboard (.md) instead.');
+}
 const lastPath = (k, v) => { try { if (v !== undefined) localStorage.setItem('sb.path.' + k, v); return localStorage.getItem('sb.path.' + k) || ''; } catch { return ''; } };
-const MENU = {
+const needProject = (fn) => () => (S.p ? fn() : alert('Open or create a project first.'));
+async function exportText(format, suffix, ext, type) {
+  const { text } = await api('project_render', { id: S.pid, format });
+  download(text, `${safeName()}${suffix}.${ext}`, type);
+}
+
+// Every menu item and shortcut button runs through this table.
+const COMMANDS = {
   new: newProject,
-  async open() {
-    const path = await ask('Open project', 'Absolute path of a folder saved with "Save project". It opens as a new project.', lastPath('save'));
-    if (path) run(async () => { const r = await api('project_load', { path }); S.pid = r.id; S.sel = null; });
+  'open-zip': () => {
+    const f = $('#zip-pick');
+    f.value = '';
+    f.onchange = () => f.files[0] && run(async () => {
+      status('Opening…');
+      const r = await fetch('/api/project.zip', { method: 'POST', headers: { 'X-Storyboard': '1' }, body: f.files[0] });
+      const j = await r.json();
+      if (!r.ok) throw new Error(j.error);
+      S.pid = j.id; S.sel = null; localStorage.setItem('sb.pid', j.id);
+    });
+    f.click();
   },
-  async save() {
-    if (!S.p) return;
-    const path = await ask('Save project', 'Absolute folder path. project.json and media/ are written there with comments, ideas and sound effects.', lastPath('save'));
-    if (path) { lastPath('save', path); run(() => api('project_save', { id: S.pid, path })); }
-  },
-  async import() {
+  'save-zip': needProject(async () => {
+    status('Packing…');
+    const r = await fetch(`/api/project.zip?id=${S.pid}`);
+    if (!r.ok) return alert((await r.json().catch(() => ({}))).error || r.statusText);
+    download(await r.blob(), `${safeName()}.zip`);
+    status('Saved zip');
+  }),
+  'import-json': async () => {
     const path = await ask('Import storyboard.json', 'Absolute path of a storyboard.json from the storyboard skills. sketches/cut_NN.png next to it are attached.', lastPath('import'));
     if (path) { lastPath('import', path); run(async () => { const r = await api('project_import', { path }); S.pid = r.id; S.sel = null; }); }
   },
-  async exportJson() {
-    if (!S.p) return;
+  'export-json': needProject(async () => {
     const path = await ask('Export storyboard.json', 'Absolute path to write storyboard.json and sketches/. Leave empty to download the JSON only.', lastPath('export'));
     if (path === null) return;
     if (path) { lastPath('export', path); return run(() => api('project_export', { id: S.pid, path })); }
-    const data = await api('project_export', { id: S.pid });
-    el('a', { href: URL.createObjectURL(new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' })), download: 'storyboard.json' }).click();
-  },
-  delete() {
-    if (S.p && confirm(`Delete "${S.p.title}"? Its scenes and images are removed from disk.`)) run(async () => { await api('project_delete', { id: S.pid }); S.pid = null; S.sel = null; });
-  },
+    download(JSON.stringify(await api('project_export', { id: S.pid }), null, 2), 'storyboard.json', 'application/json');
+  }),
+  'delete-project': needProject(() => {
+    if (confirm(`Delete "${S.p.title}"? Its scenes and images are removed from disk.`)) run(async () => { await api('project_delete', { id: S.pid }); S.pid = null; S.sel = null; });
+  }),
+  settings: () => openSettings(),
+  'add-scene': needProject(() => $('#btn-add-scene').click()),
+  'delete-scene': needProject(() => {
+    const s = S.sel?.type === 'scene' && sceneById(S.sel.id);
+    if (!s) return alert('Select a scene first.');
+    if (confirm(`Delete scene ${s.number}?`)) run(async () => { await api('scene_delete', { id: s.id }); S.sel = null; });
+  }),
+  'add-bgm': needProject(() => { S.view = 'music'; render(); document.querySelector('#view .btn.primary')?.click(); }),
+  'add-sfx': needProject(() => { S.view = 'music'; render(); document.querySelectorAll('#view .btn.primary')[1]?.click(); }),
+  'add-idea': needProject(() => { S.view = 'ideas'; render(); document.querySelector('#view .compose textarea')?.focus(); }),
+  'export-markdown': needProject(() => exportText('markdown', '', 'md', 'text/markdown')),
+  'export-narration': needProject(() => exportText('narration', '-narration', 'md', 'text/markdown')),
+  'export-csv': needProject(() => exportText('csv', '-shotlist', 'csv', 'text/csv')),
+  'export-copy': needProject(async () => { await copyText((await api('project_render', { id: S.pid, format: 'markdown' })).text); status('Copied full storyboard'); }),
+  'toggle-sidebar': () => setSidebar(document.body.classList.contains('no-sidebar')),
+  'toggle-inspector': () => setInspector(document.body.classList.contains('no-inspector')),
 };
-// Export: whole-board text for AI and people, using the same project_render op agents call.
-const safeName = () => (S.p.title || 'storyboard').replace(/[\\/:*?"<>|]+/g, '-').slice(0, 80);
-function download(text, name, type) {
-  el('a', { href: URL.createObjectURL(new Blob([text], { type })), download: name }).click();
+for (const v of ['board', 'script', 'music', 'ideas', 'comments']) COMMANDS['view-' + v] = () => { S.view = v; render(); };
+
+// Menu bar behaviour: click a title to open, hover to switch while one is open, Escape or outside click closes.
+const closeMenus = () => document.querySelectorAll('.menu-title').forEach((t) => { t.setAttribute('aria-expanded', 'false'); document.querySelector(`[data-menu-panel="${t.dataset.menu}"]`).hidden = true; });
+function openMenu(t) {
+  closeMenus();
+  t.setAttribute('aria-expanded', 'true');
+  const panel = document.querySelector(`[data-menu-panel="${t.dataset.menu}"]`);
+  panel.querySelectorAll('[data-command^="view-"]').forEach((b) => b.classList.toggle('checked', b.dataset.command === 'view-' + S.view));
+  panel.querySelector('[data-command="toggle-sidebar"]')?.classList.toggle('checked', !document.body.classList.contains('no-sidebar'));
+  panel.querySelector('[data-command="toggle-inspector"]')?.classList.toggle('checked', !document.body.classList.contains('no-inspector'));
+  panel.querySelector('[data-command="delete-scene"]')?.toggleAttribute('disabled', S.sel?.type !== 'scene');
+  panel.hidden = false;
 }
-$('#export-menu').addEventListener('click', async (e) => {
-  const b = e.target.closest('button[data-exp]');
-  if (!b || !S.p) return;
-  $('#export-menu').open = false;
-  const kind = b.dataset.exp;
-  if (kind === 'json') return MENU.exportJson();
-  try {
-    const { text } = await api('project_render', { id: S.pid, format: kind === 'copy' ? 'markdown' : kind });
-    if (kind === 'copy') { await navigator.clipboard.writeText(text); status('Copied full storyboard'); }
-    else if (kind === 'markdown') download(text, `${safeName()}.md`, 'text/markdown');
-    else if (kind === 'narration') download(text, `${safeName()}-narration.md`, 'text/markdown');
-    else download(text, `${safeName()}-shotlist.csv`, 'text/csv');
-  } catch (err) { alert(err.message); }
+$('#menubar').addEventListener('click', (e) => {
+  const t = e.target.closest('.menu-title');
+  if (t) return t.getAttribute('aria-expanded') === 'true' ? closeMenus() : openMenu(t);
+  const c = e.target.closest('[data-command]');
+  if (!c) return;
+  closeMenus();
+  Promise.resolve(COMMANDS[c.dataset.command]()).catch((err) => alert(err.message));
 });
-$('#project-menu').addEventListener('click', (e) => {
-  const b = e.target.closest('button[data-act]');
-  if (!b) return;
-  $('#project-menu').open = false;
-  MENU[b.dataset.act]();
+$('#menubar').addEventListener('mouseover', (e) => {
+  const t = e.target.closest('.menu-title');
+  if (t && document.querySelector('.menu-title[aria-expanded="true"]') && t.getAttribute('aria-expanded') !== 'true') openMenu(t);
 });
-document.addEventListener('click', (e) => {
-  for (const m of ['#project-menu', '#export-menu']) if (!e.target.closest(m)) $(m).open = false;
-});
+document.addEventListener('click', (e) => { if (!e.target.closest('#menubar')) closeMenus(); });
+document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeMenus(); });
 
 // Settings: image folder and disk use.
 async function openSettings() {
@@ -547,7 +592,6 @@ async function openSettings() {
 async function saveRoot(v) {
   try { await api('settings_update', { media_root: v }); status('Image folder changed'); openSettings(); await refresh(); } catch (e) { alert(e.message); }
 }
-$('#btn-settings').addEventListener('click', openSettings);
 $('#set-save').addEventListener('click', () => saveRoot($('#set-media-root').value));
 $('#set-reset').addEventListener('click', () => saveRoot(''));
 
@@ -568,7 +612,7 @@ document.addEventListener('paste', (e) => {
 
 // Arrow keys walk scenes on the board; Escape returns to project properties.
 document.addEventListener('keydown', (e) => {
-  if (/INPUT|TEXTAREA|SELECT/.test(document.activeElement?.tagName) || $('#dialog').open) return;
+  if (/INPUT|TEXTAREA|SELECT/.test(document.activeElement?.tagName) || $('#dialog').open || $('#settings').open) return;
   if (e.key === 'Escape') select(null);
   if ((e.key === 'ArrowRight' || e.key === 'ArrowLeft') && scenes().length) {
     const i = scenes().findIndex((s) => S.sel?.type === 'scene' && s.id === S.sel.id);
