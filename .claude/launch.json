@@ -51,6 +51,22 @@
         "product/akbun-makepresentation/workspace/src"
       ],
       "port": 4324
+    },
+    {
+      "name": "akbun-storyboard",
+      "runtimeExecutable": "cargo",
+      "runtimeArgs": [
+        "run",
+        "--manifest-path",
+        "product/akbun-storyboard/workspace/Cargo.toml",
+        "--",
+        "--data",
+        "product/akbun-storyboard/workspace/target/dev-data",
+        "serve",
+        "--port",
+        "4780"
+      ],
+      "port": 4780
     }
   ]
 }

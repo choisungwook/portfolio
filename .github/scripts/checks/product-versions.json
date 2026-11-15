@@ -81,5 +81,10 @@
     "version_file": "product/tistory-skin/akbun/src/index.xml",
     "tag_prefix": "tistory-",
     "existing_tag": "skip"
+  },
+  "release-akbun-storyboard.yml": {
+    "version_file": "product/akbun-storyboard/workspace/Cargo.toml",
+    "tag_prefix": "akbun-storyboard-v",
+    "existing_tag": "fail"
   }
 }

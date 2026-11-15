@@ -1,0 +1,139 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>akbun-storyboard</title>
+<link rel="stylesheet" href="/style.css">
+</head>
+<body>
+<!-- The app's own menu bar, as in akbun-makepresentation. Every item is a
+     data-command, so one handler in app.js routes all of them. -->
+<nav id="menubar">
+  <div class="menu">
+    <button class="menu-title" data-menu="file" aria-haspopup="true" aria-expanded="false">File</button>
+    <div class="menu-panel" data-menu-panel="file" hidden>
+      <button data-command="new">New project</button>
+      <button data-command="open-zip">Open project (.zip)…</button>
+      <button data-command="save-zip">Save project (.zip)</button>
+      <hr>
+      <button data-command="import-json">Import storyboard.json…</button>
+      <hr>
+      <button data-command="settings">Settings…</button>
+      <hr>
+      <button data-command="delete-project">Delete project…</button>
+    </div>
+  </div>
+  <div class="menu">
+    <button class="menu-title" data-menu="edit" aria-haspopup="true" aria-expanded="false">Edit</button>
+    <div class="menu-panel" data-menu-panel="edit" hidden>
+      <button data-command="add-scene">Add scene</button>
+      <button data-command="delete-scene">Delete selected scene</button>
+      <hr>
+      <button data-command="add-bgm">Add background music</button>
+      <button data-command="add-sfx">Add sound effect</button>
+      <button data-command="add-idea">Add idea</button>
+    </div>
+  </div>
+  <div class="menu">
+    <button class="menu-title" data-menu="export" aria-haspopup="true" aria-expanded="false">Export</button>
+    <div class="menu-panel" data-menu-panel="export" hidden>
+      <button data-command="export-markdown">Full storyboard (.md) — for AI</button>
+      <button data-command="export-copy">Copy full storyboard for AI</button>
+      <hr>
+      <button data-command="export-narration">Narration script (.md)</button>
+      <button data-command="export-csv">Shot list (.csv)</button>
+      <hr>
+      <button data-command="export-json">storyboard.json for the storyboard skills…</button>
+      <button data-command="save-zip">Project with images (.zip)</button>
+    </div>
+  </div>
+  <div class="menu">
+    <button class="menu-title" data-menu="view" aria-haspopup="true" aria-expanded="false">View</button>
+    <div class="menu-panel" data-menu-panel="view" hidden>
+      <button data-command="view-board">Board</button>
+      <button data-command="view-script">Script</button>
+      <button data-command="view-music">Music</button>
+      <button data-command="view-ideas">Ideas</button>
+      <button data-command="view-comments">Comments</button>
+      <hr>
+      <button data-command="toggle-sidebar">Projects</button>
+      <button data-command="toggle-inspector">Inspector</button>
+    </div>
+  </div>
+  <button class="menubar-command" data-command="settings">Settings</button>
+</nav>
+<header class="titlebar">
+  <strong class="brand">Storyboard</strong>
+  <input id="project-title" class="title-input" aria-label="Project title" placeholder="Untitled">
+  <span id="save-state" class="muted"></span>
+</header>
+
+<div class="layout">
+  <aside class="sidebar" id="sidebar">
+    <div class="side-head"><span class="muted">Projects</span><span class="spacer"></span>
+      <button id="btn-new-project" class="icon-btn" title="New project" aria-label="New project"><svg viewBox="0 0 16 16"><path d="M8 3v10M3 8h10"/></svg></button>
+      <button id="btn-sidebar-close" class="icon-btn" title="Hide projects" aria-label="Hide projects"><svg viewBox="0 0 16 16"><rect x="2" y="3" width="12" height="10" rx="2"/><path d="M6 3v10M10.5 6.5 9 8l1.5 1.5"/></svg></button>
+    </div>
+    <ul id="project-list"></ul>
+  </aside>
+
+  <section class="stage">
+    <nav class="toolbar">
+      <button id="btn-sidebar-open" class="icon-btn capsule-btn" title="Show projects" aria-label="Show projects"><svg viewBox="0 0 16 16"><rect x="2" y="3" width="12" height="10" rx="2"/><path d="M6 3v10M9 6.5 10.5 8 9 9.5"/></svg></button>
+      <div class="capsule seg" id="view-tabs" role="tablist">
+        <button data-view="board" class="on">Board</button>
+        <button data-view="script">Script</button>
+        <button data-view="music">Music</button>
+        <button data-view="ideas">Ideas</button>
+        <button data-view="comments">Comments <span id="open-count" class="count"></span></button>
+      </div>
+      <div class="capsule" id="stats"></div>
+      <span class="spacer"></span>
+      <div class="capsule">
+        <button id="btn-add-scene" class="btn primary">+ Scene</button>
+        <button id="btn-inspector" class="icon-btn" title="Show inspector" aria-label="Show inspector">
+          <svg viewBox="0 0 16 16"><rect x="2" y="3" width="12" height="10" rx="2"/><path d="M10 3v10"/></svg>
+        </button>
+      </div>
+    </nav>
+    <div id="view" class="view"></div>
+  </section>
+
+  <aside class="inspector" id="inspector"></aside>
+</div>
+
+<dialog id="dialog">
+  <form method="dialog" id="dialog-form">
+    <h3 id="dialog-title"></h3>
+    <p id="dialog-text" class="muted"></p>
+    <input id="dialog-input" class="field">
+    <div class="row end">
+      <button value="cancel" class="btn">Cancel</button>
+      <button value="ok" class="btn primary" id="dialog-ok">OK</button>
+    </div>
+  </form>
+</dialog>
+
+<dialog id="settings">
+  <form method="dialog">
+    <div class="row"><h3 style="flex:1">Settings</h3><button value="close" class="btn">Close</button></div>
+    <div class="sec">Image folder</div>
+    <p class="muted" style="margin:0 0 6px">Sketches and photos are stored here as files. Changing it moves the existing images.</p>
+    <input id="set-media-root" class="field" aria-label="Image folder">
+    <div class="row" style="margin-top:6px"><span id="set-default" class="muted" style="flex:1;font-size:11px"></span>
+      <button type="button" class="btn" id="set-reset">Default</button><button type="button" class="btn primary" id="set-save">Save</button></div>
+    <div class="sec">Storage</div>
+    <div id="set-storage"></div>
+  </form>
+</dialog>
+
+<datalist id="dl-shot"><option>screen-full<option>screen-zoom<option>motion-diagram<option>title-card<option>hands-keyboard<option>pov<option>back-view<option>wide-landscape<option>object-detail<option>timelapse<option>insert-material</datalist>
+<datalist id="dl-move"><option>hold<option>punch-in<option>slow-push-in<option>zoom-out-reveal<option>pan-follow<option>spotlight<option>split-compare<option>speed-ramp<option>jump-cut</datalist>
+<datalist id="dl-source"><option>화면 녹화<option>촬영<option>모션그래픽<option>사진·자료</datalist>
+<datalist id="dl-genre"><option>it-handson<option>it-message<option>talk-vlog<option>daily-log<option>travel-vlog</datalist>
+<input type="file" id="file-pick" accept="image/*" hidden>
+<input type="file" id="zip-pick" accept=".zip,application/zip" hidden>
+<script src="/app.js"></script>
+</body>
+</html>
