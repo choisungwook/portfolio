@@ -1,4 +1,5 @@
 import { lstatSync, readFileSync, realpathSync, statSync } from 'node:fs'
+import type { Stats } from 'node:fs'
 import { basename, isAbsolute, join } from 'node:path'
 import { realPath, under } from '../worker/paths.ts'
 import { readFrontmatter } from './frontmatter.ts'
@@ -39,7 +40,7 @@ export function inspectSkill(home: string, path: string): SkillInfo {
     throw new SkillError(400, `path does not exist: ${path}`)
   }
   if (!statSync(dir).isDirectory()) throw new SkillError(400, 'path must be a directory')
-  let stat
+  let stat: Stats
   try {
     stat = lstatSync(join(dir, SKILL_FILE))
   } catch {

@@ -6,8 +6,6 @@ tags: [approval, security, api]
 generated: { by: claude-code/claude-haiku-5-5, at: 2026-11-15T05:17:04Z }
 ---
 
-# Approval shows and stores the exact input, bound to a request id
-
 ## 결정
 
 The exact tool input of a pending approval is stored unmasked and unclipped in its own table, `approvals.input`, and cleared when the request is decided or its run ends. The events table keeps only the masked, clipped copy. A decision names the request id of the task's single open request; any other id is refused with 409. The API requires a token generated at each start.

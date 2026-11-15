@@ -6,8 +6,6 @@ tags: [typescript, ui, build]
 generated: { by: claude-code/claude-fable-5-2, at: 2026-11-15T00:00:00Z }
 ---
 
-# Run TypeScript by type stripping and ship the UI as static modules
-
 ## 결정
 
 The server and CLI are TypeScript that Node 24 runs directly. `tsc --noEmit` checks types and nothing is emitted. The UI is plain ES modules served as files, and the calendar is hand written.

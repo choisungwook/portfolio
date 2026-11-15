@@ -6,8 +6,6 @@ tags: [sqlite, storage]
 generated: { by: claude-code/claude-fable-5-2, at: 2026-11-15T00:00:00Z }
 ---
 
-# Store tasks in SQLite, not in markdown, JSON or YAML files
-
 ## 결정
 
 Task state lives in one SQLite file opened with the built-in `node:sqlite` module in WAL mode. Only fact memory stays as markdown under `memory/`, because a person edits it and git tracks it.

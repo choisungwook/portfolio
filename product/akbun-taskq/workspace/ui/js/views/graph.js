@@ -41,7 +41,11 @@ async function load() {
 function draw({ tasks, deps }, layers) {
   const byId = new Map(tasks.map((t) => [t.id, t]))
   const pos = new Map()
-  layers.forEach((ids, col) => ids.forEach((id, row) => pos.set(id, { x: PAD + col * COL_W, y: PAD + row * ROW_H })))
+  layers.forEach((ids, col) => {
+    ids.forEach((id, row) => {
+      pos.set(id, { x: PAD + col * COL_W, y: PAD + row * ROW_H })
+    })
+  })
   const width = PAD * 2 + Math.max(1, layers.length) * COL_W
   const height = PAD * 2 + Math.max(1, ...layers.map((ids) => ids.length)) * ROW_H
 

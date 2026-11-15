@@ -1,4 +1,5 @@
 import { closeSync, constants, existsSync, lstatSync, mkdirSync, openSync, writeSync } from 'node:fs'
+import type { Stats } from 'node:fs'
 import { basename, dirname, isAbsolute, join, relative, resolve, sep } from 'node:path'
 import type { Config } from '../config.ts'
 import { HttpError } from './http.ts'
@@ -31,7 +32,7 @@ function assertNoSymlink(root: string, rel: string): void {
   let current = root
   for (const part of rel.split(sep)) {
     current = join(current, part)
-    let stat
+    let stat: Stats
     try {
       stat = lstatSync(current)
     } catch {

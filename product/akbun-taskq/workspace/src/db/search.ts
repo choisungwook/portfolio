@@ -5,7 +5,7 @@ import { TASK_TITLE_SQL } from './tasks.ts'
 // Control characters, NUL included, are stripped from each term first.
 export function ftsMatch(text: string, joiner = ' '): string {
   return text.split(/\s+/)
-    .map((term) => term.replace(/[\u0000-\u001f\u007f]/g, ''))
+    .map((term) => Array.from(term).filter((char) => char.charCodeAt(0) > 0x1f && char !== '\u007f').join(''))
     .filter(Boolean)
     .map((term) => `"${term.replaceAll('"', '""')}"`)
     .join(joiner)

@@ -6,8 +6,6 @@ tags: [agent-sdk, permissions, sandbox]
 generated: { by: claude-code/claude-haiku-5-5, at: 2026-11-15T05:17:48Z }
 ---
 
-# Permission profiles follow how the SDK evaluates a tool call
-
 ## 결정
 
 Read-only account tasks use `dontAsk` with `Bash(aws *)` allowed and a `PreToolUse` hook that denies every verb outside describe, list and get. Change tasks use `default` with `canUseTool` and no bare `Bash` allow rule.

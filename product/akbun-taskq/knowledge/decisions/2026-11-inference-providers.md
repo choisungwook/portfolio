@@ -6,8 +6,6 @@ tags: [auth, bedrock, agent-sdk]
 generated: { by: claude-code/claude-fable-5-2, at: 2026-11-15T00:00:00Z }
 ---
 
-# Three inference providers selected by config
-
 ## 결정
 
 `provider` is `bedrock`, `api_key` or `subscription`. taskq never reads or stores a key or token. It only sets or removes environment variables for the worker and runs a preflight check.

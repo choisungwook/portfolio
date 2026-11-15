@@ -3,10 +3,15 @@ import { parseArgs } from 'node:util'
 import type { Db } from '../db/open.ts'
 import { ApprovalError, decideApproval, openApproval, type PendingApproval } from '../db/approvals.ts'
 
+function isControl(char: string): boolean {
+  const code = char.charCodeAt(0)
+  return code <= 0x1f || (code >= 0x7f && code <= 0x9f)
+}
+
 // Control characters and invisible or bidi format characters are shown as escapes, so the operator reads what runs.
 export function escapeControls(text: string): string {
-  return text
-    .replace(/[\u0000-\u001f\u007f-\u009f]/g, (char) => `\\x${char.charCodeAt(0).toString(16).padStart(2, '0')}`)
+  return Array.from(text, (char) => (isControl(char) ? `\\x${char.charCodeAt(0).toString(16).padStart(2, '0')}` : char))
+    .join('')
     .replace(/[\u00ad\u061c\u200b-\u200f\u2028-\u202e\u2060-\u206f\ufeff]/g, (char) =>
       `\\u{${char.charCodeAt(0).toString(16)}}`)
 }

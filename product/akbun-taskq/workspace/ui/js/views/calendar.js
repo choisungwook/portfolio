@@ -40,7 +40,7 @@ export function initCalendar() {
       step(event.key === 'ArrowLeft' ? -1 : 1)
     })
   }
-  root.querySelectorAll('[data-mode]').forEach((button) => button.addEventListener('click', () => setMode(button.dataset.mode)))
+  for (const button of root.querySelectorAll('[data-mode]')) button.addEventListener('click', () => setMode(button.dataset.mode))
 
   fillFilterOptions()
   fillLegend()
