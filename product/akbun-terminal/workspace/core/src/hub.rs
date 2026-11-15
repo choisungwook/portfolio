@@ -62,6 +62,10 @@ struct Inner {
     connections: HashMap<ConnId, Connection>,
     rings: HashMap<u32, Ring>,
     subscribers: HashMap<u32, BTreeSet<ConnId>>,
+    /// Sessions to end when the connection that spawned them goes. Kept apart
+    /// from `connections` because a connection can be dropped for being slow
+    /// well before its reader notices, and the sessions must still be found.
+    owned: HashMap<u32, ConnId>,
 }
 
 impl Inner {
@@ -112,6 +116,7 @@ impl Hub {
                 connections: HashMap::new(),
                 rings: HashMap::new(),
                 subscribers: HashMap::new(),
+                owned: HashMap::new(),
             }),
             queue_lines,
             replay_bytes,
@@ -145,10 +150,24 @@ impl Hub {
         (id, lines)
     }
 
-    /// Forgets a connection and its subscriptions. The shells keep running.
-    /// Its queue is closed, so a writer draining it ends after the last line.
-    pub fn unregister(&self, conn: ConnId) {
-        self.lock().remove(conn, false);
+    /// Forgets a connection and its subscriptions. The shells keep running,
+    /// except the ones it spawned as owned, which are returned for the caller
+    /// to end. Its queue is closed, so a writer draining it ends after the
+    /// last line.
+    pub fn unregister(&self, conn: ConnId) -> Vec<u32> {
+        let mut inner = self.lock();
+        inner.remove(conn, false);
+        let mut owned: Vec<u32> = inner
+            .owned
+            .iter()
+            .filter(|(_, owner)| **owner == conn)
+            .map(|(session, _)| *session)
+            .collect();
+        owned.sort_unstable();
+        for session in &owned {
+            inner.owned.remove(session);
+        }
+        owned
     }
 
     pub fn connection_count(&self) -> usize {
@@ -167,12 +186,21 @@ impl Hub {
     /// Runs `produce` and replies with its answer. When that is a new session,
     /// the connection is subscribed to it first, still under the lock, so the
     /// first bytes the shell prints cannot be published before this connection
-    /// is listening, and the reply is queued ahead of them.
-    pub fn reply_subscribing(&self, conn: ConnId, produce: impl FnOnce() -> Response) {
+    /// is listening, and the reply is queued ahead of them. `owned` makes the
+    /// connection the session's owner, see [`Hub::unregister`].
+    pub fn reply_subscribing(
+        &self,
+        conn: ConnId,
+        owned: bool,
+        produce: impl FnOnce() -> Response,
+    ) {
         let mut inner = self.lock();
         let response = produce();
         if let Response::Spawned { session } = &response {
             inner.subscribe(conn, *session);
+            if owned {
+                inner.owned.insert(*session, conn);
+            }
         }
         let line: Arc<str> = reply_line(&response).into();
         inner.push(conn, &line);
@@ -250,6 +278,7 @@ impl Hub {
             inner.push(conn, &line);
         }
         if ends {
+            inner.owned.remove(&session);
             inner.rings.remove(&session);
             inner.subscribers.remove(&session);
         }
@@ -401,7 +430,7 @@ mod tests {
     fn a_spawn_reply_comes_before_the_output_it_subscribed_for() {
         let hub = Hub::default();
         let (conn, lines) = hub.register(quiet());
-        hub.reply_subscribing(conn, || Response::Spawned { session: 3 });
+        hub.reply_subscribing(conn, false, || Response::Spawned { session: 3 });
         hub.publish(&output(3, b"$ "));
         assert_eq!(
             drain(&lines),
@@ -410,6 +439,33 @@ mod tests {
                 Frame::Event(output(3, b"$ ")),
             ]
         );
+    }
+
+    #[test]
+    fn only_owned_sessions_are_handed_back_when_their_connection_goes() {
+        let hub = Hub::default();
+        let (conn, _lines) = hub.register(quiet());
+        let (other, _other_lines) = hub.register(quiet());
+        hub.reply_subscribing(conn, true, || Response::Spawned { session: 1 });
+        hub.reply_subscribing(conn, false, || Response::Spawned { session: 2 });
+        hub.reply_subscribing(conn, true, || Response::Spawned { session: 3 });
+        hub.reply_subscribing(other, true, || Response::Spawned { session: 4 });
+        // A session that ended on its own is not the connection's to end later.
+        hub.publish(&Event::Exited { session: 3 });
+        assert_eq!(hub.unregister(conn), vec![1]);
+        assert_eq!(hub.unregister(conn), Vec::<u32>::new());
+        assert_eq!(hub.unregister(other), vec![4]);
+    }
+
+    #[test]
+    fn an_owned_session_is_still_found_after_a_slow_connection_was_dropped() {
+        let hub = Hub::with_limits(1, 1024);
+        let (conn, _never_read) = hub.register(quiet());
+        hub.reply_subscribing(conn, true, || Response::Spawned { session: 1 });
+        hub.publish(&output(1, b"a"));
+        hub.publish(&output(1, b"b"));
+        assert_eq!(hub.connection_count(), 0);
+        assert_eq!(hub.unregister(conn), vec![1]);
     }
 
     #[test]

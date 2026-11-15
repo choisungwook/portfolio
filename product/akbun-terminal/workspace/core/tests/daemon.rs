@@ -120,6 +120,26 @@ fn spawn(client: &Client, workspace: Option<u64>) -> u32 {
             name: None,
             command: Vec::new(),
             parent: None,
+            owned: false,
+        })
+        .unwrap();
+    match response {
+        Response::Spawned { session } => session,
+        other => panic!("{other:?}"),
+    }
+}
+
+fn spawn_running(client: &Client, command: &[&str], owned: bool) -> u32 {
+    let response = client
+        .send(Command::Spawn {
+            cwd: String::new(),
+            cols: 80,
+            rows: 24,
+            workspace: None,
+            name: None,
+            command: command.iter().map(|part| part.to_string()).collect(),
+            parent: None,
+            owned,
         })
         .unwrap();
     match response {
@@ -453,4 +473,95 @@ fn a_client_can_start_the_daemon_for_itself() {
     client.handshake().unwrap();
     assert_eq!(client.send(Command::Shutdown).unwrap(), Response::Ok);
     wait_until("the socket to go", || !sandbox.socket().exists());
+}
+
+#[test]
+fn a_write_to_a_shell_that_is_not_reading_does_not_stall_the_daemon() {
+    let sandbox = Sandbox::new();
+    let mut daemon = sandbox.start("30");
+    let writer = std::sync::Arc::new(connect(&sandbox));
+    let other = connect(&sandbox);
+    // Raw and without echo, so what is written piles up in the pty rather than
+    // being discarded as an over-long line; `sleep` never reads it.
+    let session = spawn_running(
+        &writer,
+        &["sh", "-c", "stty raw -echo; echo ready; exec sleep 30"],
+        false,
+    );
+    output_until(&writer, session, "ready");
+
+    let blocked = {
+        let writer = std::sync::Arc::clone(&writer);
+        std::thread::spawn(move || {
+            writer.send(Command::Write {
+                session,
+                bytes: vec![b'x'; 512 * 1024],
+            })
+        })
+    };
+    std::thread::sleep(Duration::from_millis(500));
+    assert!(!blocked.is_finished(), "the pty took everything, so nothing is blocked");
+
+    // Other connections get answers while that write is stuck.
+    let started = Instant::now();
+    assert_eq!(other.sessions().unwrap().len(), 1);
+    assert!(matches!(
+        other.send(Command::Detect).unwrap(),
+        Response::Statuses { .. }
+    ));
+    assert!(
+        started.elapsed() < Duration::from_secs(2),
+        "commands waited {:?} behind a stuck write",
+        started.elapsed()
+    );
+
+    // And so does shutdown, which ends the shell and frees the write.
+    assert_eq!(other.send(Command::Shutdown).unwrap(), Response::Ok);
+    assert!(daemon.exits_within(10).is_some());
+    let _ = blocked.join();
+}
+
+#[test]
+fn an_owned_shell_ends_with_its_connection_and_the_others_stay() {
+    let sandbox = Sandbox::new();
+    let _daemon = sandbox.start("30");
+    let pid_file = sandbox.root.join("owned.pid");
+    let script = format!("echo $$ > {}; exec sleep 30", pid_file.display());
+
+    let spawner = connect(&sandbox);
+    let owned = spawn_running(&spawner, &["sh", "-c", &script], true);
+    let kept = spawn_running(&spawner, &["sleep", "30"], false);
+
+    let watcher = connect(&sandbox);
+    assert!(matches!(
+        watcher.send(Command::Attach { session: owned }).unwrap(),
+        Response::Attached { .. }
+    ));
+    wait_until("the owned shell to start", || pid_file.exists());
+    let pid: i32 = loop {
+        if let Some(pid) = std::fs::read_to_string(&pid_file)
+            .ok()
+            .and_then(|text| text.trim().parse().ok())
+        {
+            break pid;
+        }
+        std::thread::sleep(Duration::from_millis(20));
+    };
+    assert_eq!(watcher.sessions().unwrap().len(), 2);
+
+    drop(spawner);
+    wait_until("the owned shell's exit", || {
+        matches!(
+            watcher.recv_event_timeout(Duration::from_millis(100)),
+            Ok(Event::Exited { session }) if session == owned
+        )
+    });
+    let left = watcher.sessions().unwrap();
+    assert_eq!(left.iter().map(|info| info.session).collect::<Vec<_>>(), [kept]);
+    // Gone and reaped: a zombie would still answer to signal 0.
+    wait_until("the process to be reaped", || {
+        // SAFETY: signal 0 only checks whether the process exists.
+        let gone = unsafe { libc::kill(pid, 0) } == -1;
+        gone
+    });
 }

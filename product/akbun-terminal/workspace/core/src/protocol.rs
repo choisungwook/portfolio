@@ -64,6 +64,11 @@ pub enum Command {
         /// own takes its parent's.
         #[serde(default)]
         parent: Option<u32>,
+        /// End the session when the connection that spawned it goes away. For
+        /// a client whose shells should not outlive it if it crashes; clients
+        /// that want shells to survive them leave it false.
+        #[serde(default)]
+        owned: bool,
     },
     /// Every live shell.
     Sessions,
@@ -517,8 +522,10 @@ mod tests {
                 name,
                 command,
                 parent,
+                owned,
                 ..
             } => {
+                assert!(!owned, "owned defaults to false");
                 assert_eq!(name.as_deref(), Some("a"));
                 assert_eq!(command, ["sh", "-c", "true"]);
                 assert_eq!(parent, Some(2));
@@ -589,6 +596,15 @@ mod tests {
         assert!(Command::SetTheme { name: "x".into() }.mutates_tree());
         assert!(!Command::LoadState { directory: "/x".into() }.mutates_tree());
         assert!(!Command::Detect.mutates_tree());
+    }
+
+    #[test]
+    fn spawn_takes_an_optional_owned_flag() {
+        let json = r#"{"v":3,"command":{"type":"spawn","cwd":"","cols":80,"rows":24,"owned":true}}"#;
+        match parse_request(json).expect("should parse") {
+            Command::Spawn { owned, .. } => assert!(owned),
+            other => panic!("unexpected command: {other:?}"),
+        }
     }
 
     #[test]

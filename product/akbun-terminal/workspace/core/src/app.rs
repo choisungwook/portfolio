@@ -124,11 +124,21 @@ fn wrap_message(text: &str, from: Option<&str>) -> String {
     }
 }
 
+const PASTE_START: &str = "\x1b[200~";
+const PASTE_END: &str = "\x1b[201~";
+
 /// The bytes that type a message. As a bracketed paste when the program asked
 /// for it, so a TUI takes a multi-line message as one piece of input.
 fn typed_bytes(message: &str, bracketed_paste: bool) -> Vec<u8> {
     if bracketed_paste {
-        [b"\x1b[200~".as_slice(), message.as_bytes(), b"\x1b[201~"].concat()
+        // The end marker is removed from the text, repeatedly because removing
+        // one can join its neighbours into another; otherwise a message could
+        // end the paste early and have the rest typed as keystrokes.
+        let mut text = message.to_string();
+        while text.contains(PASTE_END) {
+            text = text.replace(PASTE_END, "");
+        }
+        [PASTE_START.as_bytes(), text.as_bytes(), PASTE_END.as_bytes()].concat()
     } else {
         message.as_bytes().to_vec()
     }
@@ -233,6 +243,8 @@ impl App {
                 name,
                 command,
                 parent,
+                // Ownership is about the connection, which the daemon tracks.
+                owned: _,
             } => self.spawn(
                 &cwd,
                 cols,
@@ -268,9 +280,7 @@ impl App {
                 timeout_secs.map(Duration::from_secs).unwrap_or(DEFAULT_WAIT),
             ),
             Command::RenameSession { session, name } => self.rename(session, name),
-            Command::Write { session, bytes } => {
-                self.with_session(session, |session| session.write(&bytes))
-            }
+            Command::Write { session, bytes } => self.write(session, &bytes),
             Command::Resize {
                 session,
                 cols,
@@ -582,12 +592,34 @@ impl App {
         listed
     }
 
+    /// Writes raw bytes to a session. The write can block for as long as the
+    /// program is not reading its input, so it happens with only the session's
+    /// own locks held and never the table's.
+    fn write(&self, id: u32, bytes: &[u8]) -> Response {
+        let (writer, input) = {
+            let Ok(sessions) = self.sessions.lock() else {
+                return poisoned("session table");
+            };
+            let Some(target) = sessions.get(&id) else {
+                return no_session(id);
+            };
+            (target.writer(), target.input())
+        };
+        let Ok(_input) = input.lock() else {
+            return poisoned("session input");
+        };
+        match write_all(&writer, bytes) {
+            Ok(()) => Response::Ok,
+            Err(message) => Response::Error { message },
+        }
+    }
+
     /// Types `text` into a session and presses return.
     ///
     /// The return comes after a pause and the lock on the session table is not
     /// held across it, so one slow delivery does not stall every other command.
     fn send(&self, id: u32, text: &str, from: Option<u32>) -> Response {
-        let (writer, bracketed, sender) = {
+        let (writer, input, bracketed, sender) = {
             let Ok(sessions) = self.sessions.lock() else {
                 return poisoned("session table");
             };
@@ -598,7 +630,12 @@ impl App {
                 Some(name) => format!("{from} {name}"),
                 None => from.to_string(),
             });
-            (target.writer(), target.bracketed_paste(), sender)
+            (target.writer(), target.input(), target.bracketed_paste(), sender)
+        };
+        // Held until the return is written, so neither another `send` nor a
+        // viewer's keystrokes can land between the text and the return.
+        let Ok(_input) = input.lock() else {
+            return poisoned("session input");
         };
         let message = wrap_message(text, sender.as_deref());
         if let Err(message) = write_all(&writer, &typed_bytes(&message, bracketed)) {
@@ -929,6 +966,86 @@ mod tests {
     }
 
     #[test]
+    fn a_message_cannot_end_the_bracketed_paste_it_is_typed_in() {
+        assert_eq!(typed_bytes("a\x1b[201~b", false), b"a\x1b[201~b".to_vec());
+        assert_eq!(
+            typed_bytes("a\x1b[201~b", true),
+            b"\x1b[200~ab\x1b[201~".to_vec()
+        );
+        // Removing one marker must not leave a new one made of what was around it.
+        assert_eq!(
+            typed_bytes("a\x1b[20\x1b[201~1~b", true),
+            b"\x1b[200~ab\x1b[201~".to_vec()
+        );
+    }
+
+    #[test]
+    fn two_sends_to_one_session_do_not_interleave() {
+        let app = std::sync::Arc::new(App::new());
+        let spawned = app.execute(Command::Spawn {
+            cwd: String::new(),
+            cols: 200,
+            rows: 24,
+            workspace: None,
+            name: None,
+            // No echo, so the screen holds only what cat printed: one line per
+            // line it received.
+            command: vec![
+                "sh".into(),
+                "-c".into(),
+                "stty -echo; echo ready; exec cat".into(),
+            ],
+            parent: None,
+            owned: false,
+        });
+        let Response::Spawned { session } = spawned else {
+            panic!("{spawned:?}");
+        };
+        let screen_of = |app: &App| match app.execute(Command::Read { session }) {
+            Response::Text { text } => text,
+            other => panic!("expected text: {other:?}"),
+        };
+        let deadline = Instant::now() + Duration::from_secs(5);
+        while !screen_of(&app).contains("ready") {
+            assert!(Instant::now() < deadline, "the shell never got ready");
+            std::thread::sleep(Duration::from_millis(20));
+        }
+        // Two messages written whole, then both returns, would reach cat as one
+        // line holding both.
+        let senders: Vec<_> = ["alpha-alpha-alpha", "bravo-bravo-bravo"]
+            .into_iter()
+            .map(|text| {
+                let app = std::sync::Arc::clone(&app);
+                std::thread::spawn(move || {
+                    app.execute(Command::Send {
+                        session,
+                        text: text.to_string(),
+                        from: None,
+                    })
+                })
+            })
+            .collect();
+        for sender in senders {
+            assert_eq!(sender.join().unwrap(), Response::Ok);
+        }
+        let deadline = Instant::now() + Duration::from_secs(5);
+        let screen = loop {
+            let text = screen_of(&app);
+            if text.contains("alpha-alpha-alpha") && text.contains("bravo-bravo-bravo") {
+                break text;
+            }
+            assert!(Instant::now() < deadline, "messages never arrived: {text:?}");
+            std::thread::sleep(Duration::from_millis(50));
+        };
+        let lines: Vec<&str> = screen.lines().filter(|line| !line.is_empty()).collect();
+        assert!(
+            lines.contains(&"alpha-alpha-alpha") && lines.contains(&"bravo-bravo-bravo"),
+            "the messages were mixed: {screen:?}"
+        );
+        app.shutdown();
+    }
+
+    #[test]
     fn a_shell_just_typed_into_is_not_yet_stopped() {
         assert!(!settled(WorkspaceStatus::Running, false));
         assert!(settled(WorkspaceStatus::Idle, false));
@@ -949,6 +1066,7 @@ mod tests {
                 name: name.map(str::to_string),
                 command: vec!["sleep".into(), "30".into()],
                 parent,
+                owned: false,
             })
         };
         assert_eq!(spawn(Some("lead"), None, Some(9)), Response::Spawned { session: 1 });
@@ -988,6 +1106,7 @@ mod tests {
             name: None,
             command: vec!["sleep".into(), "30".into()],
             parent: None,
+            owned: false,
         });
         let Response::Spawned { session } = spawned else {
             panic!("{spawned:?}");

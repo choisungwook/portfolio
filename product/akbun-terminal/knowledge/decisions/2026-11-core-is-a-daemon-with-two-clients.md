@@ -13,7 +13,7 @@ generated: { by: claude-code, at: 2026-11-15T00:00:00Z }
 - wire는 한 줄에 JSON 하나다. 요청은 기존 envelope `{"v":3,"command":..}` 그대로이고, 응답은 `{"reply":..}`, 이벤트는 `{"event":..}`로 감싼다.
 - shell은 daemon이 소유하므로 client가 닫혀도 계속 실행된다. 다른 client는 `sessions`로 목록을 받고 `attach`로 붙는다. `attach`는 그 session의 최근 출력 256 KiB를 `replay`로 돌려준다.
 - daemon은 client가 필요할 때 띄운다. 연결과 session이 모두 없는 상태가 10초 이어지면 스스로 종료한다.
-- desktop은 이번 변경에서 종료할 때 자기가 연 session을 닫는 기존 동작을 유지한다.
+- desktop은 이번 변경에서 종료할 때 자기가 연 session을 닫는 기존 동작을 유지한다. `spawn`에 `owned: true`를 붙여, 앱이 비정상 종료돼 연결이 끊겨도 daemon이 그 shell을 종료한다. tui와 CLI는 붙이지 않는다.
 - agent끼리의 통신은 core의 CLI가 맡는다. `run`으로 이름 붙은 shell을 띄우고 `send`로 글을 입력하고 `read`로 화면을 읽고 `wait`로 작업이 멈출 때까지 기다린다. shell은 `AKBUN_TERMINAL_SESSION`으로 자기 id를 알고, 그 안에서 띄운 shell은 자식이 된다.
 - agent 목록은 `sessions` 응답에서 `agent`가 있는 항목이다. client는 걸러서 그리기만 한다.
 - 상태 판정은 daemon이 2초마다 직접 한다. client의 `detect`는 그 결과를 읽는다.
@@ -38,6 +38,7 @@ generated: { by: claude-code, at: 2026-11-15T00:00:00Z }
 
 ## 남은 것
 
+- desktop이 실행 중에 daemon을 잃었을 때의 재연결. 지금은 이후 요청이 모두 실패하고 tab이 응답하지 않는다.
 - desktop이 재실행될 때 살아 있는 session에 다시 붙는 동작. `sessions`와 `attach`는 이미 있으므로 `TerminalWindowController`가 workspace별로 tab을 복원하면 된다.
 - desktop이 `state` 이벤트를 받아 사이드바를 갱신하는 동작. 지금은 tui에서 바꾼 project가 desktop을 다시 열어야 표시된다.
 - desktop의 agent 목록 화면. tui에만 있다.

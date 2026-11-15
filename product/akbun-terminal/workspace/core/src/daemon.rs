@@ -7,12 +7,12 @@
 
 use std::fs::{self, File};
 use std::io::{BufRead, BufReader, Write};
-use std::os::fd::AsRawFd;
+use std::os::fd::{AsRawFd, RawFd};
 use std::os::unix::fs::{DirBuilderExt, FileTypeExt};
 use std::os::unix::net::{UnixListener, UnixStream};
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicBool, AtomicI32, Ordering};
-use std::sync::mpsc::{channel, RecvTimeoutError, Sender};
+use std::sync::mpsc::{channel, Receiver, RecvTimeoutError, Sender};
 use std::sync::{Arc, Mutex};
 use std::thread;
 use std::time::{Duration, Instant};
@@ -23,6 +23,9 @@ use crate::protocol::{parse_request, Command, Event, Response};
 
 /// How long the daemon stays up with no connection and no shell.
 const DEFAULT_IDLE_EXIT: Duration = Duration::from_secs(10);
+
+/// How long the accept thread waits for a client before looking again.
+const ACCEPT_POLL_MS: i32 = 50;
 
 /// How often shells are judged while any exist.
 const JUDGE_EVERY: Duration = Duration::from_secs(2);
@@ -69,6 +72,11 @@ impl IdleClock {
         let since = *self.idle_since.get_or_insert(now);
         now.saturating_duration_since(since) >= self.grace
     }
+
+    /// Starts the grace over, for when the daemon found it was in use after all.
+    fn restart(&mut self) {
+        self.idle_since = None;
+    }
 }
 
 enum Stop {
@@ -88,9 +96,34 @@ struct Daemon {
     /// Held from a tree edit until its `state` event is queued, so two edits
     /// made at once reach every other client in the order they were applied.
     tree_order: Mutex<()>,
+    /// Always nonblocking, so that whoever holds `gate` can take every client
+    /// already waiting and then know there are no more.
+    listener: UnixListener,
+    /// Held while clients are accepted and while the daemon decides to leave,
+    /// so a client is either counted by that decision or finds the socket gone.
+    /// It is never accepted and then dropped.
+    gate: Mutex<()>,
 }
 
 impl Daemon {
+    fn new(listener: UnixListener) -> Result<Self, String> {
+        listener
+            .set_nonblocking(true)
+            .map_err(|error| error.to_string())?;
+        Ok(Self {
+            app: App::new(),
+            hub: Hub::default(),
+            running: AtomicBool::new(true),
+            tree_order: Mutex::new(()),
+            listener,
+            gate: Mutex::new(()),
+        })
+    }
+
+    fn gate(&self) -> std::sync::MutexGuard<'_, ()> {
+        self.gate.lock().unwrap_or_else(|poisoned| poisoned.into_inner())
+    }
+
     fn handle(&self, conn: ConnId, line: &str, told: &mut Told) -> Flow {
         let command = match parse_request(line) {
             Ok(command) => command,
@@ -100,9 +133,9 @@ impl Daemon {
             }
         };
         match command {
-            spawn @ Command::Spawn { .. } => {
+            spawn @ Command::Spawn { owned, .. } => {
                 self.hub
-                    .reply_subscribing(conn, || self.app.execute(spawn));
+                    .reply_subscribing(conn, owned, || self.app.execute(spawn));
             }
             Command::Attach { session } => {
                 self.hub
@@ -175,12 +208,7 @@ pub fn serve(config: Config) -> Result<(), String> {
     let (stop_tx, stop_rx) = channel::<Stop>();
     watch_signals(stop_tx.clone())?;
 
-    let daemon = Arc::new(Daemon {
-        app: App::new(),
-        hub: Hub::default(),
-        running: AtomicBool::new(true),
-        tree_order: Mutex::new(()),
-    });
+    let daemon = Arc::new(Daemon::new(listener)?);
     if let Some(directory) = &config.agents_dir {
         let loaded = daemon.app.execute(Command::LoadRules {
             directory: directory.to_string_lossy().to_string(),
@@ -200,7 +228,7 @@ pub fn serve(config: Config) -> Result<(), String> {
     {
         let daemon = Arc::clone(&daemon);
         let stop = stop_tx.clone();
-        thread::spawn(move || accept_loop(listener, daemon, stop));
+        thread::spawn(move || accept_loop(daemon, stop));
     }
     log(&format!("listening on {}", config.socket.display()));
 
@@ -208,6 +236,7 @@ pub fn serve(config: Config) -> Result<(), String> {
         grace: config.idle_exit,
         idle_since: None,
     };
+    let mut socket_gone = false;
     let reason = loop {
         match stop_rx.recv_timeout(Duration::from_millis(100)) {
             Ok(Stop::Shutdown) => break "shutdown requested",
@@ -217,41 +246,136 @@ pub fn serve(config: Config) -> Result<(), String> {
         }
         let busy = daemon.hub.connection_count() > 0 || daemon.app.session_count() > 0;
         if idle.expired(Instant::now(), busy) {
-            break "idle";
+            if daemon.retire(&config.socket, &stop_tx) {
+                socket_gone = true;
+                break "idle";
+            }
+            idle.restart();
         }
     };
     log(&format!("stopping: {reason}"));
     daemon.running.store(false, Ordering::SeqCst);
     daemon.app.shutdown();
-    let _ = fs::remove_file(&config.socket);
+    // After an idle exit the path may already belong to the next daemon.
+    if !socket_gone {
+        let _ = fs::remove_file(&config.socket);
+    }
     Ok(())
 }
 
-fn accept_loop(listener: UnixListener, daemon: Arc<Daemon>, stop: Sender<Stop>) {
-    for stream in listener.incoming() {
-        match stream {
-            Ok(stream) => {
-                let daemon = Arc::clone(&daemon);
-                let stop = stop.clone();
-                thread::spawn(move || {
-                    if let Err(error) = connection(stream, &daemon, &stop) {
-                        log(&format!("connection failed: {error}"));
-                    }
-                });
+fn accept_loop(daemon: Arc<Daemon>, stop: Sender<Stop>) {
+    let fd = daemon.listener.as_raw_fd();
+    while daemon.running.load(Ordering::SeqCst) {
+        // Waiting is outside the gate, or a daemon deciding to leave would
+        // have to wait for a client that may never come.
+        if !readable(fd, ACCEPT_POLL_MS) {
+            continue;
+        }
+        let _gate = daemon.gate();
+        daemon.accept_pending(&stop);
+    }
+}
+
+fn readable(fd: RawFd, millis: i32) -> bool {
+    let mut poll = libc::pollfd {
+        fd,
+        events: libc::POLLIN,
+        revents: 0,
+    };
+    // SAFETY: one initialised pollfd that outlives the call.
+    let ready = unsafe { libc::poll(&mut poll, 1, millis) };
+    if ready < 0 && std::io::Error::last_os_error().kind() != std::io::ErrorKind::Interrupted {
+        thread::sleep(Duration::from_millis(10));
+    }
+    ready > 0
+}
+
+impl Daemon {
+    /// Takes every client that is waiting. The caller holds the gate.
+    fn accept_pending(self: &Arc<Self>, stop: &Sender<Stop>) {
+        loop {
+            match self.listener.accept() {
+                Ok((stream, _)) => self.admit(stream, stop),
+                Err(error) if error.kind() == std::io::ErrorKind::WouldBlock => return,
+                Err(error) if error.kind() == std::io::ErrorKind::Interrupted => {}
+                Err(error) => {
+                    log(&format!("accept failed: {error}"));
+                    thread::sleep(Duration::from_millis(10));
+                    return;
+                }
             }
-            Err(error) => log(&format!("accept failed: {error}")),
         }
     }
+
+    /// Registers the client here rather than on its own thread, so that once
+    /// it is accepted it counts as a connection and the idle decision sees it.
+    fn admit(self: &Arc<Self>, stream: UnixStream, stop: &Sender<Stop>) {
+        // Some platforms hand on the listener's nonblocking mode.
+        let opened = stream
+            .set_nonblocking(false)
+            .and_then(|_| Ok((stream.try_clone()?, stream.try_clone()?)))
+            .map_err(|error| error.to_string());
+        let (closer, out) = match opened {
+            Ok(pair) => pair,
+            Err(error) => return log(&format!("connection failed: {error}")),
+        };
+        let (conn, lines) = self.hub.register(move || {
+            let _ = closer.shutdown(std::net::Shutdown::Both);
+        });
+        let daemon = Arc::clone(self);
+        let stop = stop.clone();
+        thread::spawn(move || connection(stream, out, conn, lines, &daemon, &stop));
+    }
+
+    /// Whether the daemon should leave now, decided with the socket withdrawn.
+    ///
+    /// The idle check on its own leaves a gap: a client can connect after it
+    /// and before the process ends, and is dropped. So the socket is moved
+    /// aside first, which turns new clients away, then the ones already
+    /// waiting are taken and the counts looked at again. If nothing is there
+    /// the socket is deleted and the daemon may go; otherwise the same file is
+    /// moved back, which is simpler than a new bind because the listener is
+    /// still attached to it, and the daemon carries on. The directory lock is
+    /// held throughout so a daemon started in that moment waits and finds the
+    /// socket either back or gone, rather than binding its own beside ours.
+    fn retire(self: &Arc<Self>, socket: &Path, stop: &Sender<Stop>) -> bool {
+        let _gate = self.gate();
+        let Ok(_directory) = lock_directory(socket_directory(socket)) else {
+            return false;
+        };
+        let parked = parked_path(socket);
+        if fs::rename(socket, &parked).is_err() {
+            return false;
+        }
+        self.accept_pending(stop);
+        if self.hub.connection_count() == 0 && self.app.session_count() == 0 {
+            let _ = fs::remove_file(&parked);
+            return true;
+        }
+        if let Err(error) = fs::rename(&parked, socket) {
+            log(&format!("cannot put {} back: {error}", socket.display()));
+        }
+        false
+    }
+}
+
+/// Where the socket waits while the daemon decides to leave.
+fn parked_path(socket: &Path) -> PathBuf {
+    let mut name = socket.as_os_str().to_owned();
+    name.push(".parked");
+    PathBuf::from(name)
 }
 
 /// Reads one client's requests until it goes away. Writing is a second thread
 /// on the hub's queue, so a client that stops reading stalls only itself.
-fn connection(stream: UnixStream, daemon: &Daemon, stop: &Sender<Stop>) -> Result<(), String> {
-    let closer = stream.try_clone().map_err(|error| error.to_string())?;
-    let mut out = stream.try_clone().map_err(|error| error.to_string())?;
-    let (conn, lines) = daemon.hub.register(move || {
-        let _ = closer.shutdown(std::net::Shutdown::Both);
-    });
+fn connection(
+    stream: UnixStream,
+    mut out: UnixStream,
+    conn: ConnId,
+    lines: Receiver<Arc<str>>,
+    daemon: &Daemon,
+    stop: &Sender<Stop>,
+) {
     let writer = thread::spawn(move || {
         for line in lines.iter() {
             if out
@@ -280,13 +404,35 @@ fn connection(stream: UnixStream, daemon: &Daemon, stop: &Sender<Stop>) -> Resul
     }
     // Closing the queue lets the writer finish what it was given, which for a
     // shutdown includes the reply to the request that asked for it.
-    daemon.hub.unregister(conn);
+    let owned = daemon.hub.unregister(conn);
     let _ = writer.join();
     let _ = stream.shutdown(std::net::Shutdown::Both);
+    // Ended after the connection is gone, and the same way `close` ends a
+    // shell: the reader notices, so `exited` is published as for any exit.
+    for session in owned {
+        daemon.app.remove_session(session);
+    }
     if matches!(flow, Flow::Shutdown) {
         let _ = stop.send(Stop::Shutdown);
     }
-    Ok(())
+}
+
+fn socket_directory(socket: &Path) -> &Path {
+    match socket.parent() {
+        Some(parent) if !parent.as_os_str().is_empty() => parent,
+        _ => Path::new("."),
+    }
+}
+
+/// Takes an exclusive lock on the socket's directory, released when the
+/// returned file is dropped.
+fn lock_directory(directory: &Path) -> Result<File, String> {
+    let lock = File::open(directory).map_err(|error| error.to_string())?;
+    // SAFETY: flock on a descriptor this function owns.
+    if unsafe { libc::flock(lock.as_raw_fd(), libc::LOCK_EX) } != 0 {
+        return Err(format!("cannot lock {}", directory.display()));
+    }
+    Ok(lock)
 }
 
 /// Binds the socket, replacing one that nothing answers on.
@@ -294,20 +440,13 @@ fn connection(stream: UnixStream, daemon: &Daemon, stop: &Sender<Stop>) -> Resul
 /// Two daemons started at once must not both decide the other's socket is
 /// stale, so the check and the bind happen under a lock on the directory.
 fn bind(socket: &Path) -> Result<UnixListener, String> {
-    let directory = match socket.parent() {
-        Some(parent) if !parent.as_os_str().is_empty() => parent,
-        _ => Path::new("."),
-    };
+    let directory = socket_directory(socket);
     fs::DirBuilder::new()
         .recursive(true)
         .mode(0o700)
         .create(directory)
         .map_err(|error| format!("cannot create {}: {error}", directory.display()))?;
-    let lock = File::open(directory).map_err(|error| error.to_string())?;
-    // SAFETY: flock on a descriptor this function owns.
-    if unsafe { libc::flock(lock.as_raw_fd(), libc::LOCK_EX) } != 0 {
-        return Err(format!("cannot lock {}", directory.display()));
-    }
+    let _lock = lock_directory(directory)?;
 
     if let Ok(metadata) = fs::symlink_metadata(socket) {
         if !metadata.file_type().is_socket() {
@@ -399,6 +538,46 @@ fn log(message: &str) {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    fn test_daemon(name: &str) -> (Arc<Daemon>, PathBuf, Sender<Stop>) {
+        static NEXT: std::sync::atomic::AtomicU32 = std::sync::atomic::AtomicU32::new(0);
+        let directory = PathBuf::from(format!(
+            "/tmp/akd{}-{}-{name}",
+            std::process::id(),
+            NEXT.fetch_add(1, Ordering::SeqCst)
+        ));
+        let socket = directory.join("s.sock");
+        let daemon = Arc::new(Daemon::new(bind(&socket).unwrap()).unwrap());
+        (daemon, socket, channel().0)
+    }
+
+    #[test]
+    fn an_idle_daemon_retires_and_takes_its_socket_with_it() {
+        let (daemon, socket, stop) = test_daemon("idle");
+        assert!(daemon.retire(&socket, &stop));
+        assert!(!socket.exists());
+        assert!(!parked_path(&socket).exists());
+        let _ = fs::remove_dir_all(socket.parent().unwrap());
+    }
+
+    #[test]
+    fn a_client_already_waiting_when_the_daemon_tries_to_leave_is_served() {
+        let (daemon, socket, stop) = test_daemon("waiting");
+        // Connected, but not yet accepted: the state the idle check cannot see.
+        let mut client = UnixStream::connect(&socket).unwrap();
+        assert!(!daemon.retire(&socket, &stop));
+        assert_eq!(daemon.hub.connection_count(), 1);
+
+        // The daemon stays reachable on the same path, and answers the client.
+        assert!(UnixStream::connect(&socket).is_ok());
+        client
+            .write_all(b"{\"v\":3,\"command\":{\"type\":\"hello\"}}\n")
+            .unwrap();
+        let mut reply = String::new();
+        BufReader::new(&client).read_line(&mut reply).unwrap();
+        assert!(reply.contains(r#""type":"hello""#), "{reply}");
+        let _ = fs::remove_dir_all(socket.parent().unwrap());
+    }
 
     #[test]
     fn the_daemon_leaves_only_after_a_full_idle_grace() {

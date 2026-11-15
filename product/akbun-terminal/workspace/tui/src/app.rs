@@ -241,6 +241,7 @@ impl App {
                         name: None,
                         command: Vec::new(),
                         parent: None,
+                        owned: false,
                     })?;
                     match reply {
                         Response::Spawned { session } => {

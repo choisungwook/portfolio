@@ -38,6 +38,11 @@ pub struct Session {
     /// Shared so a slow typed message can write without holding the table of
     /// sessions for its whole duration.
     writer: Arc<Mutex<Box<dyn Write + Send>>>,
+    /// Held by whoever is feeding the shell a unit of input that must not be
+    /// split, such as a typed message and its return. Separate from `writer`
+    /// because a message waits between its two writes and the writer lock is
+    /// only ever held for one.
+    input: Arc<Mutex<()>>,
     child: Arc<Mutex<Box<dyn portable_pty::Child + Send + Sync>>>,
     /// The interpreted screen, kept up to date on the reader thread so that
     /// detection never sits on the path that draws output.
@@ -125,6 +130,7 @@ impl Session {
             size: Mutex::new((cols, rows)),
             master: pty.master,
             writer: Arc::new(Mutex::new(writer)),
+            input: Arc::new(Mutex::new(())),
             child: Arc::new(Mutex::new(child)),
             screen,
         })
@@ -170,6 +176,10 @@ impl Session {
         Arc::clone(&self.writer)
     }
 
+    pub fn input(&self) -> Arc<Mutex<()>> {
+        Arc::clone(&self.input)
+    }
+
     /// The shell's pid, which is the root of the tree an agent runs somewhere in.
     pub fn pid(&self) -> Option<u32> {
         self.child.lock().ok().and_then(|child| child.process_id())
@@ -181,10 +191,6 @@ impl Session {
             .lock()
             .map(|screen| screen.text())
             .unwrap_or_default()
-    }
-
-    pub fn write(&self, bytes: &[u8]) -> Result<(), String> {
-        write_all(&self.writer, bytes)
     }
 
     /// A shell that is not told the new size keeps drawing at the old one, so

@@ -10,7 +10,8 @@
 - [x] 3. desktop: CoreBridge를 socket client로 교체, Package.swift와 scripts 갱신
 - [x] 4. tui: ratatui client 신규 작성
 - [x] 5. release workflow, VERSION 0.16.0, README, wiki, knowledge 갱신
-- [ ] 6. 검증: cargo test, tmux로 tui 실행 확인, diff 리뷰
+- [x] 6. 검증: cargo test, tmux로 tui 실행 확인, diff 리뷰와 지적 반영
+- [ ] 7. PR 생성 후 macOS job(`swift test`) 결과 확인. 상태 파일 삭제는 PR 직전
 
 ## 다음 세션이 알아야 할 것
 

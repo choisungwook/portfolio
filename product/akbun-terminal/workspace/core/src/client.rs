@@ -16,7 +16,7 @@ use std::thread;
 use std::time::{Duration, Instant};
 
 use crate::paths;
-use crate::protocol::{Command, Event, Frame, Request, Response, SessionInfo, PROTOCOL_VERSION};
+use crate::protocol::{Command, Event, Request, Response, SessionInfo, PROTOCOL_VERSION};
 
 /// How long `connect_or_start` waits for a freshly started daemon to listen.
 const START_WAIT: Duration = Duration::from_secs(5);
@@ -54,14 +54,10 @@ impl Client {
         thread::spawn(move || {
             for line in BufReader::new(reader).lines() {
                 let Ok(line) = line else { break };
-                let delivered = match serde_json::from_str::<Frame>(&line) {
-                    Ok(Frame::Reply(response)) => reply_tx.send(Ok(response)).is_ok(),
-                    Ok(Frame::Event(event)) => event_tx.send(event).is_ok(),
-                    // A daemon too old to frame its replies lands here, and the
-                    // caller waiting on it is better told than left hanging.
-                    Err(error) => reply_tx
-                        .send(Err(format!("unreadable reply from the daemon: {error}")))
-                        .is_ok(),
+                let delivered = match classify(&line) {
+                    Incoming::Reply(reply) => reply_tx.send(reply).is_ok(),
+                    Incoming::Event(event) => event_tx.send(event).is_ok(),
+                    Incoming::Skip => true,
                 };
                 if !delivered {
                     break;
@@ -206,6 +202,44 @@ impl Drop for Client {
     }
 }
 
+/// What one line from the daemon is.
+#[derive(Debug, PartialEq)]
+enum Incoming {
+    Reply(Result<Response, String>),
+    Event(Event),
+    Skip,
+}
+
+/// Sorts a line by its frame key before decoding what is inside it.
+///
+/// Replies are matched to requests by position, so the two kinds must not fail
+/// alike. An event this client does not know is skipped, as the protocol says
+/// of anything unknown, since nobody is waiting for it. A reply that cannot be
+/// decoded is handed on as an error, because the caller waiting for it would
+/// otherwise take the next reply for its own. A line with neither key comes
+/// from a daemon too old to frame its replies, which is also a reply.
+fn classify(line: &str) -> Incoming {
+    let value = match serde_json::from_str::<serde_json::Value>(line) {
+        Ok(value) => value,
+        Err(error) => return unreadable_reply(error),
+    };
+    if let Some(event) = value.get("event") {
+        return match serde_json::from_value::<Event>(event.clone()) {
+            Ok(event) => Incoming::Event(event),
+            Err(_) => Incoming::Skip,
+        };
+    }
+    let body = value.get("reply").unwrap_or(&value);
+    match serde_json::from_value::<Response>(body.clone()) {
+        Ok(response) => Incoming::Reply(Ok(response)),
+        Err(error) => unreadable_reply(error),
+    }
+}
+
+fn unreadable_reply(error: serde_json::Error) -> Incoming {
+    Incoming::Reply(Err(format!("unreadable reply from the daemon: {error}")))
+}
+
 const CLOSED: &str = "the daemon closed the connection";
 
 /// The daemon binary: `$AKBUN_TERMINAL_CORE`, else the one beside this
@@ -270,4 +304,34 @@ fn start_daemon(program: &Path, socket: &Path) -> Result<PathBuf, String> {
         let _ = child.wait();
     });
     Ok(log)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn an_event_that_cannot_be_decoded_is_skipped_not_taken_for_a_reply() {
+        assert_eq!(
+            classify(r#"{"event":{"type":"from_the_future","x":1}}"#),
+            Incoming::Skip
+        );
+        assert_eq!(
+            classify(r#"{"event":{"type":"exited","session":4}}"#),
+            Incoming::Event(Event::Exited { session: 4 })
+        );
+    }
+
+    #[test]
+    fn a_reply_that_cannot_be_decoded_is_an_error_reply() {
+        assert_eq!(
+            classify(r#"{"reply":{"type":"ok"}}"#),
+            Incoming::Reply(Ok(Response::Ok))
+        );
+        assert!(matches!(
+            classify(r#"{"reply":{"type":"from_the_future"}}"#),
+            Incoming::Reply(Err(_))
+        ));
+        assert!(matches!(classify("not json"), Incoming::Reply(Err(_))));
+    }
 }

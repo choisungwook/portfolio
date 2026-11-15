@@ -314,6 +314,7 @@ fn start(socket: &Path, mut args: Vec<String>) -> Result<u8, String> {
         name,
         command: args,
         parent,
+        owned: false,
     })? {
         Response::Spawned { session } => {
             println!("{session}");
