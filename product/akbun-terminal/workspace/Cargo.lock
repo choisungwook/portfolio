@@ -13,13 +13,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "akbun-terminal-ffi"
-version = "0.0.0"
-dependencies = [
- "akbun-terminal-core",
-]
-
-[[package]]
 name = "anyhow"
 version = "1.0.104"
 source = "registry+https://github.com/rust-lang/crates.io-index"

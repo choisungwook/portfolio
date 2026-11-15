@@ -1,5 +1,6 @@
 # Decisions
 
+- [core는 daemon이고 desktop과 tui는 그 client다](2026-11-core-is-a-daemon-with-two-clients.md)
 - [세션 이름은 테마 파랑의 보색으로, 대비를 채울 때까지 명도를 옮긴다](2026-09-session-names-in-the-complement.md)
 - [콘텐츠 확대와 주변 패널 크기 분리](2026-09-content-and-panel-zoom.md)
 

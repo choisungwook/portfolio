@@ -1,5 +1,9 @@
 # Knowledge Update Log
 
+## 2026-11-15
+
+- **Creation**: [core는 daemon이고 desktop과 tui는 그 client다](decisions/2026-11-core-is-a-daemon-with-two-clients.md) 결정 기록. `adr/2026-08-typed-boundary-before-a-process-boundary.md`의 결정이 바뀌어 그 파일은 삭제
+
 ## 2026-09-23
 
 - **Update**: [숨긴 패널의 constraint는 살아 있으므로 헤더의 hugging을 명시한다](decisions/2026-09-hidden-panes-still-pull-on-the-header.md)에 접힌 패널 divider 숨김 규칙 추가
