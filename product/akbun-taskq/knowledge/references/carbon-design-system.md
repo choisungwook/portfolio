@@ -16,8 +16,6 @@ sources:
     title: Notification pattern
 ---
 
-# Carbon Design System
-
 ## 원칙
 
 Carbon은 원칙 5개를 둔다[^what-is-carbon].
