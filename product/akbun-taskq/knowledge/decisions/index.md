@@ -10,4 +10,7 @@
 * [Approval waits by polling the events table](2026-11-db-driven-approval.md) - A pending approval is a database row, not an in-memory promise.
 * [Approval shows and stores the exact input, bound to a request id](2026-11-approval-shows-exact-input.md) - The unmasked input lives in its own table until decided; decisions name a request id and the API needs a per-start token.
 * [Permission profiles follow how the SDK evaluates a tool call](2026-11-permission-profiles.md) - What the SDK documentation changed in the original permission plan.
+* [New features start from an interface](2026-11-interface-first.md) - The interface comes first and callers import only it; the first implementation is wired in one place.
+* [Agent SDKs plug in behind one AgentBackend interface](2026-11-agent-backend-interface.md) - createWorker, preflight and ask; the gate policy stays shared and each backend maps its own hook to it.
+* [A call that reaches taskq itself stops the run for review](2026-11-tamper-stops-run.md) - Sandbox-off, data directory, taskq config and ~/.claude writes end the session; other denials only refuse the call.
 * [Release a bun-compiled binary that embeds Claude Code](2026-11-release-bun-binary.md) - One executable per platform built by bun; Node SEA and requiring an installed claude were rejected.

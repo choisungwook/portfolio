@@ -1,8 +1,8 @@
 import type { HookCallback, HookCallbackMatcher, HookEvent, HookJSONOutput } from '@anthropic-ai/claude-agent-sdk'
-import type { WorkerContext } from '../types.ts'
-import { decide, type GateContext } from './gate.ts'
-import { splitSegments } from './aws-guard.ts'
-import { clip } from './text.ts'
+import type { WorkerContext } from '../../types.ts'
+import { decide, tamperOf, type GateContext, type Decision } from '../../worker/gate.ts'
+import { splitSegments } from '../../worker/aws-guard.ts'
+import { clip } from '../../worker/text.ts'
 
 // Substrings of tool output that mean the target account login has expired.
 const EXPIRED_PATTERNS = [
@@ -11,7 +11,7 @@ const EXPIRED_PATTERNS = [
 // The runner masks secrets and then clips, so the worker keeps enough output for a whole key block to reach the masker.
 const RESULT_CLIP = 20000
 
-export interface RunState { toolCalls: number; expired: boolean }
+export interface RunState { toolCalls: number; expired: boolean; tamper?: string }
 
 export function detectExpiredCredentials(text: string): boolean {
   return EXPIRED_PATTERNS.some((pattern) => text.includes(pattern))
@@ -31,12 +31,28 @@ export function buildHooks(
     const toolInput = asRecord(input.tool_input)
     state.toolCalls += 1
     ctx.emit('tool_call', { tool: input.tool_name, input: clipInput(toolInput) })
+    const tamper = tamperOf(input.tool_name, toolInput, gate)
+    if (tamper !== null) {
+      if (state.tamper === undefined) {
+        state.tamper = tamper
+        ctx.emit('tamper_blocked', { tool: input.tool_name, reason: tamper })
+        abort.abort()
+      }
+      return verdict('deny', 'This call reaches taskq itself. The run is stopped for review.')
+    }
     const decision = decide(ctx.task.type, input.tool_name, toolInput, gate)
     if (decision === 'allow') return explicitAllow(ctx.task.type, input.tool_name)
-    const reason = decision === 'deny'
-      ? 'This tool is not allowed for this task type.'
-      : 'This call needs the user approval.'
-    return { hookSpecificOutput: { hookEventName: 'PreToolUse', permissionDecision: decision, permissionDecisionReason: reason } }
+    return verdict(decision, decision === 'deny' ? 'This tool is not allowed for this task type.' : 'This call needs the user approval.')
+  }
+
+  // A hook that throws would let the SDK fall back to the permission mode, which allows edits in acceptEdits and auto.
+  const failClosed = (hook: HookCallback): HookCallback => async (...args) => {
+    try {
+      return await hook(...args)
+    } catch (error) {
+      ctx.emit('error', { source: 'gate', error: clip(String(error), 300) })
+      return verdict('deny', 'The policy check failed, so the call is denied.')
+    }
   }
 
   const post: HookCallback = async (input): Promise<HookJSONOutput> => {
@@ -60,10 +76,14 @@ export function buildHooks(
   }
 
   return {
-    PreToolUse: [{ hooks: [pre] }],
+    PreToolUse: [{ hooks: [failClosed(pre)] }],
     PostToolUse: [{ hooks: [post] }],
     PostToolUseFailure: [{ hooks: [post] }],
   }
+}
+
+function verdict(decision: Exclude<Decision, 'allow'>, reason: string): HookJSONOutput {
+  return { hookSpecificOutput: { hookEventName: 'PreToolUse', permissionDecision: decision, permissionDecisionReason: reason } }
 }
 
 // The permission rules would otherwise re-ask a pipeline such as `aws ... | jq .`, which only Bash(aws *) covers.

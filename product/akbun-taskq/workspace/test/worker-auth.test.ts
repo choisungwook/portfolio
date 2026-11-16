@@ -4,7 +4,7 @@ import { chmodSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'nod
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { resolveConfig } from '../src/config.ts'
-import { buildEnv, preflight } from '../src/worker/auth.ts'
+import { buildEnv, preflight } from '../src/agents/claude/auth.ts'
 
 // Placeholder values only; no key-shaped literals appear in the source.
 const base = {

@@ -1,6 +1,7 @@
 import { execFile } from 'node:child_process'
 import { promisify } from 'node:util'
-import type { Config } from '../config.ts'
+import type { Config } from '../../config.ts'
+import type { PreflightResult } from '../types.ts'
 
 const run = promisify(execFile)
 // The child environment is built from an allow-list. Nothing else of the parent reaches the session or its tools.
@@ -37,9 +38,7 @@ export function caBundleEnv(config: Config): Record<string, string> {
   return config.caBundle ? { AWS_CA_BUNDLE: config.caBundle, NODE_EXTRA_CA_CERTS: config.caBundle } : {}
 }
 
-export interface Preflight { ok: boolean; reason?: string }
-
-export async function preflight(config: Config, base: NodeJS.ProcessEnv = process.env): Promise<Preflight> {
+export async function preflight(config: Config, base: NodeJS.ProcessEnv = process.env): Promise<PreflightResult> {
   if (config.provider === 'subscription') return { ok: true }
   if (config.provider === 'api_key') {
     return base.ANTHROPIC_API_KEY ? { ok: true } : { ok: false, reason: 'ANTHROPIC_API_KEY is not set' }

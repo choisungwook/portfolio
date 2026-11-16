@@ -5,15 +5,16 @@ import { promisify } from 'node:util'
 import {
   query as sdkQuery, type CanUseTool, type Options, type SDKMessage, type SDKResultMessage,
 } from '@anthropic-ai/claude-agent-sdk'
-import type { Config } from '../config.ts'
-import type { Worker, WorkerContext, WorkerResult } from '../types.ts'
+import type { Config } from '../../config.ts'
+import type { Worker, WorkerContext, WorkerResult } from '../../types.ts'
 import { buildEnv } from './auth.ts'
-import { claudeExecutable } from '../resources.ts'
+import { claudeExecutable } from '../../resources.ts'
 import { buildHooks, type RunState } from './hooks.ts'
-import type { GateContext } from './gate.ts'
+import type { GateContext } from '../../worker/gate.ts'
 import { outputsOf, profileFor, type Profile } from './profiles.ts'
-import { buildPrompt, systemAppend } from './prompt.ts'
-import { RESULT_SCHEMA, failed, toWorkerResult } from './result-schema.ts'
+import { buildPrompt, systemAppend } from '../../worker/prompt.ts'
+import { RESULT_SCHEMA, failed } from '../../worker/result-schema.ts'
+import { toWorkerResult } from './result.ts'
 
 export type QueryFn = (params: { prompt: string; options: Options }) => AsyncIterable<SDKMessage>
 
@@ -75,12 +76,15 @@ async function runTask(config: Config, runQuery: QueryFn, head: (repo: string) =
       else if (message.type === 'result') final = message
     }
   } catch (error) {
-    // The abort we trigger when the target login expires surfaces as an error here; anything else is real.
-    if (!state.expired) throw error
+    // The abort the hooks trigger (expired target login, tamper) surfaces as an error here; anything else is real.
+    if (!state.expired && state.tamper === undefined) throw error
   } finally {
     ctx.signal.removeEventListener('abort', onAbort)
   }
 
+  if (state.tamper !== undefined) {
+    return { outcome: 'failed', summary: state.tamper, stats: { tool_calls: state.toolCalls }, alerts: [], followups: [], tampered: true }
+  }
   if (state.expired) {
     return { outcome: 'needs_auth', summary: 'Target account login expired', stats: {}, alerts: [], followups: [], auth_scope: 'target' }
   }

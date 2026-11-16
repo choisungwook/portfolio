@@ -1,5 +1,5 @@
 import type { HookCallback, Options, SDKMessage } from '@anthropic-ai/claude-agent-sdk'
-import type { QueryFn } from '../src/worker/sdk-worker.ts'
+import type { QueryFn } from '../src/agents/claude/worker.ts'
 
 // A fake SDK query: `script` receives the options the worker built and returns the messages to yield.
 // It may call the hooks and canUseTool itself, the way the SDK would during a run.

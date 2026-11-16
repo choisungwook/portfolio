@@ -24,6 +24,17 @@ Pull requests run only the tests whose name carries `[critical]`: the invariants
 npm run test:critical
 ```
 
+## Add a feature: interface first
+
+Every new feature starts with its interface, and the implementation is written against it.
+
+1. Define the interface in `types.ts` of the feature's directory under `src/`: what callers pass, what they get back, and the contract an implementation must keep, as a comment on the interface.
+2. Put the first implementation in its own subdirectory or file, named after what it uses (`claude/`, `sqlite.ts`).
+3. Wire the implementation in one place, a registry or `src/cli/run.ts`. The runner, API, CLI and UI import only the interface.
+4. Test callers with a fake implementation of the interface, and the real implementation in its own tests.
+
+`src/agents/types.ts` with `src/agents/claude/` is the reference. Helper functions inside one implementation are not features and need no interface of their own.
+
 ## Look at the UI with invented data
 
 `npm run demo` seeds a temporary home through the project's own functions and serves it with a paused queue and no claimable task. It refuses to run when `TASKQ_HOME` is set, so it cannot seed a real home.

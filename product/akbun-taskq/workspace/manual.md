@@ -58,6 +58,7 @@ cp taskq.config.example.json taskq.config.json
 
 | 키 | 기본값 | 뜻 |
 |---|---|---|
+| `agent` | claude | 태스크를 실행할 agent SDK. 지금은 `claude`만 있다 |
 | `maxConcurrent` | 3 | 동시에 실행할 태스크 수 |
 | `maxTurns`, `maxBudgetUsd` | 60, 5 | 태스크 하나의 턴 수와 비용 상한 |
 | `autoMode` | true | `auto` 권한 모드를 쓸 수 없는 계정이면 false |

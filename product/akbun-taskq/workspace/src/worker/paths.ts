@@ -77,6 +77,11 @@ function globReaches(pattern: string, write: boolean, places: Places): boolean {
     .some((probe) => regex.test(probe) && blocked(probe, write, places))
 }
 
+// True when a glob pattern could match the given path. A plain path never matches here.
+export function globMatches(pattern: string, path: string): boolean {
+  return GLOB.test(pattern) && new RegExp(`^${globSource(pattern)}$`).test(path)
+}
+
 // Glob syntax to a regex source: * and ? stay in one segment, ** crosses segments, [..] and {a,b} are kept.
 function globSource(pattern: string): string {
   let out = ''

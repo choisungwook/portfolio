@@ -11,8 +11,9 @@ import { nowSec } from '../time.ts'
 import { recoverStale } from './recover.ts'
 import { executeRun } from './execute.ts'
 import type { Retrospect } from '../memory/retrospect.ts'
+import type { PreflightResult } from '../agents/types.ts'
 
-export type Preflight = () => Promise<{ ok: boolean; reason?: string }>
+export type Preflight = () => Promise<PreflightResult>
 
 export interface RunnerOptions {
   db: Db
