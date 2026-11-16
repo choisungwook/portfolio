@@ -9,7 +9,7 @@
 - [x] 2. Claude 전용 파일을 `src/agents/claude/`로 이동, `claudeBackend` 구현
 - [x] 3. config `agent` 키, `run.ts`와 retrospect를 인터페이스로 연결
 - [x] 4. 테스트 import 갱신, 레지스트리 테스트, typecheck
-- [ ] 5. wiki, manual, knowledge, 버전 갱신
+- [x] 5. wiki, manual, knowledge, 버전 갱신
 - [ ] 6. PR #1495 merge 후 branch를 master에서 다시 시작하고 commit, push, PR, squash merge
 
 ## 다음 세션이 알아야 할 것
