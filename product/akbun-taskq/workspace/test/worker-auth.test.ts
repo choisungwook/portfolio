@@ -1,5 +1,8 @@
 import { test, describe } from 'node:test'
 import assert from 'node:assert/strict'
+import { chmodSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
 import { resolveConfig } from '../src/config.ts'
 import { buildEnv, preflight } from '../src/worker/auth.ts'
 
@@ -113,6 +116,21 @@ describe('buildEnv', () => {
     assert.equal(without.CLAUDE_CODE_OAUTH_TOKEN, undefined)
   })
 
+  test('[critical] caBundle points both the aws CLI and Claude Code at the bundle, for any provider', () => {
+    const parent = { ...base, AWS_CA_BUNDLE: '/etc/shell.pem', NODE_EXTRA_CA_CERTS: '/etc/shell.pem' }
+    for (const provider of ['bedrock', 'api_key', 'subscription'] as const) {
+      const env = buildEnv(resolveConfig(home, { provider, caBundle: '/etc/inspection-ca.pem' }), parent)
+      assert.equal(env.AWS_CA_BUNDLE, '/etc/inspection-ca.pem', provider)
+      assert.equal(env.NODE_EXTRA_CA_CERTS, '/etc/inspection-ca.pem', provider)
+    }
+  })
+
+  test('[critical] without caBundle the shell CA variables pass through unchanged', () => {
+    const env = buildEnv(resolveConfig(home, { provider: 'bedrock' }), { ...base, AWS_CA_BUNDLE: '/etc/shell.pem' })
+    assert.equal(env.AWS_CA_BUNDLE, '/etc/shell.pem')
+    assert.equal(env.NODE_EXTRA_CA_CERTS, undefined)
+  })
+
   test('the base environment is not mutated', () => {
     const copy = { ...base }
     buildEnv(resolveConfig(home, { provider: 'subscription' }), base)
@@ -129,5 +147,21 @@ describe('preflight without network', () => {
     const config = resolveConfig('/h', { provider: 'api_key' })
     assert.equal((await preflight(config, {})).ok, false)
     assert.equal((await preflight(config, { ANTHROPIC_API_KEY: 'placeholder' })).ok, true)
+  })
+})
+
+describe('preflight with a fake aws CLI', () => {
+  test('[critical] the bedrock login check runs aws with the configured CA bundle', async () => {
+    const bin = mkdtempSync(join(tmpdir(), 'taskq-fake-aws-'))
+    const seen = join(bin, 'seen')
+    try {
+      writeFileSync(join(bin, 'aws'), `#!/bin/sh\nprintf '%s' "$AWS_CA_BUNDLE" > '${seen}'\n`)
+      chmodSync(join(bin, 'aws'), 0o755)
+      const config = resolveConfig('/h', { provider: 'bedrock', inferenceProfile: 'infer', caBundle: '/etc/inspection-ca.pem' })
+      assert.deepEqual(await preflight(config, { PATH: bin }), { ok: true })
+      assert.equal(readFileSync(seen, 'utf8'), '/etc/inspection-ca.pem')
+    } finally {
+      rmSync(bin, { recursive: true, force: true })
+    }
   })
 })

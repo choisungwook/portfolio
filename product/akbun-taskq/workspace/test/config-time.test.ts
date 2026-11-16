@@ -35,6 +35,21 @@ test('trustedRepos defaults to an empty list and must hold absolute paths', () =
   }
 })
 
+test('[critical] caBundle must be an absolute path', () => {
+  const relative = withHome({ caBundle: 'certs/ca.pem' })
+  try {
+    assert.throws(() => loadConfig({ TASKQ_HOME: relative }), /caBundle must be an absolute path/)
+  } finally {
+    rmSync(relative, { recursive: true, force: true })
+  }
+  const absolute = withHome({ caBundle: '/etc/inspection-ca.pem' })
+  try {
+    assert.equal(loadConfig({ TASKQ_HOME: absolute }).caBundle, '/etc/inspection-ca.pem')
+  } finally {
+    rmSync(absolute, { recursive: true, force: true })
+  }
+})
+
 test('isDay accepts only real calendar days', () => {
   assert.equal(isDay('2026-03-10'), true)
   assert.equal(isDay('2024-02-29'), true)

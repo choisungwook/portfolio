@@ -14,6 +14,7 @@ export interface Config {
   provider: Provider
   awsRegion: string
   inferenceProfile: string
+  caBundle?: string            // absolute path to a PEM bundle; for networks where a TLS inspection device re-signs certificates
   model?: string
   maxConcurrent: number
   staleTtlSec: number
@@ -61,5 +62,6 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
     throw new Error(`unknown provider: ${config.provider}`)
   }
   if (config.trustedRepos.some((repo) => !isAbsolute(repo))) throw new Error('trustedRepos must be absolute paths')
+  if (config.caBundle !== undefined && !isAbsolute(config.caBundle)) throw new Error('caBundle must be an absolute path')
   return config
 }
