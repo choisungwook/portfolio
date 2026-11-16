@@ -12,16 +12,22 @@
   padding: 12px 12px 12px 15px; color: var(--fg); background: var(--panel-soft); box-shadow: inset 3px 0 0 var(--bar, var(--muted));
 }
 .card:hover:not(:disabled) { background: var(--control); }
-.board-col[data-column="ready"] .card { --bar: var(--muted); }
-.board-col[data-column="running"] .card { --bar: var(--running); }
-.board-col[data-column="needs_approval"] .card { --bar: var(--needs-approval); }
-.board-col[data-column="needs_auth"] .card { --bar: var(--needs-auth); }
-.board-col[data-column="review"] .card { --bar: var(--review); }
-.board-col[data-column="done"] .card { --bar: var(--done); }
-.board-col[data-column="failed"] .card { --bar: var(--failed); }
-.board-col[data-column="draft"] .card { --bar: var(--border); }
+.board-col[data-column="ready"] .cards { --bar: var(--muted); }
+.board-col[data-column="running"] .cards { --bar: var(--running); }
+.board-col[data-column="needs_approval"] .cards { --bar: var(--needs-approval); }
+.board-col[data-column="needs_auth"] .cards { --bar: var(--needs-auth); }
+.board-col[data-column="review"] .cards { --bar: var(--review); }
+.board-col[data-column="done"] .cards { --bar: var(--done); }
+.board-col[data-column="failed"] .cards { --bar: var(--failed); }
+.board-col[data-column="draft"] .cards { --bar: var(--border); }
 .card-title { font-weight: 600; overflow-wrap: anywhere; }
-.card .badge { align-self: flex-start; }
+/* The run button is the card's footer: a sibling of the card button, so the two never nest. */
+.card-item { display: grid; }
+.card-item > .run-now {
+  justify-self: stretch; text-align: left; min-height: 32px; padding: 0 15px; font-size: var(--text-small);
+  background: var(--panel-soft); box-shadow: inset 3px 0 0 var(--bar, var(--muted)), inset 0 1px 0 var(--border);
+}
+.card-item > .run-now:hover:not(:disabled) { background: var(--control); }.card .badge { align-self: flex-start; }
 
 .graph-wrap { overflow: auto; background: var(--stage); border-radius: var(--radius); padding: 8px; max-height: 70vh; }
 .graph-wrap svg { display: block; }

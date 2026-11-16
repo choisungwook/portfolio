@@ -1,3 +1,4 @@
+import { queueChanged } from '../wake.ts'
 import { existsSync } from 'node:fs'
 import { Hono } from 'hono'
 import { serve, type ServerType } from '@hono/node-server'
@@ -24,6 +25,11 @@ export function createApp(deps: ApiDeps, token: string): Hono {
     return c.json({ error: 'internal error' }, 500)
   })
   api.use('*', requireToken(token))
+  // A successful write may make a task claimable or cancellable, so the runner looks at once instead of after pollSec.
+  api.use('*', async (c, next) => {
+    await next()
+    if (c.req.method !== 'GET' && c.res.status < 400) queueChanged.notify()
+  })
   registerTaskRoutes(api, deps)
   registerRunRoutes(api, deps)
   registerAlertRoutes(api, deps)

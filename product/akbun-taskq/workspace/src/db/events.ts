@@ -1,3 +1,4 @@
+import { eventWritten } from '../wake.ts'
 import type { Db } from './open.ts'
 import type { EventKind } from '../types.ts'
 import { maskDeep } from '../mask.ts'
@@ -13,6 +14,8 @@ export function insertEvent(db: Db, event: {
   const payload = JSON.stringify(maskDeep(event.payload))
   const result = db.prepare('INSERT INTO events (task_id, run_id, ts, kind, payload) VALUES (?, ?, ?, ?, ?)')
     .run(event.task_id, event.run_id, nowSec(), event.kind, payload)
+  // Waiters resume after the current synchronous call stack, so an enclosing transaction has committed by then.
+  eventWritten.notify()
   return Number(result.lastInsertRowid)
 }
 

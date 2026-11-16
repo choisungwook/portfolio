@@ -22,7 +22,7 @@ export interface Config {
   maxConcurrent: number
   staleTtlSec: number
   heartbeatSec: number
-  pollSec: number
+  pollSec: number              // fallback wait for changes made by another process; in-process changes wake at once
   port: number
   maxTurns: number
   maxBudgetUsd: number
@@ -42,7 +42,7 @@ export const DEFAULTS: Omit<Config, 'home'> = {
   maxConcurrent: 3,
   staleTtlSec: 300,
   heartbeatSec: 30,
-  pollSec: 2,
+  pollSec: 60,
   port: 4517,
   maxTurns: 60,
   maxBudgetUsd: 5,

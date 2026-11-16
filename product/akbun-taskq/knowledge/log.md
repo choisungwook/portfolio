@@ -4,6 +4,8 @@ concept를 추가·수정·삭제할 때마다 오늘 날짜 섹션을 맨 위�
 
 ## 2026-11-16
 
+* **Creation**: [The runner waits on an in-process wake signal with a 60 second fallback](decisions/2026-11-wake-instead-of-poll.md) 결정 기록. 폴링 2초를 60초로 바꾸고 같은 프로세스 변경은 신호로 깨움.
+* **Update**: [Approval waits on a database row, woken by events](decisions/2026-11-db-driven-approval.md) 결정 기록. 1초 폴링에서 이벤트 신호와 60초 fallback으로 바뀜.
 * **Creation**: [The taskq UI follows IBM Carbon through a token interface](decisions/2026-11-carbon-design-system.md) 결정 기록. Carbon 선택 이유와 USWDS, GOV.UK를 고르지 않은 이유.
 * **Creation**: [Carbon Design System principles and patterns used by the taskq UI](references/carbon-design-system.md) 참고 자료 사본. 원칙, 상태 표시 규칙, 알림 규칙.
 * **Creation**: [New features start from an interface](decisions/2026-11-interface-first.md) 결정 기록. The interface comes first and callers import only it; the first implementation is wired in one place.

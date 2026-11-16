@@ -12,6 +12,8 @@ import { recoverStale } from './recover.ts'
 import { executeRun } from './execute.ts'
 import type { Retrospect } from '../memory/retrospect.ts'
 import type { PreflightResult } from '../agents/types.ts'
+import { queueChanged } from '../wake.ts'
+import type { RunControl } from './control.ts'
 
 export type Preflight = () => Promise<PreflightResult>
 
@@ -24,7 +26,7 @@ export interface RunnerOptions {
   authRecheckMs?: number     // how often a preflight pause is re-checked while the queue is paused
 }
 
-export interface Runner {
+export interface Runner extends RunControl {
   start(): Promise<void>
   stop(): Promise<void>
 }
@@ -38,7 +40,8 @@ export function createRunner({
 }: RunnerOptions): Runner {
   const runnerId = `runner-${newId()}`
   const active = new Map<string, { controller: AbortController; done: Promise<void> }>()
-  let timer: NodeJS.Timeout | undefined
+  const requested = new Set<string>()
+  const stopped = new AbortController()
   let running = false
   let verifiedAt = 0
   let lastRecheck = 0
@@ -73,7 +76,10 @@ export function createRunner({
     insertEvent(db, { task_id: task.id, run_id: runId, kind: 'claimed', payload: { runner: runnerId, resume: task.session_id } })
     const done = executeRun({ db, config, worker, runnerId, retrospect }, task, runId, controller.signal)
       .catch((error: unknown) => console.error(`taskq: run ${runId} crashed: ${String(error)}`))
-      .finally(() => active.delete(task.id))
+      .finally(() => {
+        active.delete(task.id)
+        queueChanged.notify()
+      })
     active.set(task.id, { controller, done })
   }
 
@@ -85,6 +91,14 @@ export function createRunner({
       await recheckAuth()
       return
     }
+    // Run-now requests go first. A request whose task cannot be claimed (lock held, no longer ready) is dropped;
+    // a ready task still runs in the normal order.
+    for (const id of [...requested]) {
+      if (active.size >= config.maxConcurrent) break
+      requested.delete(id)
+      if (!(await authOk())) return
+      if (claimTask(db, id, runnerId)) launch(getTask(db, id)!)
+    }
     while (active.size < config.maxConcurrent) {
       if (isQueuePaused(db)) return
       const candidate = nextEligible(db)
@@ -94,24 +108,29 @@ export function createRunner({
     }
   }
 
+  // Wakes at once on an in-process change; otherwise every pollSec, which picks up what the CLI wrote.
   async function loop(): Promise<void> {
-    try {
-      await tick()
-    } catch (error) {
-      console.error(`taskq: tick failed: ${String(error)}`)
+    while (running) {
+      await queueChanged.wait(config.pollSec * 1000, stopped.signal)
+      if (!running) return
+      await tick().catch((error: unknown) => console.error(`taskq: tick failed: ${String(error)}`))
     }
-    if (running) timer = setTimeout(() => void loop(), config.pollSec * 1000)
   }
 
   return {
     async start() {
       recoverStale(db, config, true, new Set())
       running = true
-      await loop()
+      await tick().catch((error: unknown) => console.error(`taskq: tick failed: ${String(error)}`))
+      void loop()
+    },
+    runNow(taskId) {
+      requested.add(taskId)
+      queueChanged.notify()
     },
     async stop() {
       running = false
-      clearTimeout(timer)
+      stopped.abort()
       const runs = [...active.values()]
       for (const run of runs) run.controller.abort()
       await Promise.race([

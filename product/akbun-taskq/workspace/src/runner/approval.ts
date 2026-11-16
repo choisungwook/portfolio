@@ -9,7 +9,7 @@ import { raiseAlert } from '../alerts/rules.ts'
 import { mask, maskDeep } from '../mask.ts'
 import { clipDeep } from '../clip.ts'
 import { nowSec } from '../time.ts'
-import { sleep } from './sleep.ts'
+import { eventWritten } from '../wake.ts'
 
 // Parks the run until the request's row gets a decision. The row is written here with the exact input; the events
 // table gets only the masked, clipped copy. A request that expired (its run or task ended) is denied.
@@ -35,7 +35,8 @@ export async function askApproval(
     const decision = approvalDecision(db, requestId)
     if (decision === 'approved') return true
     if (decision === 'denied' || decision === 'expired') return false
-    await sleep(config.pollSec * 1000, signal)
+    // A decision made through the API writes an event and wakes this at once; one made by the CLI waits for the timeout.
+    await eventWritten.wait(config.pollSec * 1000, signal)
   }
   throw new Error('aborted while waiting for approval')
 }
