@@ -7,7 +7,7 @@
 | 토큰 안내 | `token-notice` | 없음 | 토큰이 없거나 서버가 401을 돌려주면 전체 너비로 보인다. `taskq run`이 출력한 URL을 열라고 안내하고, 그 뒤로 폴링과 요청을 멈춘다 |
 | 헤더 검색 | `search` | `GET /api/search` | 과거 run을 FTS로 검색한다 |
 | 검색 결과 | `search-results`, `search-close` | `GET /api/search` | 일치하는 run을 나열한다. 작업 제목은 행의 `task_title`을 쓴다. 항목을 누르면 run dialog가 열린다 |
-| 알림 | `notice` | 모든 변경 요청 | 저장 성공과 서버 오류 메시지를 Carbon inline notification(색 띠, 아이콘, 글, 닫기 버튼)으로 보여준다. 타이머로 사라지지 않고, 닫기 버튼을 누르거나 다음 메시지가 올 때까지 남는다 |
+| 알림 | `notice` | 모든 변경 요청 | 저장 성공과 서버 오류 메시지를 화면 오른쪽 위의 Carbon toast(색 띠, 아이콘, 글, 닫기 버튼)로 보여준다. 타이머로 사라지지 않고, 닫기 버튼을 누르거나 다음 메시지가 올 때까지 남는다. 닫으면 포커스는 알림을 일으킨 컨트롤로 돌아간다 |
 | 새 작업 | `new-task-button`, `task-form`, `task-form-form`, `task-form-error` | `POST /api/tasks`, `GET /api/settings` | 작업을 추가한다. 초안 체크는 기본으로 켜져 있고, 끄면 `status: "ready"`로 보낸다. 제목, 의도, 주의 사항, lock_key, target_profile, repo, output_path, priority, depends_on(작업 id 하나) 입력을 받는다. access_skill은 등록된 접근 스킬 목록(`none` 포함)을 고르는 선택 목록이며, 설정 dialog를 닫을 때마다 다시 채운다 |
 | 캘린더 탭 | `calendar`, `calendar-toolbar`, `calendar-today`, `calendar-prev`, `calendar-next`, `calendar-views`, `calendar-label`, `calendar-body` | `GET /api/runs`, `GET /api/stats/daily`, `GET /api/lock-keys` | 툴바 한 줄이다. 왼쪽은 Today, 이전·다음 화살표(`calendar-prev`, `calendar-next`), 가운데는 큰 제목(월 "November 2026", 주 "Nov 9 – 15, 2026", 일 "Sunday, November 15, 2026"), 오른쪽은 Day·Week·Month 전환이다. 탭을 누르면(이미 열린 탭이어도) 오늘로 가고 현재 시각으로 스크롤한다. Today도 같다. 주·일 보기는 요일 머리글(`day-head`)을 누르면 그 날의 일 보기로 간다. 월 보기는 6주를 `/api/runs`와 `/api/stats/daily`로 읽는다. 500개를 넘으면 "Showing first N runs" 안내를 보인다. 키보드: 이전·다음 버튼에서 좌우 화살표, 캘린더 안에서 `t`(오늘), `d`, `w`, `m`(보기 전환) |
 | 캘린더 시간표 | `time-grid`, `time-head`, `day-head`, `now-line` | `GET /api/runs` | 주·일 보기. 머리글 행은 위에 고정되고 시간 영역만 세로로 스크롤한다. 시간당 48 px이며 시간선은 `--border`다. 왼쪽 시간 줄은 브라우저 로케일 형식을 따른다. 오늘 열에는 `--danger` 2 px 현재 시각선(왼쪽 끝 점)이 있고 30초마다 갱신한다. 다시 그릴 때 스크롤 위치와 포커스를 유지하며, 범위가 바뀔 때만 현재 시각(오늘이 없으면 8 AM)을 화면 높이의 3분의 1 위치로 맞춘다 |
@@ -75,11 +75,11 @@
 
 ## 디자인 토큰
 
-색, 반경, 그림자, 전환 시간은 모두 `workspace/ui/css/base.css`의 `:root`에 CSS 변수로 있다. 라이트가 기본이고 `prefers-color-scheme: dark`에서 덮어쓴다. 나머지 CSS 파일과 JS는 색 값을 직접 쓰지 않고 변수만 참조한다.
+UI는 IBM Carbon을 토큰 계약으로 따른다. 구조와 규칙은 [architecture.md](./architecture.md)의 "UI theme" 절에 있다.
 
-가져온 토큰은 `--bg`, `--panel`, `--panel-soft`, `--stage`, `--fg`, `--muted`, `--border`, `--accent`, `--accent-soft`, `--on-accent`, `--control`, `--chip`, `--hover`, `--danger`, `--radius`, `--radius-s`, `--shadow-1`, `--shadow-2`, `--ease`다.
-
-이 UI가 추가로 정의한 토큰은 상태와 결과 색이다. `--done`, `--needs-approval`, `--needs-auth`, `--review`, `--high`는 라이트와 다크 값을 따로 둔다. `--failed`는 `--danger`, `--running`은 `--accent`, `--stale`은 `--muted`를 가리킨다. 상태 배경은 `color-mix()`로 이 색을 패널에 얹어 만든다.
+- 컴포넌트 CSS가 읽을 수 있는 토큰 목록은 `workspace/ui/css/theme/contract.css`에 있고, 값은 `workspace/ui/css/theme/carbon.css`가 light(g10)와 dark(g100)로 채운다.
+- 나머지 CSS 파일과 JS는 색 값을 직접 쓰지 않고 계약 토큰만 참조한다. `test/ui-tokens.test.ts`가 검사한다.
+- 상태 색(`--done`, `--failed`, `--needs-approval`, `--needs-auth`, `--review`, `--running`, `--stale`)은 각각 독립된 값이고, 알림과 tag 배경은 `--error-soft`, `--warning-soft`, `--success-soft`, `--info-soft`를 쓴다.
 
 ## 로컬에서 확인하기
 

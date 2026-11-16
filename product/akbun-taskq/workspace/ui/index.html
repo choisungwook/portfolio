@@ -31,7 +31,7 @@
     </svg>
     <span>Settings</span>
   </button>
-  <div class="notice" data-area="notice" role="status" aria-live="polite"></div>
+  <div class="notice" data-area="notice"><span class="notice-text" role="status" aria-live="polite"></span></div>
 </header>
 
 <section class="token-notice" data-area="token-notice" role="alert" hidden>
@@ -44,7 +44,7 @@
 </section>
 
 <div class="layout">
-  <main class="main">
+  <main class="main" tabindex="-1">
     <nav class="tabs" role="tablist" aria-label="Views">
       <button type="button" role="tab" id="tab-calendar" data-tab="calendar" aria-controls="view-calendar">Calendar</button>
       <button type="button" role="tab" id="tab-board" data-tab="board" aria-controls="view-board">Board</button>

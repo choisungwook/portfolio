@@ -31,17 +31,20 @@ h3 { font-size: 14px; margin: 16px 0 8px; }
   position: sticky; top: 0; z-index: 10;
 }
 
-/* Inline notification (Carbon): status color bar, icon, message, and a close button. It stays until closed or replaced. */
+/* Toast notification (Carbon): top right under the header, so the header keeps one height. Status bar, icon, message
+   and a close button. It stays until closed or replaced. The icon's alternative text is empty: the message says it. */
 .notice {
-  flex-basis: 100%; display: flex; align-items: center; gap: 10px; margin: 0; padding: 0 0 0 12px; min-height: 40px;
-  font-size: var(--text-small); background: var(--info-soft); box-shadow: inset 3px 0 0 var(--running);
+  position: fixed; top: 60px; right: 16px; z-index: 20; width: min(360px, calc(100vw - 32px));
+  display: flex; align-items: center; gap: 10px; margin: 0; padding: 0 0 0 16px; min-height: 48px;
+  font-size: var(--text-small); background: var(--info-soft); color: var(--fg);
+  box-shadow: inset 3px 0 0 var(--running), inset 0 0 0 1px var(--border), var(--shadow-2);
 }
-.notice:empty, .notice:not([data-kind]) { display: none; }
-.notice::before { content: "i"; flex: none; width: 16px; height: 16px; border-radius: 50%; font: 700 11px/16px var(--font-sans); text-align: center; color: var(--on-accent); background: var(--running); }
-.notice[data-kind="error"] { background: var(--error-soft); box-shadow: inset 3px 0 0 var(--failed); }
-.notice[data-kind="error"]::before { content: "!"; background: var(--failed); }
-.notice[data-kind="ok"] { background: var(--success-soft); box-shadow: inset 3px 0 0 var(--done); }
-.notice[data-kind="ok"]::before { content: "\2713"; background: var(--done); }
+.notice:not([data-kind]) { display: none; }
+.notice::before { content: "i"; content: "i" / ""; flex: none; width: 16px; height: 16px; border-radius: 50%; font: 700 11px/16px var(--font-sans); text-align: center; color: var(--on-accent); background: var(--running); }
+.notice[data-kind="error"] { background: var(--error-soft); box-shadow: inset 3px 0 0 var(--failed), inset 0 0 0 1px var(--border), var(--shadow-2); }
+.notice[data-kind="error"]::before { content: "!"; content: "!" / ""; background: var(--failed); }
+.notice[data-kind="ok"] { background: var(--success-soft); box-shadow: inset 3px 0 0 var(--done), inset 0 0 0 1px var(--border), var(--shadow-2); }
+.notice[data-kind="ok"]::before { content: "\2713"; content: "\2713" / ""; background: var(--done); }
 .notice-text { flex: 1; overflow-wrap: anywhere; }
 .notice-close { flex: none; width: 40px; height: 40px; padding: 0; font-size: 18px; line-height: 1; color: var(--fg); }
 
@@ -58,8 +61,9 @@ h3 { font-size: 14px; margin: 16px 0 8px; }
   display: grid; grid-template-columns: minmax(0, 1fr) 340px; gap: 16px; padding: 12px 16px; align-items: start;
 }
 .main { min-width: 0; }
+.main:focus { outline: none; }
 .must-check {
-  position: sticky; top: 84px; max-height: calc(100vh - 100px); overflow: auto;
+  position: sticky; top: 64px; max-height: calc(100vh - 80px); overflow: auto;
   background: var(--panel); padding: 16px;
 }
 @media (max-width: 900px) {
@@ -124,20 +128,21 @@ textarea { width: 100%; padding: 8px 12px; }
 .badge.sev-critical { background: var(--error-soft); }
 .badge.sev-high { background: var(--warning-soft); }
 
-/* Status indicator (Carbon): a symbol, a color and the status word together, so color is never the only signal. */
+/* Status indicator (Carbon): a symbol, a color and the status word together, so color is never the only signal.
+   The symbol has empty alternative text: a screen reader reads only the word. */
 .status-ind { display: inline-flex; align-items: center; gap: 6px; font-weight: 600; }
 .status-ind::before {
   flex: none; width: 16px; text-align: center; font-size: 14px; line-height: 1; color: var(--ink, var(--stale));
 }
-.status-ind[data-status="draft"]::before { content: "\25CC"; --ink: var(--stale); }
-.status-ind[data-status="ready"]::before { content: "\25CB"; --ink: var(--stale); }
-.status-ind[data-status="stale"]::before { content: "\25CB"; --ink: var(--stale); }
-.status-ind[data-status="running"]::before { content: "\25CF"; --ink: var(--running); }
-.status-ind[data-status="review"]::before { content: "\25A0"; --ink: var(--review); }
-.status-ind[data-status="needs_approval"]::before { content: "\25B2"; --ink: var(--needs-approval); }
-.status-ind[data-status="needs_auth"]::before { content: "\25C6"; --ink: var(--needs-auth); }
-.status-ind[data-status="done"]::before { content: "\2714"; --ink: var(--done); }
-.status-ind[data-status="failed"]::before { content: "\2716"; --ink: var(--failed); }
+.status-ind[data-status="draft"]::before { content: "\25CC"; content: "\25CC" / ""; --ink: var(--stale); }
+.status-ind[data-status="ready"]::before { content: "\25CB"; content: "\25CB" / ""; --ink: var(--stale); }
+.status-ind[data-status="stale"]::before { content: "\25CB"; content: "\25CB" / ""; --ink: var(--stale); }
+.status-ind[data-status="running"]::before { content: "\25CF"; content: "\25CF" / ""; --ink: var(--running); }
+.status-ind[data-status="review"]::before { content: "\25A0"; content: "\25A0" / ""; --ink: var(--review); }
+.status-ind[data-status="needs_approval"]::before { content: "\25B2"; content: "\25B2" / ""; --ink: var(--needs-approval); }
+.status-ind[data-status="needs_auth"]::before { content: "\25C6"; content: "\25C6" / ""; --ink: var(--needs-auth); }
+.status-ind[data-status="done"]::before { content: "\2714"; content: "\2714" / ""; --ink: var(--done); }
+.status-ind[data-status="failed"]::before { content: "\2716"; content: "\2716" / ""; --ink: var(--failed); }
 
 pre {
   margin: 4px 0; padding: 12px; background: var(--panel-soft); border-radius: var(--radius-s);
