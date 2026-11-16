@@ -36,7 +36,7 @@ tar -xzf taskq-darwin-arm64.tar.gz
 xattr -d com.apple.quarantine taskq
 ```
 
-바이너리를 쓰면 이 문서의 `node bin/taskq`를 `taskq`로 바꿔 읽는다. 설정 파일과 `TASKQ_HOME`은 같다. 들어 있는 Claude Code는 첫 세션 때 임시 디렉터리에 한 번 풀린다.
+바이너리를 쓰면 이 문서의 `node bin/taskq`를 `taskq`로 바꿔 읽는다. `taskq version`이 taskq와 들어 있는 Claude Code의 버전을 출력한다. 설정 파일과 `TASKQ_HOME`은 같다. 들어 있는 Claude Code는 첫 세션 때 임시 디렉터리에 한 번 풀린다.
 
 ## 3. 설정 파일 만들기
 

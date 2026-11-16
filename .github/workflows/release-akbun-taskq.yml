@@ -56,10 +56,12 @@ jobs:
       - name: Build binary
         run: node scripts/build-binary.ts dist/taskq
 
-      # Without Node on PATH: opening the database runs the embedded schema, and list reads it back.
+      # Without Node on PATH: version extracts and runs the embedded Claude Code, opening the database runs the
+      # embedded schema, and list reads it back.
       - name: Smoke test
         run: |
           home=$(mktemp -d)
+          env -i HOME="$home" PATH=/usr/bin:/bin dist/taskq version | grep -q 'Claude Code'
           env -i HOME="$home" TASKQ_HOME="$home" TASKQ_NO_NOTIFY=1 PATH=/usr/bin:/bin dist/taskq add --type research --intent smoke
           env -i HOME="$home" TASKQ_HOME="$home" TASKQ_NO_NOTIFY=1 PATH=/usr/bin:/bin dist/taskq list | grep -q smoke
 

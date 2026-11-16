@@ -35,18 +35,27 @@ test('trustedRepos defaults to an empty list and must hold absolute paths', () =
   }
 })
 
-test('[critical] caBundle must be an absolute path', () => {
+test('[critical] caBundle must be an absolute path to an existing file', () => {
   const relative = withHome({ caBundle: 'certs/ca.pem' })
   try {
     assert.throws(() => loadConfig({ TASKQ_HOME: relative }), /caBundle must be an absolute path/)
   } finally {
     rmSync(relative, { recursive: true, force: true })
   }
-  const absolute = withHome({ caBundle: '/etc/inspection-ca.pem' })
+  const missing = withHome({ caBundle: '/nonexistent/inspection-ca.pem' })
   try {
-    assert.equal(loadConfig({ TASKQ_HOME: absolute }).caBundle, '/etc/inspection-ca.pem')
+    assert.throws(() => loadConfig({ TASKQ_HOME: missing }), /caBundle \/nonexistent\/inspection-ca.pem does not exist/)
   } finally {
-    rmSync(absolute, { recursive: true, force: true })
+    rmSync(missing, { recursive: true, force: true })
+  }
+  const home = withHome()
+  const bundle = join(home, 'inspection-ca.pem')
+  writeFileSync(bundle, '')
+  writeFileSync(join(home, 'taskq.config.json'), JSON.stringify({ caBundle: bundle }))
+  try {
+    assert.equal(loadConfig({ TASKQ_HOME: home }).caBundle, bundle)
+  } finally {
+    rmSync(home, { recursive: true, force: true })
   }
 })
 

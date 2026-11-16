@@ -1,4 +1,7 @@
+import { execFileSync } from 'node:child_process'
 import { loadConfig } from '../config.ts'
+import { claudeExecutable } from '../resources.ts'
+import pkg from '../../package.json' with { type: 'json' }
 import { openDb } from '../db/open.ts'
 import * as tasks from './commands.ts'
 import * as info from './info.ts'
@@ -30,7 +33,7 @@ const USAGE = `usage: taskq <command> [options]
       [--repo] [--output] [--priority N] [--depends-on ID]... [--draft]   (ready unless --draft)
   list [--status S]    show ID     resume ID    done ID
   approve ID [--request REQUEST_ID --yes]    deny ID [--request REQUEST_ID --yes]
-  alerts               log [--date YYYY-MM-DD]    search QUERY    run
+  alerts               log [--date YYYY-MM-DD]    search QUERY    run    version
   skills list | add PATH | remove NAME | discover
   pause [--reason TEXT]    unpause    cancel ID    retry ID [--draft] [--resume]`
 
@@ -38,6 +41,10 @@ export async function main(argv: string[]): Promise<void> {
   const [name, ...args] = argv
   if (!name || name === 'help' || name === '--help') {
     console.log(USAGE)
+    return
+  }
+  if (name === 'version') {
+    printVersion()
     return
   }
   const config = loadConfig()
@@ -61,6 +68,13 @@ export async function main(argv: string[]): Promise<void> {
   } finally {
     db.close()
   }
+}
+
+// The binary also runs its embedded Claude Code, so a broken extraction shows up here and not at the first session.
+function printVersion(): void {
+  console.log(`taskq ${pkg.version}`)
+  const claude = claudeExecutable()
+  if (claude) console.log(`claude ${execFileSync(claude, ['--version'], { encoding: 'utf8' }).trim()}`)
 }
 
 await main(process.argv.slice(2))

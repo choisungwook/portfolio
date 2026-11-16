@@ -362,7 +362,7 @@ The approval input is the one exemption. The exact text is stored in `approvals.
 | A skill proposal never writes SKILL.md | `test/proposal-target.test.ts`: a skill proposal targeting SKILL.md |
 | An access-skill registration rejects a relative path and a folder inside the data directory | `test/skills-inspect.test.ts`: a relative path, and a folder inside the data directory or outputs |
 | An arbitrary parent variable and AWS_ACCESS_KEY_ID never reach the child, for any provider | `test/worker-auth.test.ts`: nothing outside the allow-list reaches the child |
-| `caBundle` reaches the aws CLI and Claude Code for every provider and the bedrock preflight; without it the shell's CA passes through; a relative path is refused | `test/worker-auth.test.ts`: the three caBundle tests; `test/config-time.test.ts`: caBundle must be an absolute path |
+| `caBundle` reaches the aws CLI and Claude Code for every provider and the bedrock preflight; without it the shell's CA passes through; a relative or missing path is refused | `test/worker-auth.test.ts`: the three caBundle tests; `test/config-time.test.ts`: caBundle must be an absolute path to an existing file |
 
 ## API
 

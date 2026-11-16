@@ -63,5 +63,6 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
   }
   if (config.trustedRepos.some((repo) => !isAbsolute(repo))) throw new Error('trustedRepos must be absolute paths')
   if (config.caBundle !== undefined && !isAbsolute(config.caBundle)) throw new Error('caBundle must be an absolute path')
+  if (config.caBundle !== undefined && !existsSync(config.caBundle)) throw new Error(`caBundle ${config.caBundle} does not exist`)
   return config
 }
