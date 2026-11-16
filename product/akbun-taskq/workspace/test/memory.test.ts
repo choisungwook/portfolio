@@ -2,6 +2,7 @@ import { test, describe } from 'node:test'
 import assert from 'node:assert/strict'
 import { join, sep } from 'node:path'
 import { createRetrospector, safeName } from '../src/memory/retrospect.ts'
+import { claudeAsk } from '../src/agents/claude/ask.ts'
 import { findSimilar } from '../src/memory/similar.ts'
 import { createRunner } from '../src/runner/runner.ts'
 import { listAlerts } from '../src/db/alerts.ts'
@@ -35,7 +36,7 @@ describe('retrospect', () => {
       { file: '../../etc/passwd', text: 'escape attempt' },
       { file: 'Pref Notes.md', text: 'prefers short summaries' },
     ], [{ file: 'skill-a', text: 'should be dropped: no skillsDir' }])])
-    await createRetrospector({ db: env.db, config: env.config, query })(task as Task, finished)
+    await createRetrospector({ db: env.db, config: env.config, ask: (request) => claudeAsk(env.config, request, query) })(task as Task, finished)
     const rows = listProposals(env.db, 'pending')
     assert.equal(rows.length, 2)
     const memoryDir = join(env.home, 'memory')
@@ -52,7 +53,7 @@ describe('retrospect', () => {
     const task = addTask(env.db, { data: { intent: 'deploy staging' } })
     const { query } = fakeQuery(() => [notes([], [{ file: 'deploy-staging', text: 'steps' }])])
     const before = Math.floor(Date.now() / 1000)
-    await createRetrospector({ db: env.db, config: env.config, query })(task as Task, finished)
+    await createRetrospector({ db: env.db, config: env.config, ask: (request) => claudeAsk(env.config, request, query) })(task as Task, finished)
     const rows = listProposals(env.db, 'pending')
     assert.equal(rows.length, 1)
     assert.equal(rows[0].kind, 'skill')
@@ -69,7 +70,7 @@ describe('retrospect', () => {
     const { query } = fakeQuery(() => [notes([], [
       { file: 'deploy-staging', text: 'first' }, { file: 'deploy-staging', text: 'second' },
     ])])
-    await createRetrospector({ db: env.db, config: env.config, query })(task as Task, finished)
+    await createRetrospector({ db: env.db, config: env.config, ask: (request) => claudeAsk(env.config, request, query) })(task as Task, finished)
     const targets = listProposals(env.db, 'pending').map((row) => row.target_path)
     assert.equal(targets.length, 2)
     assert.notEqual(targets[0], targets[1])
@@ -79,7 +80,7 @@ describe('retrospect', () => {
     fresh()
     const task = addTask(env.db)
     const { query, calls } = fakeQuery(() => [notes([])])
-    await createRetrospector({ db: env.db, config: env.config, query })(task as Task, finished)
+    await createRetrospector({ db: env.db, config: env.config, ask: (request) => claudeAsk(env.config, request, query) })(task as Task, finished)
     assert.deepEqual(calls[0].tools, [])
     assert.deepEqual(calls[0].settingSources, [])
     assert.equal(calls[0].permissionMode, 'dontAsk')

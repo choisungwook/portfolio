@@ -4,7 +4,7 @@ import { mkdirSync, mkdtempSync, realpathSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { resolveConfig } from '../src/config.ts'
-import { createSdkWorker } from '../src/worker/sdk-worker.ts'
+import { createSdkWorker } from '../src/agents/claude/worker.ts'
 import type { Task, WorkerContext } from '../src/types.ts'
 import { fakeQuery, hookOf, init, success } from './fake-query.ts'
 

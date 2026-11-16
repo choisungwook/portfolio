@@ -1,8 +1,8 @@
 import type { HookCallback, HookCallbackMatcher, HookEvent, HookJSONOutput } from '@anthropic-ai/claude-agent-sdk'
-import type { WorkerContext } from '../types.ts'
-import { decide, tamperOf, type GateContext, type Decision } from './gate.ts'
-import { splitSegments } from './aws-guard.ts'
-import { clip } from './text.ts'
+import type { WorkerContext } from '../../types.ts'
+import { decide, tamperOf, type GateContext, type Decision } from '../../worker/gate.ts'
+import { splitSegments } from '../../worker/aws-guard.ts'
+import { clip } from '../../worker/text.ts'
 
 // Substrings of tool output that mean the target account login has expired.
 const EXPIRED_PATTERNS = [

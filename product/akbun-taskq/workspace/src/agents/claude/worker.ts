@@ -5,15 +5,16 @@ import { promisify } from 'node:util'
 import {
   query as sdkQuery, type CanUseTool, type Options, type SDKMessage, type SDKResultMessage,
 } from '@anthropic-ai/claude-agent-sdk'
-import type { Config } from '../config.ts'
-import type { Worker, WorkerContext, WorkerResult } from '../types.ts'
+import type { Config } from '../../config.ts'
+import type { Worker, WorkerContext, WorkerResult } from '../../types.ts'
 import { buildEnv } from './auth.ts'
-import { claudeExecutable } from '../resources.ts'
+import { claudeExecutable } from '../../resources.ts'
 import { buildHooks, type RunState } from './hooks.ts'
-import type { GateContext } from './gate.ts'
+import type { GateContext } from '../../worker/gate.ts'
 import { outputsOf, profileFor, type Profile } from './profiles.ts'
-import { buildPrompt, systemAppend } from './prompt.ts'
-import { RESULT_SCHEMA, failed, toWorkerResult } from './result-schema.ts'
+import { buildPrompt, systemAppend } from '../../worker/prompt.ts'
+import { RESULT_SCHEMA, failed } from '../../worker/result-schema.ts'
+import { toWorkerResult } from './result.ts'
 
 export type QueryFn = (params: { prompt: string; options: Options }) => AsyncIterable<SDKMessage>
 

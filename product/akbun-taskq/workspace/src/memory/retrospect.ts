@@ -1,13 +1,10 @@
 import { join } from 'node:path'
-import { query as sdkQuery, type Options } from '@anthropic-ai/claude-agent-sdk'
 import type { Config } from '../config.ts'
 import type { Db } from '../db/open.ts'
 import { insertProposal } from '../db/proposals.ts'
 import { raiseAlert } from '../alerts/rules.ts'
-import { buildEnv } from '../worker/auth.ts'
-import { claudeExecutable } from '../resources.ts'
 import { nowSec } from '../time.ts'
-import type { QueryFn } from '../worker/sdk-worker.ts'
+import type { AskRequest } from '../agents/types.ts'
 import type { Task, WorkerResult } from '../types.ts'
 
 export type Retrospect = (task: Task, result: WorkerResult) => Promise<void>
@@ -38,11 +35,10 @@ export function safeName(file: string): string | null {
 }
 
 // After a task finishes, asks one short session for memory and skill notes and stores them as pending proposals.
-export function createRetrospector(deps: { db: Db; config: Config; query?: QueryFn }): Retrospect {
-  const { db, config } = deps
-  const runQuery: QueryFn = deps.query ?? sdkQuery
+export function createRetrospector(deps: { db: Db; config: Config; ask: (request: AskRequest) => Promise<unknown> }): Retrospect {
+  const { db, config, ask } = deps
   return async (task, result) => {
-    const notes = await askNotes(runQuery, config, task, result)
+    const notes = await askNotes(ask, config, task, result)
     const memoryDir = join(config.home, 'memory')
     const skillsDir = config.skillsDir
     let proposed = 0
@@ -79,7 +75,7 @@ function store(db: Db, task: Task, kind: 'memory' | 'skill', targetOf: (stem: st
   return true
 }
 
-async function askNotes(runQuery: QueryFn, config: Config, task: Task, result: WorkerResult): Promise<{ memory: Note[]; skills: Note[] }> {
+async function askNotes(ask: (request: AskRequest) => Promise<unknown>, config: Config, task: Task, result: WorkerResult): Promise<{ memory: Note[]; skills: Note[] }> {
   const prompt = [
     'Read the finished task below and propose notes for future tasks.',
     'memory: short facts worth keeping about the user or their environment. skills: reusable procedures.',
@@ -89,22 +85,7 @@ async function askNotes(runQuery: QueryFn, config: Config, task: Task, result: W
     `Summary: ${result.summary}`,
     '</task>',
   ].join('\n')
-  // settingSources [] keeps the user's settings, hooks and skills out of this session; tools [] leaves it no tool at all.
-  const options: Options = {
-    cwd: config.home,
-    env: buildEnv(config),
-    pathToClaudeCodeExecutable: claudeExecutable(),
-    model: config.model,
-    permissionMode: 'dontAsk',
-    settingSources: [],
-    tools: [],
-    maxTurns: 3,
-    outputFormat: { type: 'json_schema', schema: NOTE_SCHEMA },
-  }
-  let structured: unknown
-  for await (const message of runQuery({ prompt, options })) {
-    if (message.type === 'result' && message.subtype === 'success') structured = message.structured_output
-  }
+  const structured = await ask({ prompt, schema: NOTE_SCHEMA, cwd: config.home })
   const record = (typeof structured === 'object' && structured !== null ? structured : {}) as Record<string, unknown>
   return { memory: notesOf(record.memory), skills: notesOf(record.skills) }
 }

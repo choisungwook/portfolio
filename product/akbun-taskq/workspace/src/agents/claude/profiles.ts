@@ -1,8 +1,8 @@
 import { homedir } from 'node:os'
 import { join } from 'node:path'
 import type { PermissionMode, SandboxSettings } from '@anthropic-ai/claude-agent-sdk'
-import type { Config } from '../config.ts'
-import type { Task } from '../types.ts'
+import type { Config } from '../../config.ts'
+import type { Task } from '../../types.ts'
 
 export interface Profile {
   permissionMode: PermissionMode

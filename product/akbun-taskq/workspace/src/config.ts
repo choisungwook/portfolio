@@ -1,6 +1,8 @@
 import { existsSync, readFileSync } from 'node:fs'
 import { isAbsolute, join } from 'node:path'
 
+import type { AgentName } from './agents/types.ts'
+
 export type Provider = 'bedrock' | 'api_key' | 'subscription'
 
 export interface SandboxConfig {
@@ -11,7 +13,8 @@ export interface SandboxConfig {
 
 export interface Config {
   home: string                 // TASKQ_HOME: holds taskq.config.json, data/, outputs/, memory/
-  provider: Provider
+  agent: AgentName             // which agent SDK runs the tasks
+  provider: Provider           // how the claude agent signs in to the model
   awsRegion: string
   inferenceProfile: string
   caBundle?: string            // absolute path to a PEM bundle; for networks where a TLS inspection device re-signs certificates
@@ -32,6 +35,7 @@ export interface Config {
 }
 
 export const DEFAULTS: Omit<Config, 'home'> = {
+  agent: 'claude',
   provider: 'bedrock',
   awsRegion: 'us-east-1',
   inferenceProfile: 'default',
@@ -49,6 +53,9 @@ export const DEFAULTS: Omit<Config, 'home'> = {
   retrospect: true,
 }
 
+// Kept here rather than read from the registry: the registry imports every backend, and config must load without them.
+const AGENTS: AgentName[] = ['claude']
+
 export function resolveConfig(home: string, overrides: Partial<Config> = {}): Config {
   return { ...DEFAULTS, home, ...overrides, sandbox: { ...DEFAULTS.sandbox, ...overrides.sandbox } }
 }
@@ -58,6 +65,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
   const file = join(home, 'taskq.config.json')
   const fromFile = existsSync(file) ? JSON.parse(readFileSync(file, 'utf8')) as Partial<Config> : {}
   const config = resolveConfig(home, fromFile)
+  if (!AGENTS.includes(config.agent)) throw new Error(`unknown agent: ${config.agent}`)
   if (!['bedrock', 'api_key', 'subscription'].includes(config.provider)) {
     throw new Error(`unknown provider: ${config.provider}`)
   }

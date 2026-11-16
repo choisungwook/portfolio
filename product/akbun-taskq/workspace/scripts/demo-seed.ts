@@ -9,7 +9,7 @@ import { ackAlert } from '../src/db/alerts.ts'
 import { pauseQueue } from '../src/db/meta.ts'
 import { raiseAlert } from '../src/alerts/rules.ts'
 import { registerSkill } from '../src/skills/registry.ts'
-import { preflight } from '../src/worker/auth.ts'
+import { agentFor } from '../src/agents/index.ts'
 import { TASKS } from './demo-data.ts'
 import { seedRuns, type SeededRun } from './demo-runs.ts'
 
@@ -124,7 +124,7 @@ function seedAlerts(db: Db, tasks: Map<string, Task>, runs: Map<string, SeededRu
 // Same check the runner makes before a claim: a failed preflight pauses the queue and raises the auth alert.
 // The demo never starts the runner loop, so this is the only place the pause is set.
 async function pauseLikeRunner(db: Db, config: Config): Promise<void> {
-  const check = await preflight(config)
+  const check = await agentFor(config).preflight(config)
   if (check.ok) throw new Error('demo refuses to run: preflight passed, so a session could start')
   const reason = check.reason ?? 'inference auth failed'
   pauseQueue(db, reason, 'preflight')

@@ -10,7 +10,8 @@ The diagram shows what runs inside the single `taskq run` process.
 browser UI --HTTP + SSE--> taskq process (127.0.0.1)
                             |- api/      Hono routes, SSE
                             |- runner/   claim loop, heartbeat, stale recovery
-                            |- worker/   one Agent SDK session per task
+                            |- agents/   AgentBackend interface; claude/ runs one Agent SDK session per task
+                            |- worker/   policy every backend enforces: gate, aws guard, prompt, result schema
                             |- memory/   similar-task lookup, retrospect, proposals
                             |- alerts/   must-check rules, macOS notification
                             '- db/       node:sqlite, WAL, numbered migrations
@@ -53,8 +54,12 @@ workspace/
     alerts/
       rules.ts              # outcome/event -> alert rows
       notify.ts             # macOS notification for critical
-    worker/                 # Agent SDK side (phase 2)
-      index.ts sdk-worker.ts profiles.ts prompt.ts hooks.ts auth.ts
+    agents/
+      types.ts              # AgentBackend: createWorker, preflight, ask
+      index.ts              # registry: config.agent -> backend
+      claude/               # the Claude Agent SDK backend
+        index.ts worker.ts hooks.ts profiles.ts auth.ts ask.ts result.ts
+    worker/                 # backend-neutral policy
       aws-guard.ts filter-args.ts result-schema.ts text.ts
     memory/                 # phase 2
       similar.ts retrospect.ts
@@ -258,7 +263,21 @@ Every finished run writes a `finished` event with its outcome. `finishRun` write
 
 After a `code` task finishes `done`, the runner creates a `security_review` task with `review_of` set and a `discovered_from` dependency. When that review returns a critical alert, the runner sets the original task to `review` and raises `security_finding`. Each `followups[]` entry becomes a `draft` task with a `discovered_from` dependency.
 
+## Agent backends
+
+`config.agent` picks the backend (default `claude`). `src/agents/index.ts` maps the name to an `AgentBackend`, and `src/cli/run.ts` is the only caller: the runner gets `createWorker(config)` and `preflight(config)`, and the retrospector gets `ask(config, request)`. The runner, API, database and UI never import an SDK.
+
+| Method | Contract |
+|---|---|
+| `createWorker(config)` | Returns the `Worker` the runner calls once per run. Every tool call goes through `decide` and `tamperOf` in `src/worker/gate.ts`; a call `tamperOf` names aborts the run with `tampered: true`. The final answer follows `RESULT_SCHEMA`. A failed model login returns `needs_auth` with `auth_scope: 'inference'` |
+| `preflight(config)` | Checks the model login before claims. A failure pauses the queue |
+| `ask(config, { prompt, schema, cwd })` | One short call with no tools that returns JSON matching `schema`, or `undefined` |
+
+Adding a backend: put it under `src/agents/<name>/`, add the name to `AgentName` in `types.ts`, to `BACKENDS` in `index.ts` and to `AGENTS` in `config.ts`. `test/agents.test.ts` checks that every registered backend has the three methods. The policy, the prompt and the result schema in `src/worker/` are shared; what a backend writes itself is the mapping from its SDK's tool-call hook and permission model to `decide`, which is what `claude/hooks.ts` and `claude/profiles.ts` do for Claude.
+
 ## Worker
+
+The rest of this section describes the `claude` backend.
 
 One `query()` call per task. Common options: `strictMcpConfig: true` with `mcpServers: {}` (no MCP server loads), `maxTurns`, `maxBudgetUsd`, `resume`, `outputFormat` with the result JSON schema, `PreToolUse` and `PostToolUse` hooks that emit `tool_call` and `tool_result`, and `sandbox` with `failIfUnavailable: true`, `allowUnsandboxedCommands: false` and `filesystem.denyRead` for the data directory and the credential directories (`~/.ssh`, `~/.gnupg`, `~/.netrc`, `~/.kube`, `~/.docker`, `~/.config/gh`). `~/.aws` stays readable because aws commands need its config.
 
@@ -312,7 +331,7 @@ An access skill is a Claude Code skill folder on this machine that signs in to t
 
 ## Providers
 
-`provider` in the config selects how the worker authenticates to the model. taskq never stores a key or token; it only shapes the child environment.
+`provider` in the config selects how the `claude` backend authenticates to the model. taskq never stores a key or token; it only shapes the child environment.
 
 The child environment is built from an allow-list: `PATH`, `HOME`, user and shell, locale (`LANG`, `LC_*`), `TMPDIR`, `TERM`, `TZ`, proxy and CA variables (`NODE_EXTRA_CA_CERTS`, `SSL_CERT_FILE`, `AWS_CA_BUNDLE`), the AWS config file paths, `CLAUDE_CONFIG_DIR` and the model name variables. Nothing else of the parent process reaches the session, so an arbitrary variable or an AWS access key in the shell never does.
 
@@ -340,7 +359,7 @@ The approval input is the one exemption. The exact text is stored in `approvals.
 
 | Invariant | Test |
 |---|---|
-| A change command never runs before approval; the wait is for the user, and a deny stops it | `test/sdk-worker.test.ts`: ops_change canUseTool waits for the approval and denies when it resolves false |
+| A change command never runs before approval; the wait is for the user, and a deny stops it | `test/sdk-worker.test.ts` (claude backend): ops_change canUseTool waits for the approval and denies when it resolves false |
 | The pending input is byte-identical to what runs, including a private-key marker and more than 500 characters | `test/approval-api.test.ts`: the pending input is the exact text, unmasked |
 | A decision names the open request: other ids and a second click are 409 | `test/approval-api.test.ts`: a decision must name the open request |
 | A payload with quotes and backslashes is stored as valid JSON and can be approved | `test/approval.test.ts`: a payload with quotes, backslashes and newlines |

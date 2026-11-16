@@ -60,7 +60,7 @@ export function resolveAccessSkill(db: Db, name: string | undefined): { path?: s
 
 // The config keys the settings view shows. Anything else in the config stays out of the API.
 export const CONFIG_KEYS: (keyof Config)[] = [
-  'provider', 'awsRegion', 'inferenceProfile', 'caBundle', 'model', 'maxConcurrent', 'staleTtlSec', 'heartbeatSec', 'pollSec', 'port',
+  'agent', 'provider', 'awsRegion', 'inferenceProfile', 'caBundle', 'model', 'maxConcurrent', 'staleTtlSec', 'heartbeatSec', 'pollSec', 'port',
   'maxTurns', 'maxBudgetUsd', 'autoMode', 'sandbox', 'prodLockKeys', 'trustedRepos', 'skillsDir', 'retrospect',
 ]
 

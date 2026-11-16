@@ -3,7 +3,7 @@ import assert from 'node:assert/strict'
 import { join } from 'node:path'
 import { homedir } from 'node:os'
 import { resolveConfig, type Config } from '../src/config.ts'
-import { profileFor } from '../src/worker/profiles.ts'
+import { profileFor } from '../src/agents/claude/profiles.ts'
 import type { Task, TaskData, TaskType } from '../src/types.ts'
 
 const home = '/home/example-taskq'
