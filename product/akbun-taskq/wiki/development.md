@@ -58,9 +58,13 @@ Seed runs, events and alerts through the functions in `src/db` and `src/runner`,
 - `data/` is created with mode 0700 and the database with 0600.
 - Sessions for research, review and ops tasks run with `outputs/` as their working directory, so the config and the database are not in a writable working directory.
 
+## Build the binary
+
+`node scripts/build-binary.ts` writes `dist/taskq` with bun on PATH. It generates `dist/binary-entry.ts`, which embeds every file under `ui/` and `src/db/schema/` plus the Claude Code binary of the installed SDK, registers them in `src/resources.ts`, and then imports `src/cli/main.ts`. Code that reads a file at run time goes through `resourcePath()`, not `import.meta.url`, or the binary will not find it. The Claude Code binary comes from the platform package npm installed, so build on the target OS. `release-akbun-taskq.yml` builds darwin-arm64 and linux-x64 and releases them as `akbun-taskq-v<version>` from `package.json`; bump the version with any change under `src/`, `ui/` or the package files.
+
 ## Adding a schema change
 
-Add `src/db/schema/NNN_name.sql` with the next number. `open.ts` runs files above the stored `user_version` inside `BEGIN IMMEDIATE`. The directory is not called `migrations` because the repository's root `.gitignore` ignores that name.
+Add `src/db/schema/NNN_name.sql` with the next number. `open.ts` runs files above the stored `user_version` inside `BEGIN IMMEDIATE`. The binary embeds the directory at build time, so nothing else needs registering. The directory is not called `migrations` because the repository's root `.gitignore` ignores that name.
 
 ## Changing what a session may do
 

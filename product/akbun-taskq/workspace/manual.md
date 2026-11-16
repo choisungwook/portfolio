@@ -24,10 +24,19 @@ npm run demo
 
 ## 2. 준비물
 
-- Node 24 이상. TypeScript 소스를 빌드 없이 바로 실행한다.
+- Node 24 이상. TypeScript 소스를 빌드 없이 바로 실행한다. 바이너리를 쓰면 Node와 checkout이 필요 없다.
 - Claude Code 설치.
 - 모델에 접근할 방법 하나: Amazon Bedrock, Anthropic API 키, Claude 구독 로그인 중 하나.
 - macOS 또는 Linux. 세션은 Claude Code 샌드박스 안에서 돌고, 샌드박스를 쓸 수 없으면 시작하지 않는다.
+
+바이너리는 GitHub Release의 `akbun-taskq-v<버전>`에 있다. Apple silicon은 `taskq-darwin-arm64.tar.gz`, linux x86_64는 `taskq-linux-x64.tar.gz`다. 화면, DB 스키마, 버전이 맞는 Claude Code가 파일 하나에 들어 있다. 압축을 풀어 PATH에 두고, macOS에서 브라우저로 받았으면 한 번 격리 속성을 지운다.
+
+```bash
+tar -xzf taskq-darwin-arm64.tar.gz
+xattr -d com.apple.quarantine taskq
+```
+
+바이너리를 쓰면 이 문서의 `node bin/taskq`를 `taskq`로 바꿔 읽는다. `taskq version`이 taskq와 들어 있는 Claude Code의 버전을 출력한다. 설정 파일과 `TASKQ_HOME`은 같다. 들어 있는 Claude Code는 첫 세션 때 임시 디렉터리에 한 번 풀린다.
 
 ## 3. 설정 파일 만들기
 
@@ -57,6 +66,7 @@ cp taskq.config.example.json taskq.config.json
 | `trustedRepos` | [] | 저장소 자체의 Claude 설정까지 로드해도 되는 저장소의 절대 경로 |
 | `retrospect` | true | 태스크가 끝난 뒤 메모 제안을 만들지 여부 |
 | `port` | 4517 | 화면과 API의 포트 |
+| `caBundle` | 없음 | 회사 TLS 검사 장비의 CA를 포함한 PEM 파일의 절대 경로. 세션의 `AWS_CA_BUNDLE`(aws CLI)과 `NODE_EXTRA_CA_CERTS`(Claude Code)에 함께 들어간다 |
 
 데이터는 실행한 디렉터리 아래에 생긴다. 다른 곳에 두려면 `TASKQ_HOME`을 지정한다.
 
@@ -188,5 +198,6 @@ taskq run
 | 조회 태스크에서 명령이 거부된다 | 조회 전용 규칙에 없는 명령이다. 변경이 필요하면 Task의 기본 모드(Change an account)로 만든다 |
 | 태스크가 "Interrupted"로 남는다 | 실행 중에 프로세스가 죽었다. 다음 실행에서 이전 세션을 이어받는다 |
 | 고친 화면이 안 보인다 | 브라우저를 새로 고친다 |
+| 회사 네트워크에서 `certificate verify failed`나 `self-signed certificate in certificate chain`이 뜬다 | TLS 검사 장비가 인증서를 자기 CA로 다시 서명한다. 그 CA를 넣은 PEM 파일을 `caBundle`에 적고 다시 시작한다 |
 
 구독 로그인은 내 기기에서 내가 쓰는 용도다. 이 도구를 다른 사람에게 제공하는 제품으로 만들 때는 `api_key`나 `bedrock`을 쓴다.

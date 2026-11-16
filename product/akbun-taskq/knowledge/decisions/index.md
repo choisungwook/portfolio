@@ -10,3 +10,4 @@
 * [Approval waits by polling the events table](2026-11-db-driven-approval.md) - A pending approval is a database row, not an in-memory promise.
 * [Approval shows and stores the exact input, bound to a request id](2026-11-approval-shows-exact-input.md) - The unmasked input lives in its own table until decided; decisions name a request id and the API needs a per-start token.
 * [Permission profiles follow how the SDK evaluates a tool call](2026-11-permission-profiles.md) - What the SDK documentation changed in the original permission plan.
+* [Release a bun-compiled binary that embeds Claude Code](2026-11-release-bun-binary.md) - One executable per platform built by bun; Node SEA and requiring an installed claude were rejected.

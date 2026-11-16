@@ -5,6 +5,7 @@ import type { Db } from '../db/open.ts'
 import { insertProposal } from '../db/proposals.ts'
 import { raiseAlert } from '../alerts/rules.ts'
 import { buildEnv } from '../worker/auth.ts'
+import { claudeExecutable } from '../resources.ts'
 import { nowSec } from '../time.ts'
 import type { QueryFn } from '../worker/sdk-worker.ts'
 import type { Task, WorkerResult } from '../types.ts'
@@ -92,6 +93,7 @@ async function askNotes(runQuery: QueryFn, config: Config, task: Task, result: W
   const options: Options = {
     cwd: config.home,
     env: buildEnv(config),
+    pathToClaudeCodeExecutable: claudeExecutable(),
     model: config.model,
     permissionMode: 'dontAsk',
     settingSources: [],

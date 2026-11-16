@@ -8,6 +8,7 @@ import {
 import type { Config } from '../config.ts'
 import type { Worker, WorkerContext, WorkerResult } from '../types.ts'
 import { buildEnv } from './auth.ts'
+import { claudeExecutable } from '../resources.ts'
 import { buildHooks, type RunState } from './hooks.ts'
 import type { GateContext } from './gate.ts'
 import { outputsOf, profileFor, type Profile } from './profiles.ts'
@@ -96,6 +97,7 @@ function buildOptions(config: Config, ctx: WorkerContext, profile: Profile, stat
     cwd: profile.cwd,
     additionalDirectories: profile.additionalDirectories,
     env: buildEnv(config),
+    pathToClaudeCodeExecutable: claudeExecutable(),
     model: config.model,
     permissionMode: profile.permissionMode,
     allowedTools: profile.allowedTools,

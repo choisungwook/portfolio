@@ -1,11 +1,11 @@
 import { existsSync } from 'node:fs'
-import { fileURLToPath } from 'node:url'
 import { Hono } from 'hono'
 import { serve, type ServerType } from '@hono/node-server'
 import { HttpError, type ApiDeps } from './http.ts'
 import { guard } from './guard.ts'
 import { requireToken } from './auth.ts'
 import { serveUi } from './static.ts'
+import { resourcePath } from '../resources.ts'
 import { registerTaskRoutes } from './routes-tasks.ts'
 import { registerRunRoutes } from './routes-runs.ts'
 import { registerAlertRoutes } from './routes-alerts.ts'
@@ -13,8 +13,6 @@ import { registerApprovalRoutes } from './routes-approvals.ts'
 import { registerMiscRoutes } from './routes-misc.ts'
 import { registerSse } from './sse.ts'
 import { registerSettingsRoutes } from './routes-settings.ts'
-
-const UI_DIR = fileURLToPath(new URL('../../ui', import.meta.url))
 
 export function createApp(deps: ApiDeps, token: string): Hono {
   const app = new Hono()
@@ -34,7 +32,8 @@ export function createApp(deps: ApiDeps, token: string): Hono {
   registerSettingsRoutes(api, deps)
   registerSse(api, deps)
   app.route('/api', api)
-  if (existsSync(UI_DIR)) app.get('*', (c) => serveUi(c, UI_DIR))
+  const index = resourcePath('ui/index.html')
+  if (index && existsSync(index)) app.get('*', (c) => serveUi(c))
   return app
 }
 

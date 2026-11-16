@@ -1,6 +1,7 @@
 import type { Context } from 'hono'
 import { readFile } from 'node:fs/promises'
 import { extname, join, normalize, sep } from 'node:path'
+import { resourcePath } from '../resources.ts'
 
 const TYPES: Record<string, string> = {
   '.html': 'text/html; charset=utf-8',
@@ -10,7 +11,7 @@ const TYPES: Record<string, string> = {
   '.svg': 'image/svg+xml',
 }
 
-// no-cache: the page is served from a checkout, so an edited file must not be hidden by the browser cache.
+// no-cache: the page can be served from a checkout, so an edited file must not be hidden by the browser cache.
 // The policy keeps the page from loading or sending anything outside this origin.
 const HEADERS = {
   'cache-control': 'no-cache',
@@ -19,10 +20,11 @@ const HEADERS = {
   'referrer-policy': 'no-referrer',
 }
 
-export async function serveUi(c: Context, uiDir: string): Promise<Response> {
+export async function serveUi(c: Context): Promise<Response> {
   const requested = c.req.path === '/' ? '/index.html' : c.req.path
-  const file = normalize(join(uiDir, requested))
-  if (!file.startsWith(uiDir + sep)) return c.text('not found', 404)
+  const relative = normalize(join('ui', requested))
+  const file = relative.startsWith('ui' + sep) ? resourcePath(relative) : undefined
+  if (!file) return c.text('not found', 404)
   try {
     const body = await readFile(file)
     return new Response(body, { headers: { 'content-type': TYPES[extname(file)] ?? 'application/octet-stream', ...HEADERS } })

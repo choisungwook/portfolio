@@ -308,7 +308,9 @@ An access skill is a Claude Code skill folder on this machine that signs in to t
 
 `provider` in the config selects how the worker authenticates to the model. taskq never stores a key or token; it only shapes the child environment.
 
-The child environment is built from an allow-list: `PATH`, `HOME`, user and shell, locale (`LANG`, `LC_*`), `TMPDIR`, `TERM`, `TZ`, proxy and CA variables, the AWS config file paths, `CLAUDE_CONFIG_DIR` and the model name variables. Nothing else of the parent process reaches the session, so an arbitrary variable or an AWS access key in the shell never does.
+The child environment is built from an allow-list: `PATH`, `HOME`, user and shell, locale (`LANG`, `LC_*`), `TMPDIR`, `TERM`, `TZ`, proxy and CA variables (`NODE_EXTRA_CA_CERTS`, `SSL_CERT_FILE`, `AWS_CA_BUNDLE`), the AWS config file paths, `CLAUDE_CONFIG_DIR` and the model name variables. Nothing else of the parent process reaches the session, so an arbitrary variable or an AWS access key in the shell never does.
+
+`caBundle` in the config is for networks where a TLS inspection device re-signs certificates with its own CA. It sets both `AWS_CA_BUNDLE` (the aws CLI) and `NODE_EXTRA_CA_CERTS` (Claude Code) in the child for every provider, and the bedrock preflight runs aws with the same `AWS_CA_BUNDLE`. Without it the shell's values pass through the allow-list. The agent cannot pick its own bundle: `aws-guard.ts` denies `--ca-bundle`.
 
 | provider | Added to the child environment | Preflight |
 |---|---|---|
@@ -360,6 +362,7 @@ The approval input is the one exemption. The exact text is stored in `approvals.
 | A skill proposal never writes SKILL.md | `test/proposal-target.test.ts`: a skill proposal targeting SKILL.md |
 | An access-skill registration rejects a relative path and a folder inside the data directory | `test/skills-inspect.test.ts`: a relative path, and a folder inside the data directory or outputs |
 | An arbitrary parent variable and AWS_ACCESS_KEY_ID never reach the child, for any provider | `test/worker-auth.test.ts`: nothing outside the allow-list reaches the child |
+| `caBundle` reaches the aws CLI and Claude Code for every provider and the bedrock preflight; without it the shell's CA passes through; a relative or missing path is refused | `test/worker-auth.test.ts`: the three caBundle tests; `test/config-time.test.ts`: caBundle must be an absolute path to an existing file |
 
 ## API
 

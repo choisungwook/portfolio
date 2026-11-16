@@ -1,10 +1,17 @@
 import { DatabaseSync } from 'node:sqlite'
 import { chmodSync, closeSync, existsSync, mkdirSync, openSync, readFileSync } from 'node:fs'
 import { join } from 'node:path'
+import { resourcePath } from '../resources.ts'
 
 export type Db = DatabaseSync
 
 const MIGRATIONS = ['001_init.sql', '002_approvals.sql', '003_access_skills.sql']
+
+function schemaFile(name: string): string {
+  const file = resourcePath(`src/db/schema/${name}`)
+  if (!file) throw new Error(`schema ${name} is missing from this build`)
+  return file
+}
 const BUSY_MS = 5000
 
 export function openDb(home: string): Db {
@@ -56,7 +63,7 @@ function migrate(db: Db): void {
     MIGRATIONS.forEach((name, index) => {
       const version = index + 1
       if (version <= current) return
-      db.exec(readFileSync(new URL(`./schema/${name}`, import.meta.url), 'utf8'))
+      db.exec(readFileSync(schemaFile(name), 'utf8'))
       db.exec(`PRAGMA user_version = ${version}`)
     })
     db.exec('COMMIT')
