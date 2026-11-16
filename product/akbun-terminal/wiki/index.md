@@ -1,6 +1,6 @@
 # akbun-terminal wiki
 
-Notes for the next agent taking over this app. Read [architecture.md](./architecture.md) for how the pieces fit and [development.md](./development.md) for how to build, test and release.
+Notes for the next agent taking over this app. Read [architecture.md](./architecture.md) for how the pieces fit and [development.md](./development.md) for how to build, test and release. [user-manual.md](./user-manual.md) is how a person uses it.
 
 ## What the app is
 

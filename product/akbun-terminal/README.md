@@ -9,7 +9,7 @@ A terminal workspace for running CLI agents. A core daemon owns the shells, the 
 | [workspace/core/](./workspace/core/) | Rust daemon and its CLI, `akbun-terminal-core` |
 | [workspace/tui/](./workspace/tui/) | Terminal UI client, `akbun-terminal-tui` |
 | [workspace/desktop/](./workspace/desktop/) | macOS app: Swift, AppKit, build scripts |
-| [wiki/](./wiki/) | Architecture and development notes |
+| [wiki/](./wiki/) | [User manual](./wiki/user-manual.md), architecture and development notes |
 | [adr/](./adr/) | Decision records made before `knowledge/` |
 | [knowledge/](./knowledge/) | Decisions since |
 
