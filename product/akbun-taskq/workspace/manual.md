@@ -60,6 +60,7 @@ cp taskq.config.example.json taskq.config.json
 |---|---|---|
 | `agent` | claude | 태스크를 실행할 agent SDK. 지금은 `claude`만 있다 |
 | `maxConcurrent` | 3 | 동시에 실행할 태스크 수 |
+| `pollSec` | 60 | 다른 프로세스(CLI)가 바꾼 내용을 확인하는 간격. 화면과 API로 바꾼 내용은 바로 반영된다 |
 | `maxTurns`, `maxBudgetUsd` | 60, 5 | 태스크 하나의 턴 수와 비용 상한 |
 | `autoMode` | true | `auto` 권한 모드를 쓸 수 없는 계정이면 false |
 | `sandbox.allowedDomains` | [] | 샌드박스 안의 명령이 접속할 수 있는 호스트. AWS 엔드포인트를 여기에 넣는다 |

@@ -4,6 +4,7 @@ import { area, clear, el } from '../core/dom.js'
 import { emit, on } from '../core/bus.js'
 import { BOARD_COLUMNS, COLLAPSED_COLUMNS, label, TYPE_MARK } from '../core/vocab.js'
 import { statusIndicator } from '../core/status.js'
+import { runNowButton, RUNNABLE } from '../core/run-now.js'
 
 let columns
 let active = false
@@ -46,9 +47,10 @@ function column(status, tasks, collapsed) {
 
 function card(task) {
   const title = task.data.title ?? task.data.intent
-  return el('li', {},
+  return el('li', { class: 'card-item' },
     el('button', { type: 'button', class: `card status-${task.status}`, onclick: () => emit('open-task', task.id) },
       el('span', { class: 'card-title', text: title }),
       el('span', { class: 'meta', text: `${TYPE_MARK[task.type] ?? label(task.type)} · ${task.lock_key ?? 'no account or repo'}` }),
-      task.blocked ? el('span', { class: 'badge blocked', text: 'blocked' }) : null))
+      task.blocked ? el('span', { class: 'badge blocked', text: 'blocked' }) : null),
+    RUNNABLE.includes(task.status) ? runNowButton(task) : null)
 }

@@ -5,6 +5,7 @@ import { emit, on } from '../core/bus.js'
 import { fmtClock, fmtDateTime } from '../core/time.js'
 import { ACTION_STATUS, label, outcomeOf, parseField, TYPE_MARK } from '../core/vocab.js'
 import { statusIndicator } from '../core/status.js'
+import { runNowButton } from '../core/run-now.js'
 import { approvalPanel } from './approval-panel.js'
 import { operatorControls } from './operator-controls.js'
 
@@ -113,6 +114,7 @@ function actionButtons(task) {
     onclick: () => mutate(() => api.post(`/tasks/${task.id}/${name}`, {}), ok),
   })
   return el('div', { class: 'actions' },
+    runNowButton(task, { primary: true }),
     make('resume', 'Resume', 'Resumed'),
     make('done', 'Done', 'Marked done'),
     el('button', {

@@ -3,7 +3,7 @@ import type { Config } from '../config.ts'
 import type { Task, Worker } from '../types.ts'
 import { insertEvent } from '../db/events.ts'
 import { insertRun } from '../db/runs.ts'
-import { claimTask, getTask, nextEligible } from '../db/tasks.ts'
+import { claimTask, getTask, isBlocked, nextEligible } from '../db/tasks.ts'
 import { isCancelRequested, isQueuePaused, pauseBy, pauseQueue, resumeQueue } from '../db/meta.ts'
 import { raiseAlert } from '../alerts/rules.ts'
 import { newId } from '../ids.ts'
@@ -12,6 +12,8 @@ import { recoverStale } from './recover.ts'
 import { executeRun } from './execute.ts'
 import type { Retrospect } from '../memory/retrospect.ts'
 import type { PreflightResult } from '../agents/types.ts'
+import { queueChanged } from '../wake.ts'
+import type { RunControl } from './control.ts'
 
 export type Preflight = () => Promise<PreflightResult>
 
@@ -24,7 +26,7 @@ export interface RunnerOptions {
   authRecheckMs?: number     // how often a preflight pause is re-checked while the queue is paused
 }
 
-export interface Runner {
+export interface Runner extends RunControl {
   start(): Promise<void>
   stop(): Promise<void>
 }
@@ -38,7 +40,8 @@ export function createRunner({
 }: RunnerOptions): Runner {
   const runnerId = `runner-${newId()}`
   const active = new Map<string, { controller: AbortController; done: Promise<void> }>()
-  let timer: NodeJS.Timeout | undefined
+  const requested = new Set<string>()
+  const stopped = new AbortController()
   let running = false
   let verifiedAt = 0
   let lastRecheck = 0
@@ -73,7 +76,10 @@ export function createRunner({
     insertEvent(db, { task_id: task.id, run_id: runId, kind: 'claimed', payload: { runner: runnerId, resume: task.session_id } })
     const done = executeRun({ db, config, worker, runnerId, retrospect }, task, runId, controller.signal)
       .catch((error: unknown) => console.error(`taskq: run ${runId} crashed: ${String(error)}`))
-      .finally(() => active.delete(task.id))
+      .finally(() => {
+        active.delete(task.id)
+        queueChanged.notify()
+      })
     active.set(task.id, { controller, done })
   }
 
@@ -85,6 +91,20 @@ export function createRunner({
       await recheckAuth()
       return
     }
+    // Run-now requests go first. One whose task is no longer ready or now waits for a dependency is dropped; one held
+    // back only by a lock key stays first in line until the lock frees.
+    for (const id of [...requested]) {
+      if (active.size >= config.maxConcurrent) break
+      if (getTask(db, id)?.status !== 'ready' || isBlocked(db, id)) {
+        requested.delete(id)
+        continue
+      }
+      if (!(await authOk())) return
+      if (claimTask(db, id, runnerId)) {
+        requested.delete(id)
+        launch(getTask(db, id)!)
+      }
+    }
     while (active.size < config.maxConcurrent) {
       if (isQueuePaused(db)) return
       const candidate = nextEligible(db)
@@ -94,24 +114,32 @@ export function createRunner({
     }
   }
 
-  async function loop(): Promise<void> {
-    try {
-      await tick()
-    } catch (error) {
-      console.error(`taskq: tick failed: ${String(error)}`)
+  // Wakes at once on an in-process change; otherwise every pollSec, which picks up what the CLI wrote.
+  // `seen` is the signal generation read before the tick that just ran, so a change during that tick is not lost.
+  async function loop(seen: number): Promise<void> {
+    while (running) {
+      await queueChanged.wait(config.pollSec * 1000, stopped.signal, seen)
+      if (!running) return
+      seen = queueChanged.version()
+      await tick().catch((error: unknown) => console.error(`taskq: tick failed: ${String(error)}`))
     }
-    if (running) timer = setTimeout(() => void loop(), config.pollSec * 1000)
   }
 
   return {
     async start() {
       recoverStale(db, config, true, new Set())
       running = true
-      await loop()
+      const seen = queueChanged.version()
+      await tick().catch((error: unknown) => console.error(`taskq: tick failed: ${String(error)}`))
+      void loop(seen)
+    },
+    runNow(taskId) {
+      requested.add(taskId)
+      queueChanged.notify()
     },
     async stop() {
       running = false
-      clearTimeout(timer)
+      stopped.abort()
       const runs = [...active.values()]
       for (const run of runs) run.controller.abort()
       await Promise.race([

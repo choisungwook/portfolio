@@ -220,16 +220,18 @@ running | needs_approval | needs_auth -> failed   cancel (API or CLI); see "Paus
 
 ## Runner
 
+The loop does not tick on a fixed short interval. It waits on `queueChanged` (`src/wake.ts`) for up to `pollSec` (default 60 s). Every successful non-GET API request, every run that ends and every run-now request notifies it, so a change made in this process is looked at at once. A change written by the CLI, which is another process, is picked up when the wait times out. Approval waits and the SSE stream wait the same way on `eventWritten`, which `insertEvent` notifies. Each waiter reads the signal's generation before it reads the database and passes it to `wait`, so a notify that arrives while it is busy (a tick awaiting preflight, an SSE write) makes the next wait return at once instead of being lost.
+
 1. Preflight inference auth (see Providers). On failure set the queue pause with `pause_by = preflight` and raise `auth_required`. While the queue is paused, the tick re-runs the preflight once a minute and a passing check lifts only a preflight pause.
 2. On start, recover every `running` and `needs_approval` task as stale. On each tick, recover `running` and `needs_approval` tasks whose `heartbeat_at` is older than the TTL. A NULL heartbeat is never recovered by the tick.
 3. Pick `ready` tasks by priority whose `blocks` dependencies are all `done`.
 4. Claim atomically: `UPDATE tasks SET status='running', claimed_by=?, heartbeat_at=? WHERE id=? AND status='ready'`, plus a `NOT EXISTS` clause that rejects a task whose `lock_key` a `running`, `needs_approval` or `needs_auth` task holds, and a clause that rejects every claim while `meta.queue_paused` is `1`. The lock and pause checks are inside the statement, so two runners cannot both claim tasks that share a lock key, and a pause cannot race a claim. The changed row count decides.
-5. Limit concurrency to `maxConcurrent` (default 3).
+5. Limit concurrency to `maxConcurrent` (default 3). Tasks asked for with run now (`runner.runNow`) are claimed before the priority order.
 6. Create the `runs` row, call the worker, update `heartbeat_at` every 30 s, then finish. Before the worker is called, a task with an `access_skill` resolves it to the registered path. A missing registration or a missing `SKILL.md` finishes the run as `failed` with the summary `access skill <name> is missing at <path>`, and no session starts.
 
 ### Approval
 
-`requestApproval` inserts an `approvals` row that holds the exact tool input, and writes a `permission_request` event with the masked, clipped copy (`request_id`, `tool`, `input`, `reason`, `bytes`). It then sets the task to `needs_approval` and raises `approval_required` with `ref` set to the request id. The wait loop polls that row's `decision` once a second. A denied or expired request returns false to the worker.
+`requestApproval` inserts an `approvals` row that holds the exact tool input, and writes a `permission_request` event with the masked, clipped copy (`request_id`, `tool`, `input`, `reason`, `bytes`). It then sets the task to `needs_approval` and raises `approval_required` with `ref` set to the request id. The wait loop reads that row's `decision` whenever an event is written in this process (a decision through the API writes `approved` or `denied`) and otherwise every `pollSec`, so a `taskq approve` from the CLI is seen within a minute. A denied or expired request returns false to the worker.
 
 - `decideApproval(db, taskId, requestId, approve)` answers only the task's single open request. Any other `request_id` throws `ApprovalError`, which the API maps to 409. In one transaction it writes the decision, clears `input`, writes the `approved` or `denied` event, and acknowledges the task's open `approval_required` alerts. The API and the CLI both call this function.
 - Ending a run (`endRun`) and stale recovery mark the open rows of that run or task as `expired` and clear `input`.
@@ -237,6 +239,20 @@ running | needs_approval | needs_auth -> failed   cancel (API or CLI); see "Paus
 - The `approval_required` message is `Approval needed: <tool>:` followed by the first 120 characters of the masked command. The macOS notification is titled `taskq · <task id>` and ends with `taskq approve <task id>` (`resume` for `auth_required`, `show` for `security_finding`); the command part is cut to fit the 200-character limit.
 
 The exact input is stored unmasked and unclipped, and only while the request is open, because a masked or clipped copy can hide the part that runs. A shell comment such as `aws s3 ls # -----BEGIN PRIVATE KEY-----` makes the masking rule redact the rest of the line, so the masked view reads `aws s3 ls` while `aws iam delete-user` is the command that runs. The decision record in `knowledge/decisions/` has the full reasoning.
+
+### Run now
+
+`POST /tasks/:id/run` (`prepareRun` in `src/db/operator.ts`) makes the task `ready`, writes a `run_requested` event, and calls `runNow` on the runner of this process, which claims it before other ready tasks as soon as a slot is free.
+
+| From | Session | Alerts acknowledged |
+|---|---|---|
+| `draft`, `ready` | kept | none |
+| `needs_auth` | kept, as Resume | `auth_required` |
+| `failed` | new | `failed`, `budget_exceeded` |
+| `review` | new | `review_ready` |
+| `done` | new | none |
+
+`running` and `needs_approval` return 409. A paused queue and an unfinished `blocks` dependency return 409 without changing the task. A lock key held by another task leaves it `ready` and first in line until the lock frees. A requested task that is no longer `ready`, or whose `blocks` dependency stopped being done, is dropped from the run-now list.
 
 ### Pause, cancel and retry
 
@@ -414,6 +430,7 @@ Writes (any non-GET under `/api`) must send `Content-Type: application/json`, op
 | `POST /tasks/:id/approve` `deny` | body `{ "request_id": "…" }`. 400 when missing, 409 when it is not the task's open request. Returns the task |
 | `GET /approvals` | open requests across tasks: `[{ task_id, task_title, request_id, tool, input, bytes, created_at }]` |
 | `POST /tasks/:id/resume` `done` | state transitions |
+| `POST /tasks/:id/run` | run now, from any status but `running` and `needs_approval`. 409 while the queue is paused or a `blocks` dependency is not done. See "Run now" |
 | `GET /runs?from=&to=&type=&lock_key=&outcome=` | runs that overlap the range (started before `to`, not ended before `from`). Each row has `task_title`, `task_type`, `lock_key` and `waits`. Returns `{ runs, truncated }`, newest first, capped at 500 |
 | `GET /runs/:id` | run with events, alerts and waits |
 | `GET /stats/daily?from=&to=&type=&lock_key=&outcome=` | per day, keyed by start day: runs, done, failed, critical, by type, cost, top 3 summaries. Filters as `/runs` |
@@ -434,6 +451,6 @@ Writes (any non-GET under `/api`) must send `Content-Type: application/json`, op
 
 `type` and `outcome` are checked against the enum lists in `src/api/params.ts` and anything else returns 400. A date (`from`, `to`) must name a real calendar day, so `2026-13-40` is 400. `output_path` must be a relative path inside `outputs/`, and `repo` an absolute path to an existing directory. The CLI `add` applies the same checks. `lock_key` is limited to 100 characters. Every SQL statement binds request values as parameters. `ORDER BY` and `LIMIT` text comes from fixed strings, and `limit` is an integer validated against 1 to 500.
 
-The SSE stream polls the events table by id every `pollSec` seconds, so events written by the CLI process reach the browser too.
+The SSE stream reads the events table by id when an event is written in this process, and otherwise every `pollSec` seconds, so events written by the CLI process reach the browser within a minute.
 
 The database directory `<home>/data` is created with mode 0700, and `taskq.db` with its `-wal` and `-shm` files is kept at 0600. The process also sets its umask to 0077 so files it creates are private.

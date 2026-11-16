@@ -5,7 +5,7 @@
   "maxConcurrent": 3,
   "staleTtlSec": 300,
   "heartbeatSec": 30,
-  "pollSec": 2,
+  "pollSec": 60,
   "port": 4517,
   "maxTurns": 60,
   "maxBudgetUsd": 5,

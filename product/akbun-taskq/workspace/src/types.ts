@@ -6,6 +6,7 @@ export type AlertKind = 'approval_required' | 'security_finding' | 'prod_touch' 
   | 'auth_required' | 'failed' | 'stale_repeat' | 'budget_exceeded' | 'review_ready' | 'proposal_pending'
 export type EventKind = 'claimed' | 'tool_call' | 'tool_result' | 'permission_request' | 'approved' | 'denied'
   | 'auth_required' | 'progress' | 'error' | 'finished' | 'cancel_requested' | 'tamper_blocked'
+  | 'run_requested'
 
 export interface TaskData {
   title?: string

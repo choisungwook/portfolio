@@ -1,10 +1,12 @@
 import type { Context } from 'hono'
 import type { Db } from '../db/open.ts'
 import type { Config } from '../config.ts'
+import type { RunControl } from '../runner/control.ts'
 
 export interface ApiDeps {
   db: Db
   config: Config
+  control?: RunControl   // the runner in the same process; without one, run-now waits for the next claim
 }
 
 export class HttpError extends Error {

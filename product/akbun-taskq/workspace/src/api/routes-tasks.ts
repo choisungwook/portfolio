@@ -6,10 +6,11 @@ import { taskDetail } from '../db/detail.ts'
 import { parseTaskInput, parseTaskPatch } from '../validate.ts'
 import { hasAccessSkill } from '../skills/registry.ts'
 import { HttpError, optionalJson, readJson, requireOk, type ApiDeps } from './http.ts'
-import { OperatorError, requestCancel, retryTask } from '../db/operator.ts'
+import { OperatorError, prepareRun, requestCancel, retryTask } from '../db/operator.ts'
+import { noRunControl } from '../runner/control.ts'
 import { enumParam, TASK_STATUSES } from './params.ts'
 
-export function registerTaskRoutes(api: Hono, { db, config }: ApiDeps): void {
+export function registerTaskRoutes(api: Hono, { db, config, control = noRunControl }: ApiDeps): void {
   api.get('/tasks', (c) => c.json(listTasks(db, enumParam(c.req.query('status'), 'status', TASK_STATUSES))))
 
   api.post('/tasks', async (c) => {
@@ -58,6 +59,20 @@ export function registerTaskRoutes(api: Hono, { db, config }: ApiDeps): void {
     if (!getTask(db, id)) return c.json({ error: 'task not found' }, 404)
     try {
       return c.json(requestCancel(db, config, id))
+    } catch (error) {
+      if (error instanceof OperatorError) throw new HttpError(409, error.message)
+      throw error
+    }
+  })
+
+  // Run now: any status but running and needs_approval. The task becomes ready and the runner claims it first.
+  api.post('/tasks/:id/run', (c) => {
+    const id = c.req.param('id')
+    if (!getTask(db, id)) return c.json({ error: 'task not found' }, 404)
+    try {
+      const task = prepareRun(db, id)
+      control.runNow(id)
+      return c.json(task)
     } catch (error) {
       if (error instanceof OperatorError) throw new HttpError(409, error.message)
       throw error

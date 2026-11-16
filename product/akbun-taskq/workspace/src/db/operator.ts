@@ -6,8 +6,8 @@ import { insertEvent } from './events.ts'
 import { ackOpenAlerts } from './alerts.ts'
 import { expireApprovals } from './approvals.ts'
 import { endRun, openRunOf } from './runs.ts'
-import { getTask, releaseTask } from './tasks.ts'
-import { clearCancelMarker, requestCancelMarker } from './meta.ts'
+import { getTask, isBlocked, releaseTask } from './tasks.ts'
+import { clearCancelMarker, isQueuePaused, requestCancelMarker } from './meta.ts'
 import { mask } from '../mask.ts'
 import { nowSec } from '../time.ts'
 
@@ -83,4 +83,32 @@ export function retryTask(db: Db, id: string, options: { draft: boolean; resume:
     clearCancelMarker(db, id)
     return true
   })
+}
+
+// Statuses a user can start by hand, and what starting means in each. running and needs_approval are already running.
+export const RUNNABLE: TaskStatus[] = ['draft', 'ready', 'failed', 'needs_auth', 'review', 'done']
+
+// Makes a task ready for an immediate run. A failed, review or done task starts a new session; a needs_auth task keeps
+// its session, as Resume does. The caller then asks the runner to claim it first.
+export function prepareRun(db: Db, id: string): Task {
+  const task = getTask(db, id)
+  if (!task) throw new OperatorError('task not found')
+  if (!RUNNABLE.includes(task.status)) throw new OperatorError(`task is ${task.status}; it is already running`)
+  if (isQueuePaused(db)) throw new OperatorError('the queue is paused; resume the queue to run tasks')
+  if (isBlocked(db, id)) throw new OperatorError('task waits for a dependency that is not done')
+  inTransaction(db, () => {
+    const keepSession = task.status === 'needs_auth' || task.status === 'draft' || task.status === 'ready'
+    const sessionClause = keepSession ? '' : ', session_id = NULL'
+    db.prepare(`UPDATE tasks SET status = 'ready', claimed_by = NULL, heartbeat_at = NULL, updated_at = ?${sessionClause}
+      WHERE id = ?`).run(nowSec(), id)
+    if (task.status === 'failed') {
+      ackOpenAlerts(db, id, 'failed')
+      ackOpenAlerts(db, id, 'budget_exceeded')
+    }
+    if (task.status === 'needs_auth') ackOpenAlerts(db, id, 'auth_required')
+    if (task.status === 'review') ackOpenAlerts(db, id, 'review_ready')
+    clearCancelMarker(db, id)
+    insertEvent(db, { task_id: id, run_id: null, kind: 'run_requested', payload: { from: task.status } })
+  })
+  return getTask(db, id)!
 }

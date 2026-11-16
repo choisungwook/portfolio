@@ -135,6 +135,11 @@ export function createFromInput(db: Db, input: TaskInput): Task {
 }
 
 // Moves a task only when it is in the expected state. Returns false otherwise.
+// True when a blocks-dependency of the task is not done yet.
+export function isBlocked(db: Db, id: string): boolean {
+  return db.prepare(`SELECT ${BLOCKED_SQL} AS blocked FROM tasks t WHERE t.id = ?`).get(id)?.blocked === 1
+}
+
 export function moveStatus(db: Db, id: string, from: TaskStatus, to: TaskStatus): boolean {
   return db.prepare('UPDATE tasks SET status = ?, updated_at = ? WHERE id = ? AND status = ?')
     .run(to, nowSec(), id, from).changes === 1
