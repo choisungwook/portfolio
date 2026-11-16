@@ -7,7 +7,7 @@
 | 토큰 안내 | `token-notice` | 없음 | 토큰이 없거나 서버가 401을 돌려주면 전체 너비로 보인다. `taskq run`이 출력한 URL을 열라고 안내하고, 그 뒤로 폴링과 요청을 멈춘다 |
 | 헤더 검색 | `search` | `GET /api/search` | 과거 run을 FTS로 검색한다 |
 | 검색 결과 | `search-results`, `search-close` | `GET /api/search` | 일치하는 run을 나열한다. 작업 제목은 행의 `task_title`을 쓴다. 항목을 누르면 run dialog가 열린다 |
-| 알림 | `notice` | 모든 변경 요청 | 저장 성공과 서버 오류 메시지를 보여준다 |
+| 알림 | `notice` | 모든 변경 요청 | 저장 성공과 서버 오류 메시지를 Carbon inline notification(색 띠, 아이콘, 글, 닫기 버튼)으로 보여준다. 타이머로 사라지지 않고, 닫기 버튼을 누르거나 다음 메시지가 올 때까지 남는다 |
 | 새 작업 | `new-task-button`, `task-form`, `task-form-form`, `task-form-error` | `POST /api/tasks`, `GET /api/settings` | 작업을 추가한다. 초안 체크는 기본으로 켜져 있고, 끄면 `status: "ready"`로 보낸다. 제목, 의도, 주의 사항, lock_key, target_profile, repo, output_path, priority, depends_on(작업 id 하나) 입력을 받는다. access_skill은 등록된 접근 스킬 목록(`none` 포함)을 고르는 선택 목록이며, 설정 dialog를 닫을 때마다 다시 채운다 |
 | 캘린더 탭 | `calendar`, `calendar-toolbar`, `calendar-today`, `calendar-prev`, `calendar-next`, `calendar-views`, `calendar-label`, `calendar-body` | `GET /api/runs`, `GET /api/stats/daily`, `GET /api/lock-keys` | 툴바 한 줄이다. 왼쪽은 Today, 이전·다음 화살표(`calendar-prev`, `calendar-next`), 가운데는 큰 제목(월 "November 2026", 주 "Nov 9 – 15, 2026", 일 "Sunday, November 15, 2026"), 오른쪽은 Day·Week·Month 전환이다. 탭을 누르면(이미 열린 탭이어도) 오늘로 가고 현재 시각으로 스크롤한다. Today도 같다. 주·일 보기는 요일 머리글(`day-head`)을 누르면 그 날의 일 보기로 간다. 월 보기는 6주를 `/api/runs`와 `/api/stats/daily`로 읽는다. 500개를 넘으면 "Showing first N runs" 안내를 보인다. 키보드: 이전·다음 버튼에서 좌우 화살표, 캘린더 안에서 `t`(오늘), `d`, `w`, `m`(보기 전환) |
 | 캘린더 시간표 | `time-grid`, `time-head`, `day-head`, `now-line` | `GET /api/runs` | 주·일 보기. 머리글 행은 위에 고정되고 시간 영역만 세로로 스크롤한다. 시간당 48 px이며 시간선은 `--border`다. 왼쪽 시간 줄은 브라우저 로케일 형식을 따른다. 오늘 열에는 `--danger` 2 px 현재 시각선(왼쪽 끝 점)이 있고 30초마다 갱신한다. 다시 그릴 때 스크롤 위치와 포커스를 유지하며, 범위가 바뀔 때만 현재 시각(오늘이 없으면 8 AM)을 화면 높이의 3분의 1 위치로 맞춘다 |
@@ -17,7 +17,7 @@
 | 하루 요약 | `day-summary` | `GET /api/stats/daily` | 일 보기에서 시간표 위의 한 줄 띠다. 완료, 실패, 치명 알림, 비용을 보이고, 상위 요약은 "Summary" 펼침 아래에 둔다. 펼침 상태는 갱신해도 유지된다. 범위는 "all runs" 또는 필터 이름과 값으로 밝힌다 |
 | 캘린더 범례 | `calendar-legend` | 없음 | 결과마다 색 띠와 낱말(`label()`)을 나란히 보이고, 마지막에 "Waiting for you" 빗금 견본을 둔다 |
 | Run dialog | `run-dialog`, `run-body` | `GET /api/runs/:id` | 요약, 결과, 시각, 통계, 출력 경로, `claude --resume` 명령 복사, 대기 구간, 이벤트 순서, 관련 알림을 보여준다 |
-| 보드 탭 | `board`, `board-columns` | `GET /api/tasks` | 상태별 열. draft와 failed는 접혀 있다. 카드에 blocked 배지가 붙는다 |
+| 보드 탭 | `board`, `board-columns` | `GET /api/tasks` | 상태별 열. 열 제목은 상태 표시(`status-ind`)다. draft와 failed는 접혀 있다. 카드에 blocked 배지가 붙는다 |
 | 작업 상세 dialog | `task-detail`, `task-body` | `GET /api/tasks/:id`, `GET /api/events?order=desc&limit=200`, `GET /api/graph`, `POST /api/tasks/:id/{resume,done,cancel,retry}`, `PATCH /api/tasks/:id` | 의도, 주의 사항, 상태, 승인 패널, run 목록, 최신순 이벤트 로그(최근 200개), 의존 관계, 상태 전환 버튼을 보여준다. 승인 결정은 이 dialog의 승인 패널에서만 한다. 운영 제어(`operator-controls`)는 상태 버튼 아래에 있다: running, needs_approval, needs_auth 작업에는 `cancel-task` 버튼이 있고, 첫 클릭은 Confirm cancel로 바뀌며 5초 안에 두 번째 클릭을 해야 실행된다. failed 작업에는 `retry-task` 버튼과 `retry-resume` 체크박스(Resume previous session)가 있다 |
 | 승인 패널 | `approval-panel` | `POST /api/tasks/:id/{approve,deny}` (`request_id`) | `pending_approval`이 있을 때만 보인다. 아래 "승인 패널" 절을 본다 |
 | 그래프 탭 | `graph`, `graph-canvas` | `GET /api/graph` | 작업을 노드, 의존을 간선으로 그린다. 의존 깊이별로 왼쪽에서 오른쪽으로 배치한다. 실패·승인·로그인 대기 상태이거나 stale run이 있고 done이 아니면 굵은 테두리를 그린다. 툴팁에 stale run 수를 보인다 |
@@ -50,6 +50,20 @@
 - 보이지 않는 문자는 `\u{202E}` 같은 이스케이프를 `hidden-char` 표시로 감싸 보인다. 대상은 제어 문자(줄바꿈 제외), 서식 문자(0 너비 문자, 양방향 제어 문자), 공백 문자(U+0020 외), 빈 글리프처럼 보이는 채움 문자, 사용자 영역, 할당되지 않은 코드 포인트다. 1개 이상이면 경고 줄을 보인다. 판정은 `pure/hidden-chars.js`가 한다.
 - 입력이 600자를 넘거나 8줄을 넘으면 Approve가 비활성이다. 입력 `pre`를 끝까지 스크롤하거나 "I have read the whole command" 체크박스를 켜야 활성이 된다. 스크롤 위치는 같은 요청 안에서 다시 그릴 때도 유지한다. Deny는 항상 활성이다.
 - Approve와 Deny는 화면에 보인 `request_id`를 보낸다. 409가 오면 작업을 다시 읽고 요청이 바뀌었다고 알린다.
+
+## 상태 표시
+
+작업 상태와 run 결과는 `status-ind`(`ui/js/core/status.js`)로 보인다. Carbon status indicator 규칙대로 기호, 색, 낱말을 함께 써서 색만으로 상태를 구분하지 않는다. 보드 열 제목, 작업 상세의 Status, run 목록, run dialog의 Result가 이것을 쓴다.
+
+| 상태 | 기호 | 색 토큰 |
+|---|---|---|
+| draft, ready, stale | ◌, ○, ○ | `--stale` |
+| running | ● | `--running` |
+| review | ■ | `--review` |
+| needs_approval | ▲ | `--needs-approval` |
+| needs_auth | ◆ | `--needs-auth` |
+| done | ✔ | `--done` |
+| failed | ✖ | `--failed` |
 
 ## 실시간 갱신
 

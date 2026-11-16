@@ -1,63 +1,4 @@
-/* Design tokens and base chrome.
-   Colors only through variables. Light is the base; dark overrides via the media query. */
-:root {
-  color-scheme: light dark;
-  --bg: #f4f5f7;
-  --panel: #ffffff;
-  --panel-soft: #f5f5f7;
-  --stage: #e4e5e9;
-  --fg: #1c1d21;
-  --muted: #7a808c;
-  --border: #e3e5ea;
-  --accent: #2f6fed;
-  --accent-soft: #e3ecff;
-  --on-accent: #ffffff;
-  --control: rgba(0, 0, 0, 0.05);
-  --chip: #ffffff;
-  --hover: rgba(20, 24, 40, 0.06);
-  --danger: #e03131;
-  --radius: 7px;
-  --radius-s: 5px;
-  --shadow-1: 0 1px 2px rgba(16, 20, 32, 0.06), 0 2px 8px rgba(16, 20, 32, 0.08);
-  --shadow-2: 0 10px 32px rgba(16, 20, 32, 0.18);
-  --ease: 140ms cubic-bezier(0.2, 0.7, 0.3, 1);
-  /* Status and outcome tokens. failed and critical use --danger; running and selection use --accent. */
-  --done: #1f8a4c;
-  --failed: var(--danger);
-  --needs-approval: #b26a00;
-  --needs-auth: #7048c4;
-  --review: #0f7b8a;
-  --running: var(--accent);
-  --stale: var(--muted);
-  --high: #b26a00;
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --bg: #1b1c1f;
-    --panel: #26272b;
-    --panel-soft: #2a2b2f;
-    --stage: #1e1f22;
-    --fg: #e9eaee;
-    --muted: #9197a3;
-    --border: #37393f;
-    --accent: #6ea0ff;
-    --accent-soft: #24385f;
-    --on-accent: #10131a;
-    --control: rgba(255, 255, 255, 0.08);
-    --chip: #3d3f46;
-    --hover: rgba(255, 255, 255, 0.07);
-    --danger: #ff6b6b;
-    --shadow-1: 0 1px 2px rgba(0, 0, 0, 0.3), 0 2px 8px rgba(0, 0, 0, 0.35);
-    --shadow-2: 0 10px 32px rgba(0, 0, 0, 0.55);
-    --done: #6bd38f;
-    --needs-approval: #f2b84b;
-    --needs-auth: #b99cf5;
-    --review: #5fd0df;
-    --high: #f2b84b;
-  }
-}
-
+/* Base chrome and shared controls, styled after Carbon. Values come only from the tokens in theme/contract.css. */
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { transition: none !important; animation: none !important; }
 }
@@ -68,15 +9,17 @@ body {
   margin: 0;
   background: var(--bg);
   color: var(--fg);
-  font: 13px/1.45 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  font: var(--text-body) var(--font-sans);
+  letter-spacing: 0.16px;
 }
 
-h1, h2, h3, h4 { line-height: 1.25; font-weight: 600; }
+h1, h2, h3, h4 { line-height: 1.3; font-weight: 600; letter-spacing: 0; }
 h1 { font-size: 16px; margin: 0; }
-h2 { font-size: 16px; margin: 6px 0; }
-h3 { font-size: 13px; margin: 14px 0 6px; }
+h2 { font-size: 20px; font-weight: 400; margin: 6px 0; }
+h3 { font-size: 14px; margin: 16px 0 8px; }
 
-:focus-visible { outline: none; box-shadow: 0 0 0 3px var(--accent-soft); }
+/* Carbon focus: a 2px ring in --focus, drawn inside so it never shifts layout. */
+:focus-visible { outline: 2px solid var(--focus); outline-offset: -2px; }
 
 .sr-only {
   position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap;
@@ -84,18 +27,29 @@ h3 { font-size: 13px; margin: 14px 0 6px; }
 
 .top {
   display: flex; flex-wrap: wrap; align-items: center; gap: 12px;
-  padding: 10px 16px; background: var(--panel); box-shadow: var(--shadow-1);
+  padding: 8px 16px; background: var(--panel); border-bottom: 1px solid var(--border);
   position: sticky; top: 0; z-index: 10;
 }
-.top .notice { margin: 0; flex-basis: 100%; min-height: 1.4em; font-size: 12px; color: var(--muted); }
-.notice[data-kind="error"] { color: var(--danger); }
-.notice[data-kind="ok"] { color: var(--done); }
+
+/* Inline notification (Carbon): status color bar, icon, message, and a close button. It stays until closed or replaced. */
+.notice {
+  flex-basis: 100%; display: flex; align-items: center; gap: 10px; margin: 0; padding: 0 0 0 12px; min-height: 40px;
+  font-size: var(--text-small); background: var(--info-soft); box-shadow: inset 3px 0 0 var(--running);
+}
+.notice:empty, .notice:not([data-kind]) { display: none; }
+.notice::before { content: "i"; flex: none; width: 16px; height: 16px; border-radius: 50%; font: 700 11px/16px var(--font-sans); text-align: center; color: var(--on-accent); background: var(--running); }
+.notice[data-kind="error"] { background: var(--error-soft); box-shadow: inset 3px 0 0 var(--failed); }
+.notice[data-kind="error"]::before { content: "!"; background: var(--failed); }
+.notice[data-kind="ok"] { background: var(--success-soft); box-shadow: inset 3px 0 0 var(--done); }
+.notice[data-kind="ok"]::before { content: "\2713"; background: var(--done); }
+.notice-text { flex: 1; overflow-wrap: anywhere; }
+.notice-close { flex: none; width: 40px; height: 40px; padding: 0; font-size: 18px; line-height: 1; color: var(--fg); }
 
 .search { display: flex; gap: 6px; flex: 1 1 260px; max-width: 480px; }
 .search input { flex: 1; min-width: 0; }
 
 .search-results {
-  margin: 12px 16px 0; padding: 12px 14px; border-radius: 12px; background: var(--panel); box-shadow: var(--shadow-2);
+  margin: 12px 16px 0; padding: 12px 16px; background: var(--panel); box-shadow: var(--shadow-2);
   max-height: 40vh; overflow: auto;
 }
 .search-results .close { float: right; }
@@ -106,75 +60,97 @@ h3 { font-size: 13px; margin: 14px 0 6px; }
 .main { min-width: 0; }
 .must-check {
   position: sticky; top: 84px; max-height: calc(100vh - 100px); overflow: auto;
-  background: var(--panel-soft); border-radius: 12px; box-shadow: var(--shadow-1); padding: 12px;
+  background: var(--panel); padding: 16px;
 }
 @media (max-width: 900px) {
   .layout { grid-template-columns: 1fr; }
   .must-check { position: static; max-height: none; order: -1; }
 }
 
-/* Segmented control: a track with the selected cell filled. */
-.segmented, .tabs, .btn-group {
-  display: inline-flex; gap: 2px; padding: 3px; border-radius: var(--radius); background: var(--control);
+/* Line tabs (Carbon): a 2px bottom line marks the selected view. */
+.tabs { display: flex; flex-wrap: wrap; margin-bottom: 16px; box-shadow: inset 0 -2px 0 var(--border); }
+.tabs [role="tab"] {
+  min-height: 40px; padding: 8px 16px; color: var(--muted); box-shadow: inset 0 -2px 0 var(--border);
 }
-.tabs { margin-bottom: 12px; flex-wrap: wrap; }
-.tabs [role="tab"], .btn-group > button {
-  min-height: 26px; padding: 4px 12px; border-radius: var(--radius-s); background: transparent; color: var(--muted);
-}
-.tabs [role="tab"][aria-selected="true"] { background: var(--accent); color: var(--on-accent); font-weight: 600; }
-.btn-group > button[aria-pressed="true"] { background: var(--chip); color: var(--fg); box-shadow: var(--shadow-1); }
+.tabs [role="tab"]:hover:not(:disabled) { color: var(--fg); box-shadow: inset 0 -2px 0 var(--border-strong); background: transparent; }
+.tabs [role="tab"][aria-selected="true"] { color: var(--fg); font-weight: 600; box-shadow: inset 0 -2px 0 var(--accent); }
+
+/* Content switcher (Carbon): joined buttons, the selected one filled. */
+.segmented, .btn-group { display: inline-flex; box-shadow: inset 0 0 0 1px var(--border-strong); }
+.btn-group > button { min-height: 32px; padding: 0 16px; color: var(--muted); }
+.btn-group > button[aria-pressed="true"] { background: var(--secondary); color: var(--on-accent); }
 
 button, input, select, textarea {
   font: inherit; color: inherit; border: 0; outline: none;
   transition: background-color var(--ease), box-shadow var(--ease), color var(--ease);
 }
+/* Buttons (Carbon): a plain button is ghost; submit is primary; .danger is the destructive kind. One primary per view. */
 button {
-  background: transparent; border-radius: var(--radius); padding: 5px 10px; min-height: 28px; cursor: pointer;
+  background: transparent; border-radius: var(--radius); padding: 0 12px; min-height: 32px; cursor: pointer; color: var(--link);
 }
 button:hover:not(:disabled) { background: var(--hover); }
-button:disabled { opacity: 0.45; cursor: default; }
-button[type="submit"] { background: var(--accent); color: var(--on-accent); }
-button[type="submit"]:hover:not(:disabled) { box-shadow: inset 0 0 0 999px var(--hover); }
-button.link { padding: 0; min-height: 0; color: var(--accent); text-align: left; }
+button:disabled { color: var(--muted); opacity: 0.6; cursor: not-allowed; }
+button[type="submit"] { background: var(--accent); color: var(--on-accent); padding: 0 16px; }
+button[type="submit"]:hover:not(:disabled) { background: var(--accent-hover); }
+button.link { padding: 0; min-height: 0; color: var(--link); text-align: left; }
 button.link:hover:not(:disabled) { background: transparent; text-decoration: underline; }
 
+/* Text inputs (Carbon): field fill with a bottom rule that thickens on focus. */
 input, select, textarea {
-  background: var(--control); border-radius: var(--radius-s); padding: 5px 8px; min-height: 28px;
+  background: var(--field); border-radius: var(--radius-s); padding: 0 12px; min-height: 32px;
+  box-shadow: inset 0 -1px 0 var(--border-strong);
 }
-input:focus-visible, select:focus-visible, textarea:focus-visible { box-shadow: 0 0 0 3px var(--accent-soft); }
-textarea { width: 100%; padding: 6px 8px; }
+.must-check input, .dialog-body input, .dialog-body select, .dialog-body textarea, .main input, .main select { background: var(--panel-soft); }
+input:focus-visible, select:focus-visible, textarea:focus-visible { outline: 2px solid var(--focus); outline-offset: -2px; }
+textarea { width: 100%; padding: 8px 12px; }
 
 .btn-group { margin-right: 4px; }
 .actions { display: flex; flex-wrap: wrap; gap: 6px; margin: 8px 0; }
-.meta { color: var(--muted); font-size: 12px; margin: 2px 0; }
+.meta { color: var(--muted); font-size: var(--text-small); margin: 2px 0; }
 .pre { white-space: pre-wrap; word-break: break-word; margin: 4px 0; }
-.empty { color: var(--muted); font-style: italic; }
+/* Empty state (Carbon): plain secondary text that says what is missing, never italic. */
+.empty { color: var(--muted); }
 .error { color: var(--danger); }
 
+/* Tag (Carbon): a pill with a tinted fill. Text says what it is; color only groups. */
 .badge {
-  display: inline-block; padding: 1px 8px; border-radius: 999px; font-size: 12px; margin-right: 4px;
-  background: var(--control); box-shadow: var(--shadow-1);
+  display: inline-flex; align-items: center; min-height: 24px; padding: 0 8px; border-radius: 999px;
+  font-size: var(--text-small); margin-right: 4px; background: var(--control); color: var(--fg);
 }
 .badge.blocked { color: var(--muted); }
-.sev-critical { color: var(--danger); }
+.sev-critical { color: var(--failed); }
 .sev-high { color: var(--high); }
 .sev-normal { color: var(--muted); }
-.badge.sev-critical { background: color-mix(in srgb, var(--danger) 14%, var(--panel)); }
-.badge.sev-high { background: color-mix(in srgb, var(--high) 14%, var(--panel)); }
+.badge.sev-critical { background: var(--error-soft); }
+.badge.sev-high { background: var(--warning-soft); }
+
+/* Status indicator (Carbon): a symbol, a color and the status word together, so color is never the only signal. */
+.status-ind { display: inline-flex; align-items: center; gap: 6px; font-weight: 600; }
+.status-ind::before {
+  flex: none; width: 16px; text-align: center; font-size: 14px; line-height: 1; color: var(--ink, var(--stale));
+}
+.status-ind[data-status="draft"]::before { content: "\25CC"; --ink: var(--stale); }
+.status-ind[data-status="ready"]::before { content: "\25CB"; --ink: var(--stale); }
+.status-ind[data-status="stale"]::before { content: "\25CB"; --ink: var(--stale); }
+.status-ind[data-status="running"]::before { content: "\25CF"; --ink: var(--running); }
+.status-ind[data-status="review"]::before { content: "\25A0"; --ink: var(--review); }
+.status-ind[data-status="needs_approval"]::before { content: "\25B2"; --ink: var(--needs-approval); }
+.status-ind[data-status="needs_auth"]::before { content: "\25C6"; --ink: var(--needs-auth); }
+.status-ind[data-status="done"]::before { content: "\2714"; --ink: var(--done); }
+.status-ind[data-status="failed"]::before { content: "\2716"; --ink: var(--failed); }
 
 pre {
-  margin: 4px 0; padding: 8px; background: var(--control); border-radius: var(--radius-s);
-  white-space: pre-wrap; word-break: break-word; font: 12px/1.4 ui-monospace, Menlo, monospace; overflow: auto;
+  margin: 4px 0; padding: 12px; background: var(--panel-soft); border-radius: var(--radius-s);
+  white-space: pre-wrap; word-break: break-word; font: 12px/1.45 var(--font-mono); overflow: auto;
 }
 
-.legend { font-size: 12px; color: var(--muted); }
+.legend { font-size: var(--text-small); color: var(--muted); }
 .swatch { display: inline-block; padding: 1px 8px 1px 10px; margin: 2px 4px 2px 0; border-radius: 999px; background: var(--control); box-shadow: inset 3px 0 0 var(--ink, var(--muted)); }
 .swatch.wait-sample { background: repeating-linear-gradient(135deg, transparent 0 5px, var(--muted) 5px 6px); box-shadow: none; }
 
-/* Full-width notice when the page has no valid token. Warning colors come from the danger token. */
+/* Full-width error notification when the page has no valid token. */
 .token-notice {
-  margin: 12px 16px 0; padding: 10px 14px; border-radius: 10px;
-  background: color-mix(in srgb, var(--danger) 10%, var(--panel)); box-shadow: inset 3px 0 0 var(--danger), var(--shadow-1);
+  margin: 12px 16px 0; padding: 12px 16px; background: var(--error-soft); box-shadow: inset 3px 0 0 var(--failed);
 }
 .token-notice p { margin: 0; font-weight: 600; }
 

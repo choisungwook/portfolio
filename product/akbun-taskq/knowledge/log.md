@@ -4,6 +4,8 @@ concept를 추가·수정·삭제할 때마다 오늘 날짜 섹션을 맨 위�
 
 ## 2026-11-16
 
+* **Creation**: [The taskq UI follows IBM Carbon through a token interface](decisions/2026-11-carbon-design-system.md) 결정 기록. Carbon 선택 이유와 USWDS, GOV.UK를 고르지 않은 이유.
+* **Creation**: [Carbon Design System principles and patterns used by the taskq UI](references/carbon-design-system.md) 참고 자료 사본. 원칙, 상태 표시 규칙, 알림 규칙.
 * **Creation**: [New features start from an interface](decisions/2026-11-interface-first.md) 결정 기록. The interface comes first and callers import only it; the first implementation is wired in one place.
 * **Creation**: [Agent SDKs plug in behind one AgentBackend interface](decisions/2026-11-agent-backend-interface.md) 결정 기록. createWorker, preflight and ask; the gate policy stays shared and each backend maps its own hook to it.
 * **Creation**: [A call that reaches taskq itself stops the run for review](decisions/2026-11-tamper-stops-run.md) 결정 기록. Sandbox-off, data directory, taskq config and ~/.claude writes end the session; the PreToolUse hook is fail-closed.

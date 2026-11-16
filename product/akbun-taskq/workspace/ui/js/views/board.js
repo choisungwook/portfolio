@@ -3,6 +3,7 @@ import { api } from '../core/api.js'
 import { area, clear, el } from '../core/dom.js'
 import { emit, on } from '../core/bus.js'
 import { BOARD_COLUMNS, COLLAPSED_COLUMNS, label, TYPE_MARK } from '../core/vocab.js'
+import { statusIndicator } from '../core/status.js'
 
 let columns
 let active = false
@@ -35,11 +36,11 @@ function column(status, tasks, collapsed) {
   const heading = `${label(status)} (${tasks.length})`
   if (collapsed) {
     return el('details', { class: 'board-col collapsed', dataset: { column: status } },
-      el('summary', { text: heading }),
+      el('summary', {}, statusIndicator(status, heading)),
       tasks.length === 0 ? el('p', { class: 'empty', text: 'None.' }) : list)
   }
   return el('section', { class: 'board-col', dataset: { column: status }, 'aria-label': heading },
-    el('h3', { text: heading }),
+    el('h3', {}, statusIndicator(status, heading)),
     tasks.length === 0 ? el('p', { class: 'empty', text: 'None.' }) : list)
 }
 

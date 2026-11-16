@@ -4,6 +4,7 @@ import { area, clear, el } from '../core/dom.js'
 import { emit, on } from '../core/bus.js'
 import { fmtClock, fmtDateTime } from '../core/time.js'
 import { ACTION_STATUS, label, outcomeOf, parseField, TYPE_MARK } from '../core/vocab.js'
+import { statusIndicator } from '../core/status.js'
 import { approvalPanel } from './approval-panel.js'
 import { operatorControls } from './operator-controls.js'
 
@@ -66,7 +67,7 @@ function sections(task, events, graph, titles, settings) {
   return [
     el('h2', { text: title }),
     el('p', { class: 'meta', text: `${TYPE_MARK[task.type] ?? label(task.type)} · ${task.lock_key ?? 'no account or repo'} · priority ${task.priority}` }),
-    el('p', { class: `status status-${task.status}`, text: `Status: ${label(task.status)}` }),
+    el('p', { class: 'status' }, 'Status: ', statusIndicator(task.status)),
     el('dl', { class: 'facts' },
       el('dt', { text: 'Created' }), el('dd', { text: fmtDateTime(task.created_at) }),
       el('dt', { text: 'Updated' }), el('dd', { text: fmtDateTime(task.updated_at) }),
@@ -126,7 +127,7 @@ function actionButtons(task) {
 function runList(runs) {
   if (runs.length === 0) return el('p', { class: 'meta', text: 'No runs yet.' })
   return el('ul', { class: 'runs' }, ...runs.map((run) => el('li', {},
-    el('span', { class: `outcome-text outcome-${outcomeOf(run)}`, text: label(outcomeOf(run)) }),
+    statusIndicator(outcomeOf(run)),
     ` ${fmtDateTime(run.started_at)} `,
     el('span', { class: 'meta', text: run.summary ?? '' }),
     el('button', { type: 'button', text: 'Open run', onclick: () => emit('open-run', run.id) }))))
