@@ -60,7 +60,7 @@ workspace/
       claude/               # the Claude Agent SDK backend
         index.ts worker.ts hooks.ts profiles.ts auth.ts ask.ts result.ts
     worker/                 # backend-neutral policy
-      aws-guard.ts filter-args.ts result-schema.ts text.ts
+      gate.ts paths.ts aws-guard.ts filter-args.ts prompt.ts result-schema.ts text.ts
     memory/                 # phase 2
       similar.ts retrospect.ts
     skills/                 # access skill registry: validation, discovery, run-time check
@@ -265,7 +265,7 @@ After a `code` task finishes `done`, the runner creates a `security_review` task
 
 ## Agent backends
 
-`config.agent` picks the backend (default `claude`). `src/agents/index.ts` maps the name to an `AgentBackend`, and `src/cli/run.ts` is the only caller: the runner gets `createWorker(config)` and `preflight(config)`, and the retrospector gets `ask(config, request)`. The runner, API, database and UI never import an SDK.
+`config.agent` picks the backend (default `claude`). `src/agents/index.ts` maps the name to an `AgentBackend`, and `src/cli/run.ts` is the only runtime caller (`scripts/demo-seed.ts` also calls `preflight`): the runner gets `createWorker(config)` and `preflight(config)`, and the retrospector gets `ask(config, request)`. The runner, API, database and UI never import an SDK.
 
 | Method | Contract |
 |---|---|
