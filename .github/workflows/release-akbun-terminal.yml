@@ -20,9 +20,9 @@ defaults:
     working-directory: product/akbun-terminal/workspace
 
 jobs:
-  # The core carries no AppKit, so its tests run on the cheap runner. This is the
-  # payoff of keeping the model in its own crates: the pty round trip, the
-  # protocol and the session lifetime are all checked here in seconds.
+  # The core and the tui carry no AppKit, so their tests run on the cheap runner:
+  # the pty round trip, the protocol, the daemon and the tui's state are all
+  # checked here in seconds.
   core:
     if: github.event_name == 'pull_request'
     runs-on: ubuntu-latest
@@ -33,15 +33,15 @@ jobs:
 
       - uses: Swatinem/rust-cache@v2
         with:
-          workspaces: product/akbun-terminal/workspace/core
+          workspaces: product/akbun-terminal/workspace
 
-      - name: Run core tests
-        run: cargo test --manifest-path core/Cargo.toml
+      - name: Run core and tui tests
+        run: cargo test --workspace
 
-  # The shell needs macOS, because the package links AppKit. This job is also the
-  # only place the two languages are linked together, which is the step most
-  # likely to break.
-  shell:
+  # The desktop app needs macOS, because the package links AppKit. This job is
+  # also the only place the Swift client talks to the real daemon, which is the
+  # step most likely to break.
+  desktop:
     if: github.event_name == 'pull_request'
     runs-on: macos-latest
     steps:
@@ -51,12 +51,13 @@ jobs:
 
       - uses: Swatinem/rust-cache@v2
         with:
-          workspaces: product/akbun-terminal/workspace/core
+          workspaces: product/akbun-terminal/workspace
 
-      - name: Build the core static library
-        run: ./scripts/build-core.sh
+      - name: Build the core daemon
+        run: ./desktop/scripts/build-core.sh
 
-      - name: Run shell tests
+      - name: Run desktop tests
+        working-directory: product/akbun-terminal/workspace/desktop
         run: swift test
 
   # macOS arm64 only. The build has to succeed before the tag is created, and the
@@ -73,7 +74,7 @@ jobs:
 
       - uses: Swatinem/rust-cache@v2
         with:
-          workspaces: product/akbun-terminal/workspace/core
+          workspaces: product/akbun-terminal/workspace
 
       - name: Read version
         id: version
@@ -83,16 +84,16 @@ jobs:
           echo "tag=akbun-terminal-v$version" >> "$GITHUB_OUTPUT"
           echo "Version: $version"
 
-      - name: Run core tests
-        run: cargo test --manifest-path core/Cargo.toml
+      - name: Run core and tui tests
+        run: cargo test --workspace
 
-      - name: Run shell tests
+      - name: Run desktop tests
         run: |
-          ./scripts/build-core.sh
-          swift test
+          ./desktop/scripts/build-core.sh
+          cd desktop && swift test
 
-      - name: Build dmg
-        run: ./scripts/bundle.sh
+      - name: Build dmg and cli archive
+        run: ./desktop/scripts/bundle.sh
 
       # Only tag once the build succeeded.
       - name: Create tag
@@ -113,7 +114,8 @@ jobs:
           cat > release-notes.md <<'EOF'
           ## About
 
-          - A macOS window that wraps a shell. The model, the sessions and the protocol live in a Rust core; the window is a thin AppKit shell over it.
+          - A terminal workspace in three parts. A Rust core daemon owns the shells, the project tree and the agent status; a macOS app and a terminal UI are clients of it.
+          - Shells live in the core, so they keep running when a client closes and the terminal UI can attach to them again.
           - Projects and workspaces on the left, terminal tabs in the middle, the project's files on the right.
           - The terminal is SwiftTerm, so colour, the cursor and full screen programs draw properly.
           - Markdown files open under the terminal, rendered or as source, and save back. A mermaid fence is drawn as a diagram, and an HTML file has a Render mode beside View and Edit.
@@ -128,7 +130,8 @@ jobs:
 
           ## Install
 
-          - The dmg is Apple Silicon (arm64) only.
+          - The dmg is Apple Silicon (arm64) only. It carries the core beside the app.
+          - `akbun-terminal-cli-*.tar.gz` holds `akbun-terminal-core` and `akbun-terminal-tui` for macOS arm64. Put both in one folder on `PATH` and run `akbun-terminal-tui`. On Linux, build them from source with `cargo build --release`.
           - Unsigned build, so the first launch fails with "damaged and can't be opened".
           - Fix by removing the quarantine attribute after installing: `xattr -cr /Applications/akbun-terminal.app`
           EOF
@@ -137,4 +140,5 @@ jobs:
           gh release create "$TAG" \
             --title "$TAG" \
             --notes-file release-notes.md \
-            product/akbun-terminal/workspace/build/*.dmg
+            product/akbun-terminal/workspace/desktop/build/*.dmg \
+            product/akbun-terminal/workspace/desktop/build/*.tar.gz

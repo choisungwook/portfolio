@@ -1,19 +1,20 @@
 # akbun-terminal wiki
 
-Notes for the next agent taking over this app. Read [architecture.md](./architecture.md) for how the pieces fit and [development.md](./development.md) for how to build, test and release.
+Notes for the next agent taking over this app. Read [architecture.md](./architecture.md) for how the pieces fit and [development.md](./development.md) for how to build, test and release. [user-manual.md](./user-manual.md) is how a person uses it.
 
 ## What the app is
 
-A macOS app that wraps shells. The left sidebar holds projects and their workspace groups and colours each by what the agent inside it is doing, the middle runs the selected workspace's tabs — shells and files in one strip — and the right lists the project's files.
+A core daemon that owns shells, with a macOS app and a terminal UI as its clients. In the macOS app the left sidebar holds projects and their workspace groups and colours each by what the agent inside it is doing, the middle runs the selected workspace's tabs — shells and files in one strip — and the right lists the project's files.
 
 ## Where the risk is
 
-- **The link step, not the code.** This is the only product here that compiles two languages into one binary. `swift build` cannot produce the Rust archive, so `scripts/build-core.sh` runs first and `Package.swift` links `core/target/release` by a fixed relative path. Building from another directory breaks the link, which is why both scripts `cd` to the package root.
-- **The header is written by hand.** `Sources/CAkbunTerminalCore/include/akbun_terminal.h` mirrors `core/crates/ffi/src/lib.rs`. Nothing checks them at compile time; `BridgeTests` is what fails when they drift.
+- **Three binaries, one protocol.** The daemon, the terminal UI and the macOS app are built separately and meet only on the socket. `BridgeTests` on the Swift side and `core/tests/daemon.rs` on the Rust side each start the real daemon; they are what fails when the two drift.
+- **A daemon outlives what started it.** A shell lives until it exits, is closed, or the daemon is stopped; closing a client is none of those. The daemon exits by itself after ten seconds with no client and no shell, so an app that closes its own shells leaves nothing behind, and a terminal UI that quits leaves its shells running on purpose.
+- **An updated client can meet an old daemon.** `CoreBridge.handshake` asks a daemon on another protocol to shut down and starts the one beside the app. That ends every shell the old daemon held.
+- **Two clients, one tree.** A tree edit answers the caller with the whole tree and reaches every other connection as a `state` event. The macOS app does not read that event yet, so an edit made in the terminal UI shows there after a restart.
 - **Wire names are the contract.** The Rust and Swift halves of the protocol are never compiled together. `responses_and_events_keep_their_wire_names` on one side and `ProtocolTests` on the other are what a rename has to trip over.
-- **One ownership rule.** Every string the core returns was allocated by Rust and goes back to `akbun_core_string_free`. `CoreBridge` is the only file allowed to hold that pointer, so the rule lives in one place.
-- **Events are drained, never pushed.** The core queues; the shell asks on its run loop. Nothing calls back from a reader thread, so no view is ever touched off the main thread.
-- **Bytes ride as JSON arrays.** Correct and several times larger than the payload. Acceptable while one session is being proved out, and the first thing to move to its own channel; the protocol version exists for exactly that.
+- **Events are drained, never pushed into a view.** A reader thread in `CoreConnection` queues what the daemon sends; the window asks on its run loop. Nothing touches a view off the main thread.
+- **Bytes ride as JSON arrays.** Correct and several times larger than the payload. It cost the same when the core was in process, so the socket did not make it worse; it is still the first thing to move to its own channel.
 - **The browser reads what is opened, and only that.** `read_directory` answers one level. The outline view asks for children inside `numberOfChildrenOfItem`, which is the moment a folder is opened, so nothing below a closed folder has been read. Hidden files and folders are listed and symlinks are leaves, both decided in the core.
 - **The only document web view is Markdown Preview.** Bundled markdown-it, Highlight.js and Mermaid run in a non-persistent WebKit view. Raw document HTML is disabled, external navigation is intercepted, and HTML files are opened by the system browser instead of executed inside the app.
 - **The menu bar is built from the core.** `shortcuts.rs` is the list of commands, their titles, their menu and their default keys; `AppDelegate` maps an id to a selector and nothing else. A key nobody changed is not in the state file, which is what lets a default move later.
@@ -43,55 +44,61 @@ A macOS app that wraps shells. The left sidebar holds projects and their workspa
 
 | File | Role |
 |---|---|
-| `core/crates/core/src/protocol.rs` | commands, responses, events, version check |
-| `core/crates/core/src/app.rs` | the only interpreter of commands, and the event queue |
-| `core/crates/core/src/session.rs` | one shell under a pty, its reader thread and its reaping |
-| `core/crates/core/src/tree.rs` | project/workspace model, chosen theme, atomic JSON persistence |
-| `core/crates/core/src/browse.rs` | one directory level, and the link rule that keeps it out of cycles |
-| `core/crates/core/src/git.rs` | porcelain status, the stage beside it, the roll up that gives a folder a colour, one commit's patch and the stash |
-| `core/crates/core/src/theme.rs` | the known colour schemes as a hex table, dark and light |
-| `core/crates/core/src/shortcuts.rs` | the menu commands, their default keys and the rule about clashes |
-| `core/crates/core/src/search.rs` | the project file index and the score that ranks a query's matches |
-| `core/crates/core/src/grep.rs` | Command shift F: the lines under the project holding a query, over that same file list |
-| `core/crates/core/src/screen.rs` | the interpreted screen the judging reads |
-| `core/crates/core/src/agent.rs` | rule files, the process tree walk, and the judgement |
-| `core/crates/core/rules/*.json` | the agent rules this build ships and seeds |
-| `core/crates/core/src/url.rs` | what counts as a URL, and what may be opened |
-| `core/crates/ffi/src/lib.rs` | the five function C surface |
-| `Sources/CAkbunTerminalCore/include/akbun_terminal.h` | the header that mirrors it |
-| `Sources/AkbunTerminalCore/Protocol.swift` | the Swift half of the protocol |
-| `Sources/AkbunTerminalCore/CoreBridge.swift` | the only file that touches pointers |
-| `Sources/AkbunTerminalCore/Release.swift` | version arithmetic and dmg naming, pure |
-| `Sources/AkbunTerminalCore/UpdateScript.swift` | the bundle swap script, testable as text |
-| `Sources/akbun-terminal/TerminalRendering.swift` | the seam a real terminal engine plugs into |
-| `Sources/akbun-terminal/SwiftTermTerminalView.swift` | the emulator behind that seam |
-| `Sources/akbun-terminal/TerminalTabBarView.swift` | the tab strip for the selected workspace |
-| `Sources/AkbunTerminalCore/TerminalTabs.swift` | which shell and which document belong to which workspace, and which is on screen |
-| `Sources/AkbunTerminalCore/Zoom.swift` | bounded size scaling, independently used by content and panels |
-| `Sources/AkbunTerminalCore/TerminalKeys.swift` | the keystrokes this app encodes itself, shift and return so far |
-| `Sources/AkbunTerminalCore/DocumentLink.swift` | where a link in a document points: a tab, a browser, or nowhere |
-| `Sources/AkbunTerminalCore/ShortcutKey.swift` | a core shortcut string to a key equivalent and a modifier mask, and back |
-| `Sources/AkbunTerminalCore/DocumentSearch.swift` | Command F over the file on screen: the matches and which one is next |
-| `Sources/AkbunTerminalCore/MarkdownPage.swift` | the sandboxed Markdown page, its CSP and source escaping |
-| `Sources/akbun-terminal/ProjectSidebarView.swift` | project/workspace two-level tree and status presentation |
-| `Sources/akbun-terminal/FileBrowserView.swift` | the outline view that reads a folder when it is opened, and the four panes over one project |
-| `Sources/akbun-terminal/GitCommitDetailView.swift` | what the clicked commit changed: its files and one diff |
-| `Sources/akbun-terminal/GitStatusPanelView.swift` | staged, not staged and the stash, read only |
-| `Sources/AkbunTerminalCore/GitDiff.swift` | a unified diff as drawable lines with the numbers down the side |
-| `Sources/akbun-terminal/DocumentView.swift` | one file tab, its read and edit modes, save, the unsaved question and the command click on a link |
-| `Sources/akbun-terminal/MarkdownPreviewView.swift` | bundled renderer loading, WebKit navigation policy and preview search |
-| `Sources/akbun-terminal/CommandPaletteView.swift` | the Command O sheet: the list, the keyboard and the marks |
-| `Sources/akbun-terminal/SearchPanelView.swift` | the Command shift F pane: the field, the debounce and the marked result lines |
-| `Sources/akbun-terminal/ShortcutsWindowController.swift` | Settings › Shortcuts, and the recording monitor |
-| `Sources/akbun-terminal/CodeHighlighter.swift` | HighlighterSwift adapter, language hint and plain-text fallback |
-| `Sources/AkbunTerminalCore/Theme.swift` | hex to bytes, the only part of a theme that can be wrong |
-| `Sources/akbun-terminal/TerminalWindowController.swift` | one window, the tabs it opens, the drain timer |
-| `Sources/akbun-terminal/Palette.swift` | every colour the window draws with, and what a git status and its stage look like |
-| `Sources/akbun-terminal/Browsers.swift` | the installed browsers, asked of the system once |
-| `Sources/akbun-terminal/Updater.swift` | release check, dmg download, bundle swap |
-| `scripts/build-core.sh` | the Rust archive the package links |
-| `scripts/bundle.sh` | assembles the .app and the dmg |
+| `core/src/protocol.rs` | commands, responses, events, version check |
+| `core/src/app.rs` | the only interpreter of commands, and the event queue |
+| `core/src/daemon.rs` | the socket server, the judging timer, idle exit and signals |
+| `core/src/hub.rs` | who hears what: connections, subscriptions, replay tails, per-connection status deltas |
+| `core/src/client.rs` | the Rust client the terminal UI and the CLI use, and starting the daemon |
+| `core/src/paths.rs` | data directory, socket, log and rules, the same answer for every client |
+| `core/src/main.rs` | `akbun-terminal-core`: serve, stop, ls, run, send, read, wait, kill, skill |
+| `core/src/SKILL.md` | the manual `skill` prints for agents |
+| `tui/` | the terminal UI: pure state, pure render, key encoding, and a thin IO loop |
+| `core/src/session.rs` | one shell under a pty, its reader thread and its reaping |
+| `core/src/tree.rs` | project/workspace model, chosen theme, atomic JSON persistence |
+| `core/src/browse.rs` | one directory level, and the link rule that keeps it out of cycles |
+| `core/src/git.rs` | porcelain status, the stage beside it, the roll up that gives a folder a colour, one commit's patch and the stash |
+| `core/src/theme.rs` | the known colour schemes as a hex table, dark and light |
+| `core/src/shortcuts.rs` | the menu commands, their default keys and the rule about clashes |
+| `core/src/search.rs` | the project file index and the score that ranks a query's matches |
+| `core/src/grep.rs` | Command shift F: the lines under the project holding a query, over that same file list |
+| `core/src/screen.rs` | the interpreted screen the judging reads |
+| `core/src/agent.rs` | rule files, the process tree walk, and the judgement |
+| `core/rules/*.json` | the agent rules this build ships and seeds |
+| `core/src/url.rs` | what counts as a URL, and what may be opened |
+| `desktop/Sources/AkbunTerminalCore/Protocol.swift` | the Swift half of the protocol |
+| `desktop/Sources/AkbunTerminalCore/CoreBridge.swift` | one request at a time to the daemon, and the handshake that replaces a stale one |
+| `desktop/Sources/AkbunTerminalCore/CoreConnection.swift` | the socket, the reader thread, and launching the daemon detached |
+| `desktop/Sources/AkbunTerminalCore/Release.swift` | version arithmetic and dmg naming, pure |
+| `desktop/Sources/AkbunTerminalCore/UpdateScript.swift` | the bundle swap script, testable as text |
+| `desktop/Sources/akbun-terminal/TerminalRendering.swift` | the seam a real terminal engine plugs into |
+| `desktop/Sources/akbun-terminal/SwiftTermTerminalView.swift` | the emulator behind that seam |
+| `desktop/Sources/akbun-terminal/TerminalTabBarView.swift` | the tab strip for the selected workspace |
+| `desktop/Sources/AkbunTerminalCore/TerminalTabs.swift` | which shell and which document belong to which workspace, and which is on screen |
+| `desktop/Sources/AkbunTerminalCore/Zoom.swift` | bounded size scaling, independently used by content and panels |
+| `desktop/Sources/AkbunTerminalCore/TerminalKeys.swift` | the keystrokes this app encodes itself, shift and return so far |
+| `desktop/Sources/AkbunTerminalCore/DocumentLink.swift` | where a link in a document points: a tab, a browser, or nowhere |
+| `desktop/Sources/AkbunTerminalCore/ShortcutKey.swift` | a core shortcut string to a key equivalent and a modifier mask, and back |
+| `desktop/Sources/AkbunTerminalCore/DocumentSearch.swift` | Command F over the file on screen: the matches and which one is next |
+| `desktop/Sources/AkbunTerminalCore/MarkdownPage.swift` | the sandboxed Markdown page, its CSP and source escaping |
+| `desktop/Sources/akbun-terminal/ProjectSidebarView.swift` | project/workspace two-level tree and status presentation |
+| `desktop/Sources/akbun-terminal/FileBrowserView.swift` | the outline view that reads a folder when it is opened, and the four panes over one project |
+| `desktop/Sources/akbun-terminal/GitCommitDetailView.swift` | what the clicked commit changed: its files and one diff |
+| `desktop/Sources/akbun-terminal/GitStatusPanelView.swift` | staged, not staged and the stash, read only |
+| `desktop/Sources/AkbunTerminalCore/GitDiff.swift` | a unified diff as drawable lines with the numbers down the side |
+| `desktop/Sources/akbun-terminal/DocumentView.swift` | one file tab, its read and edit modes, save, the unsaved question and the command click on a link |
+| `desktop/Sources/akbun-terminal/MarkdownPreviewView.swift` | bundled renderer loading, WebKit navigation policy and preview search |
+| `desktop/Sources/akbun-terminal/CommandPaletteView.swift` | the Command O sheet: the list, the keyboard and the marks |
+| `desktop/Sources/akbun-terminal/SearchPanelView.swift` | the Command shift F pane: the field, the debounce and the marked result lines |
+| `desktop/Sources/akbun-terminal/ShortcutsWindowController.swift` | Settings › Shortcuts, and the recording monitor |
+| `desktop/Sources/akbun-terminal/CodeHighlighter.swift` | HighlighterSwift adapter, language hint and plain-text fallback |
+| `desktop/Sources/AkbunTerminalCore/Theme.swift` | hex to bytes, the only part of a theme that can be wrong |
+| `desktop/Sources/akbun-terminal/TerminalWindowController.swift` | one window, the tabs it opens, the drain timer |
+| `desktop/Sources/akbun-terminal/Palette.swift` | every colour the window draws with, and what a git status and its stage look like |
+| `desktop/Sources/akbun-terminal/Browsers.swift` | the installed browsers, asked of the system once |
+| `desktop/Sources/akbun-terminal/Updater.swift` | release check, dmg download, bundle swap |
+| `desktop/scripts/build-core.sh` | the daemon and the terminal UI, release build |
+| `desktop/scripts/bundle.sh` | assembles the .app with the daemon inside, the dmg and the cli archive |
 
 ## What is not here yet
 
-Windows and Linux, a second window, and search in the scrollback. Command F searches the file in the tab and Command shift F the files under the project; neither reads the terminal beside them. Domain state belongs in the core; rendering engines and keystrokes belong in the shell.
+Windows, a desktop app for Linux, a second window, and search in the scrollback. The macOS app does not yet reattach to shells left running, follow `state` events, or show the agents list the terminal UI has. Command F searches the file in the tab and Command shift F the files under the project; neither reads the terminal beside them. Domain state belongs in the core; rendering engines and keystrokes belong in a client.

@@ -1,45 +1,71 @@
 # akbun-terminal
 
-A macOS window that wraps a shell. It restores a project and workspace tree on the left, terminal tabs in the middle and that project's files, Git history or what is waiting in the index, the working tree and the stash on the right, and colours each workspace with what the CLI agent inside it is doing.
+A terminal workspace for running CLI agents. A core daemon owns the shells, the project tree and what each agent is doing; a macOS app and a terminal UI are two windows onto it. Shells keep running when a window closes, and agents inside them can start, message, read and wait for one another through the core.
 
 ## Directory
 
 | Directory | Description |
 |---|---|
-| [workspace/](./workspace/) | Rust core, Swift shell, tests, build scripts |
-| [wiki/](./wiki/) | Architecture and development notes |
-| [adr/](./adr/) | Decision records |
+| [workspace/core/](./workspace/core/) | Rust daemon and its CLI, `akbun-terminal-core` |
+| [workspace/tui/](./workspace/tui/) | Terminal UI client, `akbun-terminal-tui` |
+| [workspace/desktop/](./workspace/desktop/) | macOS app: Swift, AppKit, build scripts |
+| [wiki/](./wiki/) | [User manual](./wiki/user-manual.md), architecture and development notes |
+| [adr/](./adr/) | Decision records made before `knowledge/` |
+| [knowledge/](./knowledge/) | Decisions since |
 
 ## How it is put together
 
-Two halves, split by how long each is expected to live.
+Three parts, split by who owns what.
 
-| Half | Holds | Language |
+| Part | Holds | Language |
 |---|---|---|
-| core | protocol, sessions, pty, everything that must survive a rewrite of the screen | Rust |
-| shell | window, views, menus, keyboard | Swift and AppKit |
+| core | shells and their ptys, the project tree, agent status, the protocol. Draws nothing | Rust |
+| tui | sidebar, tabs and a terminal inside any terminal | Rust, ratatui |
+| desktop | window, views, menus, files, Git and documents | Swift and AppKit |
 
-They meet at one JSON protocol carrying a version number. Today it travels through five C functions inside one process; the same types can travel over a socket later without the core learning anything new. The shell is expected to be replaced at least once, so it holds no state and no rules.
-
-The terminal view sits behind a small protocol of its own. SwiftTerm fills it, so escape sequences are interpreted rather than printed. Swapping in another engine is a new file, not a new design.
+Both clients speak one versioned JSON protocol to the core over a Unix socket, one document per line. A client starts the core when none is running, and the core exits by itself once it has had no client and no shell for ten seconds.
 
 ## Quick start
 
-Build and run from source:
+Terminal UI, on macOS or Linux:
 
 ```bash
-cd workspace && ./scripts/bundle.sh && open build/akbun-terminal.app
+cd workspace && cargo build --release
+./target/release/akbun-terminal-tui
 ```
 
-Run the tests. The core needs no macOS, which is why its tests are the fast ones:
+`Ctrl+G` then `?` lists the keys. `Ctrl+G` then `q` leaves; the shells stay, and the next start shows them again.
+
+macOS app, built from source:
+
+```bash
+cd workspace/desktop && ./scripts/bundle.sh && open build/akbun-terminal.app
+```
+
+Run the tests. The core and the tui need no macOS, which is why their tests are the fast ones:
 
 ```bash
 cd workspace
-cargo test --manifest-path core/Cargo.toml
-./scripts/build-core.sh && swift test
+cargo test --workspace
+./desktop/scripts/build-core.sh && (cd desktop && swift test)
 ```
 
-## What this build does
+## Agents talking to agents
+
+A shell started by the core knows its own id as `AKBUN_TERMINAL_SESSION`, so an agent in it can delegate and hear back without a person in between.
+
+```bash
+akbun-terminal-core run --name review -- claude     # start a shell running a program, print its id
+akbun-terminal-core send review "Review src/x.rs"   # type a message into it and press return
+akbun-terminal-core wait review                     # until it stops working, instead of sleeping
+akbun-terminal-core read review                     # what is on its screen
+akbun-terminal-core ls                              # every shell: id, name, parent, agent, status
+akbun-terminal-core skill                           # the manual an agent reads
+```
+
+A message sent from inside a shell arrives wrapped as `<akbun from="3 lead">…</akbun>`, which tells the receiver whom to answer. The terminal UI lists every shell with an agent in it, across workspaces, in its Agents view.
+
+## What the macOS app does
 
 - Adds folder-backed or empty projects and workspace children in a two-level sidebar.
 - Restores the project tree from a versioned JSON file in the app data directory.

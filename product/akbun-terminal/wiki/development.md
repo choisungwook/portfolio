@@ -2,57 +2,67 @@
 
 ## Prerequisites
 
-- macOS 14 or newer, Xcode command line tools for `swift`.
-- A Rust toolchain. `rustup` default stable is enough; no target needs adding.
+- A Rust toolchain. `rustup` default stable is enough; no target needs adding. This is all the core and the terminal UI need, on macOS or Linux.
+- For the desktop app: macOS 14 or newer and the Xcode command line tools for `swift`.
 
 ## Build and run
 
 ```bash
 cd workspace
-./scripts/build-core.sh          # produces core/target/release/libakbun_terminal_ffi.a
-swift build                      # links against it
-swift run akbun-terminal         # runs unbundled, update install is disabled here
+cargo build --release            # target/release/akbun-terminal-core and akbun-terminal-tui
+./target/release/akbun-terminal-tui
+
+cd desktop
+swift build
+AKBUN_TERMINAL_CORE=../target/release/akbun-terminal-core swift run akbun-terminal   # unbundled, update install is disabled here
 ```
 
-`scripts/bundle.sh` does both steps and wraps the result in an .app with a dmg beside it. Run the app from the bundle when testing anything that reads the version or the update path, because an unbundled binary has no Info.plist to read a version from.
+An unbundled app has no daemon beside it, which is what `AKBUN_TERMINAL_CORE` is for. `desktop/scripts/bundle.sh` builds everything, puts the daemon in the .app next to the executable, and leaves a dmg and a cli archive in `desktop/build/`. Run the app from the bundle when testing anything that reads the version or the update path, because an unbundled binary has no Info.plist to read a version from.
 
-The link path in `Package.swift` is relative, so `swift build` has to run from the package root. Both scripts `cd` there first; a build started elsewhere fails at the link step with a missing `-lakbun_terminal_ffi`.
+To try something without touching the shells you have open, point a client at its own daemon:
 
-The core is always built in release, even for tests. One profile keeps one link path in the package file.
+```bash
+export AKBUN_TERMINAL_HOME=$(mktemp -d)   # its own data directory and socket
+./target/release/akbun-terminal-tui
+./target/release/akbun-terminal-core stop
+```
 
 ## Test
 
 ```bash
 cd workspace
-cargo test --manifest-path core/Cargo.toml   # protocol, pty round trip, session lifetime
-./scripts/build-core.sh && swift test        # protocol shape, the bridge, update helpers
-./scripts/bundle.sh                          # the release build, which the two above do not cover
+cargo test --workspace                                   # protocol, pty round trip, the daemon end to end, the tui's state and rendering
+./desktop/scripts/build-core.sh && (cd desktop && swift test)   # protocol shape, the bridge against a real daemon, update helpers
+./desktop/scripts/bundle.sh                              # the release build, which the two above do not cover
 ```
 
 The third line is not optional after a Swift change. `swift build` and `swift test` compile without the optimiser, and Swift 6.2.3's `CopyPropagation` pass crashes on spellings both of them accept — see [the note on it](../knowledge/decisions/2026-09-release-build-crashes-on-some-swift-spellings.md). The release job builds the same way `bundle.sh` does, so a crash found here is a crash that would otherwise be found after merging.
 
-The core tests need no macOS and no AppKit, which is why CI runs them on the cheap runner. The Swift tests need the archive first; `swift test` without it fails to link.
+The core and tui tests need no macOS and no AppKit, which is why CI runs them on the cheap runner. `core/tests/daemon.rs` starts the real binary on a socket in a temp directory; no test uses the real data directory.
 
-`BridgeTests` starts a real shell. It is the test that fails when the header and the Rust surface drift apart, so do not skip it when changing either. One of its cases runs the whole detection path through the boundary: a rule file, a real pty, and a status back.
+`BridgeTests` starts its own daemon per test from `workspace/target/release/akbun-terminal-core`, so the daemon has to be built first, and a Rust change needs a rebuild before `swift test` sees it. It is the test that fails when the Swift and Rust halves of the protocol drift apart. One of its cases runs the whole detection path through the socket: a rule file, a real pty, and a status back.
 
-SwiftPM does not know the static archive is an input, so rebuilding the core is not enough to make `swift test` use it. The symptom is a Rust change that has clearly compiled and a Swift test still reporting the old behaviour, usually as an unknown command variant. Delete the test bundle to force the relink.
+The terminal UI can be driven without a person, which is how a change to it is checked:
 
 ```bash
-rm -rf .build/arm64-apple-macosx/debug/akbun-terminalPackageTests.xctest
+tmux new-session -d -s t -x 160 -y 45 ./target/release/akbun-terminal-tui
+tmux send-keys -t t 'echo hello' Enter
+tmux capture-pane -t t -p
 ```
 
 ## Syntax highlighting
 
 Highlight.js owns language grammars. Do not add language lexers to the Rust core. `CodeHighlighter.swift` only maps filenames or suffix aliases that Highlight.js cannot infer directly; unknown files remain plain text.
 
-Markdown renderer scripts live under `Sources/akbun-terminal/Resources` and are copied by SwiftPM. Pin their versions in `THIRD_PARTY_NOTICES.md`; never load them from a CDN at runtime.
+Markdown renderer scripts live under `desktop/Sources/akbun-terminal/Resources` and are copied by SwiftPM. Pin their versions in `THIRD_PARTY_NOTICES.md`; never load them from a CDN at runtime.
 
 ## Caveats
 
 - SwiftTerm is fetched by SwiftPM, so the first build and the CI jobs need network. `Package.resolved` is what pins it.
 - `TERM` is set by the core, not by the user's profile. A GUI process inherits none, and without it `clear` fails and escape codes land on screen as text.
 - Output bytes cross as JSON arrays, several times their own size. Fine for one session; the protocol version is there for when it is not.
-- The header is not generated. Change `core/crates/ffi/src/lib.rs` and the header together, in the same commit.
+- The two halves of the protocol are written by hand, `core/src/protocol.rs` and `desktop/Sources/AkbunTerminalCore/Protocol.swift`. Change them together, in the same commit.
+- A daemon keeps running the binary it was started from. After rebuilding the core, `akbun-terminal-core stop` before trying the new one.
 
 ## Release
 
@@ -62,9 +72,9 @@ Bump `workspace/VERSION` in the same commit as any change under `workspace/`. Pa
 
 | Trigger | Job | Runner | Does |
 |---|---|---|---|
-| pull request | `core` | ubuntu | `cargo test` |
-| pull request | `shell` | macOS | build the archive, `swift test` |
-| master push | `release` | macOS | both test runs, dmg, tag, release |
+| pull request | `core` | ubuntu | `cargo test --workspace` |
+| pull request | `desktop` | macOS | build the daemon, `swift test` |
+| master push | `release` | macOS | both test runs, dmg and cli archive, tag, release |
 
 Order matters: build first, then tag, then release. A failed build must not leave a tag behind. After merging, check that the release actually appeared; a green pull request says nothing about it.
 
