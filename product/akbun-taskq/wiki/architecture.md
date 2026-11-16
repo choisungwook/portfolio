@@ -91,7 +91,7 @@ export type Severity = 'critical' | 'high' | 'normal'
 export type AlertKind = 'approval_required' | 'security_finding' | 'prod_touch' | 'worker_flag'
   | 'auth_required' | 'failed' | 'stale_repeat' | 'budget_exceeded' | 'review_ready' | 'proposal_pending'
 export type EventKind = 'claimed' | 'tool_call' | 'tool_result' | 'permission_request' | 'approved' | 'denied'
-  | 'auth_required' | 'progress' | 'error' | 'finished' | 'cancel_requested'
+  | 'auth_required' | 'progress' | 'error' | 'finished' | 'cancel_requested' | 'tamper_blocked'
 
 export interface TaskData {
   title?: string
@@ -123,6 +123,7 @@ export interface WorkerResult {
   followups: { type: TaskType; intent: string }[]
   budget_exceeded?: boolean
   auth_scope?: 'target' | 'inference'               // set when outcome is needs_auth
+  tampered?: boolean                                // the gate stopped a call that reached taskq itself
 }
 
 export interface SimilarTask { task_id: string; text: string }   // a finished run that shares words with the task
@@ -279,7 +280,7 @@ Gating lives in the `PreToolUse` hook (`src/worker/gate.ts`), not in allow rules
 - a write or edit inside the task's access skill folder, for every type. Reads inside that folder are allowed (see Access skills);
 - a read, write or Glob/Grep pattern (a pattern counts when it has a slash or `~`) that resolves under the data directory or a sensitive location. Paths resolve through symlinks on the deepest existing ancestor, so a link in `outputs/` that points at `~/.ssh` is judged at its target. Sensitive locations are `~/.aws`, `~/.ssh`, `~/.gnupg`, `~/.netrc`, `~/.kube`, `~/.docker`, `~/.config/gh`, `~/.claude` (except that `~/.claude/skills` is readable), any `.env` or `.env.*` segment, and files named `credentials`, `id_rsa`, `id_ed25519`, `taskq.config.json`, or ending in `.pem` or `.key`.
 
-Some of those denials also stop the run (`tamperOf` in `gate.ts`): a call with `dangerouslyDisableSandbox: true`, any path under the data directory, a file named `taskq.config.json`, and a write under `~/.claude`. These reach taskq itself rather than the task's work, so the hook writes a `tamper_blocked` event, aborts the session, and the worker returns `failed` with `tampered: true`. The task waits as `failed` with a critical `security_finding` until a person reads the run and retries it. Every other denial only refuses that call and the session continues.
+Some of those denials also stop the run (`tamperOf` in `gate.ts`): a call with `dangerouslyDisableSandbox: true`, any path under the data directory, a file named `taskq.config.json` (a Glob or Grep pattern counts when it could match either), and a write under `~/.claude`. These reach taskq itself rather than the task's work, so the hook writes a `tamper_blocked` event, aborts the session, and the worker returns `failed` with `tampered: true`. The task waits as `failed` with a critical `security_finding` until a person reads the run and retries it. Every other denial only refuses that call and the session continues.
 
 The `PreToolUse` hook is fail-closed. If the policy check throws, the call is denied and an `error` event with `source: gate` is written. Without this the SDK would fall back to the permission mode, which allows edits in `acceptEdits` and `auto`.
 

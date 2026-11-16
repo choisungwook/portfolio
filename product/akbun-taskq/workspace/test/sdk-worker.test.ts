@@ -193,6 +193,17 @@ describe('sdk worker', () => {
     assert.ok(events.some((e) => e.kind === 'tamper_blocked'))
   })
 
+  test('[critical] a glob that could match the taskq config stops the run', async () => {
+    const { query } = fakeQuery(async (options) => {
+      await hookOf(options, 'PreToolUse')({
+        hook_event_name: 'PreToolUse', tool_name: 'Glob', tool_input: { pattern: join(home, 'taskq.config*.json') }, tool_use_id: 'tu-11',
+      } as never, 'tu-11', signal())
+      throw new Error('aborted by hook')
+    })
+    const result = await createSdkWorker(config, { query })(ctxOf(taskOf('research')).ctx)
+    assert.equal(result.tampered, true)
+  })
+
   test('[critical] a call that turns the sandbox off stops the run', async () => {
     const { query } = fakeQuery(async (options) => {
       await hookOf(options, 'PreToolUse')({

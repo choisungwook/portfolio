@@ -2,7 +2,7 @@ import { homedir } from 'node:os'
 import { basename, join } from 'node:path'
 import type { TaskType } from '../types.ts'
 import { isReadOnlyAws, splitSegments } from './aws-guard.ts'
-import { blocked, realPath, resolvePath, under } from './paths.ts'
+import { blocked, globMatches, realPath, resolvePath, under } from './paths.ts'
 
 // The single policy table. The PreToolUse hook runs before allow rules, so these decisions hold in every permission mode.
 // 'ask' sends the call to the permission prompt, where canUseTool waits for the user.
@@ -84,8 +84,9 @@ export function tamperOf(tool: string, input: Input, ctx: GateContext): string |
   const dataDir = realPath(ctx.dataDir)
   const claudeDir = realPath(join(homedir(), '.claude'))
   for (const touch of touchesOf(tool, input, ctx)) {
-    if (under(touch.real, dataDir)) return `${tool} reached the taskq data directory`
-    if (basename(touch.real) === 'taskq.config.json') return `${tool} reached the taskq config`
+    const name = basename(touch.real)
+    if (under(touch.real, dataDir) || globMatches(touch.real, join(dataDir, 'taskq.db'))) return `${tool} reached the taskq data directory`
+    if (name === 'taskq.config.json' || globMatches(name, 'taskq.config.json')) return `${tool} reached the taskq config`
     if (touch.write && under(touch.real, claudeDir)) return `${tool} tried to write Claude Code settings`
   }
   return null
