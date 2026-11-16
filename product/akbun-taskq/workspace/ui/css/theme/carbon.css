@@ -1,0 +1,104 @@
+/* Theme: IBM Carbon Design System v11 tokens (g10 light, g100 dark) from @carbon/themes 11.85.0, Apache License 2.0
+   (LICENSE-carbon.txt). Values follow Carbon's theme tokens; names follow taskq's contract in contract.css.
+   Status text colors use the shade Carbon lists for outlines and text on light themes, so a word in that color stays readable.
+   Carbon's dark notifications are not tinted; the colored bar and the status word carry the severity.
+   Carbon rules carried here: square corners, layers instead of shadows, a 2px focus ring,
+   productive motion, IBM Plex Sans when installed with the system font as fallback. */
+:root {
+  color-scheme: light dark;
+  --bg: #f4f4f4;            /* background */
+  --panel: #ffffff;         /* layer-01 */
+  --panel-soft: #f4f4f4;    /* layer-02 */
+  --stage: #e0e0e0;         /* layer-accent-01 */
+  --field: #ffffff;         /* field-01 on g10 */
+  --chip: #ffffff;
+  --control: #e8e8e8;       /* layer-accent hover */
+  --hover: rgba(141, 141, 141, 0.12);  /* background-hover */
+
+  --fg: #161616;            /* text-primary */
+  --muted: #525252;         /* text-secondary */
+  --border: #e0e0e0;        /* border-subtle-01 */
+  --border-strong: #8d8d8d; /* border-strong-01 */
+
+  --accent: #0f62fe;        /* button-primary, interactive */
+  --accent-hover: #0050e6;
+  --link: #0f62fe;          /* link-primary */
+  --accent-soft: #d0e2ff;   /* highlight */
+  --on-accent: #ffffff;
+  --focus: #0f62fe;
+  --secondary: #393939;     /* button-secondary */
+  --secondary-hover: #474747;
+  --danger: #da1e28;        /* support-error, button-danger */
+  --danger-hover: #b81921;
+  --danger-fill: #da1e28;
+
+  --error-soft: #fff1f1;
+  --warning-soft: #fcf4d6;
+  --success-soft: #defbe6;
+  --info-soft: #edf5ff;
+
+  --done: #198038;          /* green 60 */
+  --failed: #da1e28;        /* red 60 */
+  --needs-approval: #ba4e00;/* orange 60, the outline shade for light themes */
+  --needs-auth: #8e6a00;    /* yellow 60 */
+  --review: #0043ce;        /* blue 70: ready to view */
+  --running: #0f62fe;       /* blue 60: in progress */
+  --stale: #6f6f6f;         /* gray 60: not started or interrupted */
+  --high: #ba4e00;
+
+  --radius: 0;
+  --radius-s: 0;
+  --shadow-1: none;
+  --shadow-2: 0 2px 6px rgba(0, 0, 0, 0.3);
+  --ease: 110ms cubic-bezier(0.2, 0, 0.38, 0.9);  /* duration-fast-02, productive standard */
+  --font-sans: "IBM Plex Sans", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, Menlo, monospace;
+  --text-body: 14px/18px;   /* body-compact-01 */
+  --text-small: 12px;       /* label-01 */
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #161616;
+    --panel: #262626;
+    --panel-soft: #393939;
+    --stage: #393939;
+    --field: #262626;
+    --chip: #393939;
+    --control: #333333;
+    --hover: rgba(141, 141, 141, 0.16);
+
+    --fg: #f4f4f4;
+    --muted: #c6c6c6;
+    --border: #525252;
+    --border-strong: #6f6f6f;
+
+    --accent: #0f62fe;
+    --accent-hover: #0050e6;
+    --link: #78a9ff;
+    --accent-soft: #001d6c;
+    --on-accent: #ffffff;
+    --focus: #ffffff;
+    --secondary: #6f6f6f;
+    --secondary-hover: #606060;
+    --danger: #fa4d56;
+    --danger-hover: #da1e28;
+    --danger-fill: #da1e28;
+
+    --error-soft: #262626;
+    --warning-soft: #262626;
+    --success-soft: #262626;
+    --info-soft: #262626;
+
+    --done: #42be65;
+    --failed: #fa4d56;
+    --needs-approval: #ff832b;
+    --needs-auth: #f1c21b;
+    --review: #78a9ff;
+    --running: #4589ff;
+    --stale: #a8a8a8;
+    --high: #ff832b;
+
+    --shadow-2: 0 2px 6px rgba(0, 0, 0, 0.6);
+  }
+}

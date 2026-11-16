@@ -1,6 +1,6 @@
 // Thin fetch wrapper. Every request carries the token. Mutations send application/json with a JSON body ({} when empty).
 import { requestRefresh } from './refresh.js'
-import { area } from './dom.js'
+import { area, el } from './dom.js'
 import { authLost, getToken } from './token.js'
 
 const NO_TOKEN = 'Open the URL printed by taskq run to continue.'
@@ -62,10 +62,24 @@ export function qs(params) {
   return text ? `?${text}` : ''
 }
 
+// Toast notification (Carbon): it stays until the user closes it or the next message replaces it, never on a timer.
+// Only the text is a live region, so a screen reader reads the message and not the close button.
+// Closing returns focus to the control that caused the message, or to the main region when a refresh replaced it.
 export function notify(message, isError = false) {
   const node = area('notice')
-  node.textContent = message
+  const origin = document.activeElement
+  node.querySelector('.notice-text').textContent = message
   node.dataset.kind = isError ? 'error' : 'ok'
+  node.querySelector('.notice-close')?.remove()
+  const close = el('button', { type: 'button', class: 'notice-close', 'aria-label': 'Close notification', text: '\u00D7' })
+  close.addEventListener('click', () => {
+    node.querySelector('.notice-text').textContent = ''
+    delete node.dataset.kind
+    close.remove()
+    const target = origin instanceof HTMLElement && origin.isConnected && origin !== document.body ? origin : document.querySelector('main')
+    target?.focus()
+  })
+  node.append(close)
 }
 
 // Runs a mutation, shows the server's error message on failure, and refreshes views on success.

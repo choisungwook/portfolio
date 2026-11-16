@@ -1,45 +1,46 @@
-/* Must-check panel, dialogs, the add-task form, and run/task detail pieces. */
+/* Must-check panel, dialogs, the add-task form, and run/task detail pieces, after Carbon's notification and modal patterns. */
 .alert-badges { display: flex; flex-wrap: wrap; gap: 4px; margin-bottom: 8px; }
 .alert-badges .badge { font-weight: 600; }
 .queue-banner {
   display: flex; flex-wrap: wrap; gap: 8px; align-items: center; justify-content: space-between;
-  background: var(--panel-soft); border-radius: 10px; padding: 8px 10px; margin-bottom: 8px;
+  background: var(--panel-soft); padding: 8px 8px 8px 16px; margin-bottom: 12px; box-shadow: inset 3px 0 0 var(--done);
 }
-.queue-banner[data-state="paused"] { background: color-mix(in srgb, var(--needs-approval) 16%, var(--panel)); }
+.queue-banner[data-state="paused"] { background: var(--warning-soft); box-shadow: inset 3px 0 0 var(--needs-auth); }
 .queue-banner p { margin: 0; font-weight: 600; }
 .operator { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin: 8px 0; }
 .operator label { display: inline-flex; gap: 4px; align-items: center; font-size: 12px; color: var(--muted); }
+/* Danger tertiary (Carbon): outlined until armed, then filled. Destructive actions always take a second click. */
 button.danger { color: var(--danger); box-shadow: inset 0 0 0 1px var(--danger); }
-button.danger[data-armed="true"] { background: var(--danger); color: var(--on-accent); }
+button.danger:hover:not(:disabled) { background: var(--danger-fill); color: var(--on-accent); }
+button.danger[data-armed="true"] { background: var(--danger-fill); color: var(--on-accent); }
 
 .alerts { list-style: none; padding: 0; margin: 0; display: grid; gap: 8px; }
 .alert {
   --sev: var(--muted);
-  background: var(--panel); border-radius: 10px; padding: 8px 10px 8px 13px; box-shadow: inset 3px 0 0 var(--sev), var(--shadow-1);
+  background: var(--panel-soft); padding: 12px 12px 8px 16px; box-shadow: inset 3px 0 0 var(--sev), inset 0 0 0 1px var(--border); color: var(--fg);
 }
-.alert.sev-critical { --sev: var(--danger); background: color-mix(in srgb, var(--danger) 8%, var(--panel)); order: -1; }
-.alert.sev-high { --sev: var(--high); }
+.alert.sev-critical { --sev: var(--failed); background: var(--error-soft); color: var(--fg); order: -1; }
+.alert.sev-high { --sev: var(--high); background: var(--warning-soft); color: var(--fg); }
+.alert.sev-critical .sev-label { color: var(--failed); }
+.alert.sev-high .sev-label { color: var(--high); }
 .alert-head { display: flex; gap: 8px; align-items: baseline; }
-.sev-label { font-size: 12px; font-weight: 600; }
-.kind { font-size: 12px; color: var(--muted); }
+.sev-label { font-size: var(--text-small); font-weight: 600; }
+.kind { font-size: var(--text-small); color: var(--muted); }
 .alert-message { margin: 4px 0; overflow-wrap: anywhere; }
 .alert time { font-size: 12px; color: var(--muted); }
 .alert .actions { margin-bottom: 0; }
 
 dialog {
   width: min(720px, calc(100vw - 32px)); max-height: calc(100vh - 48px); padding: 0;
-  border: 0; border-radius: 14px; background: var(--panel); color: var(--fg); box-shadow: var(--shadow-2);
+  border: 0; border-radius: var(--radius); background: var(--panel); color: var(--fg); box-shadow: var(--shadow-2);
 }
-dialog::backdrop { background: color-mix(in srgb, var(--fg) 28%, transparent); }
-.dialog-body { padding: 16px 18px 4px; overflow: auto; max-height: calc(100vh - 120px); }
-.dialog-foot { display: flex; justify-content: flex-end; gap: 8px; padding: 10px 18px 14px; }
+dialog::backdrop { background: rgba(22, 22, 22, 0.5); }
+.dialog-body { padding: 16px 16px 8px; overflow: auto; max-height: calc(100vh - 120px); }
+/* Modal footer (Carbon): buttons sit at the bottom edge, the primary one on the right. */
+.dialog-foot { display: flex; justify-content: flex-end; gap: 1px; padding: 0; border-top: 1px solid var(--border); }
+.dialog-foot button { min-height: 48px; min-width: 140px; justify-content: flex-start; }
 dialog h2 { margin-top: 0; }
-.status { font-weight: 600; }
-.status-needs_approval { color: var(--needs-approval); }
-.status-needs_auth { color: var(--needs-auth); }
-.status-failed { color: var(--failed); }
-.status-review { color: var(--review); }
-.status-done { color: var(--done); }
+.status { margin: 8px 0; }
 
 .events { list-style: none; padding: 0; margin: 0; font-size: 12px; }
 .events li { padding: 5px 8px; border-radius: var(--radius-s); }
@@ -61,9 +62,9 @@ dialog h2 { margin-top: 0; }
 .task-form fieldset.kind legend { padding: 0; margin-bottom: 4px; font-size: 12px; color: var(--muted); }
 .task-form .segmented label { display: block; cursor: pointer; }
 .task-form .segmented input { position: absolute; opacity: 0; pointer-events: none; }
-.task-form .segmented span { display: block; padding: 5px 14px; border-radius: var(--radius-s); font-size: 13px; color: var(--fg); }
-.task-form .segmented input:checked + span { background: var(--chip); box-shadow: var(--shadow-1); }
-.task-form .segmented input:focus-visible + span { box-shadow: 0 0 0 3px var(--accent-soft); }
+.task-form .segmented span { display: block; padding: 7px 16px; font-size: 14px; color: var(--fg); }
+.task-form .segmented input:checked + span { background: var(--secondary); color: var(--on-accent); }
+.task-form .segmented input:focus-visible + span { outline: 2px solid var(--focus); outline-offset: -2px; }
 .task-form .meta { margin: 6px 0 0; }
 .task-form .more > summary { cursor: pointer; font-size: 12px; color: var(--muted); padding: 4px 0; }
 .task-form .more[open] > summary { margin-bottom: 10px; }
@@ -74,9 +75,9 @@ dialog h2 { margin-top: 0; }
 .task-form input[type="checkbox"] { min-height: 0; padding: 0; width: 14px; height: 14px; accent-color: var(--accent); }
 
 /* Approval panel on the task detail. The input is shown whole; a long one scrolls inside its own box. */
+/* An actionable notification (Carbon): it holds the one decision on this task. */
 .approval-panel {
-  background: var(--panel-soft); border-radius: 10px; padding: 10px 12px; margin: 8px 0;
-  box-shadow: inset 3px 0 0 var(--needs-approval), var(--shadow-1);
+  background: var(--warning-soft); padding: 12px 16px; margin: 8px 0; box-shadow: inset 3px 0 0 var(--needs-approval);
 }
 .approval-panel:focus { outline: none; }
 .approval-panel h3 { margin-top: 0; }
@@ -84,14 +85,13 @@ dialog h2 { margin-top: 0; }
 .approval-command { margin: 0; }
 .approval-json { max-height: 200px; margin: 0; }
 .approval-warning {
-  margin: 6px 0; padding: 6px 8px; border-radius: var(--radius-s); font-weight: 600; color: var(--danger);
-  background: color-mix(in srgb, var(--danger) 12%, var(--panel));
+  margin: 8px 0; padding: 8px 12px; font-weight: 600; color: var(--fg);
+  background: var(--error-soft); box-shadow: inset 3px 0 0 var(--failed);
 }
 .approval-read { display: flex; align-items: center; gap: 6px; margin-top: 8px; font-size: 12px; color: var(--muted); }
 .approval-read input { min-height: 0; width: 14px; height: 14px; padding: 0; accent-color: var(--accent); }
 .hidden-char {
-  padding: 0 2px; border-radius: 3px; font-weight: 600; color: var(--danger);
-  background: color-mix(in srgb, var(--danger) 22%, transparent);
+  padding: 0 2px; font-weight: 600; color: var(--on-accent); background: var(--danger-fill);
 }
 .pending-approvals { margin-bottom: 10px; }
 .pending-approvals h3 { margin: 0 0 6px; }

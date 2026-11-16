@@ -27,6 +27,7 @@ CLI (taskq add/list/...) ---- opens the same SQLite file directly
 | HTTP | Hono + `@hono/node-server` | Small router, SSE helper |
 | Agent | `@anthropic-ai/claude-agent-sdk` | Sessions, permissions, hooks, sandbox |
 | UI | Static ES modules in `ui/`, no framework, no build | Served by the API as files |
+| UI theme | IBM Carbon Design System tokens and patterns | See "UI theme" below |
 | Tests | `node:test` with a fake worker | CI needs no credentials and no model call |
 
 Type stripping rules: import with the `.ts` extension, no `enum`, no parameter properties, no namespaces. `tsconfig.json` sets `erasableSyntaxOnly`, `allowImportingTsExtensions`, `verbatimModuleSyntax`, `noEmit`, `strict`.
@@ -262,6 +263,15 @@ These are operator actions. The API, the CLI and the UI each call the functions 
 Every finished run writes a `finished` event with its outcome. `finishRun` writes the run close, the task status, the alerts and the follow-ups in one transaction, and only while the runner still holds the claim: `endRun` and `releaseTask` take the runner id, so a late finisher whose claim was recovered writes nothing.
 
 After a `code` task finishes `done`, the runner creates a `security_review` task with `review_of` set and a `discovered_from` dependency. When that review returns a critical alert, the runner sets the original task to `review` and raises `security_finding`. Each `followups[]` entry becomes a `draft` task with a `discovered_from` dependency.
+
+## UI theme
+
+The UI follows IBM Carbon (Apache-2.0) through a token interface, the same way agents sit behind `AgentBackend`.
+
+- `ui/css/theme/contract.css` names every token component CSS may read (surfaces, text, interaction, notification washes, status colors, shape, motion, type). Each is `initial` there.
+- `ui/css/theme/carbon.css` implements all of them with Carbon g10 (light) and g100 (dark) values from `@carbon/themes`. `LICENSE-carbon.txt` sits beside it.
+- `test/ui-tokens.test.ts` fails when a component reads a token outside the contract or a theme leaves one out. Another theme is a new file in `ui/css/theme/` added to that test's list and loaded in `index.html` instead of `carbon.css`.
+- Carbon rules applied in component CSS: square corners, layers instead of shadows, 2px inset focus ring, ghost buttons by default with one primary per view, line tabs, content switcher, tags, inline notifications that never dismiss on a timer, danger buttons that need a second click, and status indicators that pair a symbol and a word with color.
 
 ## Agent backends
 

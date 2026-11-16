@@ -1,8 +1,8 @@
 /* Calendar: toolbar, Day/Week time grid, Month grid, and the outcome colors shared with other views.
-   Colors come only from the tokens in base.css. */
+   Values come only from the tokens in theme/contract.css. */
 .cal-toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 14px; }
 .cal-nav { display: inline-flex; align-items: center; gap: 6px; }
-.cal-today { box-shadow: inset 0 0 0 1px var(--border); padding: 5px 14px; }
+.cal-today { box-shadow: inset 0 0 0 1px var(--link); padding: 0 16px; }
 .cal-arrow {
   width: 32px; height: 32px; padding: 0; border-radius: 999px;
   display: inline-flex; align-items: center; justify-content: center;
@@ -13,14 +13,14 @@
 .cal-filters { display: flex; flex-wrap: wrap; gap: 12px; margin: 10px 0; align-items: center; font-size: 12px; color: var(--muted); }
 .cal-filters label { display: inline-flex; gap: 6px; align-items: center; }
 
-.day-summary { background: var(--panel); border-radius: 12px; box-shadow: var(--shadow-1); padding: 8px 14px; margin-bottom: 10px; }
+.day-summary { background: var(--panel); border-radius: var(--radius); box-shadow: var(--shadow-1); padding: 8px 14px; margin-bottom: 10px; }
 .summary-strip { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 18px; }
 .facts-inline { display: flex; flex-wrap: wrap; gap: 4px 16px; margin: 0; }
 .facts-inline div { display: inline-flex; gap: 6px; align-items: baseline; }
 .facts-inline dt { color: var(--muted); }
 .facts-inline dd { margin: 0; font-weight: 600; }
 .summary-more { margin-top: 6px; }
-.summary-more summary { cursor: pointer; color: var(--accent); }
+.summary-more summary { cursor: pointer; color: var(--link); }
 .summary-more ol { margin: 4px 0 0; padding-left: 20px; }
 
 .facts { display: grid; grid-template-columns: max-content 1fr; gap: 2px 12px; margin: 6px 0; }
@@ -35,13 +35,12 @@
 .outcome-review { --ink: var(--review); --tint: color-mix(in srgb, var(--review) 16%, var(--panel)); }
 .outcome-stale { --ink: var(--stale); --tint: var(--control); }
 .outcome-running { --ink: var(--running); --tint: color-mix(in srgb, var(--running) 16%, var(--panel)); }
-.outcome-text { font-weight: 600; color: var(--ink); }
 
 /* Time grid: one scroll container, so the day header sticks while the hours scroll. */
 .time-grid {
   --hour-px: 48px;
   position: relative; height: min(72vh, 780px); min-height: 320px; overflow: auto;
-  background: var(--panel); border: 1px solid var(--border); border-radius: 12px;
+  background: var(--panel); border: 1px solid var(--border); border-radius: var(--radius);
 }
 .time-head { position: sticky; top: 0; z-index: 4; display: grid; background: var(--panel); border-bottom: 1px solid var(--border); }
 .time-body { position: relative; display: grid; }
@@ -90,7 +89,7 @@
 .block-time, .block-type { color: var(--muted); }
 .block.outcome-stale { outline: 1px dashed var(--ink); outline-offset: -1px; }
 .block:hover:not(:disabled) { background: color-mix(in srgb, var(--ink) 22%, var(--panel)); }
-.block:focus-visible { box-shadow: inset 3px 0 0 var(--ink), 0 0 0 2px var(--panel), 0 0 0 4px var(--accent); }
+.block:focus-visible { box-shadow: inset 3px 0 0 var(--ink), 0 0 0 2px var(--panel), 0 0 0 4px var(--focus); }
 
 /* Waiting time: hatched over the column so it reads without color. Above blocks, but click-through. */
 .wait {
@@ -103,7 +102,7 @@
 /* Month: six weeks, hairlines drawn by the 1 px gaps on the --border background. */
 .month-grid {
   display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 1px;
-  background: var(--border); border: 1px solid var(--border); border-radius: 12px; overflow: hidden;
+  background: var(--border); border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden;
 }
 .weekday { padding: 6px; font-size: 12px; color: var(--muted); text-align: center; background: var(--panel); }
 .month-cell {
@@ -122,7 +121,7 @@
 .chip .dot { flex: none; width: 6px; height: 6px; border-radius: 50%; background: var(--ink); }
 .chip-time { flex: none; color: var(--muted); }
 .chip-title { min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.month-more { min-height: 0; padding: 1px 4px; font-size: 11px; color: var(--accent); text-align: left; }
+.month-more { min-height: 0; padding: 1px 4px; font-size: 11px; color: var(--link); text-align: left; }
 .flag { font-size: 11px; font-weight: 600; }
 .flag.failed { color: var(--failed); }
 .flag.critical { color: var(--danger); }

@@ -4,6 +4,7 @@ import { area, clear, el } from '../core/dom.js'
 import { emit, on } from '../core/bus.js'
 import { fmtClock, fmtDateTime, fmtDuration } from '../core/time.js'
 import { label, outcomeOf, parseField, SEVERITY_RANK, TYPE_MARK } from '../core/vocab.js'
+import { statusIndicator } from '../core/status.js'
 
 let dialog
 let body
@@ -45,7 +46,7 @@ function sections(run) {
   return [
     el('h2', { text: title }),
     el('p', { class: 'meta', text: `${TYPE_MARK[run.task_type] ?? label(run.task_type)} · ${run.lock_key ?? 'no account or repo'}` }),
-    el('p', { class: `outcome-text outcome-${outcome}`, text: `Result: ${label(outcome)}` }),
+    el('p', { class: 'status' }, 'Result: ', statusIndicator(outcome)),
     el('dl', { class: 'facts' },
       el('dt', { text: 'Start' }), el('dd', { text: fmtDateTime(run.started_at) }),
       el('dt', { text: 'End' }), el('dd', { text: run.ended_at === null ? 'still running' : fmtDateTime(run.ended_at) }),
