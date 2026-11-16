@@ -24,6 +24,15 @@ describe('wake signal', () => {
     await second
     assert.ok(Date.now() - started < 1000)
   })
+
+  test('a notify that came while nobody waited is not lost when the waiter passes the generation it read', async () => {
+    const signal = createWakeSignal()
+    const seen = signal.version()
+    signal.notify()
+    const started = Date.now()
+    await signal.wait(60_000, undefined, seen)
+    assert.ok(Date.now() - started < 100)
+  })
 })
 
 describe('run now', () => {
@@ -98,6 +107,36 @@ describe('run now', () => {
       await waitFor(() => order.length === 2)
       assert.equal(order[1], urgent.id)
       release()
+    } finally {
+      release()
+      await runner.stop()
+    }
+  })
+
+  test('a run-now request whose task waits for a dependency again is dropped, not claimed', async () => {
+    const config = { ...env.config, maxConcurrent: 1, pollSec: 60 }
+    const ran: string[] = []
+    let release = () => {}
+    const worker = fakeWorker(async (ctx) => {
+      ran.push(ctx.task.id)
+      await new Promise<void>((resolve) => { release = resolve })
+      return result('done')
+    })
+    const parent = addTask(env.db, { status: 'done', type: 'code', data: { intent: 'parent', repo: '/tmp/x' } })
+    const child = addTask(env.db, { status: 'draft', deps: [{ depends_on: parent.id, kind: 'blocks' }] })
+    const busy = addTask(env.db, { status: 'ready', priority: 90 })
+    const runner = createRunner({ db: env.db, config, worker })
+    try {
+      await runner.start()
+      await waitFor(() => ran.length === 1)
+      prepareRun(env.db, child.id)
+      runner.runNow(child.id)
+      env.db.prepare("UPDATE tasks SET status = 'draft' WHERE id = ?").run(parent.id)
+      release()
+      await waitFor(() => statusOf(env.db, busy.id) !== 'running')
+      await sleep(100)
+      assert.deepEqual(ran, [busy.id])
+      assert.equal(statusOf(env.db, child.id), 'ready')
     } finally {
       release()
       await runner.stop()

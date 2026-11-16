@@ -36,13 +36,14 @@ export function registerSse(api: Hono, { db, config }: ApiDeps): void {
       })
       try {
         while (!closed) {
+          const seen = eventWritten.version()
           const rows = listEvents(db, { after, limit: BATCH })
           for (const row of rows) {
             after = row.id
             await stream.writeSSE({ id: String(row.id), event: 'event', data: JSON.stringify(row) })
           }
           // A full batch means more rows are waiting, so read again without sleeping.
-          if (rows.length < BATCH) await eventWritten.wait(config.pollSec * 1000, aborted.signal)
+          if (rows.length < BATCH) await eventWritten.wait(config.pollSec * 1000, aborted.signal, seen)
         }
       } finally {
         release()

@@ -220,7 +220,7 @@ running | needs_approval | needs_auth -> failed   cancel (API or CLI); see "Paus
 
 ## Runner
 
-The loop does not tick on a fixed short interval. It waits on `queueChanged` (`src/wake.ts`) for up to `pollSec` (default 60 s). Every successful non-GET API request, every run that ends and every run-now request notifies it, so a change made in this process is looked at at once. A change written by the CLI, which is another process, is picked up when the wait times out. Approval waits and the SSE stream wait the same way on `eventWritten`, which `insertEvent` notifies.
+The loop does not tick on a fixed short interval. It waits on `queueChanged` (`src/wake.ts`) for up to `pollSec` (default 60 s). Every successful non-GET API request, every run that ends and every run-now request notifies it, so a change made in this process is looked at at once. A change written by the CLI, which is another process, is picked up when the wait times out. Approval waits and the SSE stream wait the same way on `eventWritten`, which `insertEvent` notifies. Each waiter reads the signal's generation before it reads the database and passes it to `wait`, so a notify that arrives while it is busy (a tick awaiting preflight, an SSE write) makes the next wait return at once instead of being lost.
 
 1. Preflight inference auth (see Providers). On failure set the queue pause with `pause_by = preflight` and raise `auth_required`. While the queue is paused, the tick re-runs the preflight once a minute and a passing check lifts only a preflight pause.
 2. On start, recover every `running` and `needs_approval` task as stale. On each tick, recover `running` and `needs_approval` tasks whose `heartbeat_at` is older than the TTL. A NULL heartbeat is never recovered by the tick.
@@ -252,7 +252,7 @@ The exact input is stored unmasked and unclipped, and only while the request is 
 | `review` | new | `review_ready` |
 | `done` | new | none |
 
-`running` and `needs_approval` return 409. A paused queue and an unfinished `blocks` dependency return 409 without changing the task. A lock key held by another task leaves it `ready` until the lock frees.
+`running` and `needs_approval` return 409. A paused queue and an unfinished `blocks` dependency return 409 without changing the task. A lock key held by another task leaves it `ready` and first in line until the lock frees. A requested task that is no longer `ready`, or whose `blocks` dependency stopped being done, is dropped from the run-now list.
 
 ### Pause, cancel and retry
 

@@ -3,7 +3,7 @@ import type { Config } from '../config.ts'
 import type { Task, Worker } from '../types.ts'
 import { insertEvent } from '../db/events.ts'
 import { insertRun } from '../db/runs.ts'
-import { claimTask, getTask, nextEligible } from '../db/tasks.ts'
+import { claimTask, getTask, isBlocked, nextEligible } from '../db/tasks.ts'
 import { isCancelRequested, isQueuePaused, pauseBy, pauseQueue, resumeQueue } from '../db/meta.ts'
 import { raiseAlert } from '../alerts/rules.ts'
 import { newId } from '../ids.ts'
@@ -91,13 +91,19 @@ export function createRunner({
       await recheckAuth()
       return
     }
-    // Run-now requests go first. A request whose task cannot be claimed (lock held, no longer ready) is dropped;
-    // a ready task still runs in the normal order.
+    // Run-now requests go first. One whose task is no longer ready or now waits for a dependency is dropped; one held
+    // back only by a lock key stays first in line until the lock frees.
     for (const id of [...requested]) {
       if (active.size >= config.maxConcurrent) break
-      requested.delete(id)
+      if (getTask(db, id)?.status !== 'ready' || isBlocked(db, id)) {
+        requested.delete(id)
+        continue
+      }
       if (!(await authOk())) return
-      if (claimTask(db, id, runnerId)) launch(getTask(db, id)!)
+      if (claimTask(db, id, runnerId)) {
+        requested.delete(id)
+        launch(getTask(db, id)!)
+      }
     }
     while (active.size < config.maxConcurrent) {
       if (isQueuePaused(db)) return
@@ -109,10 +115,12 @@ export function createRunner({
   }
 
   // Wakes at once on an in-process change; otherwise every pollSec, which picks up what the CLI wrote.
-  async function loop(): Promise<void> {
+  // `seen` is the signal generation read before the tick that just ran, so a change during that tick is not lost.
+  async function loop(seen: number): Promise<void> {
     while (running) {
-      await queueChanged.wait(config.pollSec * 1000, stopped.signal)
+      await queueChanged.wait(config.pollSec * 1000, stopped.signal, seen)
       if (!running) return
+      seen = queueChanged.version()
       await tick().catch((error: unknown) => console.error(`taskq: tick failed: ${String(error)}`))
     }
   }
@@ -121,8 +129,9 @@ export function createRunner({
     async start() {
       recoverStale(db, config, true, new Set())
       running = true
+      const seen = queueChanged.version()
       await tick().catch((error: unknown) => console.error(`taskq: tick failed: ${String(error)}`))
-      void loop()
+      void loop(seen)
     },
     runNow(taskId) {
       requested.add(taskId)

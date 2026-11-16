@@ -32,11 +32,12 @@ export async function askApproval(
     message: `Approval needed: ${req.tool}: ${commandSnippet(req.input)}`,
   })
   while (!signal.aborted) {
+    const seen = eventWritten.version()
     const decision = approvalDecision(db, requestId)
     if (decision === 'approved') return true
     if (decision === 'denied' || decision === 'expired') return false
     // A decision made through the API writes an event and wakes this at once; one made by the CLI waits for the timeout.
-    await eventWritten.wait(config.pollSec * 1000, signal)
+    await eventWritten.wait(config.pollSec * 1000, signal, seen)
   }
   throw new Error('aborted while waiting for approval')
 }
