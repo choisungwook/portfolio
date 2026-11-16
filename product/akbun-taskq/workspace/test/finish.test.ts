@@ -23,6 +23,17 @@ describe('finish table', () => {
     assert.deepEqual(kinds, ['review_ready'])
   })
 
+  test('a run the gate stopped for tamper fails with only a security_finding', async () => {
+    const { db, config } = env
+    const task = addTask(db, { type: 'research', lock_key: 'prod-db' })
+    const runner = createRunner({ db, config, worker: fakeWorker(() => ({ ...result('failed', 'Read reached the taskq config'), tampered: true })) })
+    await runner.start()
+    await waitFor(() => statusOf(db, task.id) === 'failed')
+    await runner.stop()
+    const kinds = listAlerts(db, false).filter((a) => a.task_id === task.id).map((a) => a.kind)
+    assert.deepEqual(kinds, ['security_finding'])
+  })
+
   test('failed run on a prod lock_key raises failed and prod_touch', async () => {
     const { db, config } = env
     const task = addTask(db, { type: 'ops_change', lock_key: 'prod-db', data: { intent: 'migrate' } })

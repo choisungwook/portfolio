@@ -5,7 +5,7 @@ export type Severity = 'critical' | 'high' | 'normal'
 export type AlertKind = 'approval_required' | 'security_finding' | 'prod_touch' | 'worker_flag'
   | 'auth_required' | 'failed' | 'stale_repeat' | 'budget_exceeded' | 'review_ready' | 'proposal_pending'
 export type EventKind = 'claimed' | 'tool_call' | 'tool_result' | 'permission_request' | 'approved' | 'denied'
-  | 'auth_required' | 'progress' | 'error' | 'finished' | 'cancel_requested'
+  | 'auth_required' | 'progress' | 'error' | 'finished' | 'cancel_requested' | 'tamper_blocked'
 
 export interface TaskData {
   title?: string
@@ -37,6 +37,7 @@ export interface WorkerResult {
   followups: { type: TaskType; intent: string }[]
   budget_exceeded?: boolean
   auth_scope?: 'target' | 'inference'               // set when outcome is needs_auth
+  tampered?: boolean                                // the gate stopped a call that reached taskq itself
 }
 
 export interface SimilarTask { task_id: string; text: string }   // a finished run that shares words with the task

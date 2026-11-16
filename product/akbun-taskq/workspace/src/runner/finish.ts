@@ -18,6 +18,9 @@ interface Plan {
 
 // The finish table from the design, as a pure function.
 export function planFinish(task: Task, result: WorkerResult, config: Config): Plan {
+  if (result.tampered) {
+    return { status: 'failed', alerts: [{ kind: 'security_finding', message: `Stopped for review: ${result.summary}` }] }
+  }
   if (result.budget_exceeded) {
     return { status: 'failed', alerts: [{ kind: 'budget_exceeded', message: `Budget exceeded: ${result.summary}` }] }
   }

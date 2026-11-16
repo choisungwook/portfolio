@@ -248,6 +248,7 @@ These are operator actions. The API, the CLI and the UI each call the functions 
 | `failed` | `failed` | `failed`, plus `prod_touch` when `lock_key` is in `prodLockKeys` |
 | `needs_auth` | `needs_auth` | `auth_required` |
 | `budget_exceeded` | `failed` | `budget_exceeded` |
+| `tampered` (the gate stopped the run) | `failed` | `security_finding` only |
 | any `alerts[]` item, at the severity the worker reported | unchanged | `worker_flag` |
 | `needs_approval` (invalid as a final answer) | `failed`, summary "worker returned an invalid outcome" | `failed` |
 | `stale` | `ready` | `stale_repeat` from the second consecutive stale run, counted since the last run that did not end stale |
@@ -277,6 +278,10 @@ Gating lives in the `PreToolUse` hook (`src/worker/gate.ts`), not in allow rules
 - a call with `dangerouslyDisableSandbox: true`, and every `mcp__*` tool;
 - a write or edit inside the task's access skill folder, for every type. Reads inside that folder are allowed (see Access skills);
 - a read, write or Glob/Grep pattern (a pattern counts when it has a slash or `~`) that resolves under the data directory or a sensitive location. Paths resolve through symlinks on the deepest existing ancestor, so a link in `outputs/` that points at `~/.ssh` is judged at its target. Sensitive locations are `~/.aws`, `~/.ssh`, `~/.gnupg`, `~/.netrc`, `~/.kube`, `~/.docker`, `~/.config/gh`, `~/.claude` (except that `~/.claude/skills` is readable), any `.env` or `.env.*` segment, and files named `credentials`, `id_rsa`, `id_ed25519`, `taskq.config.json`, or ending in `.pem` or `.key`.
+
+Some of those denials also stop the run (`tamperOf` in `gate.ts`): a call with `dangerouslyDisableSandbox: true`, any path under the data directory, a file named `taskq.config.json`, and a write under `~/.claude`. These reach taskq itself rather than the task's work, so the hook writes a `tamper_blocked` event, aborts the session, and the worker returns `failed` with `tampered: true`. The task waits as `failed` with a critical `security_finding` until a person reads the run and retries it. Every other denial only refuses that call and the session continues.
+
+The `PreToolUse` hook is fail-closed. If the policy check throws, the call is denied and an `error` event with `source: gate` is written. Without this the SDK would fall back to the permission mode, which allows edits in `acceptEdits` and `auto`.
 
 Then each type decides:
 

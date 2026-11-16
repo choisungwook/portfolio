@@ -177,6 +177,60 @@ describe('sdk worker', () => {
     assert.equal(decision?.behavior, 'deny')
   })
 
+  test('[critical] a call that reaches the taskq config stops the run for review', async () => {
+    let decision: unknown
+    const { query } = fakeQuery(async (options) => {
+      decision = await hookOf(options, 'PreToolUse')({
+        hook_event_name: 'PreToolUse', tool_name: 'Read', tool_input: { file_path: join(home, 'taskq.config.json') }, tool_use_id: 'tu-7',
+      } as never, 'tu-7', signal())
+      throw new Error('aborted by hook')
+    })
+    const { ctx, events } = ctxOf(taskOf('research'))
+    const result = await createSdkWorker(config, { query })(ctx)
+    assert.equal((decision as { hookSpecificOutput: { permissionDecision: string } }).hookSpecificOutput.permissionDecision, 'deny')
+    assert.equal(result.outcome, 'failed')
+    assert.equal(result.tampered, true)
+    assert.ok(events.some((e) => e.kind === 'tamper_blocked'))
+  })
+
+  test('[critical] a call that turns the sandbox off stops the run', async () => {
+    const { query } = fakeQuery(async (options) => {
+      await hookOf(options, 'PreToolUse')({
+        hook_event_name: 'PreToolUse', tool_name: 'Bash', tool_input: { command: 'ls', dangerouslyDisableSandbox: true }, tool_use_id: 'tu-8',
+      } as never, 'tu-8', signal())
+      throw new Error('aborted by hook')
+    })
+    const result = await createSdkWorker(config, { query })(ctxOf(taskOf('ops_read')).ctx)
+    assert.equal(result.tampered, true)
+  })
+
+  test('a write outside the allowed roots is denied without stopping the run', async () => {
+    const { query } = fakeQuery(async (options) => {
+      await hookOf(options, 'PreToolUse')({
+        hook_event_name: 'PreToolUse', tool_name: 'Write', tool_input: { file_path: '/etc/example.txt', content: 'x' }, tool_use_id: 'tu-9',
+      } as never, 'tu-9', signal())
+      return [done]
+    })
+    const result = await createSdkWorker(config, { query })(ctxOf(taskOf('research')).ctx)
+    assert.equal(result.outcome, 'done')
+    assert.equal(result.tampered, undefined)
+  })
+
+  test('[critical] a policy check that throws denies the call', async () => {
+    let decision: unknown
+    const { query } = fakeQuery(async (options) => {
+      const input = { get dangerouslyDisableSandbox(): boolean { throw new Error('boom') } }
+      decision = await hookOf(options, 'PreToolUse')({
+        hook_event_name: 'PreToolUse', tool_name: 'Write', tool_input: input, tool_use_id: 'tu-10',
+      } as never, 'tu-10', signal())
+      return [done]
+    })
+    const { ctx, events } = ctxOf(taskOf('research'))
+    await createSdkWorker(config, { query })(ctx)
+    assert.equal((decision as { hookSpecificOutput: { permissionDecision: string } }).hookSpecificOutput.permissionDecision, 'deny')
+    assert.ok(events.some((e) => e.kind === 'error' && e.payload.source === 'gate'))
+  })
+
   test('expired target credentials in a failed aws call return needs_auth with target scope', async () => {
     const { query } = fakeQuery(async (options) => {
       await hookOf(options, 'PostToolUseFailure')({

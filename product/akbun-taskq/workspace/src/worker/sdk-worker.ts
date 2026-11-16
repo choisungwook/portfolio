@@ -75,12 +75,15 @@ async function runTask(config: Config, runQuery: QueryFn, head: (repo: string) =
       else if (message.type === 'result') final = message
     }
   } catch (error) {
-    // The abort we trigger when the target login expires surfaces as an error here; anything else is real.
-    if (!state.expired) throw error
+    // The abort the hooks trigger (expired target login, tamper) surfaces as an error here; anything else is real.
+    if (!state.expired && state.tamper === undefined) throw error
   } finally {
     ctx.signal.removeEventListener('abort', onAbort)
   }
 
+  if (state.tamper !== undefined) {
+    return { outcome: 'failed', summary: state.tamper, stats: { tool_calls: state.toolCalls }, alerts: [], followups: [], tampered: true }
+  }
   if (state.expired) {
     return { outcome: 'needs_auth', summary: 'Target account login expired', stats: {}, alerts: [], followups: [], auth_scope: 'target' }
   }

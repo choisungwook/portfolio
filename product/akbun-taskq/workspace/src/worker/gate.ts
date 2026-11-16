@@ -1,3 +1,5 @@
+import { homedir } from 'node:os'
+import { basename, join } from 'node:path'
 import type { TaskType } from '../types.ts'
 import { isReadOnlyAws, splitSegments } from './aws-guard.ts'
 import { blocked, realPath, resolvePath, under } from './paths.ts'
@@ -73,6 +75,20 @@ export function decide(type: TaskType, tool: string, input: Input, ctx: GateCont
     repo: ctx.repo === undefined ? undefined : realPath(ctx.repo),
   }
   return POLICY[type](tool, input, roots, touches, ctx)
+}
+
+// A call that reaches for taskq itself: turning the sandbox off, the database, the config, or Claude Code's own settings
+// (hooks live there). decide() denies these too; the hook also stops the run so a person reviews it before a retry.
+export function tamperOf(tool: string, input: Input, ctx: GateContext): string | null {
+  if (input.dangerouslyDisableSandbox === true) return 'tried to run a command outside the sandbox'
+  const dataDir = realPath(ctx.dataDir)
+  const claudeDir = realPath(join(homedir(), '.claude'))
+  for (const touch of touchesOf(tool, input, ctx)) {
+    if (under(touch.real, dataDir)) return `${tool} reached the taskq data directory`
+    if (basename(touch.real) === 'taskq.config.json') return `${tool} reached the taskq config`
+    if (touch.write && under(touch.real, claudeDir)) return `${tool} tried to write Claude Code settings`
+  }
+  return null
 }
 
 // Every path a file tool touches, resolved. A read with no path reads the working directory; a grep or glob pattern
