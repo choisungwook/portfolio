@@ -1,0 +1,126 @@
+name: release-akbun-taskq
+
+# Builds a single taskq executable per platform with bun. It embeds the UI, the schema and the Claude Code binary of
+# the locked SDK, so it runs without Node or a checkout. Pull requests build and smoke test; master releases.
+on:
+  pull_request:
+    paths:
+      - 'product/akbun-taskq/workspace/**'
+      - '.github/workflows/release-akbun-taskq.yml'
+  push:
+    branches:
+      - master
+    paths:
+      - 'product/akbun-taskq/workspace/src/**'
+      - 'product/akbun-taskq/workspace/ui/**'
+      - 'product/akbun-taskq/workspace/package.json'
+      - 'product/akbun-taskq/workspace/package-lock.json'
+      - 'product/akbun-taskq/workspace/scripts/build-binary.ts'
+      - '.github/workflows/release-akbun-taskq.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+defaults:
+  run:
+    working-directory: product/akbun-taskq/workspace
+
+jobs:
+  # The Claude Code binary comes from the platform package npm installs, so each target builds on its own OS.
+  build:
+    strategy:
+      matrix:
+        include:
+          - runner: macos-latest
+            target: darwin-arm64
+          - runner: ubuntu-latest
+            target: linux-x64
+    runs-on: ${{ matrix.runner }}
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: product/akbun-taskq/workspace/package-lock.json
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: '1.4.4'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build binary
+        run: node scripts/build-binary.ts dist/taskq
+
+      # Without Node on PATH: opening the database runs the embedded schema, and list reads it back.
+      - name: Smoke test
+        run: |
+          home=$(mktemp -d)
+          env -i HOME="$home" TASKQ_HOME="$home" TASKQ_NO_NOTIFY=1 PATH=/usr/bin:/bin dist/taskq add --type research --intent smoke
+          env -i HOME="$home" TASKQ_HOME="$home" TASKQ_NO_NOTIFY=1 PATH=/usr/bin:/bin dist/taskq list | grep -q smoke
+
+      - name: Package
+        if: github.event_name != 'pull_request'
+        run: tar -czf "taskq-${{ matrix.target }}.tar.gz" -C dist taskq
+
+      - uses: actions/upload-artifact@v7
+        if: github.event_name != 'pull_request'
+        with:
+          name: taskq-${{ matrix.target }}
+          path: product/akbun-taskq/workspace/taskq-${{ matrix.target }}.tar.gz
+          retention-days: 1
+
+  # Every platform must build before the tag exists, and the tag must exist before the release.
+  # The version is package.json's; merging the same version again fails on the existing tag.
+  release:
+    if: github.event_name != 'pull_request'
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    defaults:
+      run:
+        working-directory: .
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/download-artifact@v8
+        with:
+          path: dist
+          merge-multiple: true
+
+      - name: Read version from package.json
+        id: version
+        run: |
+          version=$(node -p "require('./product/akbun-taskq/workspace/package.json').version")
+          echo "tag=akbun-taskq-v$version" >> "$GITHUB_OUTPUT"
+
+      - name: Create tag
+        env:
+          TAG: ${{ steps.version.outputs.tag }}
+        run: |
+          git tag "$TAG"
+          git push origin "$TAG"
+
+      - name: Create release with binaries
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ steps.version.outputs.tag }}
+        run: |
+          cat > release-notes.md <<'EOF'
+          ## About
+
+          - Personal agent task queue. One executable runs the queue, the API and the UI.
+
+          ## Install
+
+          - `taskq-darwin-arm64.tar.gz` for Apple silicon, `taskq-linux-x64.tar.gz` for linux x86_64.
+          - Extract and put `taskq` on PATH. On macOS, run `xattr -d com.apple.quarantine taskq` once after a browser download.
+          - Configuration is the same as a checkout. See product/akbun-taskq/workspace/manual.md.
+          EOF
+          bash "$GITHUB_WORKSPACE/.github/scripts/release-notes.sh" "$TAG" product/akbun-taskq >> release-notes.md
+          gh release create "$TAG" --title "$TAG" --notes-file release-notes.md dist/*.tar.gz

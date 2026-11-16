@@ -2,6 +2,11 @@
 
 concept를 추가·수정·삭제할 때마다 오늘 날짜 섹션을 맨 위에 만들고 한 줄 남긴다. 구분은 `**Creation**`, `**Update**`, `**Deletion**`이다.
 
+## 2026-11-16
+
+* **Creation**: [Release a bun-compiled binary that embeds Claude Code](decisions/2026-11-release-bun-binary.md) 결정 기록. One executable per platform built by bun; Node SEA and requiring an installed claude were rejected.
+* **Update**: [Run TypeScript by type stripping and ship the UI as static modules](decisions/2026-11-no-build-typescript-static-ui.md) 결정 기록. The no-build reason now covers development only; the released binary is packaging.
+
 ## 2026-11-15
 
 * **Update**: [Permission profiles follow how the SDK evaluates a tool call](decisions/2026-11-permission-profiles.md) 결정 기록. Reads are confined by path, and project settings load only for trusted repositories.

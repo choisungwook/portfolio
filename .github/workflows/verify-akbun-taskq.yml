@@ -1,7 +1,7 @@
 name: verify-akbun-taskq
 
-# The tool runs from a checkout on its owner's machine, so there is nothing to
-# release. This job proves the code still type checks and passes its tests.
+# This job proves the code still type checks and passes its tests.
+# release-akbun-taskq.yml builds and releases the binary.
 on:
   pull_request:
     paths:
