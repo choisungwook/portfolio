@@ -101,6 +101,8 @@ Error codes and the CLI exit code each maps to. The MCP server returns them as t
 | Error code | Exit code | When |
 |---|---|---|
 | `LOCKED` | 3 | No agent, or the agent expired |
+| `USAGE` | 2 | The CLI arguments are wrong |
+| `UNEXPECTED` | 1 | An internal error. The message never carries the input |
 | `BAD_PASSWORD` | 4 | The root password does not unwrap the data key |
 | `NOT_INITIALIZED` | 1 | No `vault.json`: run `init` |
 | `ALREADY_INITIALIZED` | 8 | `init` when a vault exists |
@@ -153,7 +155,9 @@ There is no tool to overwrite, edit or delete. Those need the root password and 
 | `POST /api/keys/<name>/reveal` | none | `{value}` |
 | `GET /api/audit?limit=<n>` | none | Latest audit lines |
 | `GET /api/agent` | none | Agent status |
-| `POST /api/agent/unlock` | `{ttl?}` | Starts the agent with the key the server already holds |
+| `POST /api/agent/unlock` | `{ttl_minutes?}` | Starts the agent with the key the server already holds. Idle timeout in minutes, 1 to 480, default 15 |
 | `POST /api/agent/lock` | none | Stops the agent |
+
+Refusals before a route runs: 421 `BAD_HOST` for a wrong `Host`, 403 `BAD_ORIGIN` for a write from another origin, 401 `NO_SESSION` without the cookie, 401 `BAD_BOOTSTRAP` for a used or wrong one-time token. Other errors carry the error codes of the table above.
 
 `<name>` is URL-encoded because names contain `/`. The page has no build step: [features.md](./features.md) names its areas, and it follows IBM Carbon as [development.md](./development.md) describes.

@@ -10,3 +10,5 @@
 * [The root password, not caller detection, decides what an operation may do](2026-11-root-password-gates-mutations.md) - A session may use and create; revealing protected values and changing anything existing need the password.
 * [Derive the key-encryption key with scrypt, with parameters stored in the file](2026-11-scrypt-kdf.md) - scrypt N=2^17 from node:crypto; Argon2id was the first choice but is missing from the checkout runtime.
 * [The page follows IBM Carbon through the token contract akbun-taskq already has](2026-11-carbon-design-system.md) - Carbon tokens and rules are copied from akbun-taskq; the Carbon packages are not added.
+* [Write the MCP server on the SDK's low-level Server with JSON Schema tool inputs](2026-11-mcp-low-level-server.md) - McpServer with zod schemas was rejected to keep @modelcontextprotocol/sdk the only runtime dependency.
+* [Let tests lower scrypt N through AKBUN_KEYCHAIN_TEST_KDF_N, never below the reader's floor](2026-11-test-kdf-env.md) - CLI tests create vaults with N=2^15 instead of 2^17; the reader still refuses anything below 2^15.

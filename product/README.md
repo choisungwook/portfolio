@@ -6,7 +6,7 @@
 
 | 디렉터리 | 설명 |
 |---|---|
-| [akbun-keychain](./akbun-keychain/) | AI agent가 값을 보지 않고 쓰도록 비밀 값을 암호화해 로컬 JSON 파일에 보관하는 CLI, MCP, 로컬 페이지 키 관리 도구. 설계 단계 |
+| [akbun-keychain](./akbun-keychain/) | AI agent가 값을 보지 않고 쓰도록 비밀 값을 암호화해 로컬 JSON 파일에 보관하는 CLI, MCP, 로컬 페이지 키 관리 도구 |
 | [akbun-taskq](./akbun-taskq/) | 쌓아 둔 태스크를 여러 Claude 세션이 병렬로 처리하고, 시간대별 실행 기록과 꼭 확인할 항목을 한 화면에서 보는 개인용 에이전트 태스크 큐 |
 | [akbun-storyboard](./akbun-storyboard/) | 씬별 스케치·대본·배경음악·효과음·아이디어·댓글을 웹 UI와 CLI, MCP로 사람과 AI agent가 함께 편집하는 Rust 단일 바이너리 영상 스토리보드 도구 |
 | [akbun-makephoto](./akbun-makephoto/) | 폴더 카탈로그, 태그, 수평·자르기·밝기·색, 필름 룩, 자동 보정 버튼과 AI용 CLI를 갖춘 초보자용 macOS 사진 편집 앱 |

@@ -4,6 +4,9 @@ concept를 추가·수정·삭제할 때마다 오늘 날짜 섹션을 맨 위�
 
 ## 2026-11-17
 
+* **Creation**: [Write the MCP server on the SDK's low-level Server with JSON Schema tool inputs](decisions/2026-11-mcp-low-level-server.md) 결정 기록. McpServer with zod schemas was rejected to keep the SDK the only runtime dependency.
+* **Creation**: [Let tests lower scrypt N through AKBUN_KEYCHAIN_TEST_KDF_N](decisions/2026-11-test-kdf-env.md) 결정 기록. CLI tests use N=2^15; the reader still refuses anything lower.
+
 * **Creation**: [The page follows IBM Carbon through the token contract akbun-taskq already has](decisions/2026-11-carbon-design-system.md) 결정 기록. Carbon tokens and rules are copied from akbun-taskq; the Carbon packages are not added.
 * **Creation**: [Write everything in TypeScript on Node and release a bun-compiled binary](decisions/2026-11-typescript-node-bun-stack.md) 결정 기록. One language for the CLI, agent, MCP server and page; Go and Rust were rejected.
 * **Creation**: [Store the vault as one readable JSON file with per-entry encryption and a lock file](decisions/2026-11-json-vault-per-entry-encryption.md) 결정 기록. Metadata is plaintext and authenticated, values are encrypted one by one; SQLite and a single encrypted blob were rejected.

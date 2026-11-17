@@ -1,0 +1,90 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>akbun-keychain</title>
+  <link rel="stylesheet" href="/css/theme/contract.css">
+  <link rel="stylesheet" href="/css/theme/carbon.css">
+  <link rel="stylesheet" href="/css/app.css">
+  <script type="module" src="/js/app.js"></script>
+</head>
+<body>
+  <header class="bar">
+    <h1>akbun-keychain</h1>
+    <button type="button" class="ghost" data-area="logout" hidden>Lock and close</button>
+  </header>
+
+  <main>
+    <section class="login" data-area="login">
+      <form id="login-form">
+        <h2>Unlock the page</h2>
+        <p class="muted">Enter the root password. Five wrong attempts stop the server.</p>
+        <label for="login-password">Root password</label>
+        <input id="login-password" type="password" autocomplete="current-password" data-area="login-password" required>
+        <p class="field-error" data-area="login-error" role="alert" hidden></p>
+        <button type="submit" class="primary">Unlock</button>
+      </form>
+    </section>
+
+    <div class="notice" data-area="notice" role="status" hidden>
+      <span class="notice-text"></span>
+      <button type="button" class="ghost notice-close" aria-label="Close notification">Close</button>
+    </div>
+
+    <section class="workspace" hidden>
+      <div class="keys">
+        <div class="toolbar">
+          <input type="search" placeholder="Search name, description or tag" aria-label="Search keys" data-area="key-search">
+          <button type="button" class="primary" data-area="key-new">New key</button>
+        </div>
+        <ul class="key-list" data-area="key-list"></ul>
+
+        <form class="key-editor" data-area="key-editor" hidden>
+          <h2 class="editor-title">New key</h2>
+          <label for="editor-name">Name</label>
+          <input id="editor-name" name="name" required pattern="[a-z0-9][a-z0-9._\-]*(/[a-z0-9][a-z0-9._\-]*)*" maxlength="128">
+          <label for="editor-value">Value</label>
+          <textarea id="editor-value" name="value" rows="3" autocomplete="off" spellcheck="false"></textarea>
+          <p class="muted editor-value-hint">Left empty, the value does not change.</p>
+          <label for="editor-description">Description (plaintext, never a secret)</label>
+          <input id="editor-description" name="description" maxlength="500">
+          <label for="editor-tags">Tags, comma separated</label>
+          <input id="editor-tags" name="tags">
+          <label for="editor-access">Access for AI agents</label>
+          <select id="editor-access" name="ai_access">
+            <option value="inject">inject: usable through run, never shown</option>
+            <option value="reveal">reveal: agents may also read the value</option>
+            <option value="deny">deny: human only</option>
+          </select>
+          <p class="field-error" data-area="key-editor-error" role="alert" hidden></p>
+          <div class="actions">
+            <button type="submit" class="primary">Save</button>
+            <button type="button" class="ghost editor-cancel">Cancel</button>
+          </div>
+        </form>
+      </div>
+
+      <aside class="side">
+        <section class="panel" data-area="agent-panel">
+          <h2>Agent access</h2>
+          <p class="agent-state"></p>
+          <div class="actions">
+            <button type="button" class="ghost" data-area="agent-unlock">Allow agents for 15 minutes</button>
+            <button type="button" class="ghost" data-area="agent-lock">Stop agent access</button>
+          </div>
+        </section>
+        <section class="panel" data-area="audit-panel">
+          <h2>Audit log</h2>
+          <ol class="audit-lines"></ol>
+        </section>
+      </aside>
+    </section>
+
+    <section class="closed" hidden>
+      <h2>Locked</h2>
+      <p>The server has stopped. You can close this tab.</p>
+    </section>
+  </main>
+</body>
+</html>

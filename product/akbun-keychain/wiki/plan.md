@@ -1,5 +1,7 @@
 # Implementation plan
 
+All eight phases are implemented as of version 0.2.0; the plan stays as the record of what each phase had to prove.
+
 Eight phases. Each is one pull request, leaves the tests green, and ends with the checks listed under it. Do them in order: each phase uses only what earlier phases built.
 
 Before starting a phase, read [architecture.md](./architecture.md) and the page named in the phase. When the code has to differ from a wiki page, change the page in the same commit and, if the reason will matter later, add a decision under `knowledge/decisions/`.

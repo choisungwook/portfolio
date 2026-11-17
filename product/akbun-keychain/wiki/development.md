@@ -37,7 +37,7 @@ npm test
 node src/cli/main.ts status
 ```
 
-Tests must not need a compiled binary, a real home directory or a terminal. Every test sets `AKBUN_KEYCHAIN_HOME` to a temp directory, and core functions take the password as an argument.
+Tests must not need a compiled binary, a real home directory or a terminal. Every test sets `AKBUN_KEYCHAIN_HOME` to a temp directory, and core functions take the password as an argument. CLI tests set `AKBUN_KEYCHAIN_TEST_KDF_N=32768` so `init` uses a fast scrypt; see [the decision](../knowledge/decisions/2026-11-test-kdf-env.md).
 
 ## CI
 
@@ -52,7 +52,7 @@ Tests must not need a compiled binary, a real home directory or a terminal. Ever
 
 ## Release workflow
 
-`.github/workflows/release-akbun-keychain.yml` does not exist yet, because a workflow with nothing to build would fail. Phase 7 writes it, modeled on `.github/workflows/release-akbun-taskq.yml`.
+`.github/workflows/release-akbun-keychain.yml`, modeled on `.github/workflows/release-akbun-taskq.yml`.
 
 | Event | Jobs |
 |---|---|

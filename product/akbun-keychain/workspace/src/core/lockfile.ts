@@ -45,6 +45,14 @@ function readQuietly(path: string): string | undefined {
   }
 }
 
+// On Windows a file that another process has just deleted stays "delete pending" until its last handle closes.
+// Creating or deleting it in that window fails with EPERM or EACCES instead of EEXIST or ENOENT; both mean the lock
+// is still changing hands, so the caller retries.
+function isBusy(error: unknown): boolean {
+  const code = (error as NodeJS.ErrnoException).code
+  return code === 'EEXIST' || (process.platform === 'win32' && (code === 'EPERM' || code === 'EACCES'))
+}
+
 function tryCreate(path: string): boolean {
   try {
     const fd = openSync(path, 'wx', 0o600)
@@ -55,7 +63,7 @@ function tryCreate(path: string): boolean {
     }
     return true
   } catch (error) {
-    if ((error as NodeJS.ErrnoException).code === 'EEXIST') return false
+    if (isBusy(error)) return false
     throw error
   }
 }
@@ -64,7 +72,7 @@ function removeQuietly(path: string): void {
   try {
     unlinkSync(path)
   } catch (error) {
-    if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error
+    if ((error as NodeJS.ErrnoException).code !== 'ENOENT' && !isBusy(error)) throw error
   }
 }
 
