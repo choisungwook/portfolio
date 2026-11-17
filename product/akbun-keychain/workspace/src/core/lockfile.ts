@@ -18,19 +18,30 @@ function isAlive(pid: number): boolean {
 
 // A lock is stale when its owner is gone or it is older than staleMs. A file that cannot be parsed yet may be one
 // another process has just created, so only its age counts.
-function isStale(path: string, staleMs: number): boolean {
+// Returns the content judged stale, so the caller can check it is still the same file before removing it.
+function staleContent(path: string, staleMs: number): string | undefined {
   let ageMs: number
+  let content: string
   try {
     ageMs = Date.now() - statSync(path).mtimeMs
+    content = readFileSync(path, 'utf8')
   } catch {
-    return false
+    return undefined
   }
-  if (ageMs > staleMs) return true
+  if (ageMs > staleMs) return content
   try {
-    const { pid } = JSON.parse(readFileSync(path, 'utf8')) as { pid: unknown }
-    return typeof pid === 'number' && !isAlive(pid)
+    const { pid } = JSON.parse(content) as { pid: unknown }
+    return typeof pid === 'number' && !isAlive(pid) ? content : undefined
   } catch {
-    return false
+    return undefined
+  }
+}
+
+function readQuietly(path: string): string | undefined {
+  try {
+    return readFileSync(path, 'utf8')
+  } catch {
+    return undefined
   }
 }
 
@@ -61,7 +72,10 @@ export async function withLock<T>(path: string, fn: () => T | Promise<T>, option
   const { timeoutMs = 5000, retryMs = 50, staleMs = 30_000 } = options
   const deadline = Date.now() + timeoutMs
   while (!tryCreate(path)) {
-    if (isStale(path, staleMs)) {
+    const stale = staleContent(path, staleMs)
+    // Two waiters can judge the same lock stale. Re-reading just before removal keeps the slower one from deleting
+    // the lock the faster one has just created. A small window remains between the read and the unlink.
+    if (stale !== undefined && readQuietly(path) === stale) {
       removeQuietly(path)
       continue
     }

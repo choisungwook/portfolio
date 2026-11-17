@@ -61,6 +61,13 @@ describe('opening', () => {
     await assert.rejects(initVault('short', { kdfN: TEST_KDF_N }), rejectsWith('INVALID'))
   })
 
+  test('a kdf N that the reader would refuse is not written', async () => {
+    await assert.rejects(changePassword(PASSWORD, 'another long root password', { kdfN: 2 ** 14 }), rejectsWith('INVALID'))
+    useTempHome()
+    await assert.rejects(initVault(PASSWORD, { kdfN: 2 ** 14 }), rejectsWith('INVALID'))
+    await assert.rejects(initVault(PASSWORD, { kdfN: 3 * 2 ** 15 }), rejectsWith('INVALID'))
+  })
+
   test('init refuses to overwrite an existing vault', async () => {
     await assert.rejects(initVault(PASSWORD, { kdfN: TEST_KDF_N }), rejectsWith('ALREADY_INITIALIZED'))
   })
@@ -91,6 +98,13 @@ describe('operations', () => {
 
     await remove(dataKey, 'github/personal')
     assert.deepEqual(list(dataKey).map((entry) => entry.name), ['aws/key'])
+  })
+
+  test('names that exist on Object.prototype are ordinary keys', async () => {
+    assert.throws(() => reveal(dataKey, 'constructor'), rejectsWith('NOT_FOUND'))
+    await assert.rejects(remove(dataKey, 'constructor'), rejectsWith('NOT_FOUND'))
+    await create(dataKey, { name: 'constructor', value: 'proto-safe' })
+    assert.equal(reveal(dataKey, 'constructor'), 'proto-safe')
   })
 
   test('create on an existing name fails with EXISTS', async () => {
@@ -138,10 +152,14 @@ describe('operations', () => {
   })
 
   test('files and the directory are created with modes 0600 and 0700', { skip: process.platform === 'win32' }, async () => {
-    await update(dataKey, 'aws/key', { description: 'write a backup' })
-    assert.equal(statSync(home).mode & 0o777, 0o700)
+    // A subdirectory, so the mode under test comes from ensureHome and not from mkdtemp.
+    const created = join(useTempHome(), 'nested', 'home')
+    process.env.AKBUN_KEYCHAIN_HOME = created
+    await initVault(PASSWORD, { kdfN: TEST_KDF_N })
+    await create(openVault(PASSWORD), { name: 'k', value: 'v' })
+    assert.equal(statSync(created).mode & 0o777, 0o700)
     for (const file of ['vault.json', 'vault.json.bak']) {
-      assert.equal(statSync(join(home, file)).mode & 0o777, 0o600, file)
+      assert.equal(statSync(join(created, file)).mode & 0o777, 0o600, file)
     }
   })
 })

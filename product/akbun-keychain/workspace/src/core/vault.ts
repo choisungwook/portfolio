@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto'
 import { existsSync } from 'node:fs'
 import { canonical } from './canonical.ts'
-import { DEFAULT_KDF_N, deriveKek, deriveSubkeys, mac, macMatches, newDataKey, newKdfParams, open, seal, type Subkeys } from './crypto.ts'
+import { DEFAULT_KDF_N, MIN_KDF_N, deriveKek, deriveSubkeys, mac, macMatches, newDataKey, newKdfParams, open, seal, type Subkeys } from './crypto.ts'
 import { KeychainError } from './errors.ts'
 import { withLock } from './lockfile.ts'
 import { backupPath, ensureHome, vaultLockPath, vaultPath } from './paths.ts'
@@ -95,6 +95,18 @@ function integrityError(): KeychainError {
   return new KeychainError('INTEGRITY', 'vault.json fails its MAC: run akbun-keychain verify, or restore vault.json.bak')
 }
 
+// entries comes from JSON.parse, so a plain lookup would find inherited names such as `constructor`.
+function has(vault: VaultFile, name: string): boolean {
+  return Object.hasOwn(vault.entries, name)
+}
+
+function checkKdfN(N: number): number {
+  if (!Number.isInteger(N) || N < MIN_KDF_N || (N & (N - 1)) !== 0) {
+    throw new KeychainError('INVALID', `kdf N must be a power of two of at least ${MIN_KDF_N}`)
+  }
+  return N
+}
+
 // Every operation reads the file again. A copy read earlier may be stale, and a stale copy is how updates get lost.
 function load(dataKey: Buffer): { vault: VaultFile; keys: Subkeys } {
   const vault = readVaultFile(vaultPath())
@@ -104,8 +116,8 @@ function load(dataKey: Buffer): { vault: VaultFile; keys: Subkeys } {
 }
 
 function decryptEntry(vault: VaultFile, keys: Subkeys, name: string): string {
+  if (!has(vault, name)) throw new KeychainError('NOT_FOUND', `no key named ${name}: run akbun-keychain list`)
   const entry = vault.entries[name]
-  if (!entry) throw new KeychainError('NOT_FOUND', `no key named ${name}: run akbun-keychain list`)
   const plain = open(keys.entryKey, entry.value, entryAad(vault.vault_id, name, entry))
   if (!plain) throw new KeychainError('INTEGRITY', `entry ${name} fails authentication: its metadata was edited; restore vault.json.bak`)
   return plain.toString('utf8')
@@ -136,11 +148,12 @@ export function vaultExists(): boolean {
 
 export async function initVault(password: string, options: InitOptions = {}): Promise<void> {
   checkPassword(password)
+  checkKdfN(options.kdfN ?? DEFAULT_KDF_N)
   ensureHome()
   await withLock(vaultLockPath(), () => {
     if (vaultExists()) throw new KeychainError('ALREADY_INITIALIZED', 'a vault already exists: use it, or move vault.json away first')
     const dataKey = newDataKey()
-    const header = { vault_id: randomUUID(), kdf: newKdfParams(options.kdfN ?? DEFAULT_KDF_N) }
+    const header = { vault_id: randomUUID(), kdf: newKdfParams(checkKdfN(options.kdfN ?? DEFAULT_KDF_N)) }
     const vault: VaultFile = { format: FORMAT, ...header, wrapped_key: wrap(header, password, dataKey), entries: {}, mac: '' }
     vault.mac = mac(deriveSubkeys(dataKey, vault.vault_id).macKey, macInput(vault))
     writeVaultFile(vaultPath(), backupPath(), vault)
@@ -177,7 +190,7 @@ export async function create(dataKey: Buffer, input: NewEntry, hooks?: WriteHook
   checkAiAccess(aiAccess)
   checkValue(input.value)
   return mutate(dataKey, (vault, keys) => {
-    if (vault.entries[input.name]) throw new KeychainError('EXISTS', `a key named ${input.name} already exists: choose another name`)
+    if (has(vault, input.name)) throw new KeychainError('EXISTS', `a key named ${input.name} already exists: choose another name`)
     const at = now()
     const meta = { description, tags, ai_access: aiAccess, created_at: at, updated_at: at, version: 1 }
     vault.entries[input.name] = encryptEntry(vault, keys, input.name, meta, input.value)
@@ -212,7 +225,7 @@ export async function rename(dataKey: Buffer, name: string, newName: string): Pr
   checkName(newName)
   return mutate(dataKey, (vault, keys) => {
     const value = decryptEntry(vault, keys, name)
-    if (vault.entries[newName]) throw new KeychainError('EXISTS', `a key named ${newName} already exists: choose another name`)
+    if (has(vault, newName)) throw new KeychainError('EXISTS', `a key named ${newName} already exists: choose another name`)
     const old = vault.entries[name]
     const meta = { ...old, updated_at: now(), version: old.version + 1 }
     delete vault.entries[name]
@@ -223,7 +236,7 @@ export async function rename(dataKey: Buffer, name: string, newName: string): Pr
 
 export async function remove(dataKey: Buffer, name: string): Promise<void> {
   await mutate(dataKey, (vault) => {
-    if (!vault.entries[name]) throw new KeychainError('NOT_FOUND', `no key named ${name}: run akbun-keychain list`)
+    if (!has(vault, name)) throw new KeychainError('NOT_FOUND', `no key named ${name}: run akbun-keychain list`)
     delete vault.entries[name]
   })
 }
@@ -242,10 +255,11 @@ export function verify(dataKey: Buffer): VerifyResult {
 // Re-wraps the data key under a new salt. Entries and the MAC do not change.
 export async function changePassword(oldPassword: string, newPassword: string, options: InitOptions = {}): Promise<void> {
   checkPassword(newPassword)
+  if (options.kdfN !== undefined) checkKdfN(options.kdfN)
   await withLock(vaultLockPath(), () => {
     const vault = readVaultFile(vaultPath())
     const dataKey = unwrap(vault, oldPassword)
-    const header = { vault_id: vault.vault_id, kdf: newKdfParams(options.kdfN ?? vault.kdf.N) }
+    const header = { vault_id: vault.vault_id, kdf: newKdfParams(checkKdfN(options.kdfN ?? vault.kdf.N)) }
     writeVaultFile(vaultPath(), backupPath(), { ...vault, kdf: header.kdf, wrapped_key: wrap(header, newPassword, dataKey) })
     dataKey.fill(0)
   })

@@ -16,9 +16,10 @@ const run = spawnSync(
 process.stdout.write(run.stdout)
 process.stderr.write(run.stderr)
 
-const count = (label: string) => Number(run.stdout.match(new RegExp(`^# ${label} (\\d+)$`, 'm'))?.[1] ?? 0)
-const passed = count('pass')
-const failed = count('fail')
+// Count test lines whose name starts with [critical]. The TAP summary also counts files that matched no test.
+const count = (status: string) => (run.stdout.match(new RegExp(`^\\s*${status} \\d+ - \\[critical\\]`, 'gm')) ?? []).length
+const passed = count('ok')
+const failed = count('not ok')
 
 if (run.status !== 0 || failed > 0) {
   console.error(`critical tests failed: ${failed} failing`)
