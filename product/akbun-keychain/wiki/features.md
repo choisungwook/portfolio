@@ -4,7 +4,7 @@ The areas of the page served by `akbun-keychain gui`, by the name this wiki uses
 
 The page follows IBM Carbon; the rules are in [development.md](./development.md).
 
-The page is not built yet. This table is the contract for phase 6 of [plan.md](./plan.md); change it in the same commit when an area is added or renamed.
+`key-row`, `key-reveal`, `key-copy` and `key-delete` are created per key by `ui/js/app.js`. Change this table in the same commit when an area is added or renamed.
 
 | Name | data-area | API | What it does |
 |---|---|---|---|

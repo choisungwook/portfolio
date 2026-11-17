@@ -1,0 +1,165 @@
+name: release-akbun-keychain
+
+# Builds one akbun-keychain executable per platform with bun, with ui/ embedded, so it runs without Node or a
+# checkout. Pull requests build and smoke test on all three runners; a master push also tags and releases.
+# verify-akbun-keychain.yml runs the type check and the tests.
+on:
+  pull_request:
+    paths:
+      - 'product/akbun-keychain/workspace/**'
+      - '.github/workflows/release-akbun-keychain.yml'
+  push:
+    branches:
+      - master
+    paths:
+      - 'product/akbun-keychain/workspace/src/**'
+      - 'product/akbun-keychain/workspace/ui/**'
+      - 'product/akbun-keychain/workspace/package.json'
+      - 'product/akbun-keychain/workspace/package-lock.json'
+      - 'product/akbun-keychain/workspace/scripts/build-binary.ts'
+      - '.github/workflows/release-akbun-keychain.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+defaults:
+  run:
+    shell: bash
+    working-directory: product/akbun-keychain/workspace
+
+jobs:
+  # Each target builds on its own OS so the smoke test runs the real binary there.
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: macos-latest
+            target: darwin-arm64
+            path: /usr/bin:/bin
+          - runner: ubuntu-latest
+            target: linux-x64
+            path: /usr/bin:/bin
+          - runner: windows-latest
+            target: windows-x64
+            path: /usr/bin:/c/Windows/System32:/c/Windows
+    runs-on: ${{ matrix.runner }}
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '26'
+          cache: npm
+          cache-dependency-path: product/akbun-keychain/workspace/package-lock.json
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: '1.4.4'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build binary
+        run: node scripts/build-binary.ts dist/akbun-keychain
+
+      # Without Node on PATH: init, unlock (starts the detached agent from the binary itself), set, list, run with a
+      # masked value, lock, and run again, which must exit 3. The page assets come from inside the binary.
+      - name: Smoke test
+        env:
+          SMOKE_PATH: ${{ matrix.path }}
+        run: |
+          bin="$PWD/dist/akbun-keychain"
+          home="$RUNNER_TEMP/akbun-keychain-smoke"
+          password='smoke test root password'
+          value='smoke-secret-value-0042'
+          kc() { PATH="$SMOKE_PATH" AKBUN_KEYCHAIN_HOME="$home" "$bin" "$@"; }
+          if [ "$RUNNER_OS" = Windows ]; then show=(cmd /c "echo %SMOKE%"); else show=(sh -c 'echo "$SMOKE"'); fi
+
+          kc version
+          printf '%s\n' "$password" | kc init --password-stdin
+          printf '%s\n' "$password" | kc unlock --password-stdin
+          printf '%s' "$value" | kc set smoke/key
+          kc list | grep -q 'smoke/key'
+          output=$(kc run --env SMOKE=smoke/key -- "${show[@]}")
+          echo "$output"
+          grep -q '\[masked:smoke/key\]' <<<"$output"
+          if grep -q "$value" <<<"$output"; then echo "the value was not masked"; exit 1; fi
+          kc lock
+          set +e
+          kc run --env SMOKE=smoke/key -- "${show[@]}"
+          code=$?
+          set -e
+          test "$code" -eq 3
+
+      - name: Package
+        if: github.event_name != 'pull_request'
+        run: |
+          if [ "$RUNNER_OS" = Windows ]; then
+            7z a "akbun-keychain-${{ matrix.target }}.zip" ./dist/akbun-keychain.exe
+          else
+            tar -czf "akbun-keychain-${{ matrix.target }}.tar.gz" -C dist akbun-keychain
+          fi
+
+      - uses: actions/upload-artifact@v7
+        if: github.event_name != 'pull_request'
+        with:
+          name: akbun-keychain-${{ matrix.target }}
+          path: |
+            product/akbun-keychain/workspace/akbun-keychain-${{ matrix.target }}.tar.gz
+            product/akbun-keychain/workspace/akbun-keychain-${{ matrix.target }}.zip
+          if-no-files-found: error
+          retention-days: 1
+
+  # Every platform must build before the tag exists, and the tag must exist before the release.
+  # The version is package.json's; merging the same version again fails on the existing tag.
+  release:
+    if: github.event_name != 'pull_request'
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    defaults:
+      run:
+        working-directory: .
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/download-artifact@v8
+        with:
+          path: dist
+          merge-multiple: true
+
+      - name: Read version from package.json
+        id: version
+        run: |
+          version=$(node -p "require('./product/akbun-keychain/workspace/package.json').version")
+          echo "tag=akbun-keychain-v$version" >> "$GITHUB_OUTPUT"
+
+      - name: Create tag
+        env:
+          TAG: ${{ steps.version.outputs.tag }}
+        run: |
+          git tag "$TAG"
+          git push origin "$TAG"
+
+      - name: Create release with binaries
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ steps.version.outputs.tag }}
+        run: |
+          cat > release-notes.md <<'NOTES'
+          ## About
+
+          - A local secret store for AI agents. Values stay encrypted in one JSON file; agents use them through `run` or MCP without seeing them.
+
+          ## Install
+
+          - `akbun-keychain-darwin-arm64.tar.gz` for Apple silicon, `akbun-keychain-linux-x64.tar.gz` for linux x86_64, `akbun-keychain-windows-x64.zip` for Windows x64.
+          - Extract and put `akbun-keychain` on PATH, then run `akbun-keychain init`.
+          - The binaries are not signed. On macOS, run `xattr -d com.apple.quarantine akbun-keychain` once after a browser download. On Windows, choose "More info" then "Run anyway" on the SmartScreen warning.
+          - Manual: product/akbun-keychain/workspace/manual.md.
+          NOTES
+          bash "$GITHUB_WORKSPACE/.github/scripts/release-notes.sh" "$TAG" product/akbun-keychain >> release-notes.md
+          gh release create "$TAG" --title "$TAG" --notes-file release-notes.md dist/*.tar.gz dist/*.zip

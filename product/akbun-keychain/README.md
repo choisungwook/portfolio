@@ -2,9 +2,9 @@
 
 A local secret store for AI agents on macOS, Linux and Windows. Secrets are encrypted in one JSON file under a root password. An agent uses a secret by name, without the value entering its context, and nothing leaves the machine.
 
-**Status: in development.** Phases 0 and 1 of the [plan](./wiki/plan.md) are done: `workspace/` has the scaffold, the `version` command and the core library (encryption, vault file, lock file, audit log). There is no usable CLI yet.
+**Status: released.** Every phase of the [plan](./wiki/plan.md) is implemented. Binaries for macOS (Apple silicon), Linux x64 and Windows x64 are on the GitHub release `akbun-keychain-v<version>`. Install and daily use are in [workspace/manual.md](./workspace/manual.md).
 
-## What it will do
+## What it does
 
 - Register, edit, list, delete and use secrets from one executable, `akbun-keychain`.
 - Keep values encrypted at rest. Reading `vault.json` shows names and descriptions, never values.
@@ -19,11 +19,12 @@ A local secret store for AI agents on macOS, Linux and Windows. Secrets are encr
 |---|---|
 | [wiki/](./wiki/index.md) | Design: architecture, security model, file format, interfaces, and the implementation plan |
 | [knowledge/](./knowledge/index.md) | Decision records |
-| `workspace/` | Source and tests |
+| [workspace/](./workspace/manual.md) | Source, tests and the user manual |
 
 ## Where to start
 
-- To implement: read [wiki/index.md](./wiki/index.md), then follow [wiki/plan.md](./wiki/plan.md) phase by phase.
+- To use it: [workspace/manual.md](./workspace/manual.md).
+- To change it: read [wiki/index.md](./wiki/index.md) first.
 - To understand a choice: [knowledge/decisions/](./knowledge/decisions/index.md).
 
 ## What to know before relying on it

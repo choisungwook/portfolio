@@ -1,6 +1,6 @@
 # akbun-keychain wiki
 
-Read this before writing or changing the product. The product is at the design stage: these pages describe what to build, and [plan.md](./plan.md) says in what order.
+Read this before writing or changing the product. All phases of [plan.md](./plan.md) are implemented. These pages describe what the code does and why; keep them in step with it.
 
 - [architecture.md](./architecture.md): the four process roles, who holds the key, key flows, source layout
 - [security.md](./security.md): threat model, key hierarchy, the access rule, known limits

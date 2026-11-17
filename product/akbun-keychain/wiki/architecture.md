@@ -94,9 +94,10 @@ workspace/
       run.ts              spawn a child with secrets
       mask.ts             replace values in output streams
     cli/
-      main.ts             argument parsing, exit codes
-      prompt.ts           hidden password and value input
-      commands/           one file per command
+      main.ts             entry point, top-level help, error to exit code
+      command.ts          command type, parser, help renderer
+      io.ts               stdin, hidden password and value input
+      commands/           the command table (index.ts) and commands grouped by area
     mcp/
       server.ts           stdio server and tool definitions
     gui/

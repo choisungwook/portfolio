@@ -10,7 +10,7 @@
 - [x] 3. 4단계: run과 masking
 - [x] 4. 5단계: MCP server
 - [x] 5. 6단계: GUI server와 page (Carbon token)
-- [ ] 6. 7단계: release-akbun-keychain.yml, product-versions.json, manual.md, 인덱스
+- [x] 6. 7단계: release-akbun-keychain.yml, product-versions.json, manual.md, 인덱스
 - [ ] 7. critical-minimum 갱신, wiki 갱신, 리뷰, PR, CI 통과 후 merge, release 확인
 
 ## 다음 세션이 알아야 할 것
