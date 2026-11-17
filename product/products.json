@@ -1,7 +1,15 @@
 {
   "repoBase": "https://github.com/choisungwook/portfolio/tree/master/product",
-  "updated": "2026-11-15",
+  "updated": "2026-11-17",
   "products": [
+    {
+      "id": "akbun-keychain",
+      "name": "akbun-keychain",
+      "description": "AI agent가 값을 보지 않고 쓰도록 비밀 값을 암호화해 로컬 JSON 파일에 보관하는 CLI, MCP, 로컬 페이지 키 관리 도구. 설계 단계",
+      "kind": "backend",
+      "tags": ["typescript", "security", "mcp", "cli"],
+      "released": "2026-11-17"
+    },
     {
       "id": "akbun-taskq",
       "name": "akbun-taskq",
