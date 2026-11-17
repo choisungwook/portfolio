@@ -16,7 +16,7 @@
 
 Write these into the user manual as well; a secret store that overstates itself is worse than none.
 
-- A process running as the same OS user while the vault is unlocked. It can call `run` and make the child print a transformed value (reversed, split, hashed with a known input). Masking catches the plain value and its base64, hex and URL-encoded forms only. Masking prevents accidents, not a determined process.
+- A process running as the same OS user while the vault is unlocked. It can call `run` and make the child print a transformed value (reversed, split, hashed with a known input). Masking catches the plain value and its base64, hex and URL-encoded forms only, and for a value shorter than 8 characters the plain form only. Masking prevents accidents, not a determined process.
 - The same process reading the agent's memory with a debugger.
 - A keylogger or a fake prompt that captures the root password.
 - Rolling the whole file back to an older copy. The MAC proves the file is one the vault wrote, not that it is the newest.
@@ -70,7 +70,7 @@ Each key has one access level, `ai_access`:
 |---|---|
 | `inject` (default) | Usable through `run`. The value is never returned to the caller |
 | `reveal` | Also readable as a value by a session. For values that are not very sensitive and that a tool needs as text |
-| `deny` | Invisible to a session except by name. Human only, with the root password |
+| `deny` | A session sees its name and level only, not its description or tags, and cannot use it. Human only, with the root password |
 
 Reasons are in [the decision](../knowledge/decisions/2026-11-root-password-gates-mutations.md).
 

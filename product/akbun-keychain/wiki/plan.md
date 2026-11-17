@@ -33,8 +33,8 @@ Page: [vault-format.md](./vault-format.md). Files: `src/core/*`.
 Done when these tests pass:
 
 - `[critical]` a wrong password fails to open and does not write.
-- `[critical]` changing `description`, `tags`, `ai_access`, `version` or the entry name in the file makes that entry fail and leaves others readable.
-- `[critical]` removing an entry, or replacing one entry with an older copy of itself, fails the MAC.
+- `[critical]` changing `description`, `tags` or `ai_access` in the file makes that entry fail and leaves others readable.
+- `[critical]` changing an entry's `version` or name, removing an entry, or replacing one entry with an older copy of itself, fails the MAC and every operation returns the integrity error.
 - `[critical]` lowering `kdf.N` below 2^15 in the file is refused.
 - `[critical]` the serialized file contains no plaintext value, checked by searching the file for the test secret in plain, base64 and hex.
 - Two processes writing 50 entries each at the same time end with 100 entries.
@@ -53,10 +53,10 @@ Page: [interfaces.md](./interfaces.md), CLI section. Files: `src/cli/*`.
 
 Done when:
 
-- An end-to-end test drives the commands with `--password-stdin` against a temp home and reads back what it set.
+- An end-to-end test drives the commands with `--password-stdin` against a temp home and reads back what it set, using the stdin line order in interfaces.md.
 - `[critical]` no command accepts a password or a value as an argument; passing one is a usage error.
 - `[critical]` the value given to `set` does not appear in `audit.jsonl`.
-- Usage errors exit 2, a wrong password exits 4.
+- Every error code maps to the exit code in the interfaces.md table; usage errors exit 2, a wrong password exits 4.
 
 ## Phase 3: agent and sessions
 
@@ -89,8 +89,8 @@ Done when:
 - `[critical]` a child that prints its variable returns `[masked:<name>]`, including when the value is split across two output chunks.
 - `[critical]` `run` with a `deny` key gets `DENIED` and starts no process.
 - `[critical]` the audit line for `run` holds the program name and variable names, and neither the arguments nor the value.
-- The child's exit code is the command's exit code; a failure before spawn exits 125.
-- A child still running at the timeout is killed.
+- The child's exit code is the command's exit code; a program that cannot be started exits 125; a locked vault exits 3 and a denied key exits 4.
+- A child still running at the timeout is killed and `run` exits 124.
 
 ## Phase 5: MCP server
 
@@ -102,7 +102,7 @@ Page: MCP tools in [interfaces.md](./interfaces.md). File: `src/mcp/server.ts`.
 Done when:
 
 - A test starts the server over stdio with the SDK client, and calls every tool against a temp vault.
-- `[critical]` with no agent running every tool returns `LOCKED` with the unlock instruction and none prompts for a password.
+- `[critical]` with no agent running `keychain_status` reports locked and every other tool returns `LOCKED` with the unlock instruction; none prompts for a password.
 - `[critical]` the tool list contains no tool that overwrites, edits or deletes.
 - `run_with_secrets` output over 64 KiB is cut and says so.
 
@@ -118,8 +118,8 @@ Done when:
 
 - `[critical]` every `/api` route except login returns 401 without the cookie.
 - `[critical]` a request with a wrong `Host`, or a write with a wrong `Origin`, is refused.
-- `[critical]` the bootstrap token is refused the second time.
-- `[critical]` the fifth wrong password ends the server.
+- `[critical]` the bootstrap token is refused after one successful login.
+- `[critical]` a wrong password returns 401 with `attempts_left`, and the fifth one ends the server.
 - `node .claude/scripts/verify-page.mjs <url>` against `gui --no-open` reports no console error and lists every `data-area` in features.md.
 - A browser check creates, reveals, edits and deletes a key, and the audit panel shows the four operations.
 

@@ -84,8 +84,8 @@ Canonical JSON means: object keys sorted, no whitespace, `JSON.stringify` for sc
 Consequences:
 
 - A person can read the file but must not edit it by hand. A hand-edited description makes that entry fail authentication. This is deliberate: `ai_access` sits in the same file, and an unauthenticated policy field could be loosened by anything that can write the file.
-- A failed entry is reported by name and the other entries keep working.
-- A failed `mac` (entry removed, added or replaced by an older copy) fails closed: every operation returns the integrity error until the user restores `vault.json.bak` or runs `verify` to see what differs.
+- An entry whose `description`, `tags`, `ai_access` or timestamps were edited fails by itself: it is reported by name and the other entries keep working.
+- A failed `mac` (entry removed, added, renamed, its `version` edited, or replaced by an older copy) fails closed: every operation returns the integrity error until the user restores `vault.json.bak` or runs `verify` to see what differs.
 
 ## Writing
 
