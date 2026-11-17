@@ -89,6 +89,8 @@ Phase 0 on 2026-11-17, Linux x64, Node 22.23 and bun 1.4.4:
 | `node scripts/build-binary.ts`, then `dist/akbun-keychain version` | Prints `akbun-keychain 0.1.0` |
 | Binary size, linux-x64, no dependencies | 104 MiB, almost all of it the bun runtime |
 
+Phase 1 on the same machine: the core library under bun 1.4.4 (init with the default N=2^17, create, change password, reveal, verify, audit append) behaves as under Node.
+
 Not checked. Phase 0 of the plan settles these before anything depends on them:
 
 - Windows named pipes through `node:net` in a bun-compiled binary.

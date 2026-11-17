@@ -2,7 +2,7 @@
 
 A local secret store for AI agents on macOS, Linux and Windows. Secrets are encrypted in one JSON file under a root password. An agent uses a secret by name, without the value entering its context, and nothing leaves the machine.
 
-**Status: design only.** This directory holds the design and the implementation plan. No code exists yet; `workspace/` is created in phase 1 of the plan.
+**Status: in development.** Phases 0 and 1 of the [plan](./wiki/plan.md) are done: `workspace/` has the scaffold, the `version` command and the core library (encryption, vault file, lock file, audit log). There is no usable CLI yet.
 
 ## What it will do
 
@@ -19,7 +19,7 @@ A local secret store for AI agents on macOS, Linux and Windows. Secrets are encr
 |---|---|
 | [wiki/](./wiki/index.md) | Design: architecture, security model, file format, interfaces, and the implementation plan |
 | [knowledge/](./knowledge/index.md) | Decision records |
-| `workspace/` | Source and tests. Not created yet |
+| `workspace/` | Source and tests |
 
 ## Where to start
 
