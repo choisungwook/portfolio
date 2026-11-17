@@ -345,25 +345,30 @@ export async function startGui(options: GuiOptions): Promise<RunningGui & { boot
   return { port, url: `http://127.0.0.1:${port}/`, bootstrap, close }
 }
 
-function openBrowser(url: string): boolean {
+// Resolves false when the opener is missing (a headless Linux without xdg-open), so the link is printed instead.
+function openBrowser(url: string): Promise<boolean> {
   const [program, args] =
     process.platform === 'darwin' ? ['open', [url]] : process.platform === 'win32' ? ['cmd', ['/c', 'start', '', url]] : ['xdg-open', [url]]
-  try {
-    const child = spawn(program, args as string[], { detached: true, stdio: 'ignore', windowsHide: true })
-    child.on('error', () => {})
-    child.unref()
-    return true
-  } catch {
-    return false
-  }
+  return new Promise((resolve) => {
+    try {
+      const child = spawn(program, args as string[], { detached: true, stdio: 'ignore', windowsHide: true })
+      child.once('error', () => resolve(false))
+      child.once('spawn', () => {
+        child.unref()
+        resolve(true)
+      })
+    } catch {
+      resolve(false)
+    }
+  })
 }
 
 export async function serveGui(options: { port: number; open: boolean; print: (text: string) => void }): Promise<number> {
   return new Promise<number>((resolve, reject) => {
     startGui({ port: options.port, onClose: (code) => resolve(code) })
-      .then((gui) => {
+      .then(async (gui) => {
         const link = `${gui.url}#bootstrap=${gui.bootstrap}`
-        if (options.open && openBrowser(link)) {
+        if (options.open && (await openBrowser(link))) {
           options.print(`Opened the page on ${gui.url} in your browser. Press Ctrl+C to stop.`)
         } else {
           // The one-time link is the way in; it stops working after the first login.

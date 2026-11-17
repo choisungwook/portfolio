@@ -101,12 +101,10 @@ export const set: Command = {
     'printf %s "$TOKEN" | akbun-keychain set github/token --tag github',
     'akbun-keychain set openai/key --description "personal key"',
   ],
-  exitCodes: [[0, 'Stored.'], [2, 'Invalid name, tag or value size.'], [3, 'Locked.'], [4, 'Needs the password.'], [8, 'Exists.']],
+  exitCodes: [[0, 'Stored.'], [2, 'Invalid name, tag or value size.'], [4, 'Needs the password, or wrong password.']],
   ifFails: [
     FAIL_USAGE,
-    FAIL_LOCKED,
-    [4, 'Replacing a key needs the root password. Ask the user, or choose a new name.'],
-    [8, 'A session cannot overwrite. Choose another name, or ask the user.'],
+    [4, 'The name exists, or --ai-access was given, or the vault is locked: that needs the root password. Choose a new name, or ask the user.'],
     FAIL_LOCK_TIMEOUT,
   ],
   async run(context) {

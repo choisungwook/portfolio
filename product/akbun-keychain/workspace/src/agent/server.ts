@@ -120,7 +120,11 @@ export async function startAgent(options: AgentOptions): Promise<RunningAgent> {
   function touch(): void {
     idleAt = Math.min(Date.now() + options.idleMs, absoluteAt)
     clearTimeout(idleTimer)
-    idleTimer = setTimeout(() => void close(), Math.max(0, idleAt - Date.now()))
+    idleTimer = setTimeout(() => {
+      // A running command is activity: its own timeout ends it, not the idle timeout.
+      if (children.size > 0) touch()
+      else void close()
+    }, Math.max(0, idleAt - Date.now()))
   }
 
   const absoluteTimer = setTimeout(() => void close(), options.absoluteMs)
@@ -222,6 +226,7 @@ export async function startAgent(options: AgentOptions): Promise<RunningAgent> {
     } finally {
       children.delete(handle)
       socket.off('close', onClose)
+      touch()
     }
   }
 

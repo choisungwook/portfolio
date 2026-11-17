@@ -44,7 +44,7 @@ export const run: Command = {
     const env: Record<string, string> = {}
     for (const pair of list(context.args, 'env') ?? []) {
       const index = pair.indexOf('=')
-      if (index <= 0 || index === pair.length - 1) throw usageError(`--env takes VAR=name, got ${pair.slice(0, 40)}`, 'run')
+      if (index <= 0 || index === pair.length - 1) throw usageError('--env takes VAR=name, like GH_TOKEN=github/token', 'run')
       env[pair.slice(0, index)] = pair.slice(index + 1)
     }
     const timeoutText = option(context.args, 'timeout')

@@ -75,7 +75,8 @@ jobs:
           password='smoke test root password'
           value='smoke-secret-value-0042'
           kc() { PATH="$SMOKE_PATH" AKBUN_KEYCHAIN_HOME="$home" "$bin" "$@"; }
-          if [ "$RUNNER_OS" = Windows ]; then show=(cmd /c "echo %SMOKE%"); else show=(sh -c 'echo "$SMOKE"'); fi
+          # Git Bash rewrites a leading /c into C:/ for native programs; //c reaches cmd as /c.
+          if [ "$RUNNER_OS" = Windows ]; then show=(cmd //c "echo %SMOKE%"); else show=(sh -c 'echo "$SMOKE"'); fi
 
           kc version
           printf '%s\n' "$password" | kc init --password-stdin

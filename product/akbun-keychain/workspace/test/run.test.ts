@@ -131,6 +131,21 @@ describe('run through the agent', () => {
     assert.equal(result.stdout, 'true true from stdin\n')
   })
 
+  test('the timeout kills the whole process tree, so a background grandchild does not hold the result', { skip: process.platform === 'win32' }, async () => {
+    const started = Date.now()
+    await assert.rejects(run(['sh', '-c', 'sleep 30 & echo started; wait'], {}, { timeout_ms: 500 }), rejectsWith('TIMEOUT'))
+    assert.ok(Date.now() - started < 5000, `took ${Date.now() - started} ms`)
+  })
+
+  test('a running command keeps the agent alive past the idle timeout', async () => {
+    await agent?.close()
+    agent = await startAgent({ dataKey: openVault(PASSWORD), idleMs: 300, absoluteMs: 60_000, onExit: () => {} })
+    const result = await run([NODE, '-e', 'setTimeout(() => console.log("done"), 1200)'], {})
+    assert.equal(result.stdout, 'done\n')
+    await new Promise((resolve) => setTimeout(resolve, 700))
+    assert.equal(existsSync(join(home, 'agent.json')), false, 'the agent ends once idle again')
+  })
+
   test('a program that cannot be started is SPAWN_FAILED, and the timeout kills the child', async () => {
     await assert.rejects(run(['no-such-program-akbun'], {}), rejectsWith('SPAWN_FAILED'))
     const started = Date.now()

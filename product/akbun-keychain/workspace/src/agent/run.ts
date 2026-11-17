@@ -1,10 +1,26 @@
-import { spawn } from 'node:child_process'
+import { spawn, spawnSync, type ChildProcess } from 'node:child_process'
 import { KeychainError } from '../core/errors.ts'
 import { createMasker, type Secret } from './mask.ts'
 import type { RunParams, RunResult } from './protocol.ts'
 
 export interface RunSecret extends Secret {
   variable: string
+}
+
+// Kills the child and everything it started. A shell's background job or npm's child would otherwise keep running
+// with the secrets in its environment, and keep the pipes open so the result never arrives.
+function killTree(child: ChildProcess): void {
+  // The group can outlive the direct child, so it is killed even after the child itself exited.
+  if (child.pid === undefined) return
+  if (process.platform === 'win32') {
+    spawnSync('taskkill', ['/pid', String(child.pid), '/T', '/F'], { stdio: 'ignore', windowsHide: true })
+    return
+  }
+  try {
+    process.kill(-child.pid, 'SIGKILL')
+  } catch {
+    child.kill('SIGKILL')
+  }
 }
 
 export interface RunHandle {
@@ -26,6 +42,8 @@ export function runChild(
     cwd: params.cwd,
     env,
     shell: false,
+    // Its own process group on POSIX, so killTree reaches the grandchildren.
+    detached: process.platform !== 'win32',
     stdio: ['pipe', 'pipe', 'pipe'],
     windowsHide: true,
   })
@@ -61,9 +79,9 @@ export function runChild(
   if (params.timeout_ms !== undefined) {
     timer = setTimeout(() => {
       timedOut = true
-      child.kill('SIGKILL')
+      killTree(child)
     }, params.timeout_ms)
   }
 
-  return { result, kill: () => child.kill('SIGKILL') }
+  return { result, kill: () => killTree(child) }
 }
