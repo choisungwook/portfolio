@@ -18,8 +18,14 @@ function vaultFile(): string {
   return join(home, 'vault.json')
 }
 
-function readJson(): any {
-  return JSON.parse(readFileSync(vaultFile(), 'utf8'))
+// Loose shape for editing the file by hand the way an attacker would.
+interface RawVault {
+  kdf: { N: number }
+  entries: Record<string, Record<string, unknown>>
+}
+
+function readJson(): RawVault {
+  return JSON.parse(readFileSync(vaultFile(), 'utf8')) as RawVault
 }
 
 function writeJson(data: unknown): void {
