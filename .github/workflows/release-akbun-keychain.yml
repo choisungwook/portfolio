@@ -76,6 +76,8 @@ jobs:
           value='smoke-secret-value-0042'
           kc() { PATH="$SMOKE_PATH" AKBUN_KEYCHAIN_HOME="$home" "$bin" "$@"; }
           # Git Bash rewrites a leading /c into C:/ for native programs; //c reaches cmd as /c.
+          # $SMOKE is expanded by the child shell, not here.
+          # shellcheck disable=SC2016
           if [ "$RUNNER_OS" = Windows ]; then show=(cmd //c "echo %SMOKE%"); else show=(sh -c 'echo "$SMOKE"'); fi
 
           kc version
