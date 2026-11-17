@@ -1,6 +1,6 @@
 import { strict as assert } from 'node:assert'
 import { spawn } from 'node:child_process'
-import { existsSync } from 'node:fs'
+import { existsSync, realpathSync } from 'node:fs'
 import { join } from 'node:path'
 import { afterEach, beforeEach, describe, test } from 'node:test'
 import { agentRequest } from '../src/agent/client.ts'
@@ -121,9 +121,10 @@ describe('run through the agent', () => {
     for (const needle of ['argument-marker', 'second-argument', ...encodings(SECRET)]) assert.ok(!text.includes(needle), needle)
   })
 
+  // cwd is compared as a real path: the macOS temp directory sits behind the /var -> /private/var symlink.
   test('the child\'s exit code, cwd, environment and stdin pass through', async () => {
     const result = await run(
-      [NODE, '-e', 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>{console.log(process.cwd()===process.argv[1], process.env.PATH!==undefined, s);process.exit(7)})', home],
+      [NODE, '-e', 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>{console.log(process.cwd()===process.argv[1], process.env.PATH!==undefined, s);process.exit(7)})', realpathSync(home)],
       {},
       { stdin: 'from stdin' },
     )
