@@ -4,7 +4,7 @@ Eight phases. Each is one pull request, leaves the tests green, and ends with th
 
 Before starting a phase, read [architecture.md](./architecture.md) and the page named in the phase. When the code has to differ from a wiki page, change the page in the same commit and, if the reason will matter later, add a decision under `knowledge/decisions/`.
 
-Tests named `[critical]` guard the security model. Give them that prefix so `node --test --test-name-pattern="\\[critical\\]"` runs them alone.
+Tests named `[critical]` guard the security model. Give them that prefix so `npm run test:critical` runs them alone, and raise `test/critical-minimum.json` to the new count in the same commit. CI fails when fewer critical tests pass than that number; see the CI section of [development.md](./development.md).
 
 ## Phase 0: scaffold and spikes
 

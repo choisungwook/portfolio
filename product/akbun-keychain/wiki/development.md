@@ -7,7 +7,7 @@ This page fixes the stack and the release shape so each phase of [plan.md](./pla
 | Part | Choice |
 |---|---|
 | Language | TypeScript for the server side, JavaScript ES modules with JSDoc for the page |
-| Runtime in a checkout | Node 24, running `.ts` files directly by type stripping |
+| Runtime in a checkout | Node 24 or later, running `.ts` files directly by type stripping. CI uses the current LTS |
 | Type check | `tsc --noEmit` with `erasableSyntaxOnly`, and `checkJs` for `ui/` |
 | Tests | `node --test "test/**/*.test.ts"` |
 | Release binary | `bun build --compile`, one executable per platform with `ui/` embedded |
@@ -39,13 +39,24 @@ node src/cli/main.ts status
 
 Tests must not need a compiled binary, a real home directory or a terminal. Every test sets `AKBUN_KEYCHAIN_HOME` to a temp directory, and core functions take the password as an argument.
 
+## CI
+
+`.github/workflows/verify-akbun-keychain.yml` runs on every pull request touching this product and on master pushes touching `workspace/`. It holds what a phase must not miss:
+
+| Job | Checks |
+|---|---|
+| `verify` (ubuntu) | `npm run typecheck`, `npm run test:critical`, `npm test` |
+| `platforms` (macOS, Linux, Windows) | `npm test`, then compile the bun binary and check `version` prints the package.json version |
+
+`npm run test:critical` runs `scripts/check-critical.ts`. It fails when a `[critical]` test fails, or when fewer pass than `test/critical-minimum.json` says, so renaming or deleting a critical test cannot pass unnoticed. A phase that adds critical tests raises the minimum in the same commit.
+
 ## Release workflow
 
 `.github/workflows/release-akbun-keychain.yml` does not exist yet, because a workflow with nothing to build would fail. Phase 7 writes it, modeled on `.github/workflows/release-akbun-taskq.yml`.
 
 | Event | Jobs |
 |---|---|
-| `pull_request` touching `product/akbun-keychain/workspace/**` or the workflow | `verify` on ubuntu (typecheck, tests), then `build` on all three runners with the smoke test |
+| `pull_request` touching `product/akbun-keychain/workspace/**` or the workflow | `build` on all three runners with the smoke test. Type check and tests are in `verify-akbun-keychain.yml` |
 | `push` to master touching `src/`, `ui/`, `package.json`, `package-lock.json`, `scripts/build-binary.ts` or the workflow | `build`, then `release` |
 
 Build matrix. Each target builds on its own OS so the smoke test runs the real binary:

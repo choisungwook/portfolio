@@ -13,7 +13,7 @@
   "scripts": {
     "typecheck": "tsc --noEmit",
     "test": "node --test \"test/**/*.test.ts\"",
-    "test:critical": "node --test --test-name-pattern=\"\\\\[critical\\\\]\" \"test/**/*.test.ts\"",
+    "test:critical": "node scripts/check-critical.ts",
     "build:binary": "node scripts/build-binary.ts"
   },
   "devDependencies": {

@@ -7,10 +7,12 @@
 
 - [x] 1. 0단계: workspace scaffold, version 명령, build-binary, trivial test
 - [x] 2. 0단계: Linux에서 bun 바이너리 빌드 확인, development.md 표 갱신
-- [-] 3. 0단계: Windows/macOS spike — 건너뜀: Linux 컨테이너라 실행 불가, 7단계 CI matrix 또는 실기기에서 확인
+- [-] 3. 0단계: Windows/macOS spike — 건너뜀: Linux 컨테이너라 실행 불가. verify-akbun-keychain.yml platforms job이 테스트와 바이너리 version만 확인. named pipe, 숨김 입력, MCP stdio는 미확인
 - [x] 4. 1단계: core (canonical, crypto, paths, vault-file, lockfile, vault, audit)
 - [x] 5. 1단계: plan의 완료 조건 테스트 전부 작성, 통과
 - [x] 6. wiki/README 상태 갱신, knowledge log
+- [x] 7. verify-akbun-keychain.yml CI 추가 (typecheck, critical 하한, 3 OS 테스트와 바이너리)
+- [ ] 8. PR 직전 리뷰, PR 생성, CI 통과 후 squash merge
 
 ## 다음 세션이 알아야 할 것
 
