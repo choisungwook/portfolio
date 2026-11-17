@@ -1,6 +1,6 @@
 # Development
 
-Nothing here runs yet. This page fixes the stack and the release shape so each phase of [plan.md](./plan.md) builds on the same ground.
+This page fixes the stack and the release shape so each phase of [plan.md](./plan.md) builds on the same ground.
 
 ## Stack
 
@@ -81,13 +81,21 @@ Checked on 2026-11-17 with one script run under Node 22 and bun 1.4.4 on Linux:
 | `fs.openSync(path, 'wx')` fails with `EEXIST` on the second call | Works on both |
 | `crypto.argon2Sync` | Present in bun 1.4.4, absent in Node 22 |
 
+Phase 0 on 2026-11-17, Linux x64, Node 22.23 and bun 1.4.4:
+
+| Item | Result |
+|---|---|
+| `npm run typecheck`, `npm test` | Pass. Node 22.23 also runs `.ts` by type stripping, so the checkout works below the Node 24 the stack names |
+| `node scripts/build-binary.ts`, then `dist/akbun-keychain version` | Prints `akbun-keychain 0.1.0` |
+| Binary size, linux-x64, no dependencies | 104 MiB, almost all of it the bun runtime |
+
 Not checked. Phase 0 of the plan settles these before anything depends on them:
 
 - Windows named pipes through `node:net` in a bun-compiled binary.
 - Hidden terminal input in a bun-compiled binary on Windows.
 - `@modelcontextprotocol/sdk` stdio server inside a bun-compiled binary.
 - A detached child that outlives its parent on Windows.
-- Binary size.
+- The compiled binary on macOS and Windows. Linux is checked above.
 
 ## Caveats
 
