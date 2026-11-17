@@ -1,0 +1,23 @@
+{
+  "name": "akbun-keychain",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Local secret store for AI agents",
+  "bin": {
+    "akbun-keychain": "bin/akbun-keychain"
+  },
+  "engines": {
+    "node": ">=24"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "test": "node --test \"test/**/*.test.ts\"",
+    "test:critical": "node scripts/check-critical.ts",
+    "build:binary": "node scripts/build-binary.ts"
+  },
+  "devDependencies": {
+    "@types/node": "^24.10.0",
+    "typescript": "^5.9.3"
+  }
+}

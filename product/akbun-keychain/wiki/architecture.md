@@ -77,6 +77,7 @@ workspace/
   bin/akbun-keychain      node launcher for a checkout
   src/
     core/
+      errors.ts           error codes and KeychainError
       paths.ts            home directory, file names, socket endpoint
       canonical.ts        canonical JSON used for AAD and the MAC
       crypto.ts           scrypt, HKDF, AES-256-GCM, HMAC
@@ -101,6 +102,7 @@ workspace/
     gui/
       server.ts           node:http server, routes, session
     resources.ts          reads ui/ from disk or from the compiled binary
+    version.ts            version read from package.json
   ui/
     index.html
     js/                   plain ES modules, type-checked through JSDoc

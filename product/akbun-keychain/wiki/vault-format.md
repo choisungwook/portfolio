@@ -87,6 +87,7 @@ Consequences:
 - A person can read the file but must not edit it by hand. A hand-edited description makes that entry fail authentication. This is deliberate: `ai_access` sits in the same file, and an unauthenticated policy field could be loosened by anything that can write the file.
 - An entry whose `description`, `tags`, `ai_access` or timestamps were edited fails by itself: it is reported by name and the other entries keep working.
 - A failed `mac` (entry removed, added, renamed, its `version` edited, or replaced by an older copy) fails closed: every operation returns the integrity error until the user restores `vault.json.bak` or runs `verify` to see what differs.
+- Unlocking checks only the password, not the MAC, so a vault that fails its MAC can still be unlocked to run `verify`.
 
 ## Writing
 

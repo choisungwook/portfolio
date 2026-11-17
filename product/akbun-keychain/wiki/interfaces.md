@@ -101,6 +101,9 @@ Error codes and the CLI exit code each maps to. The MCP server returns them as t
 | Error code | Exit code | When |
 |---|---|---|
 | `LOCKED` | 3 | No agent, or the agent expired |
+| `BAD_PASSWORD` | 4 | The root password does not unwrap the data key |
+| `NOT_INITIALIZED` | 1 | No `vault.json`: run `init` |
+| `ALREADY_INITIALIZED` | 8 | `init` when a vault exists |
 | `BAD_TOKEN` | 3 | The token does not match. The client treats `agent.json` as stale |
 | `DENIED` | 4 | The access rule refuses the operation |
 | `NOT_FOUND` | 7 | No such key |
