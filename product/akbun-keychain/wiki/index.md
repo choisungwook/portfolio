@@ -7,7 +7,7 @@ Read this before writing or changing the product. The product is at the design s
 - [vault-format.md](./vault-format.md): `vault.json` schema, authenticated data, file lock, audit log
 - [interfaces.md](./interfaces.md): CLI commands, agent protocol, MCP tools, GUI HTTP API
 - [features.md](./features.md): GUI areas and their `data-area` names
-- [development.md](./development.md): stack, run, test, release workflow, what was verified and what was not
+- [development.md](./development.md): stack, design system, run, test, release workflow, what was verified and what was not
 - [plan.md](./plan.md): implementation phases with completion checks
 
 Decisions and their reasons are in [../knowledge/decisions/](../knowledge/decisions/index.md).

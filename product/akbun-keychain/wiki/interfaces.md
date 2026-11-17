@@ -38,6 +38,19 @@ With `--password-stdin` nothing is prompted and stdin is read in a fixed order, 
 
 Without `--password-stdin`, `set` reads the whole of a non-terminal stdin as the value, and asks for the password on the terminal when the rule requires one.
 
+### Help written for an agent
+
+An agent learns the tool by running `--help`, so help is part of the interface, not decoration. It is generated from one command table in `src/cli/commands/`, the same table the parser uses, so help cannot drift from behavior.
+
+- `akbun-keychain --help` lists every command with one line each, then a "Typical agent workflow" section: `status`, `list`, then `run`.
+- `akbun-keychain <command> --help` prints the same sections in the same order for every command: `Usage`, `What it does`, `Needs` (nothing, session, or root password), `Arguments`, `Examples`, `Exit codes`, `If it fails`.
+- `Needs` says in words who can run it: "An agent can run this" or "Needs the root password. An agent cannot run this; ask the user."
+- `Examples` are complete commands that work when pasted, at least two per command.
+- `If it fails` maps each exit code the command can return to the next action, for example "3: the vault is locked. Ask the user to run `akbun-keychain unlock` in a terminal. Do not retry."
+- `akbun-keychain help --json` prints the whole command table as JSON: name, summary, needs, arguments with types and defaults, examples, exit codes. Tools read this instead of parsing text.
+- Plain text only, at most 80 columns, no color codes, no pager, written to stdout with exit code 0. A usage error prints one line naming the mistake and the `--help` command to run, to stderr, with exit code 2.
+- Every error message from every command has three parts on one line: the error code, what happened, and what to do next.
+
 Exit codes:
 
 | Code | Meaning |
@@ -140,4 +153,4 @@ There is no tool to overwrite, edit or delete. Those need the root password and 
 | `POST /api/agent/unlock` | `{ttl?}` | Starts the agent with the key the server already holds |
 | `POST /api/agent/lock` | none | Stops the agent |
 
-`<name>` is URL-encoded because names contain `/`. The page has no build step: [features.md](./features.md) names its areas.
+`<name>` is URL-encoded because names contain `/`. The page has no build step: [features.md](./features.md) names its areas, and it follows IBM Carbon as [development.md](./development.md) describes.

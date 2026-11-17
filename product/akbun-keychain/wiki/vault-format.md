@@ -9,7 +9,8 @@ Everything lives in one directory: `~/.akbun-keychain/`, or the path in `AKBUN_K
 | `vault.json` | Header and all entries | permanent |
 | `vault.json.bak` | The file as it was before the last write | replaced on each write |
 | `vault.lock` | Writer lock: pid and time | during a write |
-| `audit.jsonl` | One JSON object per line | rotated to `audit.jsonl.1` at 5 MiB |
+| `audit.jsonl`, `audit.jsonl.1` to `.4` | One JSON object per line | rotated at 5 MiB, 5 files kept |
+| `audit.lock` | Lock taken while rotating | during a rotation |
 | `agent.json` | Agent pid, endpoint, session token, expiry | while unlocked |
 | `agent.sock` | Agent socket, macOS and Linux only | while unlocked |
 
@@ -114,3 +115,14 @@ One line per operation, appended with a single write:
 | `keys` | Key names involved |
 | `ok`, `code` | Result, and the error code when it failed. Denied attempts are logged too |
 | `program`, `env` | For `run`: the first element of the command and the variable names. Not the arguments |
+
+The writer takes exactly these fields. What must never be written is listed in [security.md](./security.md).
+
+Rotation, checked before each append:
+
+1. If `audit.jsonl` is under 5 MiB, append and stop.
+2. Take `audit.lock` the same way as `vault.lock`, and check the size again, because another process may have rotated already.
+3. Delete `audit.jsonl.4`, rename `.3` to `.4`, `.2` to `.3`, `.1` to `.2`, and `audit.jsonl` to `audit.jsonl.1`.
+4. Release the lock and append to a new `audit.jsonl` created with mode 0600.
+
+At most 25 MiB is kept. The `audit` command and the audit panel read across the rotated files, newest last.

@@ -9,3 +9,4 @@
 * [A background agent holds the data key after the human unlocks](2026-11-agent-holds-data-key.md) - ssh-agent pattern over a local socket; OS keychains, a password per call and a key file were rejected.
 * [The root password, not caller detection, decides what an operation may do](2026-11-root-password-gates-mutations.md) - A session may use and create; revealing protected values and changing anything existing need the password.
 * [Derive the key-encryption key with scrypt, with parameters stored in the file](2026-11-scrypt-kdf.md) - scrypt N=2^17 from node:crypto; Argon2id was the first choice but is missing from the checkout runtime.
+* [The page follows IBM Carbon through the token contract akbun-taskq already has](2026-11-carbon-design-system.md) - Carbon tokens and rules are copied from akbun-taskq; the Carbon packages are not added.

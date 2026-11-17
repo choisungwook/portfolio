@@ -17,6 +17,15 @@ Reuse [akbun-taskq](../../akbun-taskq/wiki/development.md): its `package.json` s
 
 Type stripping forbids `enum` and parameter properties, and imports need the `.ts` extension.
 
+## Design system
+
+The page follows IBM Carbon, the same way akbun-taskq does. See [the decision](../knowledge/decisions/2026-11-carbon-design-system.md).
+
+- Do not add the Carbon CSS or component packages. Copy `ui/css/theme/contract.css`, `ui/css/theme/carbon.css` and `LICENSE-carbon.txt` from `product/akbun-taskq/workspace/ui/css/theme/`, and port `test/ui-tokens.test.ts`, which fails when component CSS reads a token outside the contract.
+- Component CSS reads contract tokens only. Light is Carbon g10, dark is g100, chosen by `prefers-color-scheme`.
+- Carbon rules to apply: square corners, layers instead of shadows, a 2px inset focus ring, one primary button per view and ghost buttons elsewhere, inline notifications that do not disappear on a timer, a danger button that needs a second step, and status shown as a symbol and a word together with color.
+- The rules and their sources are copied in `product/akbun-taskq/knowledge/references/carbon-design-system.md`. Read that copy instead of the Carbon website.
+
 ## Commands
 
 Planned `package.json` scripts, run in `workspace/`:

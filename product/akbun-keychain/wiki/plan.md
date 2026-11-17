@@ -55,7 +55,11 @@ Done when:
 
 - An end-to-end test drives the commands with `--password-stdin` against a temp home and reads back what it set, using the stdin line order in interfaces.md.
 - `[critical]` no command accepts a password or a value as an argument; passing one is a usage error.
-- `[critical]` the value given to `set` does not appear in `audit.jsonl`.
+- `[critical]` after a run of every command, the test secret, the password and the data key appear nowhere in `audit.jsonl`, stdout or stderr, in plain, base64 or hex, except in the stdout of `get`.
+- `[critical]` the audit writer rejects a field outside its fixed set.
+- An audit log pushed past 5 MiB rotates to `.1`, keeps at most 5 files, and two processes appending during a rotation lose no line.
+- Every command's `--help` has the seven sections in order, at least two examples, and stays within 80 columns; `help --json` lists the same commands as the parser accepts. One test iterates the command table.
+- Every error path prints the code, what happened and the next action on one line.
 - Every error code maps to the exit code in the interfaces.md table; usage errors exit 2, a wrong password exits 4.
 
 ## Phase 3: agent and sessions
@@ -69,6 +73,7 @@ Pages: [security.md](./security.md), the agent protocol in [interfaces.md](./int
 Done when:
 
 - `[critical]` a request without the token, or with a wrong one, gets `BAD_TOKEN`.
+- `[critical]` the agent's console output and protocol error bodies contain no value, key or token.
 - `[critical]` over the socket, `get` on an `inject` or `deny` key gets `DENIED`, and `create` on an existing name gets `EXISTS`.
 - `[critical]` a session-created key is `inject` whatever the request asked for.
 - `[critical]` no protocol op changes or deletes an existing entry.
@@ -111,7 +116,7 @@ Done when:
 Pages: GUI HTTP API in [interfaces.md](./interfaces.md), [features.md](./features.md). Files: `src/gui/server.ts`, `ui/*`, `src/resources.ts`.
 
 - The server, the bootstrap token, the session cookie, the `Host` and `Origin` checks, the idle timeout, the five-failure exit.
-- The page with the areas in features.md, each carrying its `data-area`.
+- The page with the areas in features.md, each carrying its `data-area`, styled through the Carbon token contract in development.md.
 - Opening the browser: `open` on macOS, `xdg-open` on Linux, `cmd /c start` on Windows; `--no-open` prints the URL only.
 
 Done when:
@@ -120,6 +125,8 @@ Done when:
 - `[critical]` a request with a wrong `Host`, or a write with a wrong `Origin`, is refused.
 - `[critical]` the bootstrap token is refused after one successful login.
 - `[critical]` a wrong password returns 401 with `attempts_left`, and the fifth one ends the server.
+- `[critical]` no HTTP error body and no server console line contains the password, a value or a token.
+- `test/ui-tokens.test.ts` passes: component CSS reads contract tokens only.
 - `node .claude/scripts/verify-page.mjs <url>` against `gui --no-open` reports no console error and lists every `data-area` in features.md.
 - A browser check creates, reveals, edits and deletes a key, and the audit panel shows the four operations.
 

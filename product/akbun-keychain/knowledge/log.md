@@ -4,6 +4,7 @@ concept를 추가·수정·삭제할 때마다 오늘 날짜 섹션을 맨 위�
 
 ## 2026-11-17
 
+* **Creation**: [The page follows IBM Carbon through the token contract akbun-taskq already has](decisions/2026-11-carbon-design-system.md) 결정 기록. Carbon tokens and rules are copied from akbun-taskq; the Carbon packages are not added.
 * **Creation**: [Write everything in TypeScript on Node and release a bun-compiled binary](decisions/2026-11-typescript-node-bun-stack.md) 결정 기록. One language for the CLI, agent, MCP server and page; Go and Rust were rejected.
 * **Creation**: [Store the vault as one readable JSON file with per-entry encryption and a lock file](decisions/2026-11-json-vault-per-entry-encryption.md) 결정 기록. Metadata is plaintext and authenticated, values are encrypted one by one; SQLite and a single encrypted blob were rejected.
 * **Creation**: [A background agent holds the data key after the human unlocks](decisions/2026-11-agent-holds-data-key.md) 결정 기록. ssh-agent pattern over a local socket; OS keychains, a password per call and a key file were rejected.

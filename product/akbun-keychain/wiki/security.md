@@ -91,4 +91,14 @@ Reasons are in [the decision](../knowledge/decisions/2026-11-root-password-gates
 
 ## Audit log
 
-Every operation that touches a key appends a line to `audit.jsonl`: time, actor (`cli`, `mcp`, `gui`), operation, key name, result, and for `run` the program name and the variable names. Values and full command lines are never logged, because arguments can carry secrets. The log is plaintext and not tamper-proof; it answers "what did the agent use", not "prove nothing else happened".
+Every operation that touches a key appends a line to `audit.jsonl`: time, actor (`cli`, `mcp`, `gui`), operation, key name, result, and for `run` the program name and the variable names. The log is plaintext and not tamper-proof; it answers "what did the agent use", not "prove nothing else happened". Rotation is described in [vault-format.md](./vault-format.md).
+
+## Nothing secret in any output
+
+Four things never appear in the audit log, in stdout or stderr diagnostics, in error messages, in the agent's or the GUI server's console output, or in an HTTP or protocol error body: secret values, the root password, the data key and keys derived from it, and the session and bootstrap tokens.
+
+- The audit writer accepts a fixed set of fields (those in the vault-format.md table). It has no free-text field, so a value cannot be passed to it by mistake.
+- Errors carry an error code and key names. They never echo the input that failed: a rejected value is reported as "value too large", not shown.
+- `run` logs the program name and variable names, not the arguments, because arguments can carry secrets.
+- There is no debug or verbose mode that prints more.
+- The only places a value is written are: stdout of `get`, the response of `get_secret` and of the GUI reveal route, and the environment of a child started by `run`.
