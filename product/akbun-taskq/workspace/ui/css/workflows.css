@@ -58,3 +58,17 @@
   .wf-meta { grid-template-columns: 1fr; }
   .wf-runs th:nth-child(5), .wf-runs td:nth-child(5) { display: none; }
 }
+
+/* Wiki export and import: toolbar, import form and the background job list with progress bars. */
+.wiki-tools { display: flex; gap: 8px; flex-wrap: wrap; margin: -6px 0 10px; }
+.wiki-import { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin-bottom: 10px; }
+.wiki-import input { min-width: 220px; flex: 1 1 220px; }
+.job-list { list-style: none; margin: 0 0 14px; padding: 0; display: grid; gap: 8px; }
+.job { background: var(--panel); border: 1px solid var(--border); border-radius: var(--radius-l, 12px); padding: 10px 12px; }
+.job-head { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.job-head strong { overflow-wrap: anywhere; }
+.job-bar { height: 6px; border-radius: 999px; background: var(--chip); overflow: hidden; margin: 8px 0 4px; }
+.job-bar span { display: block; height: 100%; background: var(--accent); transition: width var(--ease); }
+.job[data-status="failed"] .job-bar span { background: var(--failed); }
+.job p { margin: 0; }
+.job-actions { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin-top: 6px; }

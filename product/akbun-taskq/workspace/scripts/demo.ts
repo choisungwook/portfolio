@@ -43,9 +43,15 @@ async function main(): Promise<void> {
   const controller = await seedDemo(db, config, home, configDir, Math.floor(Date.now() / 1000))
   const token = randomBytes(32).toString('hex')
   const server = await startServer({ db, config }, token)
+  // Wiki export and import make no model call, so the demo runs them.
+  const { createJobRunner } = await import('../src/jobs/runner.ts')
+  const { JOB_HANDLERS } = await import('../src/jobs/handlers.ts')
+  const jobs = createJobRunner(db, config, JOB_HANDLERS)
+  jobs.start()
 
   const stop = () => {
     controller.abort()
+    void jobs.stop()
     server.close()
     db.close()
     rmSync(home, { recursive: true, force: true })

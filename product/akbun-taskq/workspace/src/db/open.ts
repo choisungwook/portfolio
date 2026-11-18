@@ -5,7 +5,7 @@ import { resourcePath } from '../resources.ts'
 
 export type Db = DatabaseSync
 
-const MIGRATIONS = ['001_init.sql', '002_approvals.sql', '003_access_skills.sql', '004_handoffs.sql', '005_team.sql', '006_workflows.sql']
+const MIGRATIONS = ['001_init.sql', '002_approvals.sql', '003_access_skills.sql', '004_handoffs.sql', '005_team.sql', '006_workflows.sql', '007_jobs.sql']
 
 function schemaFile(name: string): string {
   const file = resourcePath(`src/db/schema/${name}`)

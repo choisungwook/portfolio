@@ -19,6 +19,7 @@ import { registerBotsRoutes } from './routes-bots.ts'
 import { registerFileRoutes } from './routes-files.ts'
 import { registerWorkflowRoutes } from './routes-workflows.ts'
 import { registerWorkspaceRoutes } from './routes-workspace.ts'
+import { registerJobRoutes } from './routes-jobs.ts'
 
 export function createApp(deps: ApiDeps, token: string): Hono {
   const app = new Hono()
@@ -46,6 +47,7 @@ export function createApp(deps: ApiDeps, token: string): Hono {
   registerFileRoutes(api, deps, deps.opener)
   registerWorkflowRoutes(api, deps)
   registerWorkspaceRoutes(api, deps)
+  registerJobRoutes(api, deps)
   registerSse(api, deps)
   app.route('/api', api)
   const index = resourcePath('ui/index.html')

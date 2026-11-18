@@ -44,3 +44,4 @@ export const queueChanged = createWakeSignal()
 export const eventWritten = createWakeSignal()
 // teamChanged: an agent may now have mail (a message was posted, a turn ended). The team hub waits on it.
 export const teamChanged = createWakeSignal()
+export const jobsChanged = createWakeSignal()

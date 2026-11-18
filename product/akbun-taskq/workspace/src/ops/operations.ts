@@ -75,6 +75,12 @@ export const OPERATIONS: Operation[] = [
   op('bots_resume', 'POST', '/bots/resume', 'Resume the bots.'),
   op('wiki_list', 'GET', '/bots/wiki', 'Wiki pages, or a search. Fields: q.'),
   op('wiki_page', 'GET', '/bots/wiki/page', 'One wiki page with its history and links. Fields: slug.'),
+  op('wiki_export', 'POST', '/bots/wiki/export', 'Export the whole wiki as a zip (deflate level 9) into shared/exports/, as a background job. Follow it with job_get.'),
+  op('wiki_import', 'POST', '/bots/wiki/import', 'Import documents into the wiki as a background job: each file becomes pages bots can search (long documents split by section, links kept, an index page). Fields: source (a zip or folder: a path in the shared folder or an absolute path), name (batch name).'),
+  op('jobs_list', 'GET', '/jobs', 'Background jobs (wiki export and import) with progress. Fields: kind, limit.'),
+  op('job_get', 'GET', '/jobs/:id', 'One job: status, steps done of total, what it is doing, result or error.'),
+  op('job_cancel', 'POST', '/jobs/:id/cancel', 'Cancel a job; a running one stops after its current step and keeps its checkpoint.'),
+  op('job_resume', 'POST', '/jobs/:id/resume', 'Resume a cancelled or failed job from its last checkpoint.'),
   // workflows
   op('workflows_list', 'GET', '/workflows', 'Workflows with their steps and last run. Fields: deleted (1 includes deleted).'),
   op('workflow_create', 'POST', '/workflows', 'Create a workflow. Fields: name, description, definition { steps: [{ id, name, kind (do|check|handoff|approval), instructions, needs [step ids], to (bot, for handoff) }] }.'),
