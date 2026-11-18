@@ -17,7 +17,7 @@ async function loadAgents() {
 
 export function ownerValue(task, onChange) {
   const cell = el('dd', { 'data-area': 'task-owner' })
-  const finished = task.status === 'done' || task.status === 'failed'
+  const finished = ['done', 'failed', 'cancelled'].includes(task.status)
   if (finished) {
     cell.append(task.owner ?? 'user')
     return cell

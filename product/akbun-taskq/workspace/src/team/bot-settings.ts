@@ -26,6 +26,16 @@ function list(value: unknown, key: string, check: (item: string) => boolean, lim
   return items
 }
 
+// An optional number limit: null or '' means "use the global default".
+function limit(value: unknown, key: string, min: number, max: number, integer: boolean): number | null {
+  if (value === null || value === undefined || value === '') return null
+  const n = typeof value === 'string' ? Number(value) : value
+  if (typeof n !== 'number' || !Number.isFinite(n) || n < min || n > max || (integer && !Number.isInteger(n))) {
+    throw new Error(`${key} must be ${integer ? 'an integer' : 'a number'} from ${min} to ${max}, or empty for the global default`)
+  }
+  return n
+}
+
 export function parseBotSettings(body: unknown, known: { skills: Set<string>; plugins: Set<string> }, base?: BotSettings): Parsed<BotSettings> {
   try {
     if (typeof body !== 'object' || body === null || Array.isArray(body)) throw new Error('body must be a JSON object')
@@ -57,6 +67,10 @@ export function parseBotSettings(body: unknown, known: { skills: Set<string>; pl
       skills: has('skills') ? list(o.skills, 'skills', (n) => known.skills.has(n)) : from.skills,
       plugins: has('plugins') ? list(o.plugins, 'plugins', (n) => known.plugins.has(n)) : from.plugins,
       model: has('model') ? (text(o.model, 'model', 100) || null) : from.model,
+      sdk: 'claude',
+      hourly_turns: has('hourly_turns') ? limit(o.hourly_turns, 'hourly_turns', 1, 1000, true) : from.hourly_turns,
+      turn_budget_usd: has('turn_budget_usd') ? limit(o.turn_budget_usd, 'turn_budget_usd', 0.01, 100, false) : from.turn_budget_usd,
+      turn_max_turns: has('turn_max_turns') ? limit(o.turn_max_turns, 'turn_max_turns', 1, 500, true) : from.turn_max_turns,
     }
     if (!value.description) throw new Error('description is required: other bots delegate by it')
     return { ok: true, value }

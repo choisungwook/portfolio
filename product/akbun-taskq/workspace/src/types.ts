@@ -1,5 +1,5 @@
 export type TaskType = 'ops_read' | 'ops_change' | 'code' | 'research' | 'security_review'
-export type TaskStatus = 'draft' | 'ready' | 'running' | 'needs_approval' | 'needs_auth' | 'review' | 'done' | 'failed'
+export type TaskStatus = 'draft' | 'ready' | 'running' | 'needs_approval' | 'needs_auth' | 'review' | 'done' | 'failed' | 'cancelled'
 export type Outcome = 'done' | 'failed' | 'needs_approval' | 'needs_auth' | 'review' | 'stale'
 export type Severity = 'critical' | 'high' | 'normal'
 export type AlertKind = 'approval_required' | 'security_finding' | 'prod_touch' | 'worker_flag'
@@ -12,6 +12,7 @@ export type EventKind = 'claimed' | 'tool_call' | 'tool_result' | 'permission_re
 export interface TaskData {
   title?: string
   intent: string
+  attachments?: string[]     // files the user attached, relative to TASKQ_HOME/shared
   cautions?: string
   access_skill?: string      // name of the user's own skill that logs in to the target account
   target_profile?: string    // AWS profile for target-account commands

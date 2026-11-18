@@ -12,6 +12,10 @@ export const BOT_DEFAULTS: Omit<BotSettings, 'role' | 'description' | 'instructi
   skills: [],
   plugins: [],
   model: null,
+  sdk: 'claude',
+  hourly_turns: null,
+  turn_budget_usd: null,
+  turn_max_turns: null,
 }
 
 // The only bot that exists from the start. The user talks to it first; it hands work to the bots the user created.

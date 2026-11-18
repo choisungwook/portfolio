@@ -144,6 +144,7 @@ textarea { width: 100%; padding: 8px 12px; }
 .status-ind[data-status="needs_auth"]::before { content: "\25C6"; content: "\25C6" / ""; --ink: var(--needs-auth); }
 .status-ind[data-status="done"]::before { content: "\2714"; content: "\2714" / ""; --ink: var(--done); }
 .status-ind[data-status="failed"]::before { content: "\2716"; content: "\2716" / ""; --ink: var(--failed); }
+.status-ind[data-status="cancelled"]::before { content: "\2298"; content: "\2298" / ""; --ink: var(--stale); }
 
 pre {
   margin: 4px 0; padding: 12px; background: var(--panel-soft); border-radius: var(--radius-s);

@@ -16,9 +16,9 @@ export async function runCommand(config: Config, db: Db): Promise<void> {
     retrospect: config.retrospect ? createRetrospector({ db, config, ask: (request) => agent.ask(config, request) }) : undefined,
   })
   const token = randomBytes(32).toString('hex')
-  const server = await startServer({ db, config, control: runner }, token)
-  await runner.start()
   const hub = teamHub(config, db, agent)
+  const server = await startServer({ db, config, control: runner, bots: hub }, token)
+  await runner.start()
   await hub?.start()
   console.log(`taskq running at http://127.0.0.1:${config.port}/#token=${token}`)
   const shutdown = async () => {

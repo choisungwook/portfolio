@@ -13,7 +13,7 @@ let resumeNext = false
 export function operatorControls(task, redraw) {
   const parts = []
   if (CANCELLABLE_STATUS.includes(task.status)) parts.push(cancelControl(task, redraw))
-  if (task.status === 'failed') parts.push(retryControl(task))
+  if (task.status === 'failed' || task.status === 'cancelled') parts.push(retryControl(task))
   return parts.length > 0 ? el('div', { class: 'operator', dataset: { area: 'operator-controls' } }, ...parts) : null
 }
 

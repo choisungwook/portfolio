@@ -88,7 +88,7 @@ describe('bot management api', () => {
     assert.equal((await call('POST', '/settings/appearance', { font_family: 'system', font_size: 40 })).status, 400)
     await call('POST', '/settings/queue-autorun', { enabled: false })
     const settings = await (await call('GET', '/settings')).json() as { appearance: unknown; queue_autorun: boolean }
-    assert.deepEqual(settings.appearance, { font_family: 'pretendard', font_size: 17 })
+    assert.deepEqual(settings.appearance, { font_family: 'pretendard', font_size: 17, language: 'ko', theme: 'system' })
     assert.equal(settings.queue_autorun, false)
   })
 })

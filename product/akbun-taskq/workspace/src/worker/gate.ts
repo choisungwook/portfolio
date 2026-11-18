@@ -15,6 +15,7 @@ export interface GateContext {
   dataDir: string      // <home>/data, which holds the database
   profile?: string     // the target AWS profile of the task
   accessSkill?: string // the registered folder of the task's access skill (realpath)
+  shared?: string      // TASKQ_HOME/shared, where attachments live; readable by every task type
 }
 
 interface Touch { real: string; write: boolean }
@@ -68,6 +69,11 @@ export function decide(type: TaskType, tool: string, input: Input, ctx: GateCont
   if (ctx.accessSkill !== undefined && touches.length > 0 && inside(touches, [realPath(ctx.accessSkill)])) {
     if (WRITE_PATH.has(tool)) return 'deny'
     if (READ.has(tool)) return 'allow'
+  }
+  // Attachments and shared files are readable for every type, never writable from a task run.
+  if (ctx.shared !== undefined && touches.length > 0 && inside(touches, [realPath(ctx.shared)])) {
+    if (READ.has(tool)) return 'allow'
+    if (WRITE_PATH.has(tool)) return 'deny'
   }
   const roots: Roots = {
     cwd: realPath(ctx.cwd),

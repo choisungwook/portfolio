@@ -7,6 +7,8 @@ export interface ApiDeps {
   db: Db
   config: Config
   control?: RunControl   // the runner in the same process; without one, run-now waits for the next claim
+  bots?: { cancel(name: string): boolean; busy(): string[] }   // the bot hub in the same process, when bots are on
+  opener?: (path: string) => void                              // tests replace the desktop file manager
 }
 
 export class HttpError extends Error {

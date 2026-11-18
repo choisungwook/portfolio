@@ -1,4 +1,6 @@
+import { execFile } from 'node:child_process'
 import { existsSync, readFileSync, realpathSync, statSync } from 'node:fs'
+import { promisify } from 'node:util'
 import { basename, isAbsolute, join } from 'node:path'
 import type { Db } from './open.ts'
 import { inspectSkill, skillFileOk, SkillError } from '../skills/inspect.ts'
@@ -82,4 +84,46 @@ export function knownNames(db: Db): { skills: Set<string>; plugins: Set<string> 
     skills: new Set(listEntries(db, 'skill').map((e) => e.name)),
     plugins: new Set(listEntries(db, 'plugin').map((e) => e.name)),
   }
+}
+
+const run = promisify(execFile)
+
+export function botsUsing(db: Db, kind: RegistryKind, name: string): string[] {
+  const column = kind === 'skill' ? 'skills' : 'plugins'
+  return db.prepare(`SELECT name, ${column} AS list FROM team_agents`).all()
+    .filter((row) => (JSON.parse(String(row.list)) as string[]).includes(name)).map((row) => String(row.name))
+}
+
+// A git checkout is pulled (fast-forward only, so local changes are never merged or overwritten). Anything else has no
+// source to update from; its description is re-read so an edited SKILL.md or manifest shows up.
+export async function updateEntry(db: Db, kind: RegistryKind, name: string): Promise<{ method: 'git' | 'reread'; output: string } | undefined> {
+  const row = db.prepare(`SELECT path FROM ${TABLE[kind]} WHERE name = ?`).get(name)
+  if (!row) return undefined
+  const path = String(row.path)
+  let method: 'git' | 'reread' = 'reread'
+  let output = 'not a git checkout; re-read the description'
+  if (existsSync(join(path, '.git'))) {
+    method = 'git'
+    try {
+      const { stdout, stderr } = await run('git', ['-C', path, 'pull', '--ff-only'], { timeout: 60_000 })
+      output = `${stdout}${stderr}`.trim().slice(0, 2000) || 'up to date'
+    } catch (error) {
+      output = `git pull failed: ${(error as { stderr?: string }).stderr?.trim().slice(0, 500) ?? String(error)}`
+    }
+  }
+  if (entryOk(kind, path)) {
+    try {
+      const info = kind === 'plugin' ? inspectPlugin(path) : null
+      const description = info?.description ?? descriptionOfSkill(path)
+      db.prepare(`UPDATE ${TABLE[kind]} SET description = ? WHERE name = ?`).run(description, name)
+    } catch {
+      // A broken manifest keeps the old description; the registry shows the entry as it was.
+    }
+  }
+  return { method, output }
+}
+
+function descriptionOfSkill(path: string): string | null {
+  const text = readFileSync(join(path, 'SKILL.md'), 'utf8')
+  return /^description:\s*(.+)$/m.exec(text)?.[1]?.trim().replace(/^["']|["']$/g, '').slice(0, 200) ?? null
 }

@@ -1,6 +1,6 @@
 // Shared names for statuses, outcomes, types and alert kinds, plus helpers that read JSON text fields.
 export const BOARD_COLUMNS = ['ready', 'running', 'needs_approval', 'needs_auth', 'review', 'done']
-export const COLLAPSED_COLUMNS = ['draft', 'failed']
+export const COLLAPSED_COLUMNS = ['draft', 'failed', 'cancelled']
 export const TASK_TYPES = ['ops_read', 'ops_change', 'code', 'research', 'security_review']
 export const OUTCOMES = ['done', 'failed', 'needs_approval', 'needs_auth', 'review', 'stale']
 export const SEVERITY_RANK = { critical: 0, high: 1, normal: 2 }
@@ -16,7 +16,7 @@ export const ACTION_STATUS = { resume: 'needs_auth', done: 'review' }
 // Plain words for the identifiers the API uses. Anything not listed is shown with underscores as spaces.
 const WORDS = {
   draft: 'Draft', ready: 'Queued', running: 'Running', done: 'Done', failed: 'Failed',
-  needs_approval: 'Waiting for approval', needs_auth: 'Login needed', review: 'Ready to review', stale: 'Interrupted',
+  cancelled: 'Cancelled', needs_approval: 'Waiting for approval', needs_auth: 'Login needed', review: 'Ready to review', stale: 'Interrupted',
   ops_read: 'Read account', ops_change: 'Change account', code: 'Code', research: 'Research',
   security_review: 'Security review',
   critical: 'Critical', high: 'High', normal: 'Normal',

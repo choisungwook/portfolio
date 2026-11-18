@@ -8,6 +8,7 @@ import {
 } from '../db/team.ts'
 import { closeUnconcluded, passStalled, skipDisabledSpeakers } from '../db/threads.ts'
 import { getMeta, setMeta } from '../db/meta.ts'
+import { limits } from '../db/settings.ts'
 import { raiseAlert } from '../alerts/rules.ts'
 import { nowSec } from '../time.ts'
 import { teamChanged } from '../wake.ts'
@@ -18,6 +19,7 @@ import { teamTools } from './tools.ts'
 import { wikiDir } from './wiki-files.ts'
 import { pluginPaths } from './bot-plugin.ts'
 import { recoverBotTasks, releaseBotTasks } from './bot-work.ts'
+import { sharedDir } from './shared.ts'
 import type { TeamBackend, TurnResult } from './types.ts'
 
 export interface HubOptions {
@@ -30,6 +32,8 @@ export interface HubOptions {
 export interface TeamHub {
   start(): Promise<void>
   stop(): Promise<void>
+  cancel(name: string): boolean   // false when the bot has no turn running
+  busy(): string[]
 }
 
 const BATCH = 20                // messages handed to one turn; the rest wait for the next turn
@@ -72,6 +76,7 @@ function localMidnight(): number {
 // session; the turn sees every message that arrived since its last turn. At most maxConcurrentTurns run at once.
 export function createTeamHub({ db, config, backend, retryAfterSec = RETRY_AFTER_SEC }: HubOptions): TeamHub {
   const active = new Map<string, { controller: AbortController; done: Promise<void> }>()
+  const cancelled = new Set<string>()
   const stopped = new AbortController()
   const search = hybridSearch(db)
   let running = false
@@ -79,19 +84,39 @@ export function createTeamHub({ db, config, backend, retryAfterSec = RETRY_AFTER
   // Budget and loop guards stop the whole team rather than one agent: a loop involves at least two agents, and the
   // user should see one alert, not one per agent. Each running turn reserves its full per-turn budget, so turns
   // started together cannot overshoot the daily limit by more than what a single turn may spend.
+  // Limits come from Settings (stored in SQLite) with taskq.config.json as the starting values; a bot's own limits
+  // override the per-bot defaults.
   function guardsHold(name: string): boolean {
-    const t = config.bots
+    const t = limits(db, config)
+    const bot = getAgent(db, name)
+    const turnBudget = bot?.turn_budget_usd ?? t.turn_budget_usd
     const since = Math.max(localMidnight(), resumedAt(db))
-    const committed = spentSince(db, since) + active.size * t.turnBudgetUsd
-    if (committed + t.turnBudgetUsd > t.dailyBudgetUsd) {
-      if (active.size === 0) pauseTeam(db, `daily budget of $${t.dailyBudgetUsd} is spent ($${spentSince(db, since).toFixed(2)} on turns and owned tasks)`)
+    const committed = spentSince(db, since) + active.size * t.turn_budget_usd
+    if (committed + turnBudget > t.daily_budget_usd) {
+      if (active.size === 0) pauseTeam(db, `daily budget of $${t.daily_budget_usd} is spent ($${spentSince(db, since).toFixed(2)} on turns and owned tasks)`)
       return false
     }
-    const recent = turnsSince(db, name, Math.max(nowSec() - 3600, resumedAt(db)))
-    if (recent >= t.hourlyTurnsPerAgent) {
-      pauseTeam(db, `${name} took ${recent} turns in the last hour; agents may be messaging each other in a loop`)
+    const hourAgo = Math.max(nowSec() - 3600, resumedAt(db))
+    const total = Number(db.prepare('SELECT count(*) AS n FROM team_turns WHERE started_at >= ?').get(hourAgo)?.n ?? 0)
+    if (total >= t.turns_per_hour_total) {
+      pauseTeam(db, `the bots took ${total} turns in the last hour (limit ${t.turns_per_hour_total})`)
       return false
     }
+    const recent = turnsSince(db, name, hourAgo)
+    const own = bot?.hourly_turns ?? t.bot_turns_per_hour
+    if (recent >= own) {
+      pauseTeam(db, `${name} took ${recent} turns in the last hour (limit ${own}); bots may be messaging each other in a loop`)
+      return false
+    }
+    return true
+  }
+
+  // The user stops a bot mid-turn. Its messages count as handled, its running task becomes cancelled.
+  function cancel(name: string): boolean {
+    const turn = active.get(name)
+    if (!turn) return false
+    cancelled.add(name)
+    turn.controller.abort()
     return true
   }
 
@@ -111,13 +136,18 @@ export function createTeamHub({ db, config, backend, retryAfterSec = RETRY_AFTER
     } catch (error) {
       console.error(`taskq: could not load skills and plugins for ${name}: ${String(error)}`)
     }
+    const shared = sharedDir(config)
+    const t = limits(db, config)
     const done = backend.runTurn(config, {
       agent,
-      system: systemFor(agent, listAgents(db), config, cwd, wiki),
-      prompt: promptFor(db, started.messages),
+      system: systemFor(agent, listAgents(db), config, cwd, wiki, shared),
+      prompt: promptFor(db, started.messages, shared),
       tools: teamTools({ db, config, agent: name, search, turnId: started.turn.id }),
       cwd,
       plugins,
+      sharedDir: shared,
+      maxTurns: agent.turn_max_turns ?? t.turn_max_turns,
+      budgetUsd: agent.turn_budget_usd ?? t.turn_budget_usd,
       resume: agent.session_id,
       signal: controller.signal,
     })
@@ -134,9 +164,10 @@ export function createTeamHub({ db, config, backend, retryAfterSec = RETRY_AFTER
   function finish(name: string, turnId: number, session: string | null, messages: TeamMessage[], result: TurnResult, aborted: boolean): void {
     if (result.session_missing) replaceAgentSession(db, name, session, null)
     else if (result.session_id) replaceAgentSession(db, name, session, result.session_id)
-    const outcome = aborted ? 'interrupted' : result.outcome
+    const wasCancelled = cancelled.delete(name)
+    const outcome = wasCancelled ? 'cancelled' : aborted ? 'interrupted' : result.outcome
     // A turn that ended without a cost figure (abort, crash) is charged its whole budget rather than nothing.
-    const cost = result.cost_usd ?? (outcome === 'done' ? 0 : config.bots.turnBudgetUsd)
+    const cost = result.cost_usd ?? (outcome === 'done' ? 0 : limits(db, config).turn_budget_usd)
     const end = endTurn(db, turnId, {
       outcome, error: result.error, turns: result.turns, cost_usd: cost, session_id: result.session_id,
     }, config.bots.maxAttempts)
@@ -145,7 +176,13 @@ export function createTeamHub({ db, config, backend, retryAfterSec = RETRY_AFTER
     if (result.auth_failed) pauseTeam(db, `model provider login failed for ${name}`)
     // Work on a task happens inside one turn. A task still running when the turn ends goes back to ready, and the bot is
     // reminded, so a forgotten finish_task does not hold the task (and the run button) forever.
-    if (outcome !== 'interrupted') {
+    if (outcome === 'cancelled') {
+      for (const id of releaseBotTasks(db, name, 'cancelled by user', 'ready')) {
+        db.prepare(`UPDATE tasks SET status = 'cancelled', updated_at = ? WHERE id = ? AND status = 'ready'`).run(nowSec(), id)
+      }
+      const note = postMessage(db, { sender: SYSTEM, recipient: name, body: 'The user cancelled this turn.' })
+      db.prepare('UPDATE team_messages SET read_at = created_at WHERE id = ?').run(note)
+    } else if (outcome !== 'interrupted') {
       const left = releaseBotTasks(db, name, 'the turn ended without finish_task', 'ready')
       if (left.length > 0 && outcome === 'done') {
         postMessage(db, { sender: SYSTEM, recipient: name, body: `Your turn ended while task${left.length > 1 ? 's' : ''} ${left.join(', ')} ${left.length > 1 ? 'were' : 'was'} running without finish_task. ${left.length > 1 ? 'They are' : 'It is'} ready again; start_task and finish_task within one turn.` })
@@ -180,7 +217,7 @@ export function createTeamHub({ db, config, backend, retryAfterSec = RETRY_AFTER
       raiseAlert(db, { task_id: null, kind: 'team_message', message: `Discussion #${id} was closed without a conclusion: its moderator is disabled.` })
     }
     for (const name of agentsWithMail(db, nowSec(), retryAfterSec)) {
-      if (active.size >= config.bots.maxConcurrentTurns) return
+      if (active.size >= limits(db, config).max_concurrent_turns) return
       if (active.has(name)) continue
       if (!guardsHold(name)) return
       launch(name)
@@ -214,6 +251,8 @@ export function createTeamHub({ db, config, backend, retryAfterSec = RETRY_AFTER
       tick()
       void loop(seen)
     },
+    cancel,
+    busy: () => [...active.keys()],
     async stop() {
       running = false
       stopped.abort()

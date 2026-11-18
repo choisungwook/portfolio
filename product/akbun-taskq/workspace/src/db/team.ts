@@ -27,11 +27,16 @@ export interface BotSettings {
   skills: string[]            // names from the global skill registry
   plugins: string[]           // names from the global plugin registry
   model: string | null        // null uses the config model
+  sdk: 'claude'               // which agent SDK runs the bot; only Claude exists today
+  hourly_turns: number | null    // per-bot rate limit; null uses the global default
+  turn_budget_usd: number | null // per-turn spend limit; null uses the global default
+  turn_max_turns: number | null  // per-turn model turns; null uses the global default
 }
 
 export interface TeamAgent extends BotSettings {
   name: string
   system: boolean
+  memory: string              // the bot's notes to itself, sent with every turn (src/team/memory.ts)
   session_id: string | null
 }
 
@@ -54,7 +59,7 @@ export interface TeamTurn {
   session_id: string | null
   started_at: number
   ended_at: number | null
-  outcome: 'done' | 'failed' | 'interrupted' | null
+  outcome: 'done' | 'failed' | 'interrupted' | 'cancelled' | null
   error: string | null
   turns: number | null
   cost_usd: number | null
@@ -75,21 +80,24 @@ function toAgent(row: Record<string, unknown>): TeamAgent {
 
 export function createAgent(db: Db, name: string, settings: BotSettings, system = false): void {
   db.prepare(`INSERT INTO team_agents (name, role, description, instructions, may_message_user, enabled, system,
-    permission_mode, sandbox, allowed_domains, blocked_commands, workdir, skills, plugins, model, created_at)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`).run(
+    permission_mode, sandbox, allowed_domains, blocked_commands, workdir, skills, plugins, model, sdk, hourly_turns,
+    turn_budget_usd, turn_max_turns, created_at)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`).run(
     name, settings.role, settings.description, settings.instructions, settings.may_message_user ? 1 : 0, settings.enabled ? 1 : 0,
     system ? 1 : 0, settings.permission_mode, settings.sandbox ? 1 : 0, JSON.stringify(settings.allowed_domains),
     JSON.stringify(settings.blocked_commands), settings.workdir, JSON.stringify(settings.skills), JSON.stringify(settings.plugins),
-    settings.model, nowSec())
+    settings.model, settings.sdk, settings.hourly_turns, settings.turn_budget_usd, settings.turn_max_turns, nowSec())
 }
 
 export function updateAgent(db: Db, name: string, settings: BotSettings): boolean {
   return db.prepare(`UPDATE team_agents SET role = ?, description = ?, instructions = ?, may_message_user = ?, enabled = ?,
-    permission_mode = ?, sandbox = ?, allowed_domains = ?, blocked_commands = ?, workdir = ?, skills = ?, plugins = ?, model = ?
+    permission_mode = ?, sandbox = ?, allowed_domains = ?, blocked_commands = ?, workdir = ?, skills = ?, plugins = ?, model = ?,
+    sdk = ?, hourly_turns = ?, turn_budget_usd = ?, turn_max_turns = ?
     WHERE name = ?`).run(
     settings.role, settings.description, settings.instructions, settings.may_message_user ? 1 : 0, settings.enabled ? 1 : 0,
     settings.permission_mode, settings.sandbox ? 1 : 0, JSON.stringify(settings.allowed_domains), JSON.stringify(settings.blocked_commands),
-    settings.workdir, JSON.stringify(settings.skills), JSON.stringify(settings.plugins), settings.model, name).changes === 1
+    settings.workdir, JSON.stringify(settings.skills), JSON.stringify(settings.plugins), settings.model, settings.sdk,
+    settings.hourly_turns, settings.turn_budget_usd, settings.turn_max_turns, name).changes === 1
 }
 
 // The orchestrator is refused. Its tasks go back to the user; its messages stay for the record.
@@ -97,7 +105,7 @@ export function deleteAgent(db: Db, name: string): boolean {
   return inTransaction(db, () => {
     const row = db.prepare('SELECT system FROM team_agents WHERE name = ?').get(name)
     if (!row || row.system === 1) return false
-    db.prepare(`UPDATE tasks SET owner = NULL, owner_since = NULL WHERE owner = ? AND status NOT IN ('done', 'failed', 'running')`).run(name)
+    db.prepare(`UPDATE tasks SET owner = NULL, owner_since = NULL WHERE owner = ? AND status NOT IN ('done', 'failed', 'cancelled', 'running')`).run(name)
     db.prepare(`UPDATE team_messages SET failed_at = ? WHERE recipient = ? AND read_at IS NULL AND failed_at IS NULL`).run(nowSec(), name)
     db.prepare('DELETE FROM team_agents WHERE name = ?').run(name)
     return true
@@ -142,13 +150,13 @@ export function firstAgentWithRole(db: Db, role: string): string | undefined {
 // until that time, which is how an agent schedules work for later.
 export function postMessage(db: Db, message: {
   sender: string; recipient: string; body: string; task_id?: string | null; reply_to?: number | null
-  thread_id?: number | null; deliver_at?: number
+  thread_id?: number | null; deliver_at?: number; attachments?: string[]
 }): number {
   const body = mask(message.body.slice(0, BODY_LIMIT))
   const now = nowSec()
-  const result = db.prepare(`INSERT INTO team_messages (sender, recipient, body, task_id, reply_to, thread_id, created_at, deliver_at)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?)`).run(message.sender, message.recipient, body, message.task_id ?? null, message.reply_to ?? null,
-    message.thread_id ?? null, now, message.deliver_at ?? now)
+  const result = db.prepare(`INSERT INTO team_messages (sender, recipient, body, task_id, reply_to, thread_id, attachments, created_at, deliver_at)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`).run(message.sender, message.recipient, body, message.task_id ?? null, message.reply_to ?? null,
+    message.thread_id ?? null, JSON.stringify(message.attachments ?? []), now, message.deliver_at ?? now)
   return Number(result.lastInsertRowid)
 }
 
@@ -207,13 +215,14 @@ export interface TurnEnd {
 // counting the attempt. A message tried maxAttempts times, or any message of a turn that already had an effect, is
 // set aside instead and returned so the caller can tell the user.
 export function endTurn(db: Db, id: number, end: {
-  outcome: 'done' | 'failed' | 'interrupted'; error?: string; turns?: number; cost_usd?: number; session_id?: string
+  outcome: 'done' | 'failed' | 'interrupted' | 'cancelled'; error?: string; turns?: number; cost_usd?: number; session_id?: string
 }, maxAttempts: number): TurnEnd {
   return inTransaction(db, (): TurnEnd => {
     db.prepare(`UPDATE team_turns SET ended_at = ?, outcome = ?, error = ?, turns = ?, cost_usd = ?,
       session_id = COALESCE(?, session_id) WHERE id = ?`)
       .run(nowSec(), end.outcome, end.error?.slice(0, 500) ?? null, end.turns ?? null, end.cost_usd ?? null, end.session_id ?? null, id)
-    if (end.outcome === 'done') return { setAside: [] }
+    // A cancelled turn's messages count as handled: the user stopped that work on purpose.
+    if (end.outcome === 'done' || end.outcome === 'cancelled') return { setAside: [] }
     return releaseMessages(db, id, end.outcome === 'interrupted', maxAttempts)
   })
 }
@@ -272,7 +281,7 @@ export function listMessages(db: Db, filter: { agent?: string; recipient?: strin
     binds.push(filter.recipient)
   }
   if (filter.unread) where.push('read_at IS NULL')
-  const sql = `SELECT id, sender, recipient, body, task_id, reply_to, thread_id, created_at, deliver_at, read_at FROM team_messages
+  const sql = `SELECT id, sender, recipient, body, task_id, reply_to, thread_id, attachments, created_at, deliver_at, read_at FROM team_messages
     ${where.length ? `WHERE ${where.join(' AND ')}` : ''} ORDER BY id DESC LIMIT ?`
   return db.prepare(sql).all(...binds, filter.limit) as unknown as TeamMessage[]
 }

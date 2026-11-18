@@ -2,7 +2,7 @@ import { api, mutate } from './api.js'
 import { el } from './dom.js'
 
 // Statuses the server lets a user start by hand (POST /tasks/:id/run). running and needs_approval are already running.
-export const RUNNABLE = ['draft', 'ready', 'failed', 'needs_auth', 'review', 'done']
+export const RUNNABLE = ['draft', 'ready', 'failed', 'cancelled', 'needs_auth', 'review', 'done']
 
 // The word says what happens: a finished task starts a new session, a login wait resumes its session.
 const LABEL = {

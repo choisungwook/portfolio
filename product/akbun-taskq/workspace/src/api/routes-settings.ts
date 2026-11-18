@@ -7,7 +7,11 @@ import { HttpError, readJson, type ApiDeps } from './http.ts'
 import {
   FONT_FAMILIES, FONT_SIZES, appearance, desktopNotificationsEnabled, queueAutorun, setAppearance, setDesktopNotifications, setQueueAutorun,
 } from '../db/meta.ts'
-import { listEntries, registerEntry, removeEntry, type RegistryKind } from '../db/bot-registry.ts'
+import { botsUsing, listEntries, registerEntry, removeEntry, updateEntry, type RegistryKind } from '../db/bot-registry.ts'
+import { LIMIT_RANGES, limits, setLimits } from '../db/settings.ts'
+import { sharedDir } from '../team/shared.ts'
+import { claudeProjectsDir } from '../open-folder.ts'
+import { noteReload, reload } from '../team/bot-plugin.ts'
 
 // Runtime config is read-only. The desktop notification preference is stored separately in SQLite.
 export function registerSettingsRoutes(api: Hono, { db, config }: ApiDeps): void {
@@ -19,6 +23,9 @@ export function registerSettingsRoutes(api: Hono, { db, config }: ApiDeps): void
     desktop_notifications: desktopNotificationsEnabled(db),
     queue_autorun: queueAutorun(db),
     appearance: appearance(db),
+    limits: limits(db, config),
+    limit_ranges: LIMIT_RANGES,
+    paths: { home: config.home, shared: sharedDir(config), sessions: claudeProjectsDir() },
     font_families: FONT_FAMILIES,
     bot_skills: listEntries(db, 'skill'),
     bot_plugins: listEntries(db, 'plugin'),
@@ -31,17 +38,31 @@ export function registerSettingsRoutes(api: Hono, { db, config }: ApiDeps): void
     return c.json({ enabled: body.enabled })
   })
 
+  api.post('/settings/limits', async (c) => {
+    const body = await readJson(c)
+    if (typeof body !== 'object' || body === null || Array.isArray(body)) throw new HttpError(400, 'body must be a JSON object')
+    const error = setLimits(db, body as Record<string, unknown>)
+    if (error) throw new HttpError(400, error)
+    return c.json(limits(db, config))
+  })
+
+  // Every field is optional; a missing one keeps its saved value.
   api.post('/settings/appearance', async (c) => {
-    const body = await readJson(c) as { font_family?: unknown; font_size?: unknown } | null
-    const family = body?.font_family
-    const size = body?.font_size
+    const body = await readJson(c) as { font_family?: unknown; font_size?: unknown; language?: unknown; theme?: unknown } | null
+    const current = appearance(db)
+    const family = body?.font_family ?? current.font_family
+    const size = body?.font_size ?? current.font_size
+    const language = body?.language ?? current.language
+    const theme = body?.theme ?? current.theme
+    if (language !== 'ko' && language !== 'en') throw new HttpError(400, 'language must be ko or en')
+    if (theme !== 'system' && theme !== 'dark' && theme !== 'light') throw new HttpError(400, 'theme must be system, dark or light')
     if (typeof family !== 'string' || !(FONT_FAMILIES as readonly string[]).includes(family)) {
       throw new HttpError(400, `font_family must be one of ${FONT_FAMILIES.join(', ')}`)
     }
     if (!Number.isInteger(size) || (size as number) < FONT_SIZES.min || (size as number) > FONT_SIZES.max) {
       throw new HttpError(400, `font_size must be an integer from ${FONT_SIZES.min} to ${FONT_SIZES.max}`)
     }
-    setAppearance(db, { font_family: family, font_size: size as number })
+    setAppearance(db, { font_family: family, font_size: size as number, language, theme })
     return c.json(appearance(db))
   })
 
@@ -52,6 +73,15 @@ export function registerSettingsRoutes(api: Hono, { db, config }: ApiDeps): void
       if (typeof body?.path !== 'string' || body.path === '') throw new HttpError(400, 'path is required')
       const path = body.path
       return c.json(asHttp(() => registerEntry(db, config.home, kind, path)), 201)
+    })
+    // Updates a registered folder from its source: `git pull --ff-only` when it is a git checkout. Then every bot that
+    // uses it reloads its copy, so the update reaches the bots' next turns.
+    api.post(`/bot-${kind}s/:name/update`, async (c) => {
+      const result = await updateEntry(db, kind, c.req.param('name'))
+      if (!result) throw new HttpError(404, `no ${kind} named ${c.req.param('name')}`)
+      const reloaded = botsUsing(db, kind, c.req.param('name'))
+      for (const bot of reloaded) noteReload(db, bot, [reload(db, config, bot, kind)])
+      return c.json({ ...result, reloaded })
     })
     api.delete(`/bot-${kind}s/:name`, (c) => {
       if (!removeEntry(db, kind, c.req.param('name'))) throw new HttpError(404, `no ${kind} named ${c.req.param('name')}`)

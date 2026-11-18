@@ -17,6 +17,11 @@ CREATE TABLE team_agents (
   skills TEXT NOT NULL DEFAULT '[]',
   plugins TEXT NOT NULL DEFAULT '[]',
   model TEXT,
+  sdk TEXT NOT NULL DEFAULT 'claude',
+  hourly_turns INTEGER,
+  turn_budget_usd REAL,
+  turn_max_turns INTEGER,
+  memory TEXT NOT NULL DEFAULT '',
   session_id TEXT,
   created_at INTEGER NOT NULL
 );
@@ -44,7 +49,7 @@ CREATE TABLE team_turns (
   session_id TEXT,
   started_at INTEGER NOT NULL,
   ended_at INTEGER,
-  outcome TEXT CHECK (outcome IN ('done', 'failed', 'interrupted')),
+  outcome TEXT CHECK (outcome IN ('done', 'failed', 'interrupted', 'cancelled')),
   error TEXT,
   turns INTEGER,
   cost_usd REAL,
@@ -61,6 +66,7 @@ CREATE TABLE team_messages (
   task_id TEXT,
   reply_to INTEGER,
   thread_id INTEGER,
+  attachments TEXT NOT NULL DEFAULT '[]',
   created_at INTEGER NOT NULL,
   deliver_at INTEGER NOT NULL,
   turn_id INTEGER,
@@ -124,3 +130,13 @@ CREATE TABLE team_threads (
   created_at INTEGER NOT NULL,
   closed_at INTEGER
 );
+
+-- Search over every bot conversation. Trigram matches any part of a word, so a Korean stem finds a word with a particle;
+-- the index is kept by triggers, so every path that writes a message is covered.
+CREATE VIRTUAL TABLE team_messages_fts USING fts5(body, tokenize = 'trigram', content = 'team_messages', content_rowid = 'id');
+CREATE TRIGGER team_messages_fts_insert AFTER INSERT ON team_messages BEGIN
+  INSERT INTO team_messages_fts (rowid, body) VALUES (NEW.id, NEW.body);
+END;
+CREATE TRIGGER team_messages_fts_delete AFTER DELETE ON team_messages BEGIN
+  INSERT INTO team_messages_fts (team_messages_fts, rowid, body) VALUES ('delete', OLD.id, OLD.body);
+END;

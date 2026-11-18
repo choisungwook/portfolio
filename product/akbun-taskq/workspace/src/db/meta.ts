@@ -71,17 +71,24 @@ export function setQueueAutorun(db: Db, enabled: boolean): void {
   setMeta(db, 'queue_autorun', enabled ? '1' : '0')
 }
 
-export interface Appearance { font_family: string; font_size: number }
+export interface Appearance { font_family: string; font_size: number; language: 'ko' | 'en'; theme: 'system' | 'dark' | 'light' }
 export const FONT_FAMILIES = ['system', 'pretendard', 'noto-sans-kr', 'ibm-plex-sans', 'serif', 'mono'] as const
 export const FONT_SIZES = { min: 12, max: 20 }
 
 export function appearance(db: Db): Appearance {
   const family = getMeta(db, 'ui_font_family') ?? 'system'
   const size = Number(getMeta(db, 'ui_font_size') ?? 15)
-  return { font_family: family, font_size: Number.isInteger(size) ? size : 15 }
+  const language = getMeta(db, 'ui_language') === 'en' ? 'en' : 'ko'
+  const theme = getMeta(db, 'ui_theme')
+  return {
+    font_family: family, font_size: Number.isInteger(size) ? size : 15, language,
+    theme: theme === 'dark' || theme === 'light' ? theme : 'system',
+  }
 }
 
 export function setAppearance(db: Db, value: Appearance): void {
   setMeta(db, 'ui_font_family', value.font_family)
   setMeta(db, 'ui_font_size', String(value.font_size))
+  setMeta(db, 'ui_language', value.language)
+  setMeta(db, 'ui_theme', value.theme)
 }

@@ -18,7 +18,7 @@ import { finishBotTask, startBotTask, type BotOutcome } from './bot-work.ts'
 const COORDINATORS = new Set(['orchestrator', 'planner'])
 // Statuses that hold a slot of bots.maxOpenTasks. draft and review wait for the user, not for the team.
 const ACTIVE = `('ready', 'running', 'needs_approval', 'needs_auth')`
-const UNFINISHED = `status NOT IN ('done', 'failed')`
+const UNFINISHED = `status NOT IN ('done', 'failed', 'cancelled')`
 // Character-trigram overlap (Jaccard) at which two intents count as the same work. This is an advisory check, not a
 // guarantee: one reworded pair measured 0.64 (0.61 in Korean), but a review found both errors. "Fix login bug" and
 // "Fix logout bug" score 0.73 (false match), and "add retry limit to export job" vs "export job: cap the number of

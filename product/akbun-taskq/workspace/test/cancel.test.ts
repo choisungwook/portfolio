@@ -44,7 +44,7 @@ describe('cancel', () => {
     await runner.stop()
 
     assert.equal(calls, 0)
-    assert.equal(statusOf(db, task.id), 'failed')
+    assert.equal(statusOf(db, task.id), 'cancelled')
     const run = db.prepare('SELECT outcome, summary FROM runs WHERE task_id = ?').get(task.id)!
     assert.equal(run.outcome, 'failed')
     assert.equal(run.summary, 'cancelled by user')
@@ -66,7 +66,7 @@ describe('cancel', () => {
 
     const res = await cancel(task.id)
     assert.equal(res.status, 200)
-    await waitFor(() => statusOf(db, task.id) === 'failed')
+    await waitFor(() => statusOf(db, task.id) === 'cancelled')
     await sleep(60)
     assert.equal(calls, 1)
     const run = db.prepare('SELECT outcome, summary FROM runs WHERE task_id = ?').get(task.id)!
@@ -92,7 +92,7 @@ describe('cancel', () => {
     const request = openApproval(db, task.id)!.request_id
 
     assert.equal((await cancel(task.id)).status, 200)
-    await waitFor(() => statusOf(db, task.id) === 'failed')
+    await waitFor(() => statusOf(db, task.id) === 'cancelled')
     assert.equal(approvalDecision(db, request), 'expired')
     assert.equal((db.prepare('SELECT input FROM approvals WHERE request_id = ?').get(request) as { input: unknown }).input, null)
   })
@@ -102,7 +102,7 @@ describe('cancel', () => {
     const waiting = addTask(db, { type: 'ops_read', data: { intent: 'login first' } })
     setStatus(db, waiting.id, 'needs_auth')
     assert.equal((await cancel(waiting.id)).status, 200)
-    assert.equal(statusOf(db, waiting.id), 'failed')
+    assert.equal(statusOf(db, waiting.id), 'cancelled')
     assert.equal(listAlerts(db, true).filter((a) => a.task_id === waiting.id).length, 0)
 
     const done = addTask(db, { data: { intent: 'finished' } })
@@ -120,7 +120,7 @@ describe('cancel', () => {
     insertApproval(db, { request_id: 'req-stale', task_id: task.id, run_id: runId, tool: 'Bash', input: '{"command":"x"}', created_at: nowSec() })
     const res = await cancel(task.id)
     assert.equal(res.status, 200)
-    assert.equal(statusOf(db, task.id), 'failed')
+    assert.equal(statusOf(db, task.id), 'cancelled')
     assert.equal(approvalDecision(db, 'req-stale'), 'expired')
   })
 })

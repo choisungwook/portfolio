@@ -11,6 +11,9 @@ export interface TurnRequest {
   tools: TeamTool[]
   cwd: string               // the bot's workdir, or its own folder under TASKQ_HOME/team/
   plugins: string[]         // plugin folders to load: the bot's skill snapshot and its selected plugins
+  sharedDir: string         // the folder every bot shares, added to the session's directories
+  maxTurns: number          // the bot's per-turn limits, already resolved against the global defaults
+  budgetUsd: number
   resume: string | null     // the session to continue; null starts a new one
   signal: AbortSignal
 }

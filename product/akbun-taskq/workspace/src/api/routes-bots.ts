@@ -8,6 +8,9 @@ import { BOT_NAME, parseBotSettings } from '../team/bot-settings.ts'
 import { noteReload, reload, reloadAll } from '../team/bot-plugin.ts'
 import { PRESETS } from '../team/roster.ts'
 import { releaseBotTasks } from '../team/bot-work.ts'
+import { getMemory, MEMORY_LIMIT, setMemory } from '../team/memory.ts'
+import { resolveShared } from '../team/shared.ts'
+import { searchMessages } from '../db/message-search.ts'
 import { getPage, listPages } from '../db/wiki.ts'
 import { forceClose, listThreads } from '../db/threads.ts'
 import { hybridSearch } from '../team/search.ts'
@@ -20,11 +23,17 @@ import { TASK_TITLE_SQL } from '../db/tasks.ts'
 import { HttpError, idParam, optionalJson, readJson, type ApiDeps } from './http.ts'
 
 // The UI, CLI, API and config call the resident agents bots; the code and tables call them the team.
-export function registerBotsRoutes(api: Hono, { db, config }: ApiDeps): void {
+export function registerBotsRoutes(api: Hono, { db, config, bots }: ApiDeps): void {
   const search = hybridSearch(db)
   // The sidebar shows each bot like a chat: the latest message it sent or received, and how many it sent the user unread.
   const lastMessage = (name: string) => db.prepare(`SELECT id, sender, recipient, substr(body, 1, 160) AS body, created_at FROM team_messages
     WHERE (sender = ? OR recipient = ?) AND deliver_at <= unixepoch() ORDER BY id DESC LIMIT 1`).get(name, name) ?? null
+  const workingSince = (name: string) => {
+    const row = db.prepare('SELECT started_at FROM team_turns WHERE agent = ? AND ended_at IS NULL').get(name)
+    return row ? Number(row.started_at) : null
+  }
+  const runningTasks = (name: string) => db.prepare(`SELECT id FROM tasks WHERE status = 'running' AND claimed_by = ?`)
+    .all(`bot:${name}`).map((row) => String(row.id))
   const unreadFrom = (name: string) => Number(db.prepare(`SELECT count(*) AS n FROM team_messages
     WHERE sender = ? AND recipient = 'user' AND read_at IS NULL`).get(name)?.n ?? 0)
 
@@ -35,17 +44,22 @@ export function registerBotsRoutes(api: Hono, { db, config }: ApiDeps): void {
       enabled: config.bots.enabled,
       paused: isTeamPaused(db),
       pause_reason: teamPauseReason(db),
-      agents: listAgents(db).map(({ instructions: _instructions, ...agent }) => ({
+      agents: listAgents(db).map(({ instructions: _instructions, memory: _memory, ...agent }) => ({
         ...agent, busy: busy.has(agent.name), last_message: lastMessage(agent.name), unread: unreadFrom(agent.name),
+        working_since: workingSince(agent.name), running_tasks: runningTasks(agent.name),
       })),
       tasks: db.prepare(`SELECT t.id, t.type, t.status, t.owner, ${TASK_TITLE_SQL} FROM tasks t
-        WHERE t.owner IS NOT NULL AND t.status NOT IN ('done', 'failed') ORDER BY t.updated_at DESC LIMIT 200`).all(),
+        WHERE t.owner IS NOT NULL AND t.status NOT IN ('done', 'failed', 'cancelled') ORDER BY t.updated_at DESC LIMIT 200`).all(),
       threads: listThreads(db, 20),
       turns: listTurns(db, 20),
     })
   })
 
   api.get('/bots/presets', (c) => c.json(PRESETS))
+
+  // Search across every bot conversation: trigram FTS for terms of three characters or more (Korean particles
+  // included), LIKE for shorter ones, newest first. Cheap: one indexed query, at most 100 rows.
+  api.get('/bots/search', (c) => c.json(searchMessages(db, c.req.query('q') ?? '')))
 
   // Creates a bot. The body is { name, preset?, ...settings }; a preset fills role, description and instructions that the
   // body leaves out. A new bot runs in auto mode with no sandbox and no blocked commands.
@@ -69,12 +83,16 @@ export function registerBotsRoutes(api: Hono, { db, config }: ApiDeps): void {
 
   // The user writes to one agent. Only the user's own words come in here; agents write through their tools.
   api.post('/bots/messages', async (c) => {
-    const body = await readJson(c) as { to?: unknown; body?: unknown } | null
+    const body = await readJson(c) as { to?: unknown; body?: unknown; attachments?: unknown } | null
     const to = typeof body?.to === 'string' ? body.to : ORCHESTRATOR
+    const files = Array.isArray(body?.attachments) ? body.attachments : []
+    if (files.length > 20 || !files.every((f) => typeof f === 'string' && f.startsWith('attachments/') && !f.split('/').includes('..') && resolveShared(config, f))) {
+      throw new HttpError(400, 'attachments must be up to 20 paths returned by POST /api/files')
+    }
     const text = typeof body?.body === 'string' ? body.body.trim() : ''
-    if (!text || text.length > 8000) throw new HttpError(400, 'body must be a non-empty string up to 8000 characters')
+    if ((!text && files.length === 0) || text.length > 8000) throw new HttpError(400, 'body must be a string up to 8000 characters, or attach a file')
     if (!getAgent(db, to)?.enabled) throw new HttpError(404, `no enabled agent named ${to}`)
-    const id = postMessage(db, { sender: USER, recipient: to, body: text })
+    const id = postMessage(db, { sender: USER, recipient: to, body: text || '(attached files)', attachments: files as string[] })
     teamChanged.notify()
     return c.json({ id }, 201)
   })
@@ -170,6 +188,30 @@ export function registerBotsRoutes(api: Hono, { db, config }: ApiDeps): void {
     if (kind !== 'skill' && kind !== 'plugin' && kind !== 'all') throw new HttpError(400, 'kind must be skill, plugin or all')
     const reports = kind === 'all' ? reloadAll(db, config, name) : [reload(db, config, name, kind)]
     return c.json({ reports, note: noteReload(db, name, reports) })
+  })
+
+  // Stops the bot's running turn. Its running task becomes cancelled; the turn is shown as cancelled.
+  api.post('/bots/:name/cancel', (c) => {
+    const name = c.req.param('name')
+    if (!getAgent(db, name)) throw new HttpError(404, 'no such bot')
+    if (!bots) throw new HttpError(409, 'bots are not running in this process')
+    if (!bots.cancel(name)) throw new HttpError(409, `${name} is not working right now`)
+    return c.json({ ok: true })
+  })
+
+  api.get('/bots/:name/memory', (c) => {
+    const name = c.req.param('name')
+    if (!getAgent(db, name)) throw new HttpError(404, 'no such bot')
+    return c.json({ memory: getMemory(db, name), limit: MEMORY_LIMIT })
+  })
+
+  api.put('/bots/:name/memory', async (c) => {
+    const name = c.req.param('name')
+    const body = await readJson(c) as { memory?: unknown } | null
+    if (typeof body?.memory !== 'string') throw new HttpError(400, 'memory must be a string')
+    const error = setMemory(db, name, body.memory)
+    if (error) throw new HttpError(error.startsWith('no bot') ? 404 : 400, error)
+    return c.json({ memory: getMemory(db, name) })
   })
 
   api.post('/bots/:name/reset', (c) => {

@@ -7,7 +7,7 @@ import { getThread, threadPosts } from '../db/threads.ts'
 const REVIEW_ROLES = new Set(['reviewer', 'doc_reviewer'])
 
 // Standing orders for one agent. It is sent on every turn, so a roster change reaches a resumed session too.
-export function systemFor(agent: TeamAgent, roster: TeamAgent[], config: Config, cwd: string, wikiDir: string): string {
+export function systemFor(agent: TeamAgent, roster: TeamAgent[], config: Config, cwd: string, wikiDir: string, sharedDir: string): string {
   const team = roster.filter((a) => a.enabled && a.name !== agent.name).map((a) => `- ${a.name} (${a.role}): ${a.description}`)
   const lines = [
     `You are "${agent.name}", the ${agent.role} among the resident bots of akbun-taskq, a personal task queue run by one user.`,
@@ -30,6 +30,7 @@ export function systemFor(agent: TeamAgent, roster: TeamAgent[], config: Config,
     '- The wiki is the team\'s long-term memory. Search it before starting work. Record decisions, facts with their source, and project status, and link related pages as [[slug]]. Your conversation may be reset; the wiki stays.',
     `- The wiki is mirrored as markdown files in ${wikiDir}. If ${wikiDir}/graphify-out/GRAPH_REPORT.md exists, it is a map of how pages relate; read it before a broad search.`,
     '- To act later (check a result tomorrow, a weekly review), send_message with deliver_at, to yourself or another bot.',
+    `- ${sharedDir} is the shared folder every bot and the user can read and write, like a mounted drive. Files the user attaches arrive under ${sharedDir}/attachments/. Put files meant for another bot or the user there and give the path.`,
     '- A decision that belongs to the user (money, deleting, publishing, widening access, anything irreversible or a matter of taste) is not yours. Send it to the orchestrator (taskq) with the options, what each gains and loses, and which you would pick.',
     '- If the same problem fails three times, stop and report what you checked and what is left.',
   ]
@@ -43,13 +44,14 @@ export function systemFor(agent: TeamAgent, roster: TeamAgent[], config: Config,
       lines.push('- That skill is private. Never copy its text into the wiki, messages or task intents; write only your findings.')
     }
   }
+  lines.push('', 'Your memory (your own notes, kept across turns and sessions; change it with memory_write):', agent.memory.trim() || '(empty)')
   return lines.join('\n')
 }
 
 // Each message is wrapped in a tag that carries who sent it. A message tag inside a body is escaped, whatever its case,
 // so a body cannot end its own block and pretend to be another sender. A message that belongs to a discussion comes
 // with the discussion so far, once per discussion.
-export function promptFor(db: Db, messages: TeamMessage[]): string {
+export function promptFor(db: Db, messages: TeamMessage[], sharedDir = ''): string {
   const blocks: string[] = []
   const shown = new Set<number>()
   for (const m of messages) {
@@ -62,7 +64,8 @@ export function promptFor(db: Db, messages: TeamMessage[]): string {
     if (m.task_id) attrs.push(`task="${m.task_id}"`)
     if (m.reply_to) attrs.push(`reply_to="${m.reply_to}"`)
     if (m.thread_id) attrs.push(`discussion="${m.thread_id}"`)
-    blocks.push(`<message ${attrs.join(' ')}>\n${escapeTags(m.body)}\n</message>`)
+    const files = attachmentsOf(m, sharedDir).map((path) => `Attached: ${path}`)
+    blocks.push(`<message ${attrs.join(' ')}>\n${escapeTags([m.body, ...files].join('\n'))}\n</message>`)
   }
   return [
     `${messages.length} new message${messages.length === 1 ? '' : 's'}, oldest first:`,
@@ -71,6 +74,13 @@ export function promptFor(db: Db, messages: TeamMessage[]): string {
     '',
     'Handle them, then end your turn. Do not wait for replies; they arrive in a later turn.',
   ].join('\n')
+}
+
+// Attachments are stored relative to the shared folder; the prompt gives the bot absolute paths it can open.
+function attachmentsOf(m: TeamMessage, sharedDir: string): string[] {
+  const list = (m as TeamMessage & { attachments?: unknown }).attachments
+  const items = typeof list === 'string' ? JSON.parse(list) as string[] : Array.isArray(list) ? list as string[] : []
+  return items.map((path) => (sharedDir ? join(sharedDir, path) : path))
 }
 
 export function escapeTags(body: string): string {
