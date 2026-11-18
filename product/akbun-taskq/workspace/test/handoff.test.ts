@@ -149,8 +149,9 @@ test('CLI accepts a handoff and a stdio MCP client reads the same record and pol
   try {
     await client.connect(transport)
     const list = await client.listTools()
-    assert.equal(list.tools.length, 2)
-    assert.ok(list.tools.every((tool) => tool.annotations?.readOnlyHint))
+    const handoffTools = list.tools.filter((tool) => tool.name === 'taskq_list_handoffs' || tool.name === 'taskq_handoff_mode')
+    assert.equal(handoffTools.length, 2)
+    assert.ok(handoffTools.every((tool) => tool.annotations?.readOnlyHint))
     const handoffs = await client.callTool({ name: 'taskq_list_handoffs', arguments: { task_id: targetId } })
     const [accepted] = (handoffs.structuredContent as { handoffs: HandoffRecord[] }).handoffs
     assert.equal(accepted.id, pending.id)

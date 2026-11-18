@@ -17,7 +17,7 @@ import { forceClose, listThreads } from '../db/threads.ts'
 import { hybridSearch } from '../team/search.ts'
 import { setOwner } from '../team/owner.ts'
 import { ROSTER } from '../team/roster.ts'
-import { isTeamPaused, pauseTeam, resumeTeam, teamPauseReason } from '../team/hub.ts'
+import { isTeamPaused, pauseTeam, requestBotCancel, resumeTeam, teamPauseReason } from '../team/hub.ts'
 import { teamChanged } from '../wake.ts'
 import { intParam } from './params.ts'
 import { TASK_TITLE_SQL } from '../db/tasks.ts'
@@ -202,9 +202,15 @@ export function registerBotsRoutes(api: Hono, { db, config, bots }: ApiDeps): vo
   api.post('/bots/:name/cancel', (c) => {
     const name = c.req.param('name')
     if (!getAgent(db, name)) throw new HttpError(404, 'no such bot')
-    if (!bots) throw new HttpError(409, 'bots are not running in this process')
-    if (!bots.cancel(name)) throw new HttpError(409, `${name} is not working right now`)
-    return c.json({ ok: true })
+    if (bots) {
+      if (!bots.cancel(name)) throw new HttpError(409, `${name} is not working right now`)
+      return c.json({ ok: true })
+    }
+    // The CLI and the MCP server run in another process than the bots: leave a marker the hub picks up on its next tick.
+    const open = db.prepare('SELECT id FROM team_turns WHERE agent = ? AND ended_at IS NULL').get(name)
+    if (!open) throw new HttpError(409, `${name} is not working right now`)
+    requestBotCancel(db, name, Number(open.id))
+    return c.json({ ok: true, requested: true })
   })
 
   api.get('/bots/:name/memory', (c) => {

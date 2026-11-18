@@ -4,7 +4,8 @@ import { USER, getAgent, listMessages, listTurns, postMessage, seedAgents } from
 import { createTeamHub, isTeamPaused, resumeTeam, teamPauseReason, type TeamHub } from '../src/team/hub.ts'
 import type { TeamBackend, TurnRequest, TurnResult } from '../src/team/types.ts'
 import { teamChanged } from '../src/wake.ts'
-import { seedTestBots, setup, sleep, waitFor, type TestEnv } from './helpers.ts'
+import { seedTestBots, setup, sleep, waitFor, TOKEN, type TestEnv } from './helpers.ts'
+import { createApp } from '../src/api/server.ts'
 
 type Script = (request: TurnRequest, call: (name: string, args: Record<string, unknown>) => Record<string, unknown>) => Promise<TurnResult> | TurnResult
 
@@ -81,6 +82,24 @@ describe('team hub', () => {
     const turns = listTurns(db, 5)
     assert.equal(turns.length, 1)
     assert.equal(db.prepare('SELECT count(*) AS n FROM team_messages WHERE recipient = ? AND turn_id = ?').get('taskq', turns[0].id)?.n, 2)
+  })
+
+  test('[critical] a cancel from the CLI or MCP server (another process) stops the running turn', async () => {
+    const { db, config } = env
+    const backend: TeamBackend = {
+      runTurn: (_config, request) => new Promise((resolve) => {
+        request.signal.addEventListener('abort', () => resolve({ outcome: 'failed', error: 'aborted' }))
+      }),
+    }
+    hub = createTeamHub({ db, config, backend, retryAfterSec: 0 })
+    await hub.start()
+    postMessage(db, { sender: USER, recipient: 'taskq', body: 'long job' })
+    teamChanged.notify()
+    await waitFor(() => hub!.busy().includes('taskq'))
+    const app = createApp({ db, config }, TOKEN)
+    const res = await app.request('/api/bots/taskq/cancel', { method: 'POST', headers: { 'x-taskq-token': TOKEN, host: `127.0.0.1:${config.port}`, 'content-type': 'application/json' }, body: '{}' })
+    assert.deepEqual(await res.json(), { ok: true, requested: true })
+    await waitFor(() => listTurns(db, 5)[0]?.outcome === 'cancelled')
   })
 
   test('the team pauses when the daily budget is spent', async () => {

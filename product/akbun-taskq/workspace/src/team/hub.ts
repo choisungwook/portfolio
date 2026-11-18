@@ -79,6 +79,13 @@ export function resumeTeam(db: Db): void {
   teamChanged.notify()
 }
 
+// A cancel asked from another process (CLI, MCP server). The hub that runs the turn checks it on every tick.
+const cancelKey = (name: string) => `bot_cancel:${name}`
+export function requestBotCancel(db: Db, name: string, turnId: number): void {
+  setMeta(db, cancelKey(name), String(turnId))
+  teamChanged.notify()
+}
+
 function resumedAt(db: Db): number {
   return Number(getMeta(db, 'team_resumed_at') ?? 0)
 }
@@ -241,6 +248,15 @@ export function createTeamHub({ db, config, backend: claude, backends = {}, retr
     })
   }
 
+  function cancelRequested(): void {
+    for (const [name, turn] of active) {
+      const marker = getMeta(db, cancelKey(name))
+      if (marker === null) continue
+      db.prepare('DELETE FROM meta WHERE key = ?').run(cancelKey(name))
+      if (Number(marker) === turn.turnId) cancel(name)
+    }
+  }
+
   // Mail for a bot that is already working goes into its running turn instead of waiting for the turn to end.
   function joinRunning(): void {
     for (const [name, turn] of active) {
@@ -257,6 +273,7 @@ export function createTeamHub({ db, config, backend: claude, backends = {}, retr
   }
 
   function tick(): void {
+    cancelRequested()
     if (isTeamPaused(db)) return
     joinRunning()
     for (const id of skipDisabledSpeakers(db).closed) {

@@ -1,0 +1,113 @@
+// Every API route as a named operation, so the CLI (`taskq api <name>`) and the MCP server (tool `taskq_<name>`) offer
+// everything the UI can do, from one table. An operation calls the route in this process (local-api.ts): the same
+// validation and the same effects as the UI, without a running server or its token.
+// test/ops-coverage.test.ts fails when a route has no operation here.
+
+export type Method = 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE'
+
+export interface Operation {
+  name: string
+  method: Method
+  path: string          // with :params, filled from the arguments of the same name
+  description: string   // what it does and the main fields; other arguments go to the query (GET) or the JSON body
+}
+
+const op = (name: string, method: Method, path: string, description: string): Operation => ({ name, method, path, description })
+
+export const OPERATIONS: Operation[] = [
+  // tasks
+  op('tasks_list', 'GET', '/tasks', 'List tasks. Fields: status.'),
+  op('task_create', 'POST', '/tasks', 'Create a task. Fields: type (research|code|ops_read|ops_change), intent, title, status (draft|ready), priority, lock_key, repo, output_path, access_skill, target_profile, depends_on [ids], attachments [shared paths], workflow_id.'),
+  op('task_get', 'GET', '/tasks/:id', 'One task with its runs, events, owner and workflow.'),
+  op('task_update', 'PATCH', '/tasks/:id', 'Change a task. Fields: status (ready), priority, intent, title, cautions, workflow_id (null removes it).'),
+  op('task_approve', 'POST', '/tasks/:id/approve', 'Approve the pending request of a task.'),
+  op('task_deny', 'POST', '/tasks/:id/deny', 'Deny the pending request of a task.'),
+  op('task_resume', 'POST', '/tasks/:id/resume', 'Resume a task that waits for login.'),
+  op('task_done', 'POST', '/tasks/:id/done', 'Mark a reviewed task done.'),
+  op('task_cancel', 'POST', '/tasks/:id/cancel', 'Cancel a running or waiting task; it shows as cancelled.'),
+  op('task_run', 'POST', '/tasks/:id/run', 'Run a task now, once, outside the queue order (needs the running taskq).'),
+  op('task_retry', 'POST', '/tasks/:id/retry', 'Put a failed or cancelled task back to ready.'),
+  op('task_handoff_mode', 'POST', '/tasks/:id/handoff-mode', 'Set whether the task accepts incoming handoffs on its own. Fields: auto_accept (boolean).'),
+  op('task_set_owner', 'POST', '/bots/tasks/:id/owner', 'Give a task to a bot, or back to the user. Fields: owner (bot name or null).'),
+  // runs, events, queue
+  op('runs_list', 'GET', '/runs', 'Past runs. Fields: from, to (unix seconds), task_id, outcome.'),
+  op('run_get', 'GET', '/runs/:id', 'One run with its summary and stats.'),
+  op('events_list', 'GET', '/events', 'Task events. Fields: task_id, run_id, after, order (asc|desc), limit.'),
+  op('stats_daily', 'GET', '/stats/daily', 'Runs and cost per day.'),
+  op('lock_keys', 'GET', '/lock-keys', 'Lock keys in use.'),
+  op('search', 'GET', '/search', 'Search past runs. Fields: q.'),
+  op('graph', 'GET', '/graph', 'Tasks and their dependencies as a graph.'),
+  op('queue_status', 'GET', '/queue', 'Whether the queue is paused and what runs.'),
+  op('queue_pause', 'POST', '/queue/pause', 'Pause the queue. Fields: reason.'),
+  op('queue_resume', 'POST', '/queue/resume', 'Resume the queue.'),
+  op('alerts_list', 'GET', '/alerts', 'Alerts that need attention.'),
+  op('alert_ack', 'POST', '/alerts/:id/ack', 'Acknowledge an alert.'),
+  op('approvals_list', 'GET', '/approvals', 'Requests waiting for approval.'),
+  op('handoffs_list', 'GET', '/handoffs', 'Handoffs between tasks. Fields: task_id.'),
+  op('handoff_accept', 'POST', '/handoffs/:id/accept', 'Accept a handoff.'),
+  op('proposals_list', 'GET', '/proposals', 'Memory proposals from past runs.'),
+  op('proposal_apply', 'POST', '/proposals/:id/apply', 'Apply a memory proposal.'),
+  op('proposal_reject', 'POST', '/proposals/:id/reject', 'Reject a memory proposal.'),
+  // bots
+  op('bots_list', 'GET', '/bots', 'Every bot with its settings, whether it works now, queued messages and owned tasks; open discussions and recent turns.'),
+  op('bot_presets', 'GET', '/bots/presets', 'Role presets for a new bot.'),
+  op('bot_create', 'POST', '/bots', 'Create a bot. Fields: name, preset or role/description/instructions, sdk (claude|openai), model, effort, permission_mode, sandbox, allowed_domains, blocked_commands, workdir, skills, plugins, limits.'),
+  op('bot_get', 'GET', '/bots/:name', 'One bot\'s settings.'),
+  op('bot_update', 'PUT', '/bots/:name', 'Change a bot\'s settings; only the fields given change. Same fields as bot_create, plus enabled.'),
+  op('bot_delete', 'DELETE', '/bots/:name', 'Delete a bot (not taskq). Its running turn is cancelled; its tasks go back to the user as drafts.'),
+  op('bot_cancel', 'POST', '/bots/:name/cancel', 'Stop the bot\'s running turn; its running task becomes cancelled.'),
+  op('bot_reload', 'POST', '/bots/:name/reload', 'Reload the bot\'s skills and plugins. Fields: kind (skill|plugin|all).'),
+  op('bot_reset', 'POST', '/bots/:name/reset', 'Start a new session on the bot\'s next turn.'),
+  op('bot_catalog', 'GET', '/bots/:name/catalog', 'Models, effort levels, permission modes and slash commands for this bot. Fields: refresh (1).'),
+  op('bot_memory_get', 'GET', '/bots/:name/memory', 'The bot\'s memory text.'),
+  op('bot_memory_set', 'PUT', '/bots/:name/memory', 'Replace the bot\'s memory. Fields: memory.'),
+  op('bot_messages', 'GET', '/bots/messages', 'Messages of a bot\'s conversation. Fields: agent, limit.'),
+  op('bot_send', 'POST', '/bots/messages', 'Send a message to a bot as the user. Fields: to (default taskq), body, attachments [shared paths]. A bot that is working takes it into its running turn.'),
+  op('bot_messages_read', 'POST', '/bots/messages/read', 'Mark messages to the user as read. Fields: agent (only that bot\'s).'),
+  op('bot_search', 'GET', '/bots/search', 'Search every bot conversation (Korean and English). Fields: q.'),
+  op('bot_thread_close', 'POST', '/bots/threads/:id/close', 'Close a discussion.'),
+  op('bots_pause', 'POST', '/bots/pause', 'Pause every bot. Fields: reason.'),
+  op('bots_resume', 'POST', '/bots/resume', 'Resume the bots.'),
+  op('wiki_list', 'GET', '/bots/wiki', 'Wiki pages, or a search. Fields: q.'),
+  op('wiki_page', 'GET', '/bots/wiki/page', 'One wiki page with its history and links. Fields: slug.'),
+  // workflows
+  op('workflows_list', 'GET', '/workflows', 'Workflows with their steps and last run. Fields: deleted (1 includes deleted).'),
+  op('workflow_create', 'POST', '/workflows', 'Create a workflow. Fields: name, description, definition { steps: [{ id, name, kind (do|check|handoff|approval), instructions, needs [step ids], to (bot, for handoff) }] }.'),
+  op('workflow_get', 'GET', '/workflows/:id', 'One workflow by id or name.'),
+  op('workflow_update', 'PUT', '/workflows/:id', 'Replace a workflow. Same fields as workflow_create.'),
+  op('workflow_delete', 'DELETE', '/workflows/:id', 'Delete a workflow. Runs keep their copy and show it deleted; bots running it are told.'),
+  op('workflow_run', 'POST', '/workflows/:id/run', 'Start a run executed by a bot. Fields: bot, task_id.'),
+  op('workflow_runs', 'GET', '/workflow-runs', 'Run history with the bot that ran each. Fields: workflow, bot, task, limit.'),
+  op('workflow_run_get', 'GET', '/workflow-runs/:id', 'One run with every step\'s status, output and evidence.'),
+  op('workflow_run_cancel', 'POST', '/workflow-runs/:id/cancel', 'Cancel a running workflow run; the bot is told.'),
+  op('workflow_step_approve', 'POST', '/workflow-runs/:id/steps/:step/approve', 'Answer an approval step. Fields: approved (boolean), note.'),
+  // files
+  op('file_upload', 'POST', '/files', 'Put a file in the shared folder under attachments/. Fields: name, data (base64). The CLI takes file=<path> instead.'),
+  op('shared_list', 'GET', '/shared', 'List the shared folder. Fields: dir.'),
+  op('shared_read', 'GET', '/shared/file', 'Read a file of the shared folder. Fields: path.'),
+  op('open_folder', 'POST', '/open-folder', 'Open a folder in the desktop file manager. Fields: target (shared|home|sessions|bot), bot.'),
+  // settings and plugins
+  op('settings_get', 'GET', '/settings', 'Settings: appearance, limits, folders, registered skills and plugins.'),
+  op('settings_limits', 'POST', '/settings/limits', 'Change usage limits. Fields: daily_budget_usd, turns_per_hour_total, max_concurrent_turns, bot_turns_per_hour, turn_budget_usd, turn_max_turns.'),
+  op('settings_appearance', 'POST', '/settings/appearance', 'Change appearance. Fields: font_family, font_size, language (ko|en), theme (system|dark|light).'),
+  op('settings_queue_autorun', 'POST', '/settings/queue-autorun', 'Whether the queue runs unowned ready tasks on its own. Fields: enabled.'),
+  op('settings_desktop_notifications', 'POST', '/settings/desktop-notifications', 'Turn desktop notifications on or off. Fields: enabled.'),
+  op('plugins_catalog', 'GET', '/plugins/catalog', 'The official plugin marketplace (listed, not installed).'),
+  op('bot_skill_add', 'POST', '/bot-skills', 'Register a skill folder for bots. Fields: path.'),
+  op('bot_skill_update', 'POST', '/bot-skills/:name/update', 'Update a registered skill (git pull) and reload the bots that use it.'),
+  op('bot_skill_remove', 'DELETE', '/bot-skills/:name', 'Unregister a skill; bots stop loading it.'),
+  op('bot_plugin_add', 'POST', '/bot-plugins', 'Register a plugin folder for bots. Fields: path.'),
+  op('bot_plugin_update', 'POST', '/bot-plugins/:name/update', 'Update a registered plugin (git pull) and reload the bots that use it.'),
+  op('bot_plugin_remove', 'DELETE', '/bot-plugins/:name', 'Unregister a plugin; bots stop loading it.'),
+  op('access_skills_discover', 'GET', '/skills/discover', 'Skill folders found on this machine that can be registered as access skills.'),
+  op('access_skill_add', 'POST', '/access-skills', 'Register an access skill (logs in to a target account). Fields: path.'),
+  op('access_skill_remove', 'DELETE', '/access-skills/:name', 'Unregister an access skill.'),
+]
+
+export function findOperation(name: string): Operation | undefined {
+  return OPERATIONS.find((o) => o.name === name)
+}
+
+export function pathParams(path: string): string[] {
+  return [...path.matchAll(/:(\w+)/g)].map((m) => m[1])
+}

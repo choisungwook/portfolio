@@ -23,7 +23,7 @@
 - [x] 16. Plugins 메뉴, live input(실행 중 turn에 메시지 추가), compose bar 모델/effort/권한 메뉴, slash command, catalog API
 - [x] 17. Workflows: 정의, task 할당, 봇 실행, 실행 기록(Argo식), 삭제 표시
 - [x] 18. OpenAI Agents SDK backend (auto mode 없음, 권한 모드로 도구 구성)
-- [ ] 19. CLI와 MCP 서버로 모든 기능 제공
+- [x] 19. CLI와 MCP 서버로 모든 기능 제공
 - [ ] 20. 문서(architecture API 표, sdk-usage, CHANGELOG SDK 절, features, manual, knowledge), 테스트
 - [ ] 21. 이 파일 삭제, PR(본문 scratchpad/pr-body.md, 세션 링크 금지), squash merge, Issue close
 
