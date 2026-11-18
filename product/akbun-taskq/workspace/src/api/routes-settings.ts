@@ -4,16 +4,24 @@ import { discoverSkills, skillRoots } from '../skills/discover.ts'
 import { SkillError } from '../skills/inspect.ts'
 import { configView, registerSkill, removeSkill, skillRows } from '../skills/registry.ts'
 import { HttpError, readJson, type ApiDeps } from './http.ts'
+import { desktopNotificationsEnabled, setDesktopNotifications } from '../db/meta.ts'
 
-// The config is read-only here. There is no route that changes it: a sandbox or auth setting changed from the page would be
-// an attack path. Skill registration is the only write.
+// Runtime config is read-only. The desktop notification preference is stored separately in SQLite.
 export function registerSettingsRoutes(api: Hono, { db, config }: ApiDeps): void {
   api.get('/settings', (c) => c.json({
     config: configView(config),
     home: config.home,
     db_path: resolve(join(config.home, 'data', 'taskq.db')),
     access_skills: skillRows(db),
+    desktop_notifications: desktopNotificationsEnabled(db),
   }))
+
+  api.post('/settings/desktop-notifications', async (c) => {
+    const body = await readJson(c) as { enabled?: unknown } | null
+    if (typeof body?.enabled !== 'boolean') throw new HttpError(400, 'enabled must be a boolean')
+    setDesktopNotifications(db, body.enabled)
+    return c.json({ enabled: body.enabled })
+  })
 
   api.get('/skills/discover', (c) => c.json(discoverSkills(db, config, skillRoots(config))))
 

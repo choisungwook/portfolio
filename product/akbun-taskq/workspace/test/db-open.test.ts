@@ -52,7 +52,7 @@ test('an existing v3 database keeps completed prerequisites eligible without rep
     const [record] = listHandoffs(db, 'target')
     assert.equal(record.accepted_via, 'auto')
     assert.equal(record.output_path, 'intent.md')
-    assert.deepEqual(takeHandoffNotices(db), [])
+    assert.deepEqual(takeHandoffNotices(db), { notices: [], enabled: true })
   } finally {
     db.close()
   }

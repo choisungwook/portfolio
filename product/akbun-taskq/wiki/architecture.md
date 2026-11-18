@@ -13,7 +13,7 @@ browser UI --HTTP + SSE--> taskq process (127.0.0.1)
                             |- agents/   AgentBackend interface; claude/ runs one Agent SDK session per task
                             |- worker/   policy every backend enforces: gate, aws guard, prompt, result schema
                             |- memory/   similar-task lookup, retrospect, proposals
-                            |- alerts/   must-check rules, macOS notification
+                            |- alerts/   must-check rules, desktop notifications
                             '- db/       node:sqlite, WAL, numbered migrations
 CLI (taskq add/list/...) ---- opens the same SQLite file directly
 ```
@@ -54,7 +54,7 @@ workspace/
       finish.ts             # outcome -> task status, alerts, follow-ups, review task
     alerts/
       rules.ts              # outcome/event -> alert rows
-      notify.ts             # macOS notification for critical
+      notify.ts             # macOS and Windows notifications
     agents/
       types.ts              # AgentBackend: createWorker, preflight, ask
       index.ts              # registry: config.agent -> backend
@@ -369,7 +369,7 @@ An access skill is a Claude Code skill folder on this machine that signs in to t
 - The API and the CLI (`taskq skills`) call the same functions in `src/skills/registry.ts`.
 - Discovery (`src/skills/discover.ts`) checks every candidate with the same function, so a symlinked folder is judged where it really points. Entries that fail are skipped.
 - The run resolves the name to its stored path in `executeRun` and passes it to the worker as `access_skill_path`. The prompt names the folder. The gate (`src/worker/gate.ts`) allows Read, Grep and Glob inside that folder for every type and denies Write and Edit there. A symlink that leads out of the folder is not inside it and falls to the type's own rules.
-- The config is read-only in the UI and the API. A sandbox or auth setting changed from a web page would be an attack path, so the only write the API accepts is the skill registry. Changes to `taskq.config.json` take effect after a restart.
+- The runtime config is read-only in the UI and API. Changes to `taskq.config.json` take effect after a restart. The desktop notification preference is stored in SQLite and takes effect immediately. Both critical alerts and handoffs keep their recorded history when desktop notifications are disabled.
 
 ## Providers
 
@@ -464,7 +464,8 @@ Writes (any non-GET under `/api`) must send `Content-Type: application/json`, op
 | `GET /queue` `POST /queue/pause` `POST /queue/resume` | pause state with `pause_by`. Pause takes `{ "reason" }`, see "Pause, cancel and retry" |
 | `POST /tasks/:id/cancel` | cancel a running, needs_approval or needs_auth task. 200 with the task; 409 in other statuses; 404 when unknown |
 | `POST /tasks/:id/retry` | retry a failed task. Body `{ "draft": true }` and `{ "resume": true }`, both optional. 200 with the task; 409 in other statuses |
-| `GET /settings` | `{ config, home, db_path, access_skills }`. `db_path` is the absolute path of the SQLite file, shown read-only in Settings. `config` is the read-only list of keys in `CONFIG_KEYS` (`src/skills/registry.ts`). Each access skill is `{ name, path, description, ok }`; `ok` is false when `SKILL.md` is gone |
+| `GET /settings` | `{ config, home, db_path, access_skills, desktop_notifications }`. `db_path` is the absolute path of the SQLite file, shown read-only in Settings. `config` is the read-only list of keys in `CONFIG_KEYS` (`src/skills/registry.ts`). Each access skill is `{ name, path, description, ok }`; `ok` is false when `SKILL.md` is gone |
+| `POST /settings/desktop-notifications` | persist the desktop notification preference with `{"enabled":true}` or `{"enabled":false}` |
 | `GET /skills/discover` | `[{ name, path, description, registered }]` found one level deep under `$CLAUDE_CONFIG_DIR/skills` (or `~/.claude/skills`) and `skillsDir`. Capped at 200 |
 | `POST /access-skills` | body `{ "path": "/abs/dir" }`. 201 with the stored row; 400 with the reason; 409 when the name or path is already registered |
 | `DELETE /access-skills/:name` | 204. 404 when unknown; 409 when a task in draft, ready, running, needs_approval or needs_auth names it (up to 5 ids listed). Never touches the skill's files |

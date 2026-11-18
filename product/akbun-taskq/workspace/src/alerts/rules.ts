@@ -1,6 +1,7 @@
 import type { Db } from '../db/open.ts'
 import type { AlertKind, Severity } from '../types.ts'
 import { insertAlert } from '../db/alerts.ts'
+import { desktopNotificationsEnabled } from '../db/meta.ts'
 import { noticeFor, notifyDesktop, type Notice } from './notify.ts'
 import { mask } from '../mask.ts'
 
@@ -26,5 +27,7 @@ export function raiseAlert(db: Db, alert: {
   const severity = alert.severity ?? SEVERITY[alert.kind]
   const message = mask(alert.message)
   insertAlert(db, { task_id: alert.task_id, run_id: alert.run_id ?? null, severity, kind: alert.kind, message, ref: alert.ref ?? null })
-  if (severity === 'critical') notify(noticeFor(alert.kind, alert.task_id, message))
+  if (severity === 'critical' && desktopNotificationsEnabled(db)) {
+    notify(noticeFor(alert.kind, alert.task_id, message))
+  }
 }

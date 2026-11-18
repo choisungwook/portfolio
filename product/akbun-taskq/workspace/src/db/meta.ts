@@ -1,4 +1,4 @@
-import type { Db } from './open.ts'
+import { inTransaction, type Db } from './open.ts'
 import { nowSec } from '../time.ts'
 
 // Who paused the queue. A user pause survives a successful preflight; only a preflight pause is cleared by one.
@@ -11,6 +11,19 @@ export function getMeta(db: Db, key: string): string | null {
 
 export function setMeta(db: Db, key: string, value: string): void {
   db.prepare('INSERT INTO meta (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value').run(key, value)
+}
+
+export function desktopNotificationsEnabled(db: Db): boolean {
+  return getMeta(db, 'desktop_notifications') !== '0'
+}
+
+export function setDesktopNotifications(db: Db, enabled: boolean): void {
+  inTransaction(db, () => {
+    if (enabled && !desktopNotificationsEnabled(db)) {
+      db.prepare('UPDATE handoffs SET notification_processed_at = ? WHERE notification_processed_at IS NULL').run(nowSec())
+    }
+    setMeta(db, 'desktop_notifications', enabled ? '1' : '0')
+  })
 }
 
 export function isQueuePaused(db: Db): boolean {

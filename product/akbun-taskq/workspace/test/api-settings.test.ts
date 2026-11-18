@@ -5,6 +5,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { createApp } from '../src/api/server.ts'
 import { CONFIG_KEYS } from '../src/skills/registry.ts'
+import { openDb } from '../src/db/open.ts'
 import { setup, TOKEN, type TestEnv } from './helpers.ts'
 
 const JSON_TYPE = { 'content-type': 'application/json' }
@@ -69,6 +70,26 @@ describe('settings and access skill api', () => {
     mkdirSync(join(claudeDir, 'empty-folder'))
     assert.equal(await bad({ path: join(claudeDir, 'empty-folder') }), 400)
     assert.equal(await bad({ path: skill(join(env.home, 'data', 'inside'), 'inside') }), 400)
+  })
+
+  test('the desktop notification setting defaults on and persists across DB connections', async () => {
+    const url = '/api/settings/desktop-notifications'
+    const before = await (await app().request('/api/settings', { headers: host() })).json()
+    assert.equal(before.desktop_notifications, true)
+    assert.equal((await app().request(url, { ...write({ enabled: false }), headers: { ...JSON_TYPE, host: host().host } })).status, 401)
+    assert.equal((await app().request(url, write({ enabled: 'false' }))).status, 400)
+    assert.equal((await app().request(url, write({ enabled: false }))).status, 200)
+    const reopened = openDb(env.home)
+    try {
+      const sameHome = createApp({ db: reopened, config: env.config }, TOKEN)
+      const saved = await (await sameHome.request('/api/settings', { headers: host() })).json()
+      assert.equal(saved.desktop_notifications, false)
+      assert.equal((await sameHome.request(url, write({ enabled: true }))).status, 200)
+      const restored = await (await app().request('/api/settings', { headers: host() })).json()
+      assert.equal(restored.desktop_notifications, true)
+    } finally {
+      reopened.close()
+    }
   })
 
   test('GET /skills/discover lists found skills and marks the registered ones', async () => {

@@ -27,7 +27,7 @@ npm run demo
 - Node 24 이상. TypeScript 소스를 빌드 없이 바로 실행한다. 바이너리를 쓰면 Node와 checkout이 필요 없다.
 - Claude Code 설치.
 - 모델에 접근할 방법 하나: Amazon Bedrock, Anthropic API 키, Claude 구독 로그인 중 하나.
-- macOS 또는 Linux. 세션은 Claude Code 샌드박스 안에서 돌고, 샌드박스를 쓸 수 없으면 시작하지 않는다.
+- macOS, Linux 또는 Windows의 WSL2. 세션은 Claude Code 샌드박스 안에서 돌고, 샌드박스를 쓸 수 없으면 시작하지 않는다.
 
 바이너리는 GitHub Release의 `akbun-taskq-v<버전>`에 있다. Apple silicon은 `taskq-darwin-arm64.tar.gz`, linux x86_64는 `taskq-linux-x64.tar.gz`다. 화면, DB 스키마, 버전이 맞는 Claude Code가 파일 하나에 들어 있다. 압축을 풀어 PATH에 두고, macOS에서 브라우저로 받았으면 한 번 격리 속성을 지운다.
 
@@ -145,7 +145,7 @@ node bin/taskq add --type ops_read --access-skill example-readonly --target-prof
 
 ### 인계 알림과 수락
 
-새 인계는 Must check 패널과 태스크 상세의 Handoffs에 기록된다. macOS에서는 시스템 알림도 뜬다. Handoffs에서 발신·수신 태스크, 산출물 경로, 도착 시각, 수락 방식과 시각을 확인할 수 있다.
+새 인계는 Must check 패널과 태스크 상세의 Handoffs에 기록된다. macOS와 Windows에서는 시스템 알림도 뜬다. Windows에서 WSL2로 taskq를 실행할 때는 WSL의 Windows 상호 운용이 활성화되어 있고 `powershell.exe`가 WSL의 PATH에 있어야 한다. Handoffs에서 발신·수신 태스크, 산출물 경로, 도착 시각, 수락 방식과 시각을 확인할 수 있다.
 
 자동 수락은 기본으로 켜져 있다. 태스크에서 Automatically accept incoming handoffs를 끄면 Accept handoff를 누르기까지 실행이 대기한다. 다시 켜면 현재 대기 중인 인계를 수락한다. 선행 태스크를 재실행하면 새 산출물은 새 인계로 기록된다.
 
@@ -161,7 +161,7 @@ taskq handoff accept HANDOFF_ID
 
 ## 7. 확인하고 처리하기
 
-오른쪽 Must check 패널에 내가 봐야 할 것이 심각도 순으로 쌓인다. critical이 생기면 macOS 알림도 온다. 알림은 안내일 뿐이고 눌러도 동작하지 않는다. 처리는 화면이나 명령에서 한다.
+오른쪽 Must check 패널에 내가 봐야 할 것이 심각도 순으로 쌓인다. 인계와 중요 경고의 시스템 알림은 Settings → Notifications → Desktop notifications에서 끄거나 켤 수 있다. 기본값은 켜짐이며 끈 상태에도 앱 내 기록은 남는다. 다시 켜면 이후의 알림부터 표시한다. 인계와 경고 처리는 화면이나 명령에서 한다.
 
 | 상황 | 화면 | 명령 |
 |---|---|---|
