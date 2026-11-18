@@ -308,7 +308,9 @@
       <label data-area="bot-name-row">Name <input name="name" type="text" maxlength="32" pattern="[a-z][a-z0-9\-]*" autocomplete="off" spellcheck="false" placeholder="coder"></label>
       <label data-area="bot-preset-row">Start from <select name="preset" data-area="bot-preset"><option value="">Blank</option></select></label>
       <label>Role <input name="role" type="text" maxlength="40" autocomplete="off"></label>
+      <label>Agent SDK <select name="sdk" data-area="bot-sdk"><option value="claude">Claude Agent SDK</option><option value="openai">OpenAI Agents SDK</option></select></label>
       <label>Model <input name="model" type="text" maxlength="100" autocomplete="off" placeholder="config default"></label>
+      <p class="meta wide" data-area="bot-sdk-hint" hidden>OpenAI bots have no auto mode. Their permission mode picks their tools: plan reads files, accept edits also writes in its folder and the shared folder, bypass also runs shell commands. Set OPENAI_API_KEY where taskq runs.</p>
       <label class="wide">Description <span class="meta">Other bots hand work to this bot by this text.</span><textarea name="description" rows="2" maxlength="500" required></textarea></label>
       <label class="wide">Instructions <textarea name="instructions" rows="5" maxlength="8000"></textarea></label>
       <label class="wide">Working directory <input name="workdir" type="text" maxlength="500" autocomplete="off" spellcheck="false" placeholder="the bot's own folder"></label>

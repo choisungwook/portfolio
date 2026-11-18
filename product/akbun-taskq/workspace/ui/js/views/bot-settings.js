@@ -27,7 +27,7 @@ function init() {
   if (dialog) return
   dialog = area('bot-settings')
   form = area('bot-form')
-  clear(area('bot-mode')).append(...MODES.map(([value, text]) => el('option', { value, text })))
+  form.elements.sdk.addEventListener('change', () => showSdk(form.elements.permission_mode.value))
   dialog.querySelector('[data-close]').addEventListener('click', () => dialog.close())
   form.addEventListener('submit', save)
   area('bot-preset').addEventListener('change', () => {
@@ -91,7 +91,8 @@ export async function openBotSettings(name) {
     f.description.value = value.description
     f.instructions.value = value.instructions
     f.workdir.value = value.workdir ?? ''
-    f.permission_mode.value = value.permission_mode
+    f.sdk.value = value.sdk ?? 'claude'
+    showSdk(value.permission_mode)
     f.sandbox.checked = value.sandbox
     f.allowed_domains.value = value.allowed_domains.join('\n')
     f.blocked_commands.value = value.blocked_commands.join('\n')
@@ -118,7 +119,7 @@ async function save(event) {
   const checked = (kind) => [...form.querySelectorAll(`input[name="${kind}"]:checked`)].map((input) => input.value)
   const body = {
     role: f.role.value, model: f.model.value, description: f.description.value, instructions: f.instructions.value,
-    workdir: f.workdir.value, permission_mode: f.permission_mode.value, sandbox: f.sandbox.checked,
+    workdir: f.workdir.value, permission_mode: f.permission_mode.value, sandbox: f.sandbox.checked, sdk: f.sdk.value,
     allowed_domains: lines(f.allowed_domains.value), blocked_commands: lines(f.blocked_commands.value),
     skills: checked('skill'), plugins: checked('plugin'), enabled: f.enabled.checked, may_message_user: f.may_message_user.checked,
     hourly_turns: f.hourly_turns.value === '' ? null : Number(f.hourly_turns.value),
@@ -136,4 +137,14 @@ async function save(event) {
   } catch (failure) {
     error.textContent = failure.message
   }
+}
+
+// The permission modes the bot's SDK has. OpenAI has no auto mode, so a Claude bot switched to OpenAI moves to accept edits.
+const OPENAI_MODES = ['plan', 'acceptEdits', 'bypassPermissions']
+function showSdk(current) {
+  const openai = form.elements.sdk.value === 'openai'
+  const modes = openai ? MODES.filter(([value]) => OPENAI_MODES.includes(value)) : MODES
+  clear(area('bot-mode')).append(...modes.map(([value, text]) => el('option', { value, text })))
+  form.elements.permission_mode.value = modes.some(([value]) => value === current) ? current : openai ? 'acceptEdits' : 'auto'
+  area('bot-sdk-hint').hidden = !openai
 }

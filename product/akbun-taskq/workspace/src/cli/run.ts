@@ -6,6 +6,7 @@ import { agentFor } from '../agents/index.ts'
 import { startServer } from '../api/server.ts'
 import { createRetrospector } from '../memory/retrospect.ts'
 import { createTeamHub, type TeamHub } from '../team/hub.ts'
+import { createOpenAITeamBackend } from '../agents/openai/team.ts'
 
 // Runs the loop and the API in this process until SIGINT or SIGTERM. The API token lives in memory only: a new start
 // issues a new token, and the UI gets it from the URL fragment printed below.
@@ -38,5 +39,6 @@ function teamHub(config: Config, db: Db, agent: ReturnType<typeof agentFor>): Te
     console.warn(`taskq: the ${agent.name} backend has no bots support; bots.enabled is ignored`)
     return undefined
   }
-  return createTeamHub({ db, config, backend: agent.team })
+  // OpenAI bots run on their own backend next to the Claude one; it needs OPENAI_API_KEY only when such a bot works.
+  return createTeamHub({ db, config, backend: agent.team, backends: { openai: createOpenAITeamBackend() } })
 }

@@ -2,6 +2,7 @@ import { existsSync, statSync } from 'node:fs'
 import { isAbsolute } from 'node:path'
 import { EFFORTS, PERMISSION_MODES, type BotEffort, type BotPermissionMode, type BotSdk, type BotSettings } from '../db/team.ts'
 import { BOT_DEFAULTS } from './roster.ts'
+import { PERMISSIONS_BY_SDK } from './catalog.ts'
 
 // Shared by the API and the CLI: turns a request body into BotSettings, or explains what is wrong.
 export const BOT_NAME = /^[a-z][a-z0-9-]{0,31}$/
@@ -85,6 +86,12 @@ export function parseBotSettings(body: unknown, known: { skills: Set<string>; pl
       turn_max_turns: has('turn_max_turns') ? limit(o.turn_max_turns, 'turn_max_turns', 1, 500, true) : from.turn_max_turns,
     }
     if (!value.description) throw new Error('description is required: other bots delegate by it')
+    // The OpenAI Agents SDK has no auto mode or permission modes; taskq builds an OpenAI bot's tools from plan,
+    // acceptEdits or bypassPermissions. A bot switched to OpenAI without a mode given gets acceptEdits.
+    if (!PERMISSIONS_BY_SDK[value.sdk].includes(value.permission_mode)) {
+      if (has('permission_mode')) throw new Error(`a ${value.sdk} bot's permission_mode must be one of ${PERMISSIONS_BY_SDK[value.sdk].join(', ')}`)
+      value.permission_mode = 'acceptEdits'
+    }
     return { ok: true, value }
   } catch (error) {
     return { ok: false, error: error instanceof Error ? error.message : String(error) }

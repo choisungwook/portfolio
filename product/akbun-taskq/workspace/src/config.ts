@@ -24,6 +24,10 @@ export interface BotsConfig {
   maxAttempts: number          // a message whose turn failed this many times is set aside
   readRoots: string[]          // absolute directories agents may Read besides their own folder and outputs/
   personaSkill?: string        // absolute path of a skill folder that speaks for the user when a choice is the user's
+  // OpenAI bots: the API answers in tokens, not dollars, so a turn's cost is estimated from these prices (USD per
+  // million tokens) for the daily budget. Set them to your model's price list.
+  openaiInputPerMTok: number
+  openaiOutputPerMTok: number
 }
 
 export interface Config {
@@ -70,6 +74,7 @@ export const DEFAULTS: Omit<Config, 'home'> = {
   bots: {
     enabled: false, maxConcurrentTurns: 2, turnMaxTurns: 30, turnBudgetUsd: 1, dailyBudgetUsd: 10,
     hourlyTurnsPerAgent: 20, maxOpenTasks: 10, maxAttempts: 3, readRoots: [],
+    openaiInputPerMTok: 1.25, openaiOutputPerMTok: 10,
   },
 }
 
@@ -98,6 +103,9 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
   if (config.caBundle !== undefined && !existsSync(config.caBundle)) throw new Error(`caBundle ${config.caBundle} does not exist`)
   const bots = config.bots
   if (bots.readRoots.some((root) => !isAbsolute(root))) throw new Error('bots.readRoots must be absolute paths')
+  for (const key of ['openaiInputPerMTok', 'openaiOutputPerMTok'] as const) {
+    if (!(Number.isFinite(bots[key]) && bots[key] >= 0)) throw new Error(`bots.${key} must be a number of 0 or more`)
+  }
   if (bots.personaSkill !== undefined && !(isAbsolute(bots.personaSkill) && existsSync(join(bots.personaSkill, 'SKILL.md')))) {
     throw new Error('bots.personaSkill must be an absolute path to a folder with SKILL.md')
   }
