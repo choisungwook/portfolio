@@ -9,7 +9,6 @@ bot이 쓰는 SDK와 CLI를 2026-11-18 기준 stable 버전에 맞춘다. 코드
 ### Changed
 
 - `@anthropic-ai/claude-agent-sdk` 0.3.325 → 0.3.327(Claude Code v2.1.327과 같은 수준). peer인 `@anthropic-ai/sdk`는 1.8.0 → 1.10.0. 0.3.328은 `next` 태그라 쓰지 않았다.
-- 대조한 CLI 버전을 적었다: Codex CLI 0.170.0, Kiro CLI 3.5.0.
 
 ### SDK
 
@@ -23,7 +22,7 @@ bot이 쓰는 SDK와 CLI를 2026-11-18 기준 stable 버전에 맞춘다. 코드
 
 Codex CLI 0.170.0: `@openai/codex-sdk` 0.170.0의 `codex exec` 인자 구성(`--experimental-json`, `--config`, `--sandbox`, `--cd`, `--add-dir`, `--skip-git-repo-check`, `approval_policy`, `resume <id>`)과 `turn.completed` usage 필드가 taskq가 넘기고 읽는 것과 같다.
 
-Kiro CLI 3.5.0: 3.0.0부터 V3가 기본이지만 `--trust-all-tools`를 쓰지 않는 스크립트는 V2로 시작한다. plan과 accept edits bot은 `--trust-tools`를 쓰므로 `--v3`를 계속 붙인다. 3.5.0의 로그인 변경(`auth.portalUrl`)은 device flow 인자에 영향이 없다.
+Kiro CLI 3.5.0: 3.0.0부터 V3가 기본이지만 `--trust-all-tools`를 쓰지 않는 스크립트는 V2로 시작한다. bypass를 뺀 모든 bot은 `--trust-tools`를 쓰므로 `--v3`를 계속 붙인다. 3.5.0의 로그인 변경(`auth.portalUrl`)은 device flow 인자에 영향이 없다.
 
 ### Not verified with a real model
 
