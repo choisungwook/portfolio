@@ -76,9 +76,13 @@ describe('kiro bots', () => {
   })
 
   test('a missing kiro-cli and a lost login are reported; the hub runs Kiro bots on the Kiro backend', async () => {
-    const missing: KiroSpawn = async function* () { throw new Error('spawn kiro-cli ENOENT') }
+    const missing: KiroSpawn = async function* () {
+      yield* failWith('spawn kiro-cli ENOENT')
+    }
     assert.match((await createKiroTeamBackend(missing).runTurn(env.config, request)).error ?? '', /kiro-cli was not found/)
-    const expired: KiroSpawn = async function* () { throw new Error('kiro-cli exited with code 1: Not logged in. Run kiro-cli login') }
+    const expired: KiroSpawn = async function* () {
+      yield* failWith('kiro-cli exited with code 1: Not logged in. Run kiro-cli login')
+    }
     assert.equal((await createKiroTeamBackend(expired).runTurn(env.config, request)).auth_failed, true)
     const seen: string[] = []
     hub = createTeamHub({
@@ -115,3 +119,9 @@ describe('kiro bots', () => {
     assert.ok(!existsSync(join(env.home, 'kiro-token')), 'taskq stores no token')
   })
 })
+
+// A spawn that fails the way a missing or signed-out CLI does.
+async function* failWith(message: string): AsyncGenerator<string> {
+  yield* []
+  throw new Error(message)
+}

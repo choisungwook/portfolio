@@ -148,7 +148,9 @@ describe('openai team backend', () => {
     assert.ok(args.join(' ').includes(`mcp_servers.taskq.args=`) && args.join(' ').includes('"--bot", "coder"'))
     assert.ok(args.includes('approval_policy="never"') && args.includes('model_reasoning_effort="high"'))
     assert.deepEqual(args.slice(-2), ['resume', 'th-0'])
-    const failing: CodexSpawn = async function* () { throw new Error('spawn codex ENOENT') }
+    const failing: CodexSpawn = async function* () {
+      yield* failWith('spawn codex ENOENT')
+    }
     const missing = await createOpenAITeamBackend(undefined, fetch, failing).runTurn(env.config, { ...request, agent })
     assert.match(missing.error ?? '', /Codex CLI was not found/)
   })
@@ -177,3 +179,9 @@ describe('openai team backend', () => {
     assert.deepEqual(seen.sort(), ['claude:planner', 'openai:coder'])
   })
 })
+
+// A spawn that fails the way a missing or signed-out CLI does.
+async function* failWith(message: string): AsyncGenerator<string> {
+  yield* []
+  throw new Error(message)
+}
