@@ -1,20 +1,37 @@
 import { inTransaction, type Db } from './open.ts'
-import type { TaskType } from '../types.ts'
 import { mask } from '../mask.ts'
 import { nowSec } from '../time.ts'
 
-// 'user' is the person; 'taskq' is the queue itself reporting a finished task. Neither is an agent row.
+// 'user' is the person; 'queue' is the task queue reporting a finished task. Neither is a bot row.
 export const USER = 'user'
-export const SYSTEM = 'taskq'
+export const SYSTEM = 'queue'
+// The orchestrator bot. It exists from the first start, is listed first and cannot be deleted.
+export const ORCHESTRATOR = 'taskq'
 
-export interface TeamAgent {
-  name: string
+export type BotPermissionMode = 'auto' | 'acceptEdits' | 'default' | 'dontAsk' | 'plan' | 'bypassPermissions'
+export const PERMISSION_MODES: BotPermissionMode[] = ['auto', 'acceptEdits', 'default', 'dontAsk', 'plan', 'bypassPermissions']
+
+// What a bot is and what it may do. A new bot runs in auto mode with no sandbox and no blocked commands: the user
+// tightens per bot. taskq's own data and config are protected for every bot regardless (src/team/bot-gate.ts).
+export interface BotSettings {
   role: string
   description: string
   instructions: string
-  task_types: TaskType[]
   may_message_user: boolean
   enabled: boolean
+  permission_mode: BotPermissionMode
+  sandbox: boolean
+  allowed_domains: string[]   // network hosts commands may reach when the sandbox is on
+  blocked_commands: string[]  // Bash command patterns (* matches anything) that are always refused
+  workdir: string | null      // absolute working directory; null is the bot's own folder under TASKQ_HOME/team/
+  skills: string[]            // names from the global skill registry
+  plugins: string[]           // names from the global plugin registry
+  model: string | null        // null uses the config model
+}
+
+export interface TeamAgent extends BotSettings {
+  name: string
+  system: boolean
   session_id: string | null
 }
 
@@ -45,28 +62,57 @@ export interface TeamTurn {
 }
 
 const BODY_LIMIT = 8000
+const JSON_FIELDS = ['allowed_domains', 'blocked_commands', 'skills', 'plugins'] as const
+const BOOL_FIELDS = ['may_message_user', 'enabled', 'sandbox', 'system'] as const
 
 function toAgent(row: Record<string, unknown>): TeamAgent {
-  return {
-    name: String(row.name), role: String(row.role), description: String(row.description),
-    instructions: String(row.instructions), task_types: JSON.parse(String(row.task_types)) as TaskType[],
-    may_message_user: row.may_message_user === 1, enabled: row.enabled === 1,
-    session_id: row.session_id === null ? null : String(row.session_id),
-  }
+  const agent = { ...row } as Record<string, unknown>
+  for (const key of JSON_FIELDS) agent[key] = JSON.parse(String(row[key] ?? '[]'))
+  for (const key of BOOL_FIELDS) agent[key] = row[key] === 1
+  delete agent.created_at
+  return agent as unknown as TeamAgent
 }
 
-// Adds roster entries that are missing. An existing row is left alone so the user's edits survive a restart.
-export function seedAgents(db: Db, roster: Omit<TeamAgent, 'session_id' | 'enabled'>[]): void {
-  const insert = db.prepare(`INSERT OR IGNORE INTO team_agents
-    (name, role, description, instructions, task_types, may_message_user, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)`)
-  for (const agent of roster) {
-    insert.run(agent.name, agent.role, agent.description, agent.instructions, JSON.stringify(agent.task_types),
-      agent.may_message_user ? 1 : 0, nowSec())
+export function createAgent(db: Db, name: string, settings: BotSettings, system = false): void {
+  db.prepare(`INSERT INTO team_agents (name, role, description, instructions, may_message_user, enabled, system,
+    permission_mode, sandbox, allowed_domains, blocked_commands, workdir, skills, plugins, model, created_at)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`).run(
+    name, settings.role, settings.description, settings.instructions, settings.may_message_user ? 1 : 0, settings.enabled ? 1 : 0,
+    system ? 1 : 0, settings.permission_mode, settings.sandbox ? 1 : 0, JSON.stringify(settings.allowed_domains),
+    JSON.stringify(settings.blocked_commands), settings.workdir, JSON.stringify(settings.skills), JSON.stringify(settings.plugins),
+    settings.model, nowSec())
+}
+
+export function updateAgent(db: Db, name: string, settings: BotSettings): boolean {
+  return db.prepare(`UPDATE team_agents SET role = ?, description = ?, instructions = ?, may_message_user = ?, enabled = ?,
+    permission_mode = ?, sandbox = ?, allowed_domains = ?, blocked_commands = ?, workdir = ?, skills = ?, plugins = ?, model = ?
+    WHERE name = ?`).run(
+    settings.role, settings.description, settings.instructions, settings.may_message_user ? 1 : 0, settings.enabled ? 1 : 0,
+    settings.permission_mode, settings.sandbox ? 1 : 0, JSON.stringify(settings.allowed_domains), JSON.stringify(settings.blocked_commands),
+    settings.workdir, JSON.stringify(settings.skills), JSON.stringify(settings.plugins), settings.model, name).changes === 1
+}
+
+// The orchestrator is refused. Its tasks go back to the user; its messages stay for the record.
+export function deleteAgent(db: Db, name: string): boolean {
+  return inTransaction(db, () => {
+    const row = db.prepare('SELECT system FROM team_agents WHERE name = ?').get(name)
+    if (!row || row.system === 1) return false
+    db.prepare(`UPDATE tasks SET owner = NULL, owner_since = NULL WHERE owner = ? AND status NOT IN ('done', 'failed')`).run(name)
+    db.prepare(`UPDATE team_messages SET failed_at = ? WHERE recipient = ? AND read_at IS NULL AND failed_at IS NULL`).run(nowSec(), name)
+    db.prepare('DELETE FROM team_agents WHERE name = ?').run(name)
+    return true
+  })
+}
+
+// Creates the orchestrator once. An existing row is left alone so the user's edits survive a restart.
+export function seedAgents(db: Db, roster: (BotSettings & { name: string; system?: boolean })[]): void {
+  for (const bot of roster) {
+    if (!db.prepare('SELECT 1 FROM team_agents WHERE name = ?').get(bot.name)) createAgent(db, bot.name, bot, bot.system ?? false)
   }
 }
 
 export function listAgents(db: Db): TeamAgent[] {
-  return db.prepare('SELECT * FROM team_agents ORDER BY rowid').all().map((row) => toAgent(row))
+  return db.prepare('SELECT * FROM team_agents ORDER BY system DESC, rowid').all().map((row) => toAgent(row))
 }
 
 export function getAgent(db: Db, name: string): TeamAgent | undefined {
@@ -92,7 +138,6 @@ export function firstAgentWithRole(db: Db, role: string): string | undefined {
   return row ? String(row.name) : undefined
 }
 
-// The body is masked here because this is the only path that stores message text.
 // The body is masked here because this is the only path that stores message text. deliver_at holds a message back
 // until that time, which is how an agent schedules work for later.
 export function postMessage(db: Db, message: {

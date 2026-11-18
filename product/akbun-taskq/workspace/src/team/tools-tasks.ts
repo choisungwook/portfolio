@@ -8,12 +8,14 @@ import { queueChanged, teamChanged } from '../wake.ts'
 import { raiseAlert } from '../alerts/rules.ts'
 import type { TaskType } from '../types.ts'
 import { ToolError, repoAllowed, type ScopedTools, type TeamTool } from './tools.ts'
+import { finishBotTask, startBotTask, type BotOutcome } from './bot-work.ts'
 
-// A task has exactly one owner. The owner gets the result and is the only agent that hands the task on, besides the
-// coordinators (lead and planner). Before a task is created it is compared with every open task, so two agents told
+// A task has exactly one owner. The owner works on it (start_task, finish_task) and is the only bot that hands it on,
+// besides the coordinators (orchestrator and planner). Before a task is created it is compared with every open task, so two agents told
 // about the same work do not both queue it.
 
-const COORDINATORS = new Set(['lead', 'planner'])
+// Roles that hand out work. The orchestrator taskq has the first; a user-made bot gets it by choosing the planner role.
+const COORDINATORS = new Set(['orchestrator', 'planner'])
 // Statuses that hold a slot of bots.maxOpenTasks. draft and review wait for the user, not for the team.
 const ACTIVE = `('ready', 'running', 'needs_approval', 'needs_auth')`
 const UNFINISHED = `status NOT IN ('done', 'failed')`
@@ -37,7 +39,7 @@ export function taskTools(scope: ScopedTools): TeamTool[] {
   return [
     {
       name: 'create_task',
-      description: 'Add a task to the queue and own it (or give it to `owner`). It runs in its own sandboxed session; the result comes to the owner. Refused when an open task looks like the same work: then message its owner, or pass its id in not_duplicate_of if it really differs. Tasks touching an account (ops types, access_skill, target_profile) are drafts the user must promote.',
+      description: 'Record a task and own it (or give it to `owner`, who is told). The owner works on it with start_task and finish_task. Refused when an open task looks like the same work: then message its owner, or pass its id in not_duplicate_of if it really differs. Tasks touching an account (ops types, access_skill, target_profile) are drafts the user must promote.',
       input: {
         type: z.enum(TASK_TYPES as [TaskType, ...TaskType[]]),
         intent: z.string().min(1).max(4000),
@@ -55,9 +57,7 @@ export function taskTools(scope: ScopedTools): TeamTool[] {
       },
       readOnly: false,
       handler(args) {
-        const me = self()
         const type = args.type as TaskType
-        if (!me.task_types.includes(type)) throw new ToolError(`your role may create ${me.task_types.join(', ') || 'no'} tasks, not ${type}; ask the planner`)
         const owner = (args.owner as string | undefined) ?? agent
         if (!getAgent(db, owner)?.enabled) throw new ToolError(`no enabled agent named ${owner}`)
         const repo = args.repo as string | undefined
@@ -92,7 +92,7 @@ export function taskTools(scope: ScopedTools): TeamTool[] {
     },
     {
       name: 'assign_task',
-      description: 'Hand a task to another agent. Allowed for the current owner, and for lead and planner on any unfinished task (including the user\'s own tasks). Both the old and the new owner are told.',
+      description: 'Hand a task to another bot. Allowed for the current owner, and for the orchestrator and planners on any unfinished task (including the user\'s own tasks). Both the old and the new owner are told.',
       input: { task_id: TASK_ID, to: z.string().max(80), note: z.string().max(2000).optional() },
       readOnly: false,
       handler(args) {
@@ -101,7 +101,7 @@ export function taskTools(scope: ScopedTools): TeamTool[] {
         if (!task) throw new ToolError('task not found')
         if (task.status === 'done' || task.status === 'failed') throw new ToolError(`task is ${task.status}; create a new one instead`)
         if (task.owner !== agent && !COORDINATORS.has(me.role)) {
-          throw new ToolError(`task ${task.id} is owned by ${task.owner ?? 'the user'}; ask them or the lead`)
+          throw new ToolError(`task ${task.id} is owned by ${task.owner ?? 'the user'}; ask them or taskq`)
         }
         const to = String(args.to)
         if (!getAgent(db, to)?.enabled) throw new ToolError(`no enabled agent named ${to}`)
@@ -118,6 +118,31 @@ export function taskTools(scope: ScopedTools): TeamTool[] {
         }
         teamChanged.notify()
         return { task_id: task.id, owner: to }
+      },
+    },
+    {
+      name: 'start_task',
+      description: 'Begin work on a task you own. It shows as running on the board and the calendar until you call finish_task. Refused while a task it depends on is not done.',
+      input: { task_id: TASK_ID },
+      readOnly: false,
+      handler(args) {
+        const started = startBotTask(db, agent, String(args.task_id), self().session_id)
+        if (!started.ok) throw new ToolError(started.error)
+        wrote()
+        return { task_id: args.task_id, status: 'running', run_id: started.runId }
+      },
+    },
+    {
+      name: 'finish_task',
+      description: 'End work on a task you started. outcome done: finished; review: finished and the user should look; failed: could not be done. The summary is what the user reads: what you did and the evidence (commands, output, file paths).',
+      input: { task_id: TASK_ID, outcome: z.enum(['done', 'review', 'failed']), summary: z.string().min(1).max(4000) },
+      readOnly: false,
+      handler(args) {
+        const finished = finishBotTask(db, agent, String(args.task_id), args.outcome as BotOutcome, String(args.summary))
+        if (!finished.ok) throw new ToolError(finished.error)
+        wrote()
+        queueChanged.notify()
+        return { task_id: args.task_id, outcome: args.outcome }
       },
     },
     {

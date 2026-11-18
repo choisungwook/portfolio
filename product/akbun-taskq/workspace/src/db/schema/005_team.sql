@@ -1,14 +1,42 @@
+-- A bot: one resident Claude session with its own role, permission mode, sandbox and command gate. `system` marks the
+-- orchestrator taskq, which cannot be deleted and is listed first.
 CREATE TABLE team_agents (
   name TEXT PRIMARY KEY,
   role TEXT NOT NULL,
   description TEXT NOT NULL,
   instructions TEXT NOT NULL,
-  task_types TEXT NOT NULL,
   may_message_user INTEGER NOT NULL DEFAULT 0,
   enabled INTEGER NOT NULL DEFAULT 1,
+  system INTEGER NOT NULL DEFAULT 0,
+  permission_mode TEXT NOT NULL DEFAULT 'auto'
+    CHECK (permission_mode IN ('auto', 'acceptEdits', 'default', 'dontAsk', 'plan', 'bypassPermissions')),
+  sandbox INTEGER NOT NULL DEFAULT 0,
+  allowed_domains TEXT NOT NULL DEFAULT '[]',
+  blocked_commands TEXT NOT NULL DEFAULT '[]',
+  workdir TEXT,
+  skills TEXT NOT NULL DEFAULT '[]',
+  plugins TEXT NOT NULL DEFAULT '[]',
+  model TEXT,
   session_id TEXT,
   created_at INTEGER NOT NULL
 );
+
+-- Skills and plugins registered once in the global settings; each bot picks which of them it loads.
+CREATE TABLE bot_skills (
+  name TEXT PRIMARY KEY,
+  path TEXT NOT NULL UNIQUE,
+  description TEXT,
+  created_at INTEGER NOT NULL
+);
+CREATE TABLE bot_plugins (
+  name TEXT PRIMARY KEY,
+  path TEXT NOT NULL UNIQUE,
+  description TEXT,
+  created_at INTEGER NOT NULL
+);
+
+-- A run a bot did in its own session, as opposed to a one-off run started from the task (bot is NULL).
+ALTER TABLE runs ADD COLUMN bot TEXT;
 
 CREATE TABLE team_turns (
   id INTEGER PRIMARY KEY,

@@ -1,11 +1,10 @@
 import { test, describe } from 'node:test'
 import assert from 'node:assert/strict'
 import { USER, getAgent, listMessages, listTurns, postMessage, seedAgents } from '../src/db/team.ts'
-import { DEFAULT_ROSTER } from '../src/team/roster.ts'
 import { createTeamHub, isTeamPaused, resumeTeam, teamPauseReason, type TeamHub } from '../src/team/hub.ts'
 import type { TeamBackend, TurnRequest, TurnResult } from '../src/team/types.ts'
 import { teamChanged } from '../src/wake.ts'
-import { setup, sleep, waitFor, type TestEnv } from './helpers.ts'
+import { seedTestBots, setup, sleep, waitFor, type TestEnv } from './helpers.ts'
 
 type Script = (request: TurnRequest, call: (name: string, args: Record<string, unknown>) => Record<string, unknown>) => Promise<TurnResult> | TurnResult
 
@@ -24,9 +23,9 @@ function fakeBackend(script: Script): { backend: TeamBackend; requests: TurnRequ
 describe('team hub', () => {
   let env: TestEnv
   let hub: TeamHub | undefined
-  test.beforeEach(() => {
+  test.beforeEach(async () => {
     env = setup()
-    seedAgents(env.db, DEFAULT_ROSTER)
+    await seedTestBots(env.db)
   })
   test.afterEach(async () => {
     await hub?.stop()
@@ -34,25 +33,25 @@ describe('team hub', () => {
     env.cleanup()
   })
 
-  test('a user message wakes the lead, the lead delegates, and the planner answers in its own turn', async () => {
+  test('a user message wakes taskq, taskq delegates, and the planner answers in its own turn', async () => {
     const { db, config } = env
     const { backend, requests } = fakeBackend((request, call) => {
-      if (request.agent.name === 'lead' && request.prompt.includes('from="user"')) call('send_message', { to: 'planner', body: 'schedule a survey' })
-      if (request.agent.name === 'planner') call('send_message', { to: 'lead', body: 'scheduled' })
-      if (request.agent.name === 'lead' && request.prompt.includes('from="planner"')) call('send_message', { to: USER, body: 'survey scheduled' })
+      if (request.agent.name === 'taskq' && request.prompt.includes('from="user"')) call('send_message', { to: 'planner', body: 'schedule a survey' })
+      if (request.agent.name === 'planner') call('send_message', { to: 'taskq', body: 'scheduled' })
+      if (request.agent.name === 'taskq' && request.prompt.includes('from="planner"')) call('send_message', { to: USER, body: 'survey scheduled' })
       return { outcome: 'done', session_id: `sess-${request.agent.name}`, cost_usd: 0.01, turns: 1 }
     })
     hub = createTeamHub({ db, config, backend, retryAfterSec: 0 })
     await hub.start()
-    postMessage(db, { sender: USER, recipient: 'lead', body: 'please survey X' })
+    postMessage(db, { sender: USER, recipient: 'taskq', body: 'please survey X' })
     teamChanged.notify()
     await waitFor(() => listMessages(db, { recipient: USER, limit: 5 }).length === 1)
-    assert.deepEqual(requests.map((r) => r.agent.name), ['lead', 'planner', 'lead'])
+    assert.deepEqual(requests.map((r) => r.agent.name), ['taskq', 'planner', 'taskq'])
     assert.equal(requests[0].resume, null)
-    assert.equal(requests[2].resume, 'sess-lead')
+    assert.equal(requests[2].resume, 'sess-taskq')
     assert.equal(getAgent(db, 'planner')?.session_id, 'sess-planner')
     assert.match(requests[1].system, /You are "planner"/)
-    assert.match(requests[1].system, /- lead \(lead\)/)
+    assert.match(requests[1].system, /- taskq \(orchestrator\)/)
   })
 
   test('the team pauses when the daily budget is spent', async () => {
@@ -62,10 +61,10 @@ describe('team hub', () => {
     const { backend, requests } = fakeBackend(() => ({ outcome: 'done', cost_usd: 0.06 }))
     hub = createTeamHub({ db, config, backend, retryAfterSec: 0 })
     await hub.start()
-    postMessage(db, { sender: USER, recipient: 'lead', body: 'one' })
+    postMessage(db, { sender: USER, recipient: 'taskq', body: 'one' })
     teamChanged.notify()
     await waitFor(() => listTurns(db, 5).some((t) => t.ended_at !== null))
-    postMessage(db, { sender: USER, recipient: 'lead', body: 'two' })
+    postMessage(db, { sender: USER, recipient: 'taskq', body: 'two' })
     teamChanged.notify()
     await waitFor(() => isTeamPaused(db))
     assert.equal(requests.length, 1)
@@ -76,12 +75,12 @@ describe('team hub', () => {
     const { db, config } = env
     config.bots.hourlyTurnsPerAgent = 3
     const { backend } = fakeBackend((request, call) => {
-      call('send_message', { to: request.agent.name === 'lead' ? 'planner' : 'lead', body: 'your turn' })
+      call('send_message', { to: request.agent.name === 'taskq' ? 'planner' : 'taskq', body: 'your turn' })
       return { outcome: 'done', cost_usd: 0 }
     })
     hub = createTeamHub({ db, config, backend, retryAfterSec: 0 })
     await hub.start()
-    postMessage(db, { sender: USER, recipient: 'lead', body: 'go' })
+    postMessage(db, { sender: USER, recipient: 'taskq', body: 'go' })
     teamChanged.notify()
     await waitFor(() => isTeamPaused(db))
     assert.match(teamPauseReason(db) ?? '', /loop/)
@@ -113,12 +112,12 @@ describe('team hub', () => {
       }
       return { outcome: 'done', session_id: 'fresh' }
     })
-    db.prepare("UPDATE team_agents SET session_id = 'gone' WHERE name = 'lead'").run()
+    db.prepare("UPDATE team_agents SET session_id = 'gone' WHERE name = 'taskq'").run()
     hub = createTeamHub({ db, config, backend, retryAfterSec: 0 })
     await hub.start()
-    postMessage(db, { sender: USER, recipient: 'lead', body: 'hi' })
+    postMessage(db, { sender: USER, recipient: 'taskq', body: 'hi' })
     teamChanged.notify()
-    await waitFor(() => getAgent(db, 'lead')?.session_id === 'fresh')
+    await waitFor(() => getAgent(db, 'taskq')?.session_id === 'fresh')
     assert.deepEqual(requests.map((r) => r.resume), ['gone', null])
   })
 
@@ -127,7 +126,7 @@ describe('team hub', () => {
     const { backend } = fakeBackend(() => ({ outcome: 'failed', auth_failed: true, error: 'login' }))
     hub = createTeamHub({ db, config, backend, retryAfterSec: 0 })
     await hub.start()
-    postMessage(db, { sender: USER, recipient: 'lead', body: 'hi' })
+    postMessage(db, { sender: USER, recipient: 'taskq', body: 'hi' })
     teamChanged.notify()
     await waitFor(() => isTeamPaused(db))
     resumeTeam(db)

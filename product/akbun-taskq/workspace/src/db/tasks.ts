@@ -65,9 +65,11 @@ export function listDeps(db: Db): { task_id: string; depends_on: string; kind: s
 }
 
 // Ready tasks whose handoffs are accepted and whose lock_key has no active task.
+// The queue runs only tasks no bot owns; a bot's task waits for that bot. Run-now (claimTask) is not limited this way:
+// it is the user's one-off run, whoever owns the task.
 export function nextEligible(db: Db): Task | undefined {
   const row = db.prepare(`SELECT t.* FROM tasks t
-    WHERE t.status = 'ready'
+    WHERE t.status = 'ready' AND t.owner IS NULL
       AND NOT ${BLOCKED_SQL}
       AND NOT EXISTS (SELECT 1 FROM tasks o WHERE t.lock_key IS NOT NULL AND o.lock_key = t.lock_key
         AND o.id != t.id AND o.status IN ('running', 'needs_approval', 'needs_auth'))
@@ -122,8 +124,10 @@ export function setPriority(db: Db, id: string, priority: number): void {
 }
 
 // Tasks whose heartbeat is older than the TTL. A NULL heartbeat is not stale: it is not claimed. At startup (`all`) every running or needs_approval task is returned.
+// A task a bot is working on (claimed_by 'bot:<name>') is the bot hub's to recover, not the runner's.
 export function staleCandidates(db: Db, cutoff: number, all: boolean): Task[] {
   const rows = db.prepare(`SELECT * FROM tasks WHERE status IN ('running', 'needs_approval')
+    AND (claimed_by IS NULL OR claimed_by NOT LIKE 'bot:%')
     AND (? = 1 OR (heartbeat_at IS NOT NULL AND heartbeat_at < ?))`).all(all ? 1 : 0, cutoff)
   return rows.map((row) => toTask(row as unknown as TaskRow))
 }

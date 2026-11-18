@@ -11,11 +11,13 @@ import { getMeta, setMeta } from '../db/meta.ts'
 import { raiseAlert } from '../alerts/rules.ts'
 import { nowSec } from '../time.ts'
 import { teamChanged } from '../wake.ts'
-import { DEFAULT_ROSTER } from './roster.ts'
+import { ROSTER } from './roster.ts'
 import { agentDir, promptFor, systemFor } from './prompt.ts'
 import { hybridSearch } from './search.ts'
 import { teamTools } from './tools.ts'
 import { wikiDir } from './wiki-files.ts'
+import { pluginPaths } from './bot-plugin.ts'
+import { recoverBotTasks } from './bot-work.ts'
 import type { TeamBackend, TurnResult } from './types.ts'
 
 export interface HubOptions {
@@ -98,18 +100,24 @@ export function createTeamHub({ db, config, backend, retryAfterSec = RETRY_AFTER
     const agent = getAgent(db, name)
     if (!started || !agent) return
     const controller = new AbortController()
-    const cwd = agentDir(config, name)
-    mkdirSync(cwd, { recursive: true })
+    const own = agentDir(config, name)
+    mkdirSync(own, { recursive: true })
+    const cwd = agent.workdir ?? own
     const wiki = wikiDir(config)
     mkdirSync(wiki, { recursive: true })
-    const readRoots = [join(config.home, 'outputs'), wiki, ...config.trustedRepos, ...config.bots.readRoots]
+    let plugins: string[] = []
+    try {
+      plugins = pluginPaths(db, config, name)
+    } catch (error) {
+      console.error(`taskq: could not load skills and plugins for ${name}: ${String(error)}`)
+    }
     const done = backend.runTurn(config, {
       agent,
-      system: systemFor(agent, listAgents(db), config, readRoots, wiki),
+      system: systemFor(agent, listAgents(db), config, cwd, wiki),
       prompt: promptFor(db, started.messages),
       tools: teamTools({ db, config, agent: name, search, turnId: started.turn.id }),
       cwd,
-      readRoots: config.bots.personaSkill ? [...readRoots, config.bots.personaSkill] : readRoots,
+      plugins,
       resume: agent.session_id,
       signal: controller.signal,
     })
@@ -190,8 +198,9 @@ export function createTeamHub({ db, config, backend, retryAfterSec = RETRY_AFTER
 
   return {
     async start() {
-      seedAgents(db, DEFAULT_ROSTER)
+      seedAgents(db, ROSTER)
       for (const { agent, end } of recoverTurns(db)) reportSetAside(agent, end, 'taskq stopped during the turn')
+      recoverBotTasks(db)
       running = true
       const seen = teamChanged.version()
       tick()

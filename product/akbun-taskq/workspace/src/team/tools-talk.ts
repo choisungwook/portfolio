@@ -34,7 +34,7 @@ export function talkTools(scope: ScopedTools): TeamTool[] {
         const busy = new Set(openTurnAgents(db))
         return {
           agents: listAgents(db).filter((a) => a.enabled).map((a) => ({
-            name: a.name, role: a.role, description: a.description, task_types: a.task_types, busy: busy.has(a.name),
+            name: a.name, role: a.role, description: a.description, busy: busy.has(a.name),
           })),
         }
       },
@@ -57,7 +57,7 @@ export function talkTools(scope: ScopedTools): TeamTool[] {
           throw new ToolError('a message to yourself needs deliver_at at least 10 minutes ahead; for notes, use the wiki')
         }
         if (to === USER) {
-          if (!self().may_message_user) throw new ToolError('only the lead messages the user; send this to the lead')
+          if (!self().may_message_user) throw new ToolError('your settings do not let you message the user; send this to taskq, the orchestrator')
         } else if (!enabled(to)) {
           throw new ToolError(`no enabled agent named ${to}; call list_agents`)
         }

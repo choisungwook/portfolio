@@ -9,8 +9,8 @@ export interface TurnRequest {
   system: string            // appended to the backend's own system prompt
   prompt: string            // the new messages, as built by prompt.ts
   tools: TeamTool[]
-  cwd: string               // the agent's own folder under TASKQ_HOME/team/
-  readRoots: string[]       // directories Read, Glob and Grep may reach besides cwd
+  cwd: string               // the bot's workdir, or its own folder under TASKQ_HOME/team/
+  plugins: string[]         // plugin folders to load: the bot's skill snapshot and its selected plugins
   resume: string | null     // the session to continue; null starts a new one
   signal: AbortSignal
 }

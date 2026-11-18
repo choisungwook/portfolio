@@ -21,9 +21,17 @@ export function reportToOwner(db: Db, task: Task, runId: string, result: WorkerR
 }
 
 // The automatic security review of an agent's code task goes to the reviewer, so the coder does not review its own
-// change. Without an enabled reviewer it goes to the lead, never back to the author. Tasks the user added stay unowned.
+// change. Without an enabled reviewer it goes to the orchestrator, never back to the author. Tasks the user added stay unowned.
 export function reviewOwner(db: Db, task: Task): string | null {
   if (!task.owner) return null
-  const reviewer = firstAgentWithRole(db, 'reviewer') ?? firstAgentWithRole(db, 'lead')
+  const reviewer = firstAgentWithRole(db, 'reviewer') ?? firstAgentWithRole(db, 'orchestrator')
   return reviewer && reviewer !== task.owner ? reviewer : null
+}
+
+// A task created with an owner by taskq itself (the automatic security review) is announced to that bot, which would
+// otherwise not know it has work: the queue does not run tasks a bot owns.
+export function notifyOwner(db: Db, task: Task): void {
+  if (!task.owner || !getAgent(db, task.owner)) return
+  postMessage(db, { sender: SYSTEM, recipient: task.owner, task_id: task.id, body: `Task ${task.id} is now yours: ${task.data.intent}` })
+  teamChanged.notify()
 }

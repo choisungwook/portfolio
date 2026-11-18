@@ -8,6 +8,7 @@ import { currentView } from '../core/nav.js'
 import { label } from '../core/vocab.js'
 import { botAvatar, senderAvatar } from './avatar.js'
 import { botsSnapshot, shortTime } from './bots-sidebar.js'
+import { openBotSettings } from './bot-settings.js'
 
 const POLL_MS = 5000
 
@@ -54,13 +55,14 @@ function renderHead() {
     botAvatar(bot, 64),
     el('div', { class: 'chat-who' },
       el('h2', { text: agent.name }),
-      el('p', { class: 'meta', text: `${agent.role}${agent.enabled ? '' : ' · disabled'}${agent.busy ? ' · working now' : ''}${agent.session_id ? '' : ' · no session yet'}` }),
+      el('p', { class: 'meta', text: `${agent.role} · ${agent.permission_mode} mode${agent.sandbox ? ' · sandboxed' : ''}${agent.blocked_commands.length ? ` · ${agent.blocked_commands.length} blocked command${agent.blocked_commands.length === 1 ? '' : 's'}` : ''}${agent.enabled ? '' : ' · disabled'}${agent.busy ? ' · working now' : ''}${agent.session_id ? '' : ' · no session yet'}` }),
       el('p', { class: 'chat-desc', text: agent.description }),
       owned.length === 0 ? null : el('ul', { class: 'chat-tasks', 'aria-label': `Tasks ${agent.name} owns` },
         ...owned.map((t) => el('li', {},
           el('button', { type: 'button', class: 'chip-button', onclick: () => emit('open-task', t.id) },
             el('span', { text: t.task_title }), el('span', { class: 'meta', text: ` · ${label(t.status)}` }))))),
     ),
+    el('button', { type: 'button', class: 'chat-gear', 'aria-label': `${agent.name} settings`, title: 'Settings', text: '⚙', onclick: () => openBotSettings(agent.name) }),
   )
   nodes.input.placeholder = `Message ${agent.name}`
   nodes.input.disabled = !agent.enabled

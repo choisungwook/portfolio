@@ -6,6 +6,8 @@ import { area, clear, el } from '../core/dom.js'
 import { emit, on } from '../core/bus.js'
 import { currentView, show } from '../core/nav.js'
 import { botAvatar, setRoster, userAvatar } from './avatar.js'
+import { openBotMenu } from './bot-menu.js'
+import { openBotSettings } from './bot-settings.js'
 
 const POLL_MS = 5000
 
@@ -17,6 +19,7 @@ export function initBotsSidebar() {
   list = area('bot-list')
   state = area('bots-state')
   area('me-avatar').append(userAvatar(56))
+  area('bot-add').addEventListener('click', () => openBotSettings(null))
   on('refresh', load)
   on('bots-changed', load)
   load()
@@ -49,11 +52,24 @@ function render(team) {
     text: label,
   }), ...(toggle ? [toggle] : []))
   const selected = currentView().view === 'bot' ? currentView().bot : null
-  clear(list).append(...team.agents.map((a) => el('li', {},
+  // The orchestrator comes first from the API (system bots sort first) and is marked so CSS can set it apart.
+  clear(list).append(...team.agents.map((a) => el('li', { class: 'side-bot-row', dataset: { system: String(a.system) } },
     el('button', {
       type: 'button', class: 'side-item side-bot', dataset: { bot: a.name, busy: String(a.busy), enabled: String(a.enabled) },
-      'aria-current': a.name === selected ? 'page' : null,
+      'aria-current': a.name === selected ? 'page' : null, 'aria-haspopup': 'menu',
+      title: 'Right-click for more',
       onclick: () => show('bot', a.name),
+      oncontextmenu: (event) => {
+        event.preventDefault()
+        openBotMenu(a, event.clientX, event.clientY)
+      },
+      onkeydown: (event) => {
+        if (event.key === 'ContextMenu' || (event.shiftKey && event.key === 'F10')) {
+          event.preventDefault()
+          const box = event.currentTarget.getBoundingClientRect()
+          openBotMenu(a, box.left + 40, box.bottom)
+        }
+      },
     },
     botAvatar(a.name, 44),
     el('span', { class: 'side-bot-text' },
@@ -61,7 +77,11 @@ function render(team) {
         el('strong', { text: a.name }),
         el('time', { class: 'meta', text: a.last_message ? shortTime(a.last_message.created_at) : '' })),
       el('span', { class: 'side-bot-preview', text: preview(a) })),
-    a.unread > 0 ? el('span', { class: 'unread-dot', 'aria-label': `${a.unread} unread` }) : null))))
+    a.unread > 0 ? el('span', { class: 'unread-dot', 'aria-label': `${a.unread} unread` }) : null),
+    el('button', {
+      type: 'button', class: 'side-bot-gear', 'aria-label': `${a.name} settings`, title: 'Settings', text: '⚙',
+      onclick: () => openBotSettings(a.name),
+    }))))
 }
 
 function preview(agent) {

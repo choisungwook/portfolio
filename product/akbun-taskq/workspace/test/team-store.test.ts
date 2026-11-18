@@ -7,12 +7,11 @@ import {
 } from '../src/db/team.ts'
 import { getPage, writePage, pageHistory } from '../src/db/wiki.ts'
 import { hybridSearch } from '../src/team/search.ts'
-import { DEFAULT_ROSTER } from '../src/team/roster.ts'
 import { ToolError, repoAllowed, teamTools } from '../src/team/tools.ts'
 import { getTask } from '../src/db/tasks.ts'
 import { listAlerts } from '../src/db/alerts.ts'
 import { createRunner } from '../src/runner/runner.ts'
-import { addTask, fakeWorker, result, setup, statusOf, waitFor, type TestEnv } from './helpers.ts'
+import { addTask, fakeWorker, seedTestBots, result, setup, sleep, statusOf, waitFor, type TestEnv } from './helpers.ts'
 
 function tool(env: TestEnv, agent: string, name: string) {
   const found = teamTools({ db: env.db, config: env.config, agent, search: hybridSearch(env.db) }).find((t) => t.name === name)
@@ -22,54 +21,54 @@ function tool(env: TestEnv, agent: string, name: string) {
 
 describe('team mailbox', () => {
   let env: TestEnv
-  test.beforeEach(() => {
+  test.beforeEach(async () => {
     env = setup()
-    seedAgents(env.db, DEFAULT_ROSTER)
+    await seedTestBots(env.db)
   })
   test.afterEach(() => env.cleanup())
 
   test('a turn takes every unread message once and blocks a second turn', () => {
     const { db } = env
-    postMessage(db, { sender: USER, recipient: 'lead', body: 'first' })
-    postMessage(db, { sender: USER, recipient: 'lead', body: 'second' })
-    assert.deepEqual(agentsWithMail(db, Math.floor(Date.now() / 1000), 60), ['lead'])
-    const started = startTurn(db, 'lead', 20)
+    postMessage(db, { sender: USER, recipient: 'taskq', body: 'first' })
+    postMessage(db, { sender: USER, recipient: 'taskq', body: 'second' })
+    assert.deepEqual(agentsWithMail(db, Math.floor(Date.now() / 1000), 60), ['taskq'])
+    const started = startTurn(db, 'taskq', 20)
     assert.deepEqual(started?.messages.map((m) => m.body), ['first', 'second'])
-    postMessage(db, { sender: USER, recipient: 'lead', body: 'third' })
-    assert.equal(startTurn(db, 'lead', 20), undefined)
+    postMessage(db, { sender: USER, recipient: 'taskq', body: 'third' })
+    assert.equal(startTurn(db, 'taskq', 20), undefined)
     assert.deepEqual(agentsWithMail(db, Math.floor(Date.now() / 1000), 60), [])
   })
 
   test('a failed turn returns its messages, and the third failure sets them aside', () => {
     const { db } = env
-    postMessage(db, { sender: USER, recipient: 'lead', body: 'hello' })
+    postMessage(db, { sender: USER, recipient: 'taskq', body: 'hello' })
     for (let attempt = 1; attempt <= 2; attempt++) {
-      const { turn } = startTurn(db, 'lead', 20)!
+      const { turn } = startTurn(db, 'taskq', 20)!
       assert.deepEqual(endTurn(db, turn.id, { outcome: 'failed', error: 'boom' }, 3).setAside, [])
     }
-    const { turn } = startTurn(db, 'lead', 20)!
+    const { turn } = startTurn(db, 'taskq', 20)!
     const aside = endTurn(db, turn.id, { outcome: 'failed', error: 'boom' }, 3)
     assert.equal(aside.setAside.length, 1)
     assert.equal(aside.reason, 'attempts')
-    assert.equal(startTurn(db, 'lead', 20), undefined)
+    assert.equal(startTurn(db, 'taskq', 20), undefined)
   })
 
   test('an interrupted turn does not count as an attempt, and recovery reopens a crashed turn', () => {
     const { db } = env
-    postMessage(db, { sender: USER, recipient: 'lead', body: 'hello' })
+    postMessage(db, { sender: USER, recipient: 'taskq', body: 'hello' })
     for (let i = 0; i < 5; i++) {
-      const { turn } = startTurn(db, 'lead', 20)!
+      const { turn } = startTurn(db, 'taskq', 20)!
       endTurn(db, turn.id, { outcome: 'interrupted' }, 3)
     }
-    startTurn(db, 'lead', 20)
+    startTurn(db, 'taskq', 20)
     assert.equal(recoverTurns(db).length, 1)
-    const again = startTurn(db, 'lead', 20)
+    const again = startTurn(db, 'taskq', 20)
     assert.equal(again?.messages.length, 1)
   })
 
   test('message text is masked before it is stored', () => {
     const { db } = env
-    postMessage(db, { sender: 'lead', recipient: USER, body: 'key AKIAABCDEFGHIJKLMNOP leaked' })
+    postMessage(db, { sender: 'taskq', recipient: USER, body: 'key AKIAABCDEFGHIJKLMNOP leaked' })
     const [stored] = listMessages(db, { recipient: USER, limit: 1 })
     assert.doesNotMatch(stored.body, /AKIAABCDEFGHIJKLMNOP/)
   })
@@ -77,7 +76,7 @@ describe('team mailbox', () => {
 
 describe('team wiki', () => {
   let env: TestEnv
-  test.beforeEach(() => {
+  test.beforeEach(async () => {
     env = setup()
   })
   test.afterEach(() => env.cleanup())
@@ -95,41 +94,39 @@ describe('team wiki', () => {
 
   test('search finds the latest text only, and operators in the query are plain words', () => {
     const { db } = env
-    writePage(db, { slug: 'decisions/storage', title: 'Storage', body: 'we picked postgres', author: 'lead', base_revision: 0 })
-    writePage(db, { slug: 'decisions/storage', title: 'Storage', body: 'we picked sqlite', author: 'lead', base_revision: 1 })
+    writePage(db, { slug: 'decisions/storage', title: 'Storage', body: 'we picked postgres', author: 'taskq', base_revision: 0 })
+    writePage(db, { slug: 'decisions/storage', title: 'Storage', body: 'we picked sqlite', author: 'taskq', base_revision: 1 })
     const search = hybridSearch(db)
     assert.deepEqual(search('postgres'), [])
     assert.equal(search('sqlite OR "x').length, 1)
   })
 
   test('a slug outside the pattern is refused', () => {
-    const r = writePage(env.db, { slug: '../etc', title: 'x', body: 'x', author: 'lead', base_revision: 0 })
+    const r = writePage(env.db, { slug: '../etc', title: 'x', body: 'x', author: 'taskq', base_revision: 0 })
     assert.equal(r.ok, false)
   })
 })
 
 describe('team tools', () => {
   let env: TestEnv
-  test.beforeEach(() => {
+  test.beforeEach(async () => {
     env = setup()
-    seedAgents(env.db, DEFAULT_ROSTER)
+    await seedTestBots(env.db)
   })
   test.afterEach(() => env.cleanup())
 
   test('only an agent allowed to message the user can, and the user sees an alert', () => {
     assert.throws(() => tool(env, 'coder', 'send_message')({ to: USER, body: 'done' }), ToolError)
-    tool(env, 'lead', 'send_message')({ to: USER, body: 'report ready' })
+    tool(env, 'taskq', 'send_message')({ to: USER, body: 'report ready' })
     assert.ok(listAlerts(env.db, false).some((a) => a.kind === 'team_message' && a.message.includes('report ready')))
   })
 
   test('an agent cannot message itself or an unknown agent', () => {
-    assert.throws(() => tool(env, 'lead', 'send_message')({ to: 'lead', body: 'x' }), /yourself/)
-    assert.throws(() => tool(env, 'lead', 'send_message')({ to: 'ghost', body: 'x' }), /no enabled agent/)
+    assert.throws(() => tool(env, 'taskq', 'send_message')({ to: 'taskq', body: 'x' }), /yourself/)
+    assert.throws(() => tool(env, 'taskq', 'send_message')({ to: 'ghost', body: 'x' }), /no enabled agent/)
   })
 
-  test('task types follow the role, account tasks are drafts, and the owner is recorded', () => {
-    assert.throws(() => tool(env, 'lead', 'create_task')({ type: 'research', intent: 'x' }), /may create no tasks/)
-    assert.throws(() => tool(env, 'coder', 'create_task')({ type: 'research', intent: 'x' }), /not research/)
+  test('account tasks are drafts, agent priority is capped, and the owner is recorded', () => {
     const ops = tool(env, 'planner', 'create_task')({ type: 'ops_read', intent: 'list buckets' })
     assert.equal(ops.status, 'draft')
     const research = tool(env, 'planner', 'create_task')({ type: 'research', intent: 'survey the cache options', owner: 'doc-reviewer' })
@@ -167,9 +164,9 @@ describe('team tools', () => {
 
 describe('task results reach the owner', () => {
   let env: TestEnv
-  test.beforeEach(() => {
+  test.beforeEach(async () => {
     env = setup()
-    seedAgents(env.db, DEFAULT_ROSTER)
+    await seedTestBots(env.db)
   })
   test.afterEach(() => env.cleanup())
 
@@ -181,11 +178,16 @@ describe('task results reach the owner', () => {
       preflight: async () => ({ ok: true }),
     })
     await runner.start()
+    // A bot's task waits for its bot; the user's run button still runs it once.
+    await sleep(50)
+    assert.equal(statusOf(db, task.id), 'ready')
+    runner.runNow(task.id)
     await waitFor(() => statusOf(db, task.id) === 'done')
     await waitFor(() => listMessages(db, { recipient: 'reviewer', limit: 5 }).length === 1)
     await runner.stop()
+    assert.match(listMessages(db, { recipient: 'reviewer', limit: 1 })[0].body, /is now yours/)
     const [toCoder] = listMessages(db, { recipient: 'coder', limit: 5 })
-    assert.equal(toCoder.sender, 'taskq')
+    assert.equal(toCoder.sender, 'queue')
     assert.equal(toCoder.task_id, task.id)
     assert.match(toCoder.body, /fixed; npm test passed/)
     assert.equal(getAgent(db, 'reviewer')?.role, 'reviewer')

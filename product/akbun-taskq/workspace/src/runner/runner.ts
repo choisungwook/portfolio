@@ -5,7 +5,7 @@ import { insertEvent } from '../db/events.ts'
 import { insertRun } from '../db/runs.ts'
 import { listTaskHandoffs } from '../db/handoffs.ts'
 import { claimTask, getTask, isBlocked, nextEligible } from '../db/tasks.ts'
-import { isCancelRequested, isQueuePaused, pauseBy, pauseQueue, resumeQueue } from '../db/meta.ts'
+import { isCancelRequested, isQueuePaused, pauseBy, pauseQueue, queueAutorun, resumeQueue } from '../db/meta.ts'
 import { raiseAlert } from '../alerts/rules.ts'
 import { sendHandoffNotices } from '../alerts/handoffs.ts'
 import { newId } from '../ids.ts'
@@ -116,7 +116,7 @@ export function createRunner({
       if (claimAndLaunch(id)) requested.delete(id)
     }
     while (active.size < config.maxConcurrent) {
-      if (isQueuePaused(db)) return
+      if (isQueuePaused(db) || !queueAutorun(db)) return
       const candidate = nextEligible(db)
       if (!candidate) return
       if (!(await authOk())) return

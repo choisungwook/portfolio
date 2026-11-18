@@ -6,7 +6,7 @@ import {
 import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js'
 import type { Config } from '../../config.ts'
 import { claudeExecutable } from '../../resources.ts'
-import { decideTeamRead, tamperOf } from '../../worker/gate.ts'
+import { botGate } from '../../team/bot-gate.ts'
 import { ToolError, type TeamTool } from '../../team/tools.ts'
 import type { TeamBackend, TurnRequest, TurnResult } from '../../team/types.ts'
 import { buildEnv } from './auth.ts'
@@ -14,12 +14,12 @@ import { buildEnv } from './auth.ts'
 export type TeamQueryFn = (params: { prompt: AsyncIterable<SDKUserMessage>; options: Options }) => AsyncIterable<SDKMessage>
 
 const SERVER = 'team'
-const READ_TOOLS = ['Read', 'Glob', 'Grep']
 const INFERENCE_AUTH_ERRORS = new Set(['authentication_failed', 'cloud_credential_error'])
 const MISSING_SESSION = /no conversation found|session .* not found/i
 
-// A resident agent is one Claude session that is resumed for every turn, not a process that stays up. The session file
-// survives a taskq restart, so the agent keeps its conversation; an idle agent costs nothing.
+// A bot is one Claude session that is resumed for every turn, not a process that stays up. The session file survives a
+// taskq restart, so the bot keeps its conversation; an idle bot costs nothing. The bot's settings decide its tools'
+// reach: permission mode (auto by default), sandbox (off by default) and blocked commands (none by default).
 export function createClaudeTeamBackend(runQuery: TeamQueryFn = sdkQuery): TeamBackend {
   return {
     async runTurn(config, request) {
@@ -57,7 +57,7 @@ async function runTurn(config: Config, request: TurnRequest, runQuery: TeamQuery
       }
     }
   } catch (error) {
-    // The abort the read hook triggers on a tamper attempt surfaces as an error; report the attempt, not the abort.
+    // The abort the gate triggers on a tamper attempt surfaces as an error; report the attempt, not the abort.
     if (state.tampered) return { outcome: 'failed', error: state.tampered, tampered: state.tampered, session_id: sessionId }
     throw error
   } finally {
@@ -67,20 +67,32 @@ async function runTurn(config: Config, request: TurnRequest, runQuery: TeamQuery
 }
 
 function optionsFor(config: Config, request: TurnRequest, abort: AbortController, state: { tampered?: string }): Options {
+  const agent = request.agent
+  const dataDir = join(config.home, 'data')
   return {
     cwd: request.cwd,
     env: buildEnv(config),
     pathToClaudeCodeExecutable: claudeExecutable(),
-    model: config.model,
-    // The built-in tool set is cut to the read tools, and nothing from the user's settings is loaded: no hooks, no
-    // permission rules, no MCP servers, no skills. The team server below is the only way the agent changes anything.
-    tools: READ_TOOLS,
+    model: agent.model ?? config.model,
+    // The user's own Claude settings are not loaded: a bot is what its settings say, nothing more. Skills and plugins
+    // come from the bot's snapshot (src/team/bot-plugin.ts). Plugin MCP servers load only when the bot has plugins.
     settingSources: [],
-    strictMcpConfig: true,
+    plugins: request.plugins.map((path) => ({ type: 'local' as const, path })),
+    strictMcpConfig: request.plugins.length === 0,
     mcpServers: { [SERVER]: serverFor(request.tools) },
-    permissionMode: 'dontAsk',
-    allowedTools: [...READ_TOOLS, ...request.tools.map((t) => `mcp__${SERVER}__${t.name}`)],
-    hooks: { PreToolUse: [{ hooks: [readGate(config, request, abort, state)] }] },
+    permissionMode: agent.permission_mode,
+    allowDangerouslySkipPermissions: agent.permission_mode === 'bypassPermissions' || undefined,
+    allowedTools: request.tools.map((t) => `mcp__${SERVER}__${t.name}`),
+    // Nobody watches a bot's turn, so a call its mode would ask about is refused with a reason instead of waiting.
+    canUseTool: async () => ({ behavior: 'deny', message: 'Nobody is present to approve this. Change this bot\'s permission mode, or ask the user through the orchestrator.' }),
+    hooks: { PreToolUse: [{ hooks: [gateHook(config, request, abort, state)] }] },
+    sandbox: agent.sandbox ? {
+      enabled: true,
+      failIfUnavailable: true,
+      allowUnsandboxedCommands: false,
+      filesystem: { allowWrite: [request.cwd], denyRead: [dataDir, join(config.home, 'taskq.config.json')] },
+      network: { allowedDomains: agent.allowed_domains },
+    } : undefined,
     maxTurns: config.bots.turnMaxTurns,
     maxBudgetUsd: config.bots.turnBudgetUsd,
     resume: request.resume ?? undefined,
@@ -89,34 +101,28 @@ function optionsFor(config: Config, request: TurnRequest, abort: AbortController
   }
 }
 
-// allowedTools lets every Read through the permission check, so the path rule lives in a hook, which runs first and
-// whose deny holds in every permission mode. A hook that throws denies. A read of taskq's own data or config ends the
-// turn as tampered, as it ends a task run (knowledge/decisions/2026-11-tamper-stops-run.md).
-function readGate(config: Config, request: TurnRequest, abort: AbortController, state: { tampered?: string }): HookCallback {
+// The bot's gate (src/team/bot-gate.ts) as a PreToolUse hook, which runs before the permission mode and whose deny
+// holds in every mode. A call that reaches taskq itself ends the turn as tampered. A hook that throws denies.
+function gateHook(config: Config, request: TurnRequest, abort: AbortController, state: { tampered?: string }): HookCallback {
   return async (input) => {
     if (input.hook_event_name !== 'PreToolUse') return {}
     if (input.tool_name.startsWith(`mcp__${SERVER}__`)) return {}
-    let allowed = false
+    let reason: string
     try {
       const toolInput = typeof input.tool_input === 'object' && input.tool_input !== null ? input.tool_input as Record<string, unknown> : {}
-      const dataDir = join(config.home, 'data')
-      const tamper = tamperOf(input.tool_name, toolInput, { cwd: request.cwd, outputs: request.cwd, dataDir })
-      if (tamper !== null) {
-        state.tampered ??= tamper
+      const verdict = botGate(config, request.agent, request.cwd, input.tool_name, toolInput)
+      if (verdict.action === 'allow') return {}
+      if (verdict.action === 'stop') {
+        state.tampered ??= verdict.reason
         abort.abort()
+        reason = 'This call reaches taskq itself. The turn is stopped for review.'
       } else {
-        allowed = decideTeamRead(input.tool_name, toolInput, { cwd: request.cwd, roots: request.readRoots, dataDir }) === 'allow'
+        reason = verdict.reason
       }
     } catch {
-      allowed = false
+      reason = 'The gate check failed, so the call is denied.'
     }
-    if (allowed) return {}
-    return {
-      hookSpecificOutput: {
-        hookEventName: 'PreToolUse', permissionDecision: 'deny',
-        permissionDecisionReason: `You may read only your own folder and: ${request.readRoots.join(', ') || 'nothing else'}.`,
-      },
-    }
+    return { hookSpecificOutput: { hookEventName: 'PreToolUse', permissionDecision: 'deny', permissionDecisionReason: reason } }
   }
 }
 

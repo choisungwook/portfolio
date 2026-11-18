@@ -17,6 +17,7 @@ import { initBotChat } from './views/bot-chat.js'
 import { initBotsSidebar } from './views/bots-sidebar.js'
 import { initSharedViews } from './views/shared-views.js'
 import { initNav } from './core/nav.js'
+import { initGlobalSettings, loadGlobalSettings } from './views/global-settings.js'
 import { initTokenNotice } from './views/token-notice.js'
 
 initTokenNotice()
@@ -33,10 +34,12 @@ initSearch()
 initTaskDetail()
 initTaskForm()
 initSettings()
+initGlobalSettings()
 initBotChat()
 initSharedViews()
 initNav()
 if (hasToken) {
+  loadGlobalSettings()
   initBotsSidebar()
   startLive()
   requestRefresh()

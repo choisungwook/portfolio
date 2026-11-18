@@ -1,20 +1,27 @@
 import { parseArgs } from 'node:util'
 import {
-  USER, getAgent, listAgents, listMessages, listTurns, markRead, postMessage, seedAgents, setAgentEnabled, setAgentSession,
+  ORCHESTRATOR, USER, createAgent, deleteAgent, getAgent, listAgents, listMessages, listTurns, markRead, postMessage, seedAgents, setAgentEnabled, setAgentSession,
 } from '../db/team.ts'
 import { getPage, listPages } from '../db/wiki.ts'
 import { forceClose, listThreads, speakerOf } from '../db/threads.ts'
 import { hybridSearch } from '../team/search.ts'
+import { knownNames } from '../db/bot-registry.ts'
+import { BOT_NAME, parseBotSettings } from '../team/bot-settings.ts'
+import { noteReload, reload, reloadAll } from '../team/bot-plugin.ts'
+import { PRESETS } from '../team/roster.ts'
 import { exportWiki } from '../team/wiki-files.ts'
 import { setOwner } from '../team/owner.ts'
-import { DEFAULT_ROSTER } from '../team/roster.ts'
+import { ROSTER } from '../team/roster.ts'
 import { isTeamPaused, pauseTeam, resumeTeam, teamPauseReason } from '../team/hub.ts'
 import { teamChanged } from '../wake.ts'
 import type { Command } from './types.ts'
 
 const USAGE = `usage: taskq bots <action>
-  list                         agents, roles and whether each has a session
-  say [--to NAME] TEXT...      message an agent (default: lead)
+  list                         bots, roles and whether each has a session
+  new NAME [--preset P] [--description TEXT]   presets: planner, coder, reviewer, doc-reviewer
+  delete NAME                  delete a bot (not taskq); its open tasks go back to you
+  reload NAME [skill|plugin]   copy the bot's selected skills or plugins again
+  say [--to NAME] TEXT...      message a bot (default: taskq, the orchestrator)
   inbox [--all]                messages the team sent you; marks them read unless --all
   log [--agent NAME] [--limit N]
   turns [--limit N]
@@ -36,7 +43,7 @@ function limitOf(value: string | undefined, fallback: number): number {
 export const bots: Command = ({ config, db }, args) => {
   const [action, ...rest] = args
   // The roster is seeded here too, so a message can be queued before the first taskq run.
-  seedAgents(db, DEFAULT_ROSTER)
+  seedAgents(db, ROSTER)
   switch (action) {
     case 'list': {
       for (const a of listAgents(db)) {
@@ -48,7 +55,7 @@ export const bots: Command = ({ config, db }, args) => {
     }
     case 'say': {
       const { values, positionals } = parseArgs({ args: rest, strict: true, allowPositionals: true, options: { to: { type: 'string' } } })
-      const to = values.to ?? 'lead'
+      const to = values.to ?? ORCHESTRATOR
       const body = positionals.join(' ').trim()
       if (!body) throw new Error('usage: taskq bots say [--to NAME] TEXT...')
       if (!getAgent(db, to)?.enabled) throw new Error(`no enabled agent named ${to}`)
@@ -91,6 +98,33 @@ export const bots: Command = ({ config, db }, args) => {
       const page = getPage(db, slug)
       if (!page) throw new Error('no such page')
       console.log(`# ${page.title}\n(revision ${page.revision} by ${page.updated_by})\n\n${page.body}`)
+      return
+    }
+    case 'new': {
+      const { values, positionals } = parseArgs({ args: rest, strict: true, allowPositionals: true, options: { preset: { type: 'string' }, description: { type: 'string' } } })
+      const [name] = positionals
+      if (!name || !BOT_NAME.test(name) || getAgent(db, name) || name === USER || name === 'queue') throw new Error('usage: taskq bots new NAME [--preset P]; NAME must be new, lowercase, start with a letter')
+      const preset = values.preset ? PRESETS[values.preset] : undefined
+      if (values.preset && !preset) throw new Error(`unknown preset; one of ${Object.keys(PRESETS).join(', ')}`)
+      const parsed = parseBotSettings({ ...(preset ?? {}), ...(values.description ? { description: values.description } : {}) }, knownNames(db))
+      if (!parsed.ok) throw new Error(parsed.error)
+      createAgent(db, name, parsed.value)
+      noteReload(db, name, reloadAll(db, config, name))
+      console.log(`bot ${name} created (permission mode auto, no sandbox, no blocked commands); change it in its settings`)
+      return
+    }
+    case 'delete': {
+      const [name] = rest
+      if (name === ORCHESTRATOR) throw new Error(`${ORCHESTRATOR} cannot be deleted`)
+      if (!name || !deleteAgent(db, name)) throw new Error(`no bot named ${name ?? ''}`)
+      console.log(`bot ${name} deleted`)
+      return
+    }
+    case 'reload': {
+      const [name, kind] = rest
+      if (!name || !getAgent(db, name)) throw new Error(`no bot named ${name ?? ''}`)
+      if (kind !== undefined && kind !== 'skill' && kind !== 'plugin') throw new Error('usage: taskq bots reload NAME [skill|plugin]')
+      console.log(noteReload(db, name, kind ? [reload(db, config, name, kind)] : reloadAll(db, config, name)))
       return
     }
     case 'search': {

@@ -48,7 +48,7 @@
 <div class="layout">
   <nav class="sidebar" data-area="sidebar" aria-label="Navigation">
     <div class="side-me">
-      <span class="avatar avatar-lg" data-area="me-avatar" aria-hidden="true"></span>
+      <span data-area="me-avatar" aria-hidden="true"></span>
       <strong>akbun-taskq</strong>
     </div>
     <ul class="side-list" data-area="side-views">
@@ -60,6 +60,7 @@
     <div class="side-heading">
       <h2 id="bots-heading">Bots</h2>
       <div class="bots-state" data-area="bots-state"></div>
+      <button type="button" class="add-bot" data-area="bot-add" aria-label="Add a bot" title="Add a bot">+</button>
     </div>
     <ul class="side-list side-bots" data-area="bot-list" aria-labelledby="bots-heading"></ul>
     <ul class="side-list" data-area="side-shared">
@@ -217,9 +218,82 @@
   </form>
 </dialog>
 
+<dialog data-area="bot-settings" aria-labelledby="bot-settings-title">
+  <form class="dialog-body bot-form" data-area="bot-form" method="dialog">
+    <h2 id="bot-settings-title" data-area="bot-settings-title">Bot settings</h2>
+    <div class="bot-form-grid">
+      <label data-area="bot-name-row">Name <input name="name" type="text" maxlength="32" pattern="[a-z][a-z0-9\-]*" autocomplete="off" spellcheck="false" placeholder="coder"></label>
+      <label data-area="bot-preset-row">Start from <select name="preset" data-area="bot-preset"><option value="">Blank</option></select></label>
+      <label>Role <input name="role" type="text" maxlength="40" autocomplete="off"></label>
+      <label>Model <input name="model" type="text" maxlength="100" autocomplete="off" placeholder="config default"></label>
+      <label class="wide">Description <span class="meta">Other bots hand work to this bot by this text.</span><textarea name="description" rows="2" maxlength="500" required></textarea></label>
+      <label class="wide">Instructions <textarea name="instructions" rows="5" maxlength="8000"></textarea></label>
+      <label class="wide">Working directory <input name="workdir" type="text" maxlength="500" autocomplete="off" spellcheck="false" placeholder="the bot's own folder"></label>
+    </div>
+    <fieldset class="bot-gate">
+      <legend>Permissions and gate</legend>
+      <label>Permission mode <select name="permission_mode" data-area="bot-mode"></select></label>
+      <label class="check"><input type="checkbox" name="sandbox"> Run commands in a sandbox</label>
+      <label class="wide">Allowed network hosts in the sandbox <span class="meta">One per line.</span><textarea name="allowed_domains" rows="2" spellcheck="false"></textarea></label>
+      <label class="wide">Blocked commands <span class="meta">One pattern per line; * matches anything. Example: git push*</span><textarea name="blocked_commands" rows="3" spellcheck="false"></textarea></label>
+      <p class="meta">taskq's own data and config are always off limits; a call that reaches them stops the turn and pauses the bots.</p>
+    </fieldset>
+    <fieldset>
+      <legend>Skills and plugins</legend>
+      <p class="meta">Registered in the global settings. Saving copies the chosen ones for this bot; Reload copies them again.</p>
+      <div class="bot-picks" data-area="bot-skills"></div>
+      <div class="bot-picks" data-area="bot-plugins"></div>
+    </fieldset>
+    <fieldset>
+      <legend>Behavior</legend>
+      <label class="check"><input type="checkbox" name="enabled"> Enabled</label>
+      <label class="check"><input type="checkbox" name="may_message_user"> May message me directly</label>
+    </fieldset>
+    <p class="error" data-area="bot-form-error" role="alert"></p>
+    <div class="dialog-actions">
+      <button type="button" class="danger" data-area="bot-delete">Delete bot</button>
+      <span class="spacer"></span>
+      <button type="button" data-close>Cancel</button>
+      <button type="submit" data-area="bot-save">Save</button>
+    </div>
+  </form>
+</dialog>
+
+<ul class="bot-menu" data-area="bot-menu" role="menu" hidden></ul>
+
 <dialog data-area="settings-dialog" aria-labelledby="settings-title">
   <div class="dialog-body">
     <h2 id="settings-title">Settings</h2>
+    <section class="settings-section" aria-labelledby="appearance-title">
+      <h3 id="appearance-title">Appearance</h3>
+      <div class="appearance-row">
+        <label>Font <select data-area="font-family"></select></label>
+        <label>Size <input type="range" min="12" max="20" step="1" data-area="font-size"> <output data-area="font-size-value"></output></label>
+      </div>
+    </section>
+    <section class="settings-section" aria-labelledby="queue-title">
+      <h3 id="queue-title">Queue</h3>
+      <label class="check"><input type="checkbox" data-area="queue-autorun"> Run tasks no bot owns automatically</label>
+      <p class="meta">Off, a task without an owner runs only when you press its run button. A bot's task always waits for that bot.</p>
+    </section>
+    <section class="settings-section" aria-labelledby="bot-skills-title">
+      <h3 id="bot-skills-title">Skills for bots</h3>
+      <p class="meta">Agent skill folders (with SKILL.md) that bots can load. Each bot picks its own in its settings.</p>
+      <ul class="skill-list" data-area="registry-skill"></ul>
+      <form class="skill-path-form" data-area="registry-skill-form">
+        <label>Path to a skill folder <input name="path" type="text" maxlength="500" autocomplete="off" spellcheck="false" placeholder="/absolute/path/to/skill"></label>
+        <button type="submit">Add</button>
+      </form>
+    </section>
+    <section class="settings-section" aria-labelledby="bot-plugins-title">
+      <h3 id="bot-plugins-title">Plugins for bots</h3>
+      <p class="meta">Claude Code plugin folders (with .claude-plugin/plugin.json): skills, commands, hooks and MCP servers together.</p>
+      <ul class="skill-list" data-area="registry-plugin"></ul>
+      <form class="skill-path-form" data-area="registry-plugin-form">
+        <label>Path to a plugin folder <input name="path" type="text" maxlength="500" autocomplete="off" spellcheck="false" placeholder="/absolute/path/to/plugin"></label>
+        <button type="submit">Add</button>
+      </form>
+    </section>
     <section class="settings-section" aria-labelledby="notifications-title">
       <h3 id="notifications-title">Notifications</h3>
       <label class="check"><input type="checkbox" data-area="desktop-notifications" disabled> Desktop notifications</label>

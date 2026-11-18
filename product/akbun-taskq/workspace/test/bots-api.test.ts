@@ -16,16 +16,16 @@ describe('bots api', () => {
   const headers = () => ({ host: `127.0.0.1:${env.config.port}`, 'x-taskq-token': TOKEN })
   const post = (body: unknown) => ({ method: 'POST', headers: { ...headers(), 'content-type': 'application/json' }, body: JSON.stringify(body) })
 
-  test('the roster is listed without instructions, and a user message goes to the lead by default', async () => {
+  test('only the orchestrator exists at first, and a user message goes to it by default', async () => {
     const team = await (await app().request('/api/bots', { headers: headers() })).json() as { enabled: boolean; agents: Record<string, unknown>[] }
     assert.equal(team.enabled, false)
-    assert.deepEqual(team.agents.map((a) => a.name), ['lead', 'planner', 'coder', 'reviewer', 'doc-reviewer'])
+    assert.deepEqual(team.agents.map((a) => a.name), ['taskq'])
     assert.equal('instructions' in team.agents[0], false)
     const res = await app().request('/api/bots/messages', post({ body: 'survey X' }))
     assert.equal(res.status, 201)
-    assert.equal(listMessages(env.db, { recipient: 'lead', limit: 5 })[0].sender, 'user')
+    assert.equal(listMessages(env.db, { recipient: 'taskq', limit: 5 })[0].sender, 'user')
     const after = await (await app().request('/api/bots', { headers: headers() })).json() as { agents: { name: string; last_message: { body: string } | null }[] }
-    assert.equal(after.agents.find((a) => a.name === 'lead')?.last_message?.body, 'survey X')
+    assert.equal(after.agents.find((a) => a.name === 'taskq')?.last_message?.body, 'survey X')
   })
 
   test('an unknown recipient and an empty body are refused', async () => {
