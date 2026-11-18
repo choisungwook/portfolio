@@ -2,6 +2,22 @@
 
 concept를 추가·수정·삭제할 때마다 오늘 날짜 섹션을 맨 위에 만들고 한 줄 남긴다. 구분은 `**Creation**`, `**Update**`, `**Deletion**`이다.
 
+## 2026-11-18
+
+* **Creation**: [Workflows are step graphs a bot executes and taskq judges](decisions/2026-11-workflows-run-by-bots.md) 결정 기록. 단계 그래프, bot 실행, taskq 판정, snapshot과 삭제 표시.
+* **Creation**: [OpenAI bots plug in behind TeamBackend](decisions/2026-11-openai-bot-backend.md) 결정 기록. Responses API 대화, 권한 모드로 도구 선택, 토큰 기반 비용 추정.
+* **Creation**: [The CLI and MCP server reach every route through one table of operations](decisions/2026-11-operations-for-cli-and-mcp.md) 결정 기록. operation 표, 프로세스 안 호출, DB marker로 취소.
+* **Update**: [Resident role agents are resumed sessions with a mailbox](decisions/2026-11-resident-agent-team.md) 결정 기록. 일하는 bot에게 온 메시지를 진행 중 turn에 넣는 것을 기록.
+* **Creation**: [Bots share one folder, keep memory and settings in SQLite](decisions/2026-11-bot-workspace.md) 결정 기록. 공용 폴더, JSON 업로드, bot 메모리, SQLite 설정, 대화 검색, 취소 처리.
+* **Creation**: [Bots work on their own tasks with per-bot permissions](decisions/2026-11-bots-execute-tasks.md) 결정 기록. bot이 task를 직접 처리, bot별 권한 모드·샌드박스·차단 명령, 시작 버튼은 일회성, taskq 오케스트레이터.
+* **Update**: [Resident role agents are resumed sessions with a mailbox](decisions/2026-11-resident-agent-team.md) 결정 기록. 읽기 전용 bot 설계가 bot별 권한 설정으로 바뀐 것을 기록.
+* **Creation**: [The UI uses a soft messenger theme and a left sidebar where bots read like chats](decisions/2026-11-soft-theme-sidebar.md) 결정 기록. Team을 Bots로, 탭을 사이드바와 bot별 채팅으로, 기본 테마를 soft로.
+* **Update**: [The taskq UI follows IBM Carbon through a token interface](decisions/2026-11-carbon-design-system.md) 결정 기록. 기본 테마가 soft로 바뀌고 Carbon은 패턴과 두 번째 테마로 남음.
+* **Creation**: [A task has one owner agent; several agents meet only in a bounded discussion](decisions/2026-11-task-ownership-and-discussions.md) 결정 기록. owner 열, 중복 작업 검사, 순서와 라운드가 정해진 토론.
+* **Creation**: [Team wiki search is trigram FTS plus link expansion, behind a WikiSearch interface](decisions/2026-11-wiki-hybrid-search.md) 결정 기록. 벡터 검색 대신 trigram과 링크 확장, graphify용 파일 미러.
+* **Update**: [Resident role agents are resumed sessions with a mailbox](decisions/2026-11-resident-agent-team.md) 결정 기록. 리뷰 반영: 쓰기 뒤 실패한 turn 재시도 안 함, 예산 범위, deliver_at, 확인 필요 항목.
+* **Creation**: [Resident role agents are resumed sessions with a mailbox, and work still runs as tasks](decisions/2026-11-resident-agent-team.md) 결정 기록. 상주 프로세스 대신 resume, 동기 호출 대신 mailbox, agent는 읽기만 하고 일은 큐 작업으로.
+
 ## 2026-11-16
 
 * **Creation**: [The runner waits on an in-process wake signal with a 60 second fallback](decisions/2026-11-wake-instead-of-poll.md) 결정 기록. 폴링 2초를 60초로 바꾸고 같은 프로세스 변경은 신호로 깨움.

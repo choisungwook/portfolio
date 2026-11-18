@@ -27,7 +27,8 @@ export function pauseReason(value: unknown): string {
 
 // Ends a task as cancelled by the user. With an owner, nothing is written unless that runner still holds the claim.
 // Without an owner (a needs_auth task, or a task whose runner is gone), the status must still be cancellable.
-// The open run closes as failed, its open requests expire, and no failed alert is raised: the user did it.
+// The task becomes cancelled (shown as Cancelled, retryable like a failed task). The open run closes as failed with the
+// summary 'cancelled by user', its open requests expire, and no failed alert is raised: the user did it.
 export function closeCancelled(db: Db, task: Task, owner?: string): boolean {
   return inTransaction(db, () => {
     const current = getTask(db, task.id)
@@ -41,11 +42,11 @@ export function closeCancelled(db: Db, task: Task, owner?: string): boolean {
         summary: CANCEL_SUMMARY, stats: {}, ended_at: now,
       })
     }
-    releaseTask(db, task.id, 'failed', owner)
+    releaseTask(db, task.id, 'cancelled', owner)
     expireApprovals(db, 'task_id', task.id, now)
     ackOpenAlerts(db, task.id, 'approval_required')
     clearCancelMarker(db, task.id)
-    insertEvent(db, { task_id: task.id, run_id: open?.id ?? null, kind: 'finished', payload: { outcome: 'failed', cancelled: true } })
+    insertEvent(db, { task_id: task.id, run_id: open?.id ?? null, kind: 'finished', payload: { outcome: 'cancelled', cancelled: true } })
     return true
   })
 }
@@ -75,7 +76,7 @@ export function retryTask(db: Db, id: string, options: { draft: boolean; resume:
   return inTransaction(db, () => {
     const sessionClause = options.resume ? '' : ', session_id = NULL'
     const changed = db.prepare(`UPDATE tasks SET status = ?, claimed_by = NULL, heartbeat_at = NULL, updated_at = ?${sessionClause}
-      WHERE id = ? AND status = 'failed'`)
+      WHERE id = ? AND status IN ('failed', 'cancelled')`)
       .run(options.draft ? 'draft' : 'ready', nowSec(), id).changes === 1
     if (!changed) return false
     ackOpenAlerts(db, id, 'failed')
@@ -86,7 +87,7 @@ export function retryTask(db: Db, id: string, options: { draft: boolean; resume:
 }
 
 // Statuses a user can start by hand, and what starting means in each. running and needs_approval are already running.
-export const RUNNABLE: TaskStatus[] = ['draft', 'ready', 'failed', 'needs_auth', 'review', 'done']
+export const RUNNABLE: TaskStatus[] = ['draft', 'ready', 'failed', 'cancelled', 'needs_auth', 'review', 'done']
 
 // Makes a task ready for an immediate run. A failed, review or done task starts a new session; a needs_auth task keeps
 // its session, as Resume does. The caller then asks the runner to claim it first.
@@ -96,6 +97,8 @@ export function prepareRun(db: Db, id: string): Task {
   if (!RUNNABLE.includes(task.status)) throw new OperatorError(`task is ${task.status}; it is already running`)
   if (isQueuePaused(db)) throw new OperatorError('the queue is paused; resume the queue to run tasks')
   if (isBlocked(db, id)) throw new OperatorError('task waits for a dependency to finish or for a handoff to be accepted')
+  // A one-off run has no bot session to report the workflow's steps, so it would skip them all.
+  if (task.data.workflow_id) throw new OperatorError('this task has a workflow; only a bot runs workflows: give the task to a bot (owner)')
   inTransaction(db, () => {
     const keepSession = task.status === 'needs_auth' || task.status === 'draft' || task.status === 'ready'
     const sessionClause = keepSession ? '' : ', session_id = NULL'

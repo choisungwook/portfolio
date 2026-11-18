@@ -3,7 +3,7 @@ type: Decision
 title: The taskq UI follows IBM Carbon through a token interface
 description: Carbon was chosen for its license, principles and status and notification patterns; the theme is one implementation of a token contract.
 tags: [ui, design-system]
-generated: { by: claude-code/claude-opus-5-5, at: 2026-11-16T00:00:00Z }
+generated: { by: claude-code/claude-opus-5-5, at: 2026-11-18T15:00:00Z }
 ---
 
 ## 결정
@@ -11,6 +11,7 @@ generated: { by: claude-code/claude-opus-5-5, at: 2026-11-16T00:00:00Z }
 - UI는 IBM Carbon Design System의 토큰(g10, g100)과 패턴(status indicator, notification, tabs, buttons, modal)을 따른다.
 - Carbon CSS 패키지를 그대로 싣지 않는다. `ui/css/theme/contract.css`의 토큰 계약을 `ui/css/theme/carbon.css`가 구현하고, 컴포넌트 CSS는 계약 토큰만 읽는다. `test/ui-tokens.test.ts`가 이를 검사한다.
 - 근거 자료는 [Carbon 사본](../references/carbon-design-system.md)에 있다.
+- 2026-11-18부터 기본 테마는 [soft 테마](2026-11-soft-theme-sidebar.md)다. `carbon.css`는 같은 계약의 두 번째 구현으로 남고, 상태 표시, 알림, 위험 버튼 같은 패턴은 계속 Carbon을 따른다. 탭 줄은 왼쪽 사이드바로 바뀌었다.
 
 ## 이유
 

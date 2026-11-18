@@ -19,7 +19,7 @@ export const unpause: Command = ({ db }) => {
 export const cancel: Command = ({ config, db }, args) => {
   const id = requireId(args)
   const task = wrap(() => requestCancel(db, config, id))
-  console.log(`${id} ${task.status}${task.status === 'failed' ? ' (cancelled)' : ' (cancel requested; the runner stops it)'}`)
+  console.log(`${id} ${task.status}${task.status === 'cancelled' ? '' : ' (cancel requested; the runner stops it)'}`)
 }
 
 export const retry: Command = ({ db }, args) => {

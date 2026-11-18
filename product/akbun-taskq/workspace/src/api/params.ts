@@ -4,7 +4,7 @@ import { HttpError } from './http.ts'
 // Enum values the API accepts. Filters outside these lists are rejected with 400, never passed to SQL.
 export const FILTER_TYPES = ['ops_read', 'ops_change', 'code', 'research', 'security_review'] as const
 export const FILTER_OUTCOMES = ['done', 'failed', 'needs_approval', 'needs_auth', 'review', 'stale'] as const
-export const TASK_STATUSES = ['draft', 'ready', 'running', 'needs_approval', 'needs_auth', 'review', 'done', 'failed'] as const
+export const TASK_STATUSES = ['draft', 'ready', 'running', 'needs_approval', 'needs_auth', 'review', 'done', 'failed', 'cancelled'] as const
 export const PROPOSAL_STATUSES = ['pending', 'applied', 'rejected'] as const
 const LOCK_KEY_MAX = 100
 

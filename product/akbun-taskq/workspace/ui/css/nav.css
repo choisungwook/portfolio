@@ -1,0 +1,91 @@
+/* Sidebar navigation and the bots list, laid out like a chat app's conversation list. Font sizes are in em so the
+   global font size setting scales them with the body text. */
+.avatar {
+  display: inline-flex; align-items: center; justify-content: center; flex: none; border-radius: 50%;
+  color: var(--avatar-eye); font-weight: 800; line-height: 1; letter-spacing: 0; user-select: none;
+}
+.side-bot-row { display: flex; align-items: center; position: relative; }
+.side-bot-row .side-bot { flex: 1; min-width: 0; }
+.side-bot-gear {
+  position: absolute; right: 6px; bottom: 6px; width: 28px; min-height: 28px; padding: 0; border-radius: 50%;
+  color: var(--muted); opacity: 0; transition: opacity var(--ease);
+}
+.side-bot-row:hover .side-bot-gear, .side-bot-gear:focus-visible { opacity: 1; }
+.side-bot-row[data-system="true"] .side-bot { box-shadow: inset 0 -1px 0 var(--border); border-radius: var(--radius) var(--radius) 0 0; }
+.add-bot { width: 28px; min-height: 28px; padding: 0; border-radius: 50%; font-size: 1.2em; color: var(--fg); background: var(--panel-soft); }
+.bot-menu {
+  position: fixed; z-index: 40; min-width: 200px; padding: 6px; margin: 0; list-style: none;
+  background: var(--panel); border-radius: var(--radius); box-shadow: var(--shadow-2), inset 0 0 0 1px var(--border);
+}
+.bot-menu button { display: block; width: 100%; text-align: left; color: var(--fg); padding: 8px 12px; border-radius: var(--radius-s); }
+.bot-menu button.danger { color: var(--danger); }
+.bot-menu hr { border: 0; border-top: 1px solid var(--border); margin: 4px 0; }
+.sidebar {
+  position: sticky; top: 64px; max-height: calc(100vh - 80px); overflow: auto;
+  background: var(--panel); border-radius: var(--radius-l); padding: 16px 8px;
+}
+.side-me { display: flex; flex-direction: column; align-items: center; gap: 6px; padding: 4px 0 16px; }
+.side-me strong { font-size: 1.07em; }
+.side-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 2px; }
+.side-item {
+  display: flex; align-items: center; gap: 12px; width: 100%; min-height: 44px; padding: 6px 12px;
+  border-radius: var(--radius); color: var(--fg); text-align: left; font-size: 1.0em;
+}
+.side-item:hover:not(:disabled) { background: var(--hover); }
+.side-item[aria-current="page"] { background: var(--panel-soft); font-weight: 700; }
+.side-icon { width: 24px; text-align: center; font-size: 1.13em; color: var(--muted); }
+.side-item[aria-current="page"] .side-icon { color: var(--accent); }
+.side-heading { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 16px 12px 6px; }
+.side-heading h2 { margin: 0; font-size: 0.87em; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); }
+.bots-state { display: flex; align-items: center; gap: 4px; }
+.bots-state-label { font-size: var(--text-small); color: var(--muted); }
+.bots-state-label[data-state="running"] { color: var(--done); }
+.bots-state-label[data-state="paused"] { color: var(--needs-approval); }
+.bots-state button { min-height: 28px; padding: 0 8px; font-size: var(--text-small); }
+.side-bots { margin-bottom: 8px; }
+.side-bot { min-height: 64px; padding: 8px 10px; gap: 12px; position: relative; }
+.side-bot .avatar { flex: none; }
+.side-bot[data-enabled="false"] { opacity: 0.5; }
+.side-bot[data-busy="true"] .avatar { animation: bob 1.2s ease-in-out infinite; }
+.side-bot-text { flex: 1; min-width: 0; display: grid; gap: 2px; }
+.side-bot-top { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; }
+.side-bot-top strong { font-size: 1.07em; font-weight: 700; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.side-bot-top time { flex: none; }
+.side-bot-preview {
+  color: var(--muted); font-size: 0.93em; font-weight: 400;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.unread-dot { position: absolute; top: 10px; left: 44px; width: 12px; height: 12px; border-radius: 50%; background: var(--running); box-shadow: 0 0 0 2px var(--panel); }
+@keyframes bob { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-3px); } }
+
+.view-title { font-size: 1.6em; font-weight: 700; margin: 4px 0 16px; }
+
+@media (max-width: 800px) {
+  .sidebar { position: static; max-height: none; padding: 8px; }
+  .side-me { display: none; }
+  .side-list:not(.side-bots) { display: flex; overflow-x: auto; gap: 4px; }
+  .side-list:not(.side-bots) .side-item { white-space: nowrap; }
+}
+.side-me { position: relative; }
+.side-search { position: absolute; top: 0; right: 4px; width: 36px; min-height: 36px; padding: 0; border-radius: 50%; font-size: 1.4em; color: var(--fg); background: var(--panel-soft); }
+.side-search[aria-current="page"] { background: var(--accent); color: var(--on-accent); }
+.avatar-wrap { position: relative; display: inline-flex; flex: none; }
+.sdk-badge {
+  position: absolute; right: -3px; bottom: -3px; display: inline-flex; align-items: center; justify-content: center;
+  border-radius: 50%; background: var(--panel); color: var(--accent); box-shadow: 0 0 0 2px var(--panel); font-weight: 700; line-height: 1;
+}
+.sdk-badge[data-sdk="openai"] { color: var(--fg); }
+.side-avatar { position: relative; display: inline-flex; border-radius: 50%; flex: none; }
+/* A working bot gets a turning ring around its avatar and an accent-colored "Working 12s" line. */
+.side-avatar[data-busy="true"]::before {
+  content: ""; position: absolute; inset: -4px; border-radius: 50%;
+  border: 2px solid transparent; border-top-color: var(--accent); border-right-color: var(--accent); animation: spin 0.9s linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+.side-bot-working { display: flex; align-items: center; gap: 6px; color: var(--accent); font-weight: 600; font-size: 0.93em; }
+.side-bot[data-busy="true"] { background: var(--accent-soft); }
+.side-bot[data-busy="true"] .avatar { animation: none; }
+.side-me .side-title { font-size: 1.6em; font-weight: 800; letter-spacing: -0.02em; padding: 6px 0 4px; }
+.side-me { align-items: flex-start; padding: 4px 12px 14px; }
+.side-icon svg { display: block; margin: 0 auto; }
+.danger-quiet { color: var(--danger); }

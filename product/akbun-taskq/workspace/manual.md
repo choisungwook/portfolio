@@ -68,6 +68,7 @@ cp taskq.config.example.json taskq.config.json
 | `trustedRepos` | [] | 저장소 자체의 Claude 설정까지 로드해도 되는 저장소의 절대 경로 |
 | `retrospect` | true | 태스크가 끝난 뒤 메모 제안을 만들지 여부 |
 | `port` | 4517 | 화면과 API의 포트 |
+| `bots.enabled` | false | 상주 bot을 켠다. 자세한 값은 "10. bot에게 맡기기"에 있다 |
 | `caBundle` | 없음 | 회사 TLS 검사 장비의 CA를 포함한 PEM 파일의 절대 경로. 세션의 `AWS_CA_BUNDLE`(aws CLI)과 `NODE_EXTRA_CA_CERTS`(Claude Code)에 함께 들어간다 |
 
 데이터는 실행한 디렉터리 아래에 생긴다. 다른 곳에 두려면 `TASKQ_HOME`을 지정한다.
@@ -77,6 +78,8 @@ cp taskq.config.example.json taskq.config.json
 | `data/taskq.db` | 모든 태스크와 실행 기록. SQLite 파일 하나 |
 | `outputs/` | 조사 문서와 리뷰 문서 |
 | `memory/` | 적용한 메모 제안 |
+| `team/<bot>/` | bot마다 하나인 작업 폴더. 세션의 작업 디렉터리다 |
+| `wiki/` | bot wiki의 markdown 사본. graphify 같은 도구가 읽는다 |
 
 ## 4. 실행하기
 
@@ -84,6 +87,9 @@ cp taskq.config.example.json taskq.config.json
 
 ```bash
 node bin/taskq run
+taskq bots list | new NAME [--preset P] | delete NAME | reload NAME [skill|plugin] | say [--to NAME] TEXT | inbox | log | turns
+taskq bots threads | close THREAD | wiki [SLUG] | search QUERY | export
+taskq bots assign TASK AGENT|user | pause | resume | enable NAME | disable NAME | reset NAME
 ```
 
 출력된 주소를 연다. 주소 끝의 `#token=...`은 실행할 때마다 바뀌고, 이 토큰이 없으면 화면이 데이터를 받지 못한다. 서버를 다시 시작했다면 새로 출력된 주소로 다시 연다.
@@ -176,12 +182,15 @@ taskq handoff accept HANDOFF_ID
 
 ## 8. 화면 둘러보기
 
-| 탭 | 보는 것 |
+| 왼쪽 메뉴 | 보는 것 |
 |---|---|
 | Calendar | 언제 무엇이 실행됐는지. Day, Week, Month로 바꾸고 Today로 돌아온다. 빗금은 내 승인이나 로그인을 기다린 시간이다 |
 | Board | 상태별 태스크 카드 |
 | Graph | 태스크 사이의 의존 관계 |
 | Proposals | 태스크가 끝난 뒤 올라온 메모 제안. 내용을 보고 Apply 또는 Reject |
+| Bots (왼쪽 메뉴) | bot마다 채팅방처럼 최근 메시지와 시각을 보인다. bot을 누르면 대화 전체가 열리고 거기서 메시지를 보낸다. 맡은 작업은 대화 위에 칩으로 보인다 |
+| Discussions | bot끼리의 토론. 다음 차례, 결론, 결론 없이 닫기 |
+| Wiki | bot이 함께 쓰는 기록. 검색과 본문 보기 |
 | Settings | 접근 skill, 데이터베이스 위치, 현재 설정값(읽기 전용) |
 
 위쪽 검색창은 지난 실행의 요약을 찾는다.
@@ -199,20 +208,139 @@ taskq cancel ID              taskq retry ID [--draft] [--resume]
 taskq pause [--reason TEXT]  taskq unpause
 taskq alerts                 taskq log [--date YYYY-MM-DD]
 taskq search QUERY           taskq skills list | add PATH | remove NAME | discover
+taskq bots list | say | inbox | log | ...      bot과 대화, 설정, wiki (10절)
+taskq workflows list | create FILE | run ID --bot NAME | runs | run-show RUN_ID | approve RUN_ID STEP
+taskq api [OPERATION key=value...]            화면에서 할 수 있는 모든 일. taskq api로 목록을 본다
+taskq mcp                                     같은 operation을 MCP 도구 taskq_<operation>으로 제공
 taskq run
 ```
 
+`taskq api`와 MCP 도구는 화면이 쓰는 API를 그대로 부른다. 예를 들어 `taskq api bot_update name=coder model=claude-sonnet-5-5 effort=high`는 bot 설정 화면에서 바꾸는 것과 같다. Claude Code 같은 MCP 클라이언트에 `taskq mcp`를 등록하면 그 agent가 task, bot, workflow, 공용 폴더, 설정을 모두 다룬다.
+
 `T`는 `research`, `ops_read`, `ops_change`, `code`, `security_review` 중 하나다.
 
-## 10. 처음 쓸 때 직접 확인할 것
+## 10. bot에게 맡기기
+
+bot은 역할을 가진 상주 세션이다. bot마다 Claude Agent SDK와 OpenAI Agents SDK 중 하나를 고르고, 왼쪽 목록에서 아바타 오른쪽 아래 표시(✻ Claude, ◎ OpenAI)로 구별한다. 태스크는 내 작업 노트이고, bot이 자기가 맡은(owner) 태스크를 가져가 직접 처리한 뒤 결과를 남긴다. 처음에는 오케스트레이터 bot `taskq` 하나만 있다. taskq에게 목표를 말하면 태스크로 나눠 알맞은 bot에게 맡기고, 끝나면 결과를 알려준다. 다른 bot은 내가 만든다.
+
+화면 왼쪽 메뉴의 Bots에서 bot을 누르면 그 bot과의 대화를 메신저처럼 본다. `+`로 bot을 만들고, bot의 톱니나 오른쪽 버튼 메뉴로 설정, skill·plugin 다시 불러오기, 새 세션, 끄기, 지우기를 한다. taskq는 맨 위에 고정되고 지우거나 끌 수 없다.
+
+태스크의 시작 버튼은 bot과 상관없는 일회성 실행이다. 지금까지처럼 태스크 종류별 권한과 승인 절차로 한 번 돌고 끝난다. bot이 맡은 태스크도 시작 버튼으로 한 번 돌릴 수 있고, 그 결과는 맡은 bot에게 전달된다.
+
+bot을 만들 때 고를 수 있는 시작 프리셋은 아래와 같다. 만든 뒤 모두 바꿀 수 있다.
+
+| 프리셋 | 하는 일 |
+|---|---|
+| planner | 일을 태스크로 나누고 순서(depends_on)와 우선순위를 정해 bot에게 맡긴다 |
+| coder | 코드 태스크를 맡아 작업 디렉터리에서 고치고 테스트를 돌린 뒤 결과를 남긴다 |
+| reviewer | 변경을 보고 file:line 근거를 붙여 지적한다 |
+| doc-reviewer | 문서와 계획에서 근거 없는 주장과 재현되지 않는 절차를 찾는다 |
+
+bot 설정에서 정하는 것은 아래와 같다.
+
+| 설정 | 기본값 | 뜻 |
+|---|---|---|
+| 권한 모드 | Auto | Claude가 판단하고 위험한 호출은 거절한다. Accept edits, Ask(승인이 필요한 호출은 거절), Plan only, Bypass도 고를 수 있다. bot은 지켜보는 사람이 없으므로 승인을 기다리지 않고 거절한다 |
+| 샌드박스 | 끔 | 켜면 명령이 샌드박스에서 돌고, 쓰기는 작업 디렉터리로, 네트워크는 허용 호스트로 제한된다 |
+| 차단 명령 | 없음 | 줄마다 패턴 하나. `*`만 와일드카드다. `git push*`를 넣으면 `cd app && git push`도 막힌다. 변수나 스크립트 파일로 우회할 수 있으니 꼭 막아야 할 것은 샌드박스로 막는다 |
+| 작업 디렉터리 | bot 폴더 | bot이 일하는 곳. 저장소에서 일할 bot은 저장소 경로를 넣는다 |
+| skill, plugin | 없음 | 설정에 등록된 것 중에서 고른다 |
+
+설정과 관계없이 모든 bot은 taskq의 데이터와 설정 파일을 건드릴 수 없다. 건드리려 하면 그 turn이 멈추고 bot 전체가 멈추며 보안 알림이 뜬다.
+
+bot은 계속 떠 있는 프로세스가 아니다. 메시지가 올 때마다 그 bot의 세션을 이어서 한 번 일하고 멈춘다. 그래서 taskq를 다시 시작해도 대화가 이어지고, 메시지가 없으면 비용이 들지 않는다. 메시지 없이 스스로 깨어나지는 않는다. 나중에 할 일은 bot이 시각을 정한 메시지(`deliver_at`)로 예약하고, 그 시각에 깨어난다. 자기 자신에게는 10분 이상 뒤로만 예약할 수 있다.
+
+작업 하나는 bot 하나가 맡는다(owner). 맡은 bot만 그 태스크를 시작할 수 있고, 시작하면 Board에서 실행 중으로 바뀌고 Calendar에 그 bot의 실행으로 남는다. 계정을 건드리는 초안은 내가 Queued로 바꿔야 bot이 시작할 수 있다. Board 카드의 `@coder` 같은 배지와 bot 대화 위의 작업 칩이 누가 무엇을 맡았는지 보여준다. 작업 상세의 Owner에서 다른 bot에게 넘기거나 되찾는다. taskq나 planner 역할 bot이 내 작업을 가져가면 Must check에 알림이 뜬다. bot이 열려 있는 작업과 비슷한 작업을 만들려 하면 거절되고 그 작업의 owner와 이야기하라는 답을 받는다. 이 비슷함 검사는 글자 겹침으로만 판단해서 표현이 다르면 놓치고, 비슷한 문장의 다른 작업을 잘못 막기도 한다.
+
+여러 bot의 의견이 필요한 질문은 토론으로 한다. 토론을 연 bot이 참가자와 라운드 수를 정하고, 참가자는 순서대로 앞사람의 말을 보고 의견을 낸다. 라운드가 끝나면 연 bot이 결론을 wiki에 남기고 필요한 작업을 맡긴다. 결론을 내지 않으면 토론은 결론 없이 닫히고 알림이 뜬다. Discussions 화면이나 `taskq bots close`로 직접 닫을 수도 있다.
+
+bot이 할 수 있는 일은 bot 설정의 권한 모드, 샌드박스, 차단 명령이 정한다. bot이 만든 계정 조회·변경 태스크는 항상 초안으로 들어가므로, Board에서 내가 보고 Queued로 바꿔야 실행된다.
+
+OpenAI bot은 bot 설정의 Agent SDK에서 고른다. taskq를 실행하는 환경에 `OPENAI_API_KEY`가 있어야 한다. OpenAI Agents SDK에는 auto 모드가 없어서 권한 모드가 bot이 받는 도구를 정한다. Plan은 파일 읽기만, Accept edits는 bot 폴더와 공용 폴더에 쓰기까지, Bypass는 셸 명령까지(샌드박스를 켜면 셸은 빠진다). 비용은 토큰 수에 설정 파일의 `bots.openaiInputPerMTok`, `bots.openaiOutputPerMTok` 단가를 곱한 추정치로 하루 예산에 들어간다.
+
+정해진 순서로 일을 시키려면 Workflows를 쓴다. 왼쪽 메뉴의 Workflows에서 단계(실행, 검증, 다른 bot에 넘김, 사용자 승인)와 순서를 그래프로 만들고, 새 작업 창에서 Bot과 Workflow를 고르거나 작업 상세의 Workflow 행에서 지정한다. 그 bot이 작업을 시작하면 단계마다 결과를 보고한다. 검증 단계는 실행한 명령과 출력을 증거로 남겨야 성공하고, 승인 단계는 내가 실행 기록 화면에서 승인해야 넘어간다. 성공은 bot의 말이 아니라 모든 단계가 끝났는지로 taskq가 판정한다. 실행 기록에는 어느 bot이 언제 실행했는지와, 지운 workflow면 "삭제됨"이 남는다. bot 없이 workflow만 지정한 작업은 큐가 실행하지 않는다.
+
+bot을 쓰려면 설정 파일에 `bots`를 넣고 다시 시작한다.
+
+```json
+"bots": {
+  "enabled": true,
+  "dailyBudgetUsd": 10,
+  "readRoots": ["/Users/me/work"]
+}
+```
+
+| 키 | 기본값 | 뜻 |
+|---|---|---|
+| `enabled` | false | 팀을 켠다 |
+| `dailyBudgetUsd` | 10 | 자정 이후 bot 턴 비용과, bot이 맡은 뒤 실행된 태스크 비용을 합한 상한. 넘으면 bot이 멈춘다. 이미 큐에 들어간 태스크는 큐를 멈춰야 멈춘다 |
+| `hourlyTurnsPerAgent` | 20 | bot 하나가 1시간에 할 수 있는 턴 수. bot끼리 메시지를 주고받는 루프를 막는다. 넘으면 bot이 멈춘다 |
+| `turnMaxTurns`, `turnBudgetUsd` | 30, 1 | bot 턴 한 번의 모델 턴 수와 비용 상한 |
+| `maxOpenTasks` | 10 | bot이 맡은 태스크 중 대기, 실행, 승인 대기, 로그인 대기 상태인 것의 최대 개수. 초안과 리뷰 대기는 세지 않는다 |
+| `maxConcurrentTurns` | 2 | 동시에 일하는 bot 수 |
+| `maxAttempts` | 3 | 같은 메시지로 실패한 턴이 이 횟수가 되면 그 메시지를 내려놓고 알림을 띄운다 |
+| `readRoots` | [] | bot이 만드는 code 태스크의 저장소로 쓸 수 있는 디렉터리. 시작 버튼으로 돌 때의 권한 경계다 |
+| `personaSkill` | 없음 | 나 대신 판단할 기준을 담은 skill 폴더의 절대 경로. taskq는 내 결정이 아닌 선택을 할 때, reviewer와 doc-reviewer는 리뷰할 때 읽는다. 승인을 대신하지 않는다 |
+
+일을 맡기고 결과를 받는 명령은 아래와 같다. 화면에서는 왼쪽 메뉴의 taskq를 눌러 같은 일을 한다.
+
+```bash
+taskq bots say "README의 설치 절차를 실제로 따라 해 보고 틀린 곳을 고쳐줘. 저장소는 /Users/me/work/app"
+taskq bots inbox
+taskq bots log
+taskq bots wiki
+```
+
+taskq가 나에게 보낸 메시지는 Must check에도 "Message from a bot"으로 뜨고, 메뉴의 taskq 옆에 파란 점이 붙는다. CLI로 보낸 메시지는 실행 중인 taskq가 `pollSec`(기본 60초) 안에 가져가고, 화면에서 보낸 메시지는 바로 전달된다.
+
+bot이 공유하는 기억은 wiki다. bot은 일을 시작하기 전에 wiki를 찾고, 결정과 출처가 있는 사실, 진행 상태를 적는다. 세션을 새로 시작해도(`taskq bots reset NAME`) wiki는 남는다.
+
+wiki 검색은 단어의 일부로도 찾는다. "검색률"로 "검색률이"가 들어간 페이지를 찾고, 맞은 페이지가 `[[slug]]`로 가리키는 페이지도 함께 보여준다. 같은 뜻의 다른 단어는 찾지 못한다. 페이지는 `TASKQ_HOME/wiki/` 아래 markdown 파일로도 저장되므로, graphify 같은 도구로 이 폴더의 지식 그래프를 만들 수 있다. 결과가 `wiki/graphify-out/GRAPH_REPORT.md`에 있으면 bot이 읽는다. 이 파일들은 사본이라 고쳐도 wiki에 반영되지 않는다.
+
+```bash
+taskq bots search 검색률
+taskq bots export
+```
+
+글로벌 설정(헤더의 Settings)에서 정하는 것은 아래와 같다.
+
+- Appearance: 글꼴과 글자 크기. 바꾸는 즉시 앱 전체에 적용된다.
+- Queue: 맡은 bot이 없는 태스크를 큐가 스스로 실행할지. 끄면 시작 버튼을 눌러야만 실행된다.
+- 왼쪽 메뉴의 Plugins: bot이 쓸 skill 폴더와 plugin 폴더를 등록하고 보고 업데이트하고 지운다. Anthropic 공식 plugin 목록도 보이지만 설치하지는 않는다. 각 bot은 자기 설정에서 고른다. bot은 고른 것을 복사해 두고 쓰므로, skill 파일을 고친 뒤에는 bot의 오른쪽 버튼 메뉴에서 Reload skills를 눌러야 반영된다.
+
+bot은 내 Claude Code 설정(~/.claude의 권한 규칙, hook, skill)을 읽지 않는다. bot 설정 화면에 보이는 것만으로 동작한다.
+
+멈춘 bot을 Resume하면 예산과 턴 수 계산이 그 시점부터 다시 시작된다. 상한에 걸린 원인을 확인하고 켠다. 메시지를 보내거나 작업을 만든 뒤 실패한 턴은 같은 일을 반복하지 않도록 다시 돌리지 않는다. 이때 Must check에 어떤 메시지를 내려놓았는지 뜨므로, 필요하면 다시 보낸다.
+
+bot과 대화할 때 쓰는 기능은 아래와 같다.
+
+| 하고 싶은 것 | 방법 |
+|---|---|
+| 일하는 중인지 보기 | 왼쪽 메뉴에서 그 bot 아바타 둘레에 고리가 돌고 "작업 중 12s"가 보인다. 대화 화면 아래에도 작업 바가 뜬다 |
+| 하던 일 멈추기 | 대화 입력창에서 Esc, 작업 바의 중단, 또는 bot 오른쪽 버튼 메뉴의 진행 중 작업 취소. 그 turn은 취소됨으로 남고, bot이 실행 중이던 태스크는 취소됨 상태가 된다 |
+| 파일 주기 | 대화나 새 작업 창에 파일을 끌어다 놓거나, 스크린샷을 붙여넣거나, `+`로 고른다. 파일은 공용 폴더의 `attachments/`에 저장된다 |
+| 대화 안에서 찾기 | 대화 화면에서 Cmd/Ctrl+F |
+| 모든 대화에서 찾기 | 왼쪽 위 돋보기 또는 Cmd/Ctrl+K. 한글과 영어 모두 단어 일부로 찾는다 |
+| bot끼리 파일 나누기 | 공용 폴더(`TASKQ_HOME/shared`). 모든 bot이 같은 경로로 읽고 쓰고, 왼쪽 메뉴의 공용 폴더에서 보고 올리고 받는다 |
+| bot이 기억할 것 고치기 | bot 오른쪽 버튼 메뉴의 메모리. bot이 매 turn 읽는 자기 메모다 |
+| skill·plugin 새 버전 받기 | Plugins 메뉴에서 업데이트. git 저장소면 받아 오고 쓰는 bot을 모두 다시 불러온다 |
+| 일하는 bot에게 더 말하기 | 그냥 보낸다. Claude bot은 진행 중인 turn에서 바로 받아 처리하고, OpenAI bot과 자리가 없는 bot은 메시지를 쌓아 두었다가 다음 turn에 처리한다. 쌓인 수가 대화 아래에 보인다 |
+| 모델, effort, 권한 바꾸기 | 입력창 아래 메뉴. 다음 turn부터 적용된다. ↻는 skill·plugin을 다시 읽고 모델과 명령 목록을 새로 불러온다 |
+| skill을 slash command로 쓰기 | 입력창에 `/`를 치고 고른다. `/이름 인자`로 보내면 bot이 그 skill로 처리한다 |
+
+설정 화면에서는 언어(한국어 기본, English), 테마(시스템, 다크, 라이트), 사용량 제한(하루 예산, 전체와 bot별 시간당 turn, 동시에 일하는 bot, turn당 예산과 모델 턴), 폴더 열기(공용 폴더, 세션 대화 기록, 데이터 폴더)를 정한다. 모두 `TASKQ_HOME/data/taskq.db`에 저장되므로 taskq를 닫았다 열거나 새 버전으로 바꿔도 그대로 남는다. 같은 `TASKQ_HOME`을 쓰면 된다.
+
+## 11. 처음 쓸 때 직접 확인할 것
 
 아래는 실제 모델 세션 없이 검증했기 때문에, 내 기기에서 한 번씩 확인한다.
 
 - 조회 태스크의 AWS 명령이 샌드박스 안에서 엔드포인트에 닿는지. 안 닿으면 `sandbox.allowedDomains`에 호스트를 추가한다.
 - `auto` 권한 모드를 내 계정과 모델에서 쓸 수 있는지. 안 되면 `autoMode`를 false로 둔다.
 - 변경 태스크가 변경 명령 앞에서 승인을 묻는지. 내 Claude 설정에 allow 규칙이 있어도 묻는지 본다.
+- bot의 Esc 취소가 실제 세션을 멈추는지, 첨부한 파일을 bot이 읽는지.
+- bot을 켰다면 `taskq bots say "hello"` 뒤 `taskq bots turns`에 턴이 done으로 남는지, `taskq bots inbox`에 taskq의 답이 오는지. 세션 이어받기, bot 도구 호출, 읽기 경로 제한은 가짜 SDK로만 시험했다.
 
-## 11. 자주 겪는 문제
+## 12. 자주 겪는 문제
 
 | 증상 | 원인과 해결 |
 |---|---|
@@ -221,6 +349,7 @@ taskq run
 | 태스크가 계속 "Login needed"다 | 대상 계정 로그인이 만료됐다. 터미널에서 로그인한 뒤 Resume |
 | 조회 태스크에서 명령이 거부된다 | 조회 전용 규칙에 없는 명령이다. 변경이 필요하면 Task의 기본 모드(Change an account)로 만든다 |
 | 태스크가 "Interrupted"로 남는다 | 실행 중에 프로세스가 죽었다. 다음 실행에서 이전 세션을 이어받는다 |
+| Must check에 "Bots paused"가 떠 있다 | 일일 예산을 다 썼거나, bot 하나가 1시간 턴 상한을 넘었거나(메시지 루프 의심), 모델 로그인이 실패했거나, bot이 taskq 데이터를 읽으려 했다. `taskq bots log`로 원인을 보고 `taskq bots resume`이나 메뉴 Bots 옆의 Resume으로 다시 켠다 |
 | 고친 화면이 안 보인다 | 브라우저를 새로 고친다 |
 | 회사 네트워크에서 `certificate verify failed`나 `self-signed certificate in certificate chain`이 뜬다 | TLS 검사 장비가 인증서를 자기 CA로 다시 서명한다. 그 CA를 넣은 PEM 파일을 `caBundle`에 적고 다시 시작한다 |
 

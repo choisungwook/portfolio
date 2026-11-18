@@ -72,3 +72,10 @@ export function startRunner(options: RunnerOptions): Runner {
 export async function stopRunners(): Promise<void> {
   await Promise.all(live.splice(0).map((runner) => runner.stop()))
 }
+
+// The orchestrator taskq plus one bot per preset, named after the preset. Bot tests use this roster.
+export async function seedTestBots(db: Db): Promise<void> {
+  const { seedAgents } = await import('../src/db/team.ts')
+  const { BOT_DEFAULTS, PRESETS, ROSTER } = await import('../src/team/roster.ts')
+  seedAgents(db, [...ROSTER, ...Object.entries(PRESETS).map(([name, preset]) => ({ ...BOT_DEFAULTS, ...preset, name }))])
+}

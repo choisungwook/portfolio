@@ -24,7 +24,8 @@ defaults:
     working-directory: product/akbun-taskq/workspace
 
 jobs:
-  verify:
+  # Type check, changelog and docs coverage run next to the tests instead of before them.
+  checks:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
@@ -56,17 +57,43 @@ jobs:
       - name: Build
         run: npm run build
 
+      # Docs an agent relies on must cover the code: every API route, every Agent SDK option and every bot tool, plus a
+      # changelog entry with an SDK section for the version being built, and every route reachable from the CLI and MCP.
+      - name: Check docs and operations cover routes, SDK options and the changelog
+        run: node --test test/docs-coverage.test.ts test/ops-coverage.test.ts
+        env:
+          TASKQ_NO_NOTIFY: '1'
+
+  # The test files are split into two shards that run as parallel jobs; inside a job node --test runs files in parallel.
+  tests:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2]
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: product/akbun-taskq/workspace/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
       # Pull requests run only the tests marked [critical]: the invariants whose
       # failure is an incident (approval, gating, auth, masking, claim, paths).
       # Worker, SDK and notifier are fakes, so no credentials and no model call.
       - name: Run critical tests
         if: github.event_name == 'pull_request'
-        run: npm run test:critical
+        run: node --test --test-shard=${{ matrix.shard }}/2 --test-name-pattern="\[critical\]" "test/**/*.test.ts"
         env:
           TASKQ_NO_NOTIFY: '1'
 
       - name: Run all tests
         if: github.event_name != 'pull_request'
-        run: npm test
+        run: node --test --test-shard=${{ matrix.shard }}/2 "test/**/*.test.ts"
         env:
           TASKQ_NO_NOTIFY: '1'

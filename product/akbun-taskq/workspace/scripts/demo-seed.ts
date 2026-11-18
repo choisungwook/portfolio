@@ -11,6 +11,8 @@ import { raiseAlert } from '../src/alerts/rules.ts'
 import { registerSkill } from '../src/skills/registry.ts'
 import { agentFor } from '../src/agents/index.ts'
 import { TASKS } from './demo-data.ts'
+import { seedTeam } from './demo-team.ts'
+import { seedWorkflows } from './demo-workflows.ts'
 import { seedRuns, type SeededRun } from './demo-runs.ts'
 
 type AlertArg = Parameters<typeof raiseAlert>[1]
@@ -138,6 +140,10 @@ export async function seedDemo(db: Db, config: Config, home: string, configDir: 
   const { runs, controller } = seedRuns(db, config, tasks, now)
   seedProposals(db, tasks, now)
   seedAlerts(db, tasks, runs)
+  const all = [...tasks.values()]
+  seedTeam(db, (all.find((t) => t.type === 'code') ?? all[0]).id,
+    all.filter((t) => !['done', 'failed'].includes(t.status)).slice(0, 6).map((t) => t.id))
+  seedWorkflows(db, (all.find((t) => t.type === 'code') ?? all[0]).id)
   await pauseLikeRunner(db, config)
   return controller
 }

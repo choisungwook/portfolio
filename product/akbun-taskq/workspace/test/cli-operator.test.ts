@@ -28,7 +28,7 @@ describe('taskq pause, unpause, cancel, retry', () => {
       const waiting = addTask(db, { type: 'ops_read', data: { intent: 'login first' } })
       setStatus(db, waiting.id, 'needs_auth')
       cancel({ config, db }, [waiting.id])
-      assert.equal(getTask(db, waiting.id)!.status, 'failed')
+      assert.equal(getTask(db, waiting.id)!.status, 'cancelled')
 
       const failed = addTask(db, { data: { intent: 'failed' } })
       setStatus(db, failed.id, 'failed')
@@ -45,7 +45,7 @@ describe('taskq pause, unpause, cancel, retry', () => {
     assert.equal(logs.length, 4)
     assert.equal(logs[0], 'queue paused')
     assert.equal(logs[1], 'queue resumed')
-    assert.match(logs[2], / failed \(cancelled\)$/)
+    assert.match(logs[2], / cancelled$/)
     assert.match(logs[3], / draft$/)
   })
 })

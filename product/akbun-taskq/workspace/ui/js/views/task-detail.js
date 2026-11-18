@@ -7,6 +7,9 @@ import { ACTION_STATUS, label, outcomeOf, parseField, TYPE_MARK } from '../core/
 import { statusIndicator } from '../core/status.js'
 import { runNowButton } from '../core/run-now.js'
 import { approvalPanel } from './approval-panel.js'
+import { ownerValue } from './owner-picker.js'
+import { workflowValue } from './task-workflow.js'
+import { download } from './bot-chat.js'
 import { operatorControls } from './operator-controls.js'
 
 let dialog
@@ -18,6 +21,7 @@ export function initTaskDetail() {
   dialog = area('task-detail')
   body = area('task-body')
   dialog.querySelector('[data-close]').addEventListener('click', () => dialog.close())
+  on('open-workflow-run', () => dialog.close())
   on('open-task', openTask)
   // The Review button on an approval alert or in the must-check list: open the task at its approval panel.
   on('review-approval', (id) => {
@@ -75,6 +79,12 @@ function sections(task, events, graph, titles, settings) {
       el('dt', { text: 'Claimed by' }), el('dd', { text: task.claimed_by ?? 'none' }),
       el('dt', { text: 'Session' }), el('dd', { text: task.session_id ?? 'none' }),
       el('dt', { text: 'Access skill' }), el('dd', {}, accessSkillValue(data, settings)),
+      el('dt', { text: 'Owner' }), ownerValue(task, () => {
+        if (dialog.open && currentId === task.id) fill(task.id)
+      }),
+      el('dt', { text: 'Workflow' }), workflowValue(task, () => {
+        if (dialog.open && currentId === task.id) fill(task.id)
+      }),
     ),
     actionButtons(task),
     operatorControls(task, () => {
@@ -83,6 +93,9 @@ function sections(task, events, graph, titles, settings) {
     task.pending_approval ? approvalPanel(task, task.pending_approval) : null,
     el('h3', { text: 'Intent' }),
     el('p', { class: 'pre', text: data.intent }),
+    ...(data.attachments?.length ? [el('h3', { text: 'Attachments' }), el('div', { class: 'msg-files' }, ...data.attachments.map((path) => el('button', {
+      type: 'button', class: 'file-chip', text: path.split('/').pop(), title: path, onclick: () => download(path),
+    })))] : []),
     el('h3', { text: 'Cautions' }),
     el('p', { class: 'pre', text: data.cautions ?? 'None.' }),
     el('h3', { text: 'Runs' }),

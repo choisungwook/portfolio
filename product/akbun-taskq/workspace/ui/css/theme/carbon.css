@@ -46,8 +46,18 @@
   --stale: #6f6f6f;         /* gray 60: not started or interrupted */
   --high: #ba4e00;
 
+  --avatar-1: #f1c21b;
+  --avatar-2: #ff832b;
+  --avatar-3: #8a3ffc;
+  --avatar-4: #da1e28;
+  --avatar-5: #0f62fe;
+  --avatar-6: #198038;
+  --avatar-user: #ffffff;
+  --avatar-eye: #161616;
+
   --radius: 0;
   --radius-s: 0;
+  --radius-l: 0;
   --shadow-1: none;
   --shadow-2: 0 2px 6px rgba(0, 0, 0, 0.3);
   --ease: 110ms cubic-bezier(0.2, 0, 0.38, 0.9);  /* duration-fast-02, productive standard */

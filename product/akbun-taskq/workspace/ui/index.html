@@ -5,11 +5,14 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>akbun-taskq</title>
 <link rel="stylesheet" href="css/theme/contract.css">
-<link rel="stylesheet" href="css/theme/carbon.css">
+<link rel="stylesheet" href="css/theme/soft.css">
 <link rel="stylesheet" href="css/base.css">
 <link rel="stylesheet" href="css/calendar.css">
 <link rel="stylesheet" href="css/work.css">
 <link rel="stylesheet" href="css/panels.css">
+<link rel="stylesheet" href="css/nav.css">
+<link rel="stylesheet" href="css/chat.css">
+<link rel="stylesheet" href="css/workflows.css">
 <link rel="stylesheet" href="css/settings.css">
 </head>
 <body>
@@ -17,19 +20,19 @@
   <h1>akbun-taskq</h1>
   <form class="search" role="search" data-area="search">
     <label class="sr-only" for="search-input">Search past runs</label>
-    <input id="search-input" type="search" name="q" maxlength="200" placeholder="Search past runs">
-    <button type="submit" class="quiet">Search</button>
+    <input id="search-input" type="search" name="q" maxlength="200" placeholder="Search past runs" data-i18n-placeholder="header.search_runs">
+    <button type="submit" class="quiet" data-i18n="header.search">Search</button>
   </form>
   <button type="button" class="primary-button" data-area="new-task-button">
     <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"></path></svg>
-    <span>New task</span>
+    <span data-i18n="header.new_task">New task</span>
   </button>
   <button type="button" class="settings-button" data-area="settings-button" title="Settings">
     <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round" aria-hidden="true">
       <path d="M10.0 4.7 L10.4 1.9 L13.6 1.9 L14.0 4.7 L15.8 5.4 L18.0 3.7 L20.3 6.0 L18.6 8.2 L19.3 10.0 L22.1 10.4 L22.1 13.6 L19.3 14.0 L18.6 15.8 L20.3 18.0 L18.0 20.3 L15.8 18.6 L14.0 19.3 L13.6 22.1 L10.4 22.1 L10.0 19.3 L8.2 18.6 L6.0 20.3 L3.7 18.0 L5.4 15.8 L4.7 14.0 L1.9 13.6 L1.9 10.4 L4.7 10.0 L5.4 8.2 L3.7 6.0 L6.0 3.7 L8.2 5.4Z"></path>
       <circle cx="12" cy="12" r="3.2"></circle>
     </svg>
-    <span>Settings</span>
+    <span data-i18n="header.settings">Settings</span>
   </button>
   <div class="notice" data-area="notice"><span class="notice-text" role="status" aria-live="polite"></span></div>
 </header>
@@ -44,15 +47,35 @@
 </section>
 
 <div class="layout">
+  <nav class="sidebar" data-area="sidebar" aria-label="Navigation">
+    <div class="side-me">
+      <strong class="side-title">akbun-taskq</strong>
+      <button type="button" class="side-search" data-view="search" data-i18n-title="nav.search" title="Search every bot conversation">⌕</button>
+    </div>
+    <ul class="side-list" data-area="side-views">
+      <li><button type="button" class="side-item" data-view="calendar"><span class="side-icon" aria-hidden="true">◷</span><span data-i18n="nav.calendar">Calendar</span></button></li>
+      <li><button type="button" class="side-item" data-view="board"><span class="side-icon" aria-hidden="true">▤</span><span data-i18n="nav.board">Board</span></button></li>
+      <li><button type="button" class="side-item" data-view="graph"><span class="side-icon" aria-hidden="true">⋔</span><span data-i18n="nav.graph">Graph</span></button></li>
+      <li><button type="button" class="side-item" data-view="proposals"><span class="side-icon" aria-hidden="true">✎</span><span data-i18n="nav.proposals">Proposals</span></button></li>
+    </ul>
+    <div class="side-heading">
+      <h2 id="bots-heading" data-i18n="nav.bots">Bots</h2>
+      <div class="bots-state" data-area="bots-state"></div>
+      <button type="button" class="add-bot" data-area="bot-add" aria-label="Add a bot" title="Add a bot" data-i18n-title="bots.add">+</button>
+    </div>
+    <ul class="side-list side-bots" data-area="bot-list" aria-labelledby="bots-heading"></ul>
+    <ul class="side-list" data-area="side-shared">
+      <li><button type="button" class="side-item" data-view="discussions"><span class="side-icon" aria-hidden="true">❝</span><span data-i18n="nav.discussions">Discussions</span></button></li>
+      <li><button type="button" class="side-item" data-view="shared"><span class="side-icon" aria-hidden="true"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><path d="M3 6.5a1.5 1.5 0 0 1 1.5-1.5h4.4l2 2.2h8.6A1.5 1.5 0 0 1 21 8.7v9.8a1.5 1.5 0 0 1-1.5 1.5h-15A1.5 1.5 0 0 1 3 18.5z"/></svg></span><span data-i18n="nav.shared">Shared folder</span></button></li>
+      <li><button type="button" class="side-item" data-view="workflows"><span class="side-icon" aria-hidden="true"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><rect x="3" y="4" width="6" height="5" rx="1.2"/><rect x="15" y="4" width="6" height="5" rx="1.2"/><rect x="9" y="15" width="6" height="5" rx="1.2"/><path d="M6 9v2.5h12V9M12 11.5V15"/></svg></span><span data-i18n="nav.workflows">Workflows</span></button></li>
+      <li><button type="button" class="side-item" data-view="plugins"><span class="side-icon" aria-hidden="true"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><path d="M9 4h3.5v1.5a1.8 1.8 0 1 0 3.5 0V4H20v4.5h-1.5a1.8 1.8 0 1 0 0 3.5H20V20h-4.5v-1.5a1.8 1.8 0 1 0-3.5 0V20H4v-4.5h1.5a1.8 1.8 0 1 0 0-3.5H4V8h5z"/></svg></span><span data-i18n="nav.plugins">Plugins</span></button></li>
+      <li><button type="button" class="side-item" data-view="wiki"><span class="side-icon" aria-hidden="true">✦</span><span data-i18n="nav.wiki">Wiki</span></button></li>
+    </ul>
+  </nav>
   <main class="main" tabindex="-1">
-    <nav class="tabs" role="tablist" aria-label="Views">
-      <button type="button" role="tab" id="tab-calendar" data-tab="calendar" aria-controls="view-calendar">Calendar</button>
-      <button type="button" role="tab" id="tab-board" data-tab="board" aria-controls="view-board">Board</button>
-      <button type="button" role="tab" id="tab-graph" data-tab="graph" aria-controls="view-graph">Graph</button>
-      <button type="button" role="tab" id="tab-proposals" data-tab="proposals" aria-controls="view-proposals">Proposals</button>
-    </nav>
 
-    <section id="view-calendar" role="tabpanel" aria-labelledby="tab-calendar" data-area="calendar">
+
+    <section id="view-calendar" data-view-panel="calendar" aria-label="Calendar" data-area="calendar">
       <div class="cal-toolbar" data-area="calendar-toolbar">
         <div class="cal-nav">
           <button type="button" class="cal-today" data-area="calendar-today">Today</button>
@@ -86,29 +109,127 @@
       <p class="legend" data-area="calendar-legend"></p>
     </section>
 
-    <section id="view-board" role="tabpanel" aria-labelledby="tab-board" data-area="board" hidden>
+    <section id="view-board" data-view-panel="board" aria-label="Board" data-area="board" hidden>
       <div class="board-columns" data-area="board-columns"></div>
     </section>
 
-    <section id="view-graph" role="tabpanel" aria-labelledby="tab-graph" data-area="graph" hidden>
+    <section id="view-graph" data-view-panel="graph" aria-label="Graph" data-area="graph" hidden>
       <p class="legend">Solid arrow = blocks. Dashed arrow = discovered from. Thick outline = failed, waiting for a person, or has stale runs.</p>
       <div data-area="graph-canvas"></div>
     </section>
 
-    <section id="view-proposals" role="tabpanel" aria-labelledby="tab-proposals" data-area="proposals" hidden>
+    <section id="view-proposals" data-view-panel="proposals" aria-label="Proposals" data-area="proposals" hidden>
       <div data-area="proposal-list"></div>
+    </section>
+
+    <section id="view-bot" class="chat" data-view-panel="bot" aria-label="Bot conversation" data-area="bot-chat" hidden>
+      <header class="chat-head" data-area="bot-head"></header>
+      <div class="chat-find" data-area="chat-find" hidden>
+        <input type="search" data-area="chat-find-input" data-i18n-placeholder="chat.find" placeholder="Find in this conversation" aria-label="Find in this conversation">
+        <span class="meta" data-area="chat-find-count"></span>
+        <button type="button" data-area="chat-find-prev" aria-label="Previous match">↑</button>
+        <button type="button" data-area="chat-find-next" aria-label="Next match">↓</button>
+        <button type="button" data-area="chat-find-close" aria-label="Close">×</button>
+      </div>
+      <div class="chat-log" data-area="bot-log"></div>
+      <div class="chat-working" data-area="chat-working" role="status" aria-live="polite" hidden></div>
+      <form class="chat-compose" data-area="bot-compose">
+        <div class="attach-chips" data-area="bot-attachments" hidden></div>
+        <ul class="slash-list" data-area="bot-slash" role="listbox" aria-label="Slash commands" hidden></ul>
+        <div class="compose-row">
+          <button type="button" class="attach-button" data-area="bot-attach" data-i18n-title="chat.attach" title="Attach files" aria-label="Attach files">＋</button>
+          <label class="sr-only" for="bot-input">Message</label>
+          <textarea id="bot-input" data-area="bot-input" rows="1" maxlength="8000" placeholder="Message"></textarea>
+          <button type="submit" data-i18n="chat.send">Send</button>
+        </div>
+        <div class="compose-tools" data-area="bot-tools"></div>
+        <p class="drop-hint" data-i18n="chat.drop">Drop files here to attach them</p>
+      </form>
+    </section>
+
+    <section id="view-discussions" data-view-panel="discussions" aria-label="Discussions" data-area="discussions" hidden>
+      <h2 class="view-title" data-i18n="discussions.title">Discussions</h2>
+      <ul class="thread-list" data-area="thread-list"></ul>
+    </section>
+
+    <section id="view-search" data-view-panel="search" aria-label="Search" data-area="search-view" hidden>
+      <h2 class="view-title" data-i18n="search.title">Search every bot conversation</h2>
+      <form class="wiki-search" data-area="msg-search" role="search">
+        <input type="search" data-area="msg-query" data-i18n-placeholder="search.placeholder" placeholder="Search in Korean or English" aria-label="Search every bot conversation">
+      </form>
+      <ul class="search-hits" data-area="msg-hits"></ul>
+    </section>
+
+    <section id="view-shared" data-view-panel="shared" aria-label="Shared folder" data-area="shared-view" hidden>
+      <h2 class="view-title" data-i18n="shared.title">Shared folder</h2>
+      <p class="meta" data-i18n="shared.hint">Every bot reads and writes this folder at the same path. Attached files are saved under attachments/.</p>
+      <div class="shared-bar">
+        <nav class="shared-crumbs" data-area="shared-crumbs" aria-label="Folder path"></nav>
+        <button type="button" data-area="shared-upload" data-i18n="shared.upload">Upload files</button>
+        <button type="button" data-area="shared-open" data-i18n="shared.open">Open in file manager</button>
+      </div>
+      <div class="shared-drop" data-area="shared-drop">
+        <div class="attach-chips" data-area="shared-chips" hidden></div>
+        <ul class="shared-list" data-area="shared-list"></ul>
+      </div>
+    </section>
+
+    <section id="view-plugins" data-view-panel="plugins" aria-label="Plugins" data-area="plugins-view" hidden>
+      <h2 class="view-title" data-i18n="nav.plugins">Plugins</h2>
+      <p class="meta" data-i18n="plugins.hint">Skills and plugins registered here can be chosen per bot in its settings. Update pulls a git checkout and reloads every bot that uses it.</p>
+    <section class="plugins-section" aria-labelledby="bot-skills-title">
+      <h3 class="plugins-heading" id="bot-skills-title" data-i18n="settings.skills">Skills for bots</h3>
+      <p class="meta">Agent skill folders (with SKILL.md) that bots can load. Each bot picks its own in its settings.</p>
+      <ul class="skill-list" data-area="registry-skill"></ul>
+      <form class="skill-path-form" data-area="registry-skill-form">
+        <label>Path to a skill folder <input name="path" type="text" maxlength="500" autocomplete="off" spellcheck="false" placeholder="/absolute/path/to/skill"></label>
+        <button type="submit">Add</button>
+      </form>
+    </section>
+    <section class="plugins-section" aria-labelledby="bot-plugins-title">
+      <h3 class="plugins-heading" id="bot-plugins-title" data-i18n="settings.plugins">Plugins for bots</h3>
+      <p class="meta">Claude Code plugin folders (with .claude-plugin/plugin.json): skills, commands, hooks and MCP servers together.</p>
+      <ul class="skill-list" data-area="registry-plugin"></ul>
+      <form class="skill-path-form" data-area="registry-plugin-form">
+        <label>Path to a plugin folder <input name="path" type="text" maxlength="500" autocomplete="off" spellcheck="false" placeholder="/absolute/path/to/plugin"></label>
+        <button type="submit">Add</button>
+      </form>
+    </section>
+      <section class="plugins-section" aria-labelledby="official-title">
+        <div class="plugins-head">
+          <h3 id="official-title" class="plugins-heading" data-i18n="plugins.official">Official marketplace</h3>
+          <label class="check"><input type="checkbox" data-area="official-anthropic" checked> <span data-i18n="plugins.anthropic_only">Anthropic only</span></label>
+          <input type="search" data-area="official-filter" data-i18n-placeholder="plugins.filter" placeholder="Filter" aria-label="Filter the official plugins">
+        </div>
+        <p class="meta" data-i18n="plugins.official_hint">The plugins in Anthropic's official marketplace, listed for reference. Nothing is installed: clone one and register its folder above to use it.</p>
+        <ul class="official-list" data-area="official-list"></ul>
+      </section>
+    </section>
+
+    <section id="view-workflows" data-view-panel="workflows" aria-label="Workflows" data-area="workflows-view" hidden></section>
+
+    <section id="view-wiki" data-view-panel="wiki" aria-label="Wiki" data-area="wiki" hidden>
+      <h2 class="view-title" data-i18n="wiki.title">Wiki</h2>
+      <form class="wiki-search" data-area="wiki-search" role="search">
+        <input type="search" data-area="wiki-query" aria-label="Search the bots' wiki" placeholder="Search the wiki">
+        <button type="submit" class="quiet">Search</button>
+      </form>
+      <div class="wiki-layout">
+        <ul class="wiki-list" data-area="wiki-list"></ul>
+        <article class="wiki-page" data-area="wiki-page" hidden></article>
+      </div>
     </section>
   </main>
 
   <aside class="must-check" data-area="alerts-panel" aria-labelledby="must-check-title">
-    <h2 id="must-check-title">Must check</h2>
+    <h2 id="must-check-title" data-i18n="panel.must_check">Must check</h2>
     <div class="alert-badges" data-area="alert-badges"></div>
     <div class="queue-banner" data-area="queue-banner" data-state="running">
       <p data-area="queue-text" aria-live="polite"></p>
       <button type="button" data-area="queue-toggle">Pause queue</button>
     </div>
     <section class="pending-approvals" data-area="pending-approvals" aria-labelledby="pending-title" hidden>
-      <h3 id="pending-title">Pending approvals</h3>
+      <h3 id="pending-title" data-i18n="panel.pending">Pending approvals</h3>
       <ul class="alerts" data-area="pending-list"></ul>
     </section>
     <ul class="alerts" data-area="alerts-list"></ul>
@@ -138,8 +259,16 @@
           </div>
           <p class="meta" data-area="task-kind-hint"></p>
         </fieldset>
-        <label class="wide">Intent <textarea name="intent" rows="5" maxlength="4000" required placeholder="What should be done, and what to be careful about"></textarea></label>
+        <label class="wide">Intent <textarea name="intent" rows="3" maxlength="4000" required placeholder="What should be done, and what to be careful about" data-area="task-intent"></textarea></label>
+        <div class="wide task-attach" data-area="task-attach-zone">
+          <button type="button" class="attach-button" data-area="task-attach" data-i18n-title="task.attach" title="Attach files" aria-label="Attach files">＋</button>
+          <span class="meta" data-i18n="task.drop">Drop or paste files to attach them</span>
+          <div class="attach-chips" data-area="task-attachments" hidden></div>
+        </div>
         <label class="wide" data-area="task-skill-field">Access skill <select name="access_skill"><option value="">none</option></select></label>
+        <label>Bot <select name="owner" data-area="task-owner-select"><option value="">none (the queue runs it)</option></select></label>
+        <label>Workflow <select name="workflow_id" data-area="task-workflow-select"><option value="">none</option></select></label>
+        <p class="meta wide" data-area="task-workflow-hint" hidden>Only a bot runs workflows: pick the bot that runs it.</p>
         <label class="check wide"><input name="draft" type="checkbox" checked> Save as draft</label>
         <details class="wide more" data-area="task-more">
           <summary>More options</summary>
@@ -172,9 +301,99 @@
   </form>
 </dialog>
 
+<dialog data-area="bot-settings" aria-labelledby="bot-settings-title">
+  <form class="dialog-body bot-form" data-area="bot-form" method="dialog">
+    <h2 id="bot-settings-title" data-area="bot-settings-title">Bot settings</h2>
+    <div class="bot-form-grid">
+      <label data-area="bot-name-row">Name <input name="name" type="text" maxlength="32" pattern="[a-z][a-z0-9\-]*" autocomplete="off" spellcheck="false" placeholder="coder"></label>
+      <label data-area="bot-preset-row">Start from <select name="preset" data-area="bot-preset"><option value="">Blank</option></select></label>
+      <label>Role <input name="role" type="text" maxlength="40" autocomplete="off"></label>
+      <label>Agent SDK <select name="sdk" data-area="bot-sdk"><option value="claude">Claude Agent SDK</option><option value="openai">OpenAI Agents SDK</option></select></label>
+      <label>Model <input name="model" type="text" maxlength="100" autocomplete="off" placeholder="config default"></label>
+      <p class="meta wide" data-area="bot-sdk-hint" hidden>OpenAI bots have no auto mode. Their permission mode picks their tools: plan reads files, accept edits also writes in its folder and the shared folder, bypass also runs shell commands. Set OPENAI_API_KEY where taskq runs.</p>
+      <label class="wide">Description <span class="meta">Other bots hand work to this bot by this text.</span><textarea name="description" rows="2" maxlength="500" required></textarea></label>
+      <label class="wide">Instructions <textarea name="instructions" rows="5" maxlength="8000"></textarea></label>
+      <label class="wide">Working directory <input name="workdir" type="text" maxlength="500" autocomplete="off" spellcheck="false" placeholder="the bot's own folder"></label>
+    </div>
+    <fieldset class="bot-gate">
+      <legend>Permissions and gate</legend>
+      <label>Permission mode <select name="permission_mode" data-area="bot-mode"></select></label>
+      <label class="check"><input type="checkbox" name="sandbox"> Run commands in a sandbox</label>
+      <label class="wide">Allowed network hosts in the sandbox <span class="meta">One per line.</span><textarea name="allowed_domains" rows="2" spellcheck="false"></textarea></label>
+      <label class="wide">Blocked commands <span class="meta">One pattern per line; * matches anything; matched anywhere in the command. Example: git push*. This prevents accidents; it is not a security boundary: use the sandbox for that.</span><textarea name="blocked_commands" rows="3" spellcheck="false"></textarea></label>
+      <p class="meta">taskq's own data and config are always off limits; a call that reaches them stops the turn and pauses the bots.</p>
+    </fieldset>
+    <fieldset>
+      <legend>Skills and plugins</legend>
+      <p class="meta">Registered in the global settings. Saving copies the chosen ones for this bot; Reload copies them again.</p>
+      <div class="bot-picks" data-area="bot-skills"></div>
+      <div class="bot-picks" data-area="bot-plugins"></div>
+    </fieldset>
+    <fieldset>
+      <legend>Limits</legend>
+      <p class="meta">Empty uses the default in Settings.</p>
+      <div class="bot-form-grid">
+        <label>Turns per hour <input name="hourly_turns" type="number" min="1" max="1000" step="1"></label>
+        <label>Budget per turn (USD) <input name="turn_budget_usd" type="number" min="0.01" max="100" step="0.01"></label>
+        <label>Model turns per turn <input name="turn_max_turns" type="number" min="1" max="500" step="1"></label>
+        <label>Agent SDK <input name="sdk" type="text" value="Claude Agent SDK" readonly></label>
+      </div>
+      <button type="button" data-area="bot-session-folder">Open session folder</button>
+    </fieldset>
+    <fieldset>
+      <legend>Behavior</legend>
+      <label class="check"><input type="checkbox" name="enabled"> Enabled</label>
+      <label class="check"><input type="checkbox" name="may_message_user"> May message me directly</label>
+    </fieldset>
+    <p class="error" data-area="bot-form-error" role="alert"></p>
+    <div class="dialog-actions">
+      <button type="button" class="danger" data-area="bot-delete">Delete bot</button>
+      <span class="spacer"></span>
+      <button type="button" data-close>Cancel</button>
+      <button type="submit" data-area="bot-save">Save</button>
+    </div>
+  </form>
+</dialog>
+
+<ul class="bot-menu" data-area="bot-menu" role="menu" hidden></ul>
+
+<dialog data-area="memory-dialog" aria-labelledby="memory-title">
+  <form class="dialog-body bot-form" data-area="memory-form" method="dialog">
+    <h2 id="memory-title" data-area="memory-title">Memory</h2>
+    <p class="meta" data-i18n="memory.hint">The bot's own notes, sent with every turn. The bot edits them too, with memory_write.</p>
+    <textarea name="memory" rows="14" maxlength="16000" data-area="memory-text"></textarea>
+    <p class="meta" data-area="memory-count"></p>
+    <p class="error" data-area="memory-error" role="alert"></p>
+    <div class="dialog-actions"><span class="spacer"></span><button type="button" data-close>Cancel</button><button type="submit">Save</button></div>
+  </form>
+</dialog>
+
 <dialog data-area="settings-dialog" aria-labelledby="settings-title">
   <div class="dialog-body">
-    <h2 id="settings-title">Settings</h2>
+    <h2 id="settings-title" data-i18n="settings.title">Settings</h2>
+    <section class="settings-section" aria-labelledby="appearance-title">
+      <h3 id="appearance-title" data-i18n="settings.appearance">Appearance</h3>
+      <div class="appearance-row">
+        <label><span data-i18n="settings.language">Language</span> <select data-area="ui-language"><option value="ko">한국어</option><option value="en">English</option></select></label>
+        <label><span data-i18n="settings.theme">Theme</span> <select data-area="ui-theme"><option value="system" data-i18n="settings.theme.system">System</option><option value="dark" data-i18n="settings.theme.dark">Dark</option><option value="light" data-i18n="settings.theme.light">Light</option></select></label>
+        <label>Font <select data-area="font-family"></select></label>
+        <label>Size <input type="range" min="12" max="20" step="1" data-area="font-size"> <output data-area="font-size-value"></output></label>
+      </div>
+    </section>
+    <section class="settings-section" aria-labelledby="limits-title">
+      <h3 id="limits-title" data-i18n="settings.limits">Rate limits</h3>
+      <p class="meta" data-i18n="settings.limits.hint">Limits for all bots together, and the defaults each bot uses unless its own settings say otherwise.</p>
+      <form class="limits-form" data-area="limits-form"></form>
+    </section>
+    <section class="settings-section" aria-labelledby="folders-title">
+      <h3 id="folders-title" data-i18n="settings.folders">Folders</h3>
+      <ul class="folder-list" data-area="folder-list"></ul>
+    </section>
+    <section class="settings-section" aria-labelledby="queue-title">
+      <h3 id="queue-title" data-i18n="settings.queue">Queue</h3>
+      <label class="check"><input type="checkbox" data-area="queue-autorun"> <span data-i18n="settings.autorun">Run tasks no bot owns automatically</span></label>
+      <p class="meta">Off, a task without an owner runs only when you press its run button. A bot's task always waits for that bot.</p>
+    </section>
     <section class="settings-section" aria-labelledby="notifications-title">
       <h3 id="notifications-title">Notifications</h3>
       <label class="check"><input type="checkbox" data-area="desktop-notifications" disabled> Desktop notifications</label>

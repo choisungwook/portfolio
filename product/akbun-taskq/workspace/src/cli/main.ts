@@ -9,6 +9,9 @@ import { runCommand } from './run.ts'
 import { skills } from './skills.ts'
 import * as operator from './operator.ts'
 import { handoff, handoffs } from './handoffs.ts'
+import { bots } from './bots.ts'
+import { api } from './api.ts'
+import { workflows } from './workflows.ts'
 import type { Command } from './types.ts'
 
 const COMMANDS: Record<string, Command> = {
@@ -29,6 +32,9 @@ const COMMANDS: Record<string, Command> = {
   retry: operator.retry,
   handoff,
   handoffs,
+  bots,
+  workflows,
+  api,
 }
 
 const USAGE = `usage: taskq <command> [options]
@@ -39,7 +45,10 @@ const USAGE = `usage: taskq <command> [options]
   alerts               log [--date YYYY-MM-DD]    search QUERY    run    version
   skills list | add PATH | remove NAME | discover
   handoffs [--task TASK]    handoff accept ID    handoff mode TASK [auto|manual]    mcp
-  pause [--reason TEXT]    unpause    cancel ID    retry ID [--draft] [--resume]`
+  pause [--reason TEXT]    unpause    cancel ID    retry ID [--draft] [--resume]
+  bots list | say [--to NAME] TEXT | inbox | log | turns | threads | wiki [SLUG] | search | export | assign | pause | resume | enable | disable | reset
+  workflows list | show | create FILE | update | delete | run ID --bot NAME | runs | run-show | cancel | approve
+  api [OPERATION key=value... | --json JSON]   every API route by name; taskq api lists them (the MCP server offers the same as taskq_<name>)`
 
 export async function main(argv: string[]): Promise<void> {
   const [name, ...args] = argv
@@ -60,7 +69,7 @@ export async function main(argv: string[]): Promise<void> {
   if (name === 'mcp') {
     try {
       const { serveMcp } = await import('../mcp/server.ts')
-      await serveMcp(db, pkg.version)
+      await serveMcp(db, config, pkg.version)
     } finally {
       db.close()
     }

@@ -1,5 +1,5 @@
 import type { Hono } from 'hono'
-import { createFromInput, getTask, listTasks, moveStatus, patchData, setPriority } from '../db/tasks.ts'
+import { createFromInput, getTask, listTasks, moveStatus, patchData, setPriority, workflowIdOf } from '../db/tasks.ts'
 import type { Context } from 'hono'
 import { ApprovalError, decideApproval } from '../db/approvals.ts'
 import { taskDetail } from '../db/detail.ts'
@@ -33,6 +33,13 @@ export function registerTaskRoutes(api: Hono, { db, config, control = noRunContr
     const task = getTask(db, id)
     if (!task) return c.json({ error: 'task not found' }, 404)
     if (patch.status === 'ready' && !moveStatus(db, id, 'draft', 'ready')) throw new HttpError(409, 'only draft tasks can be made ready')
+    if (patch.data.workflow_id) {
+      try {
+        patch.data.workflow_id = workflowIdOf(db, patch.data.workflow_id)
+      } catch (error) {
+        throw new HttpError(400, error instanceof Error ? error.message : String(error))
+      }
+    }
     if (patch.priority !== undefined) setPriority(db, id, patch.priority)
     if (Object.keys(patch.data).length > 0) patchData(db, id, patch.data)
     return c.json(getTask(db, id))

@@ -1,0 +1,166 @@
+/* Theme: soft messenger. Dark first, like a chat app at night: near-black page, raised charcoal panels, large rounded
+   corners, bold type, and one saturated color per bot. The light variant keeps the same shapes on a warm white page.
+   Status colors stay distinct from the bot colors' meaning: a bot color only says who, a status color says what state.
+   Rules carried here: 16px corners on cards and bubbles, 10px on controls, no borders where a layer change separates,
+   soft shadows only for things that float (toasts, dialogs), the system font with Korean faces first. */
+:root {
+  color-scheme: dark;
+  --bg: #121212;
+  --panel: #1c1c1e;
+  --panel-soft: #2a2a2d;
+  --stage: #2a2a2d;
+  --field: #2a2a2d;
+  --chip: #2f2f33;
+  --control: #333337;
+  --hover: rgba(255, 255, 255, 0.07);
+
+  --fg: #f5f5f7;
+  --muted: #9a9aa1;
+  --border: #2f2f33;
+  --border-strong: #5a5a60;
+
+  --accent: #f2a33a;
+  --accent-hover: #f5b45a;
+  --link: #f5b45a;
+  --accent-soft: #3a2a12;
+  --on-accent: #1a1206;
+  --focus: #f5b45a;
+  --secondary: #3a3a3f;
+  --secondary-hover: #48484e;
+  --danger: #ff6b6b;
+  --danger-hover: #ff8a8a;
+  --danger-fill: #e5484d;
+
+  --error-soft: #3a1d1f;
+  --warning-soft: #3a2e14;
+  --success-soft: #16301f;
+  --info-soft: #182537;
+
+  --done: #4cc38a;
+  --failed: #ff6b6b;
+  --needs-approval: #ff9f43;
+  --needs-auth: #f5d547;
+  --review: #7aa7ff;
+  --running: #4d8dff;
+  --stale: #8e8e93;
+  --high: #ff9f43;
+
+  --avatar-1: #f2a33a;
+  --avatar-2: #ee6b2f;
+  --avatar-3: #8b5cf6;
+  --avatar-4: #ef4444;
+  --avatar-5: #3b82f6;
+  --avatar-6: #22c55e;
+  --avatar-user: #ffffff;
+  --avatar-eye: #121212;
+
+  --radius: 10px;
+  --radius-s: 8px;
+  --radius-l: 16px;
+  --shadow-1: none;
+  --shadow-2: 0 8px 24px rgba(0, 0, 0, 0.45);
+  --ease: 160ms cubic-bezier(0.2, 0, 0, 1);
+  --font-sans: "Pretendard", "Apple SD Gothic Neo", "Noto Sans KR", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-mono: ui-monospace, "SF Mono", Menlo, monospace;
+  --text-body: 15px/22px;
+  --text-small: 13px;
+}
+
+/* Light: chosen in Settings (data-theme="light"), or by the system when Settings says System. */
+:root[data-theme="light"] {
+    color-scheme: light;
+    --bg: #f6f5f2;
+    --panel: #ffffff;
+    --panel-soft: #f0efeb;
+    --stage: #e9e7e2;
+    --field: #f0efeb;
+    --chip: #ecebe6;
+    --control: #e6e4df;
+    --hover: rgba(0, 0, 0, 0.05);
+
+    --fg: #17171a;
+    --muted: #63636a;
+    --border: #e4e2dd;
+    --border-strong: #a3a29d;
+
+    --accent: #e8922a;
+    --accent-hover: #d5811c;
+    --link: #b8650c;
+    --accent-soft: #fde9cc;
+    --on-accent: #1a1206;
+    --focus: #b8650c;
+    --secondary: #2f2f33;
+    --secondary-hover: #45454b;
+    --danger: #c9302c;
+    --danger-hover: #a8241f;
+    --danger-fill: #d23b37;
+
+    --error-soft: #fdeceb;
+    --warning-soft: #fcf3dc;
+    --success-soft: #e3f6ea;
+    --info-soft: #e8f0fd;
+
+    --done: #1d8a50;
+    --failed: #c9302c;
+    --needs-approval: #b75b00;
+    --needs-auth: #8a6a00;
+    --review: #2c5cc5;
+    --running: #2463d6;
+    --stale: #6b6b70;
+    --high: #b75b00;
+
+    --avatar-user: #e4e2dd;
+    --avatar-eye: #17171a;
+
+    --shadow-2: 0 8px 24px rgba(0, 0, 0, 0.12);
+}
+
+@media (prefers-color-scheme: light) {
+  :root:not([data-theme="dark"]) {
+    color-scheme: light;
+    --bg: #f6f5f2;
+    --panel: #ffffff;
+    --panel-soft: #f0efeb;
+    --stage: #e9e7e2;
+    --field: #f0efeb;
+    --chip: #ecebe6;
+    --control: #e6e4df;
+    --hover: rgba(0, 0, 0, 0.05);
+
+    --fg: #17171a;
+    --muted: #63636a;
+    --border: #e4e2dd;
+    --border-strong: #a3a29d;
+
+    --accent: #e8922a;
+    --accent-hover: #d5811c;
+    --link: #b8650c;
+    --accent-soft: #fde9cc;
+    --on-accent: #1a1206;
+    --focus: #b8650c;
+    --secondary: #2f2f33;
+    --secondary-hover: #45454b;
+    --danger: #c9302c;
+    --danger-hover: #a8241f;
+    --danger-fill: #d23b37;
+
+    --error-soft: #fdeceb;
+    --warning-soft: #fcf3dc;
+    --success-soft: #e3f6ea;
+    --info-soft: #e8f0fd;
+
+    --done: #1d8a50;
+    --failed: #c9302c;
+    --needs-approval: #b75b00;
+    --needs-auth: #8a6a00;
+    --review: #2c5cc5;
+    --running: #2463d6;
+    --stale: #6b6b70;
+    --high: #b75b00;
+
+    --avatar-user: #e4e2dd;
+    --avatar-eye: #17171a;
+
+    --shadow-2: 0 8px 24px rgba(0, 0, 0, 0.12);
+  }
+}

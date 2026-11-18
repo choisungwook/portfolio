@@ -64,6 +64,7 @@ async function runTask(config: Config, runQuery: QueryFn, head: (repo: string) =
   const gate: GateContext = {
     cwd: profile.cwd, outputs, repo: task.data.repo, dataDir: join(config.home, 'data'), profile: task.data.target_profile,
     accessSkill: ctx.access_skill_path,
+    shared: join(config.home, 'shared'),
   }
   const options = buildOptions(config, ctx, profile, state, abort, gate)
 

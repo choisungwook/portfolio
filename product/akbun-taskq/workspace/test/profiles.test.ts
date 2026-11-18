@@ -11,7 +11,7 @@ const outputs = join(home, 'outputs')
 
 function taskOf(type: TaskType, data: Partial<TaskData> = {}): Task {
   return {
-    id: 't-1', type, status: 'running', priority: 0, lock_key: null, claimed_by: null, heartbeat_at: null,
+    id: 't-1', type, status: 'running', priority: 0, lock_key: null, claimed_by: null, heartbeat_at: null, owner: null,
     session_id: null, data: { intent: 'example intent', repo: '/work/example-repo', ...data }, created_at: 0, updated_at: 0,
   }
 }

@@ -1,9 +1,10 @@
 export type TaskType = 'ops_read' | 'ops_change' | 'code' | 'research' | 'security_review'
-export type TaskStatus = 'draft' | 'ready' | 'running' | 'needs_approval' | 'needs_auth' | 'review' | 'done' | 'failed'
+export type TaskStatus = 'draft' | 'ready' | 'running' | 'needs_approval' | 'needs_auth' | 'review' | 'done' | 'failed' | 'cancelled'
 export type Outcome = 'done' | 'failed' | 'needs_approval' | 'needs_auth' | 'review' | 'stale'
 export type Severity = 'critical' | 'high' | 'normal'
 export type AlertKind = 'approval_required' | 'security_finding' | 'prod_touch' | 'worker_flag'
   | 'auth_required' | 'failed' | 'stale_repeat' | 'budget_exceeded' | 'review_ready' | 'proposal_pending' | 'handoff_received'
+  | 'team_message' | 'team_paused'
 export type EventKind = 'claimed' | 'tool_call' | 'tool_result' | 'permission_request' | 'approved' | 'denied'
   | 'auth_required' | 'progress' | 'error' | 'finished' | 'cancel_requested' | 'tamper_blocked'
   | 'run_requested' | 'handoff_received' | 'handoff_accepted'
@@ -11,6 +12,7 @@ export type EventKind = 'claimed' | 'tool_call' | 'tool_result' | 'permission_re
 export interface TaskData {
   title?: string
   intent: string
+  attachments?: string[]     // files the user attached, relative to TASKQ_HOME/shared
   cautions?: string
   access_skill?: string      // name of the user's own skill that logs in to the target account
   target_profile?: string    // AWS profile for target-account commands
@@ -21,11 +23,14 @@ export interface TaskData {
   base_commit?: string       // code: HEAD before the run
   max_turns?: number
   max_budget_usd?: number
+  workflow_id?: string       // the workflow the owner bot runs for this task; '' or absent: none
 }
 
 export interface Task {
   id: string; type: TaskType; status: TaskStatus; priority: number
   lock_key: string | null; claimed_by: string | null; heartbeat_at: number | null
+  owner: string | null       // team agent that owns the task and gets its result; null for the user's own task
+  owner_since?: number | null
   session_id: string | null; data: TaskData; created_at: number; updated_at: number
 }
 

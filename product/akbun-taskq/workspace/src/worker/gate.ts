@@ -15,6 +15,7 @@ export interface GateContext {
   dataDir: string      // <home>/data, which holds the database
   profile?: string     // the target AWS profile of the task
   accessSkill?: string // the registered folder of the task's access skill (realpath)
+  shared?: string      // TASKQ_HOME/shared, where attachments live; readable by every task type
 }
 
 interface Touch { real: string; write: boolean }
@@ -68,6 +69,11 @@ export function decide(type: TaskType, tool: string, input: Input, ctx: GateCont
   if (ctx.accessSkill !== undefined && touches.length > 0 && inside(touches, [realPath(ctx.accessSkill)])) {
     if (WRITE_PATH.has(tool)) return 'deny'
     if (READ.has(tool)) return 'allow'
+  }
+  // Attachments and shared files are readable for every type, never writable from a task run.
+  if (ctx.shared !== undefined && touches.length > 0 && inside(touches, [realPath(ctx.shared)])) {
+    if (READ.has(tool)) return 'allow'
+    if (WRITE_PATH.has(tool)) return 'deny'
   }
   const roots: Roots = {
     cwd: realPath(ctx.cwd),
@@ -137,4 +143,15 @@ function gitReadOnly(command: string, repo: string | undefined): boolean {
   if (args.some((arg) => /^-[^-]*O/.test(arg))) return false
   if (sub !== 'log' && !(args.includes('--no-ext-diff') && args.includes('--no-textconv'))) return false
   return true
+}
+
+// A resident team agent has Read, Glob and Grep only, confined to its own folder and the read roots. The same path
+// resolution and sensitive-path checks as task sessions apply.
+export function decideTeamRead(tool: string, input: Input, ctx: { cwd: string; roots: string[]; dataDir: string }): Decision {
+  if (!READ.has(tool)) return 'deny'
+  const gate: GateContext = { cwd: ctx.cwd, outputs: ctx.cwd, dataDir: ctx.dataDir }
+  if (tamperOf(tool, input, gate) !== null) return 'deny'
+  const touches = touchesOf(tool, input, gate)
+  if (touches.some((touch) => blocked(touch.real, false, { dataDir: realPath(ctx.dataDir) }))) return 'deny'
+  return inside(touches, [ctx.cwd, ...ctx.roots].map((root) => realPath(root))) ? 'allow' : 'deny'
 }

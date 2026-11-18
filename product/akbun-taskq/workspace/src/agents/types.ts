@@ -1,5 +1,6 @@
 import type { Config } from '../config.ts'
 import type { Worker } from '../types.ts'
+import type { TeamBackend } from '../team/types.ts'
 
 export type AgentName = 'claude'
 
@@ -17,4 +18,5 @@ export interface AgentBackend {
   createWorker(config: Config): Worker
   preflight(config: Config): Promise<PreflightResult>
   ask(config: Config, request: AskRequest): Promise<unknown>
+  team?: TeamBackend         // resident agents; a backend without one cannot run the team
 }

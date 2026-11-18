@@ -14,6 +14,7 @@ browser UI --HTTP + SSE--> taskq process (127.0.0.1)
                             |- worker/   policy every backend enforces: gate, aws guard, prompt, result schema
                             |- memory/   similar-task lookup, retrospect, proposals
                             |- alerts/   must-check rules, desktop notifications
+                            |- team/     resident role agents: hub loop, mailbox, tools, wiki (off unless bots.enabled)
                             '- db/       node:sqlite, WAL, numbered migrations
 CLI (taskq add/list/...) ---- opens the same SQLite file directly
 ```
@@ -64,6 +65,10 @@ workspace/
       gate.ts paths.ts aws-guard.ts filter-args.ts prompt.ts result-schema.ts text.ts
     memory/                 # phase 2
       similar.ts retrospect.ts
+    team/                   # resident agent team, see "Team"
+      types.ts              # TeamBackend: runTurn
+      hub.ts roster.ts prompt.ts report.ts owner.ts search.ts wiki-files.ts
+      tools.ts tools-talk.ts tools-tasks.ts tools-wiki.ts
     skills/                 # access skill registry: validation, discovery, run-time check
       inspect.ts registry.ts discover.ts frontmatter.ts
     api/
@@ -298,12 +303,13 @@ After a `code` task finishes `done`, the runner creates a `security_review` task
 
 ## UI theme
 
-The UI follows IBM Carbon (Apache-2.0) through a token interface, the same way agents sit behind `AgentBackend`.
+The UI reads its colors, shapes and type through a token interface, the same way agents sit behind `AgentBackend`. The decision is [the soft theme and sidebar](../knowledge/decisions/2026-11-soft-theme-sidebar.md).
 
-- `ui/css/theme/contract.css` names every token component CSS may read (surfaces, text, interaction, notification washes, status colors, shape, motion, type). Each is `initial` there.
-- `ui/css/theme/carbon.css` implements all of them with Carbon g10 (light) and g100 (dark) values from `@carbon/themes`. `LICENSE-carbon.txt` sits beside it.
-- `test/ui-tokens.test.ts` fails when a component reads a token outside the contract or a theme leaves one out. Another theme is a new file in `ui/css/theme/` added to that test's list and loaded in `index.html` instead of `carbon.css`.
-- Carbon rules applied in component CSS: square corners, layers instead of shadows, 2px inset focus ring, ghost buttons by default with one primary per view, line tabs, content switcher, tags, inline notifications that never dismiss on a timer, danger buttons that need a second click, and status indicators that pair a symbol and a word with color.
+- `ui/css/theme/contract.css` names every token component CSS may read (surfaces, text, interaction, notification washes, status colors, bot avatar colors, shape, motion, type). Each is `initial` there.
+- `ui/css/theme/soft.css` is the theme `index.html` loads: dark first with a light variant, 16 px corners on cards and bubbles, 10 px on controls, bold type, one color per bot (avatars are plain circles with the bot's initial). The font family and size in Settings override `--font-sans`, `--text-body` and `--text-small` on `:root` at run time; sidebar and chat sizes are in `em` so they follow. `ui/css/theme/carbon.css` is the earlier IBM Carbon theme (Apache-2.0, `LICENSE-carbon.txt` beside it), kept as a second implementation; swapping the `<link>` in `index.html` switches back.
+- `test/ui-tokens.test.ts` fails when a component reads a token outside the contract or a theme leaves one out. Both theme files are in its list.
+- Layout: a left sidebar (`css/nav.css`) holds the views, the bots list (orchestrator first, a gear on each bot, a right-click menu, and `+` to add one) and the shared views; `<main>` shows one view; the Must check panel is on the right (under the sidebar below 1280 px, on top below 800 px). The bot conversation, discussions and wiki views are in `css/chat.css`. `ui/js/core/nav.js` switches views and emits `tab` (view name) and `bot` (bot name).
+- Component patterns kept from Carbon: inline notifications that never dismiss on a timer, danger buttons that need a second click, status indicators that pair a symbol and a word with color, one primary button per view.
 
 ## Agent backends
 
@@ -316,6 +322,129 @@ The UI follows IBM Carbon (Apache-2.0) through a token interface, the same way a
 | `ask(config, { prompt, schema, cwd })` | One short call with no tools that returns JSON matching `schema`, or `undefined` |
 
 Adding a backend: put it under `src/agents/<name>/`, add the name to `AgentName` in `types.ts`, to `BACKENDS` in `index.ts` and to `AGENTS` in `config.ts`. `test/agents.test.ts` checks that every registered backend has the three methods. The policy, the prompt and the result schema in `src/worker/` are shared; what a backend writes itself is the mapping from its SDK's tool-call hook and permission model to `decide`, which is what `claude/hooks.ts` and `claude/profiles.ts` do for Claude.
+
+## Bots
+
+Bots are resident agent sessions with a role, on the Claude Agent SDK or the OpenAI Agents SDK (chosen per bot). Tasks are the user's notes of work; a bot takes a task it owns, works on it in its own session and closes it. The run button on a task is separate: a one-off run that belongs to no bot. The UI, CLI (`taskq bots`), API (`/api/bots`) and config key (`bots`) call them bots; the code (`src/team/`), tables (`team_*`) and wake signal (`teamChanged`) call them the team. The design records are [bots execute tasks](../knowledge/decisions/2026-11-bots-execute-tasks.md), [resumed sessions and the mailbox](../knowledge/decisions/2026-11-resident-agent-team.md), [ownership and discussions](../knowledge/decisions/2026-11-task-ownership-and-discussions.md), [wiki search](../knowledge/decisions/2026-11-wiki-hybrid-search.md), [workflows](../knowledge/decisions/2026-11-workflows-run-by-bots.md), [OpenAI bots](../knowledge/decisions/2026-11-openai-bot-backend.md) and [operations for the CLI and MCP](../knowledge/decisions/2026-11-operations-for-cli-and-mcp.md). They are off by default (`bots.enabled`).
+
+```text
+user --bot chat / taskq bots say--> team_messages --hub--> bot turn (resumed Claude session in its workdir)
+                                         ^                   |- team tools: messages, tasks (start/finish), discussions, wiki
+                                         |                   |- built-in tools, per the bot's permission mode, sandbox and gate
+                                         |                   '- skills and plugins from the bot's snapshot
+                  a task run by the run button reports to the task's owner
+```
+
+| Part | What it does |
+|---|---|
+| `team_agents` | One row per bot: role, description (what others delegate by), instructions, `may_message_user`, `enabled`, `system` (the orchestrator), `permission_mode` (default `auto`), `sandbox` (default off), `allowed_domains`, `blocked_commands` (default none), `workdir`, `skills`, `plugins`, `model`, `effort`, `sdk` (`claude` or `openai`), per-bot limits, `memory`, `session_id` (a Claude session id, or an OpenAI response id). Listed with `system` first |
+| Orchestrator | `taskq`, created on first start from `team/roster.ts`. It may message the user, cannot be deleted or disabled, and is pinned first in the sidebar. Every other bot is created by the user, optionally from a preset (planner, coder, reviewer, doc-reviewer) |
+| `bot_skills`, `bot_plugins` | The global registry (Settings). A skill is a folder with `SKILL.md`; a plugin is a folder with `.claude-plugin/plugin.json`. Removing an entry takes it off every bot |
+| `team_messages` | Mailbox. `sender` and `recipient` are bot names, `user` or `queue` (a run's report). `deliver_at` holds a message back until that time. A turn claims every deliverable message of one bot (`turn_id`, `read_at`, `attempts`) |
+| `team_turns` | One row per bot turn with outcome, cost, session id and `writes` (tool calls with an effect). An open row means the bot is busy |
+| `tasks.owner`, `tasks.owner_since` | The one bot that owns a task, and since when. NULL is the user's own task |
+| `runs.bot` | Set on a run a bot did in its own session; NULL on a run from the queue or the run button |
+| `team_threads` | Discussions: moderator, ordered participants, rounds, `posts`, status `open`, `concluding`, `closed` |
+| `wiki_pages`, `wiki_revisions`, `wiki_fts` (trigram), `wiki_links` | Shared memory. `writePage` needs the revision the writer read; a stale write returns the current page. `[[slug]]` references are stored as links |
+| `team/hub.ts` | Waits on `teamChanged`, the next `deliver_at`, or `pollSec`. For each enabled bot with deliverable mail, no open turn and no failed turn in the last 60 s, up to `bots.maxConcurrentTurns`, checks the guards, opens a turn and calls `TeamBackend.runTurn` with the bot's workdir and plugin folders |
+| `team/tools*.ts` | SDK-neutral tool handlers, each input checked against its zod schema. `tools-talk.ts`: messages and discussions. `tools-tasks.ts`: create, assign, start, finish, list, read tasks. `tools-wiki.ts`: list, search, read, write (and mirror) |
+| `team/bot-work.ts` | `start_task`: only the owner, only a ready task (or a draft that touches no account) whose blocking dependencies are done; sets running with `claimed_by = 'bot:<name>'` and opens a run with `bot`. `finish_task`: closes the run, sets done, review or failed, raises the failed or review alert. On start, a task a bot had running goes back to ready and the bot gets a message |
+| `team/bot-gate.ts` | Always: a call that reaches taskq's data directory, config, Claude Code settings (write) or turns the sandbox off ends the turn and pauses the bots (`security_finding`). Per bot: a Bash command whose whole text or any segment of a pipeline or list matches a `blocked_commands` pattern (`*` is the only wildcard) is refused |
+| `team/bot-plugin.ts` | Copies the bot's selected skills into one local plugin (`bot-plugins/<bot>/skills-plugin/skills/<name>`, loaded with `skipMcpDiscovery`) and its selected plugins into `bot-plugins/<bot>/plugins/<name>`. The copies live outside the bot's folder and the gate stops any write to them, because a plugin a bot could edit would run hooks and MCP servers outside its tool calls. Saving settings and Reload rebuild the copy; a turn loads the copy, so a skill edited on disk reaches the bot at the next Reload, not mid-work. `node_modules` and `.git` are not copied |
+| `team/search.ts`, `team/wiki-files.ts` | Wiki search (below) and the markdown mirror under `TASKQ_HOME/wiki/` for folder tools such as graphify |
+| `team/report.ts` | Inside `finishRun`'s transaction, posts a queue run's outcome to the task's owner. The automatic security review of a bot's code task is created owned by the first enabled reviewer, else the orchestrator, never the author, and that bot is told |
+| `team/live-input.ts` | The input stream of a running Claude turn. The hub pushes messages that arrive meanwhile into it (`joinTurn` marks them on the same turn); the turn ends when every message has its result |
+| `team/catalog.ts` | The compose bar's models, effort levels, permission modes and slash commands for one bot: the backend's `catalog()` (cached 10 minutes, `?refresh=1` asks again), else a built-in list marked `fallback` |
+| `workflows`, `workflow_runs`, `workflow_steps`, `db/workflows.ts`, `team/workflow-work.ts` | Workflows, below |
+| `agents/openai/team.ts`, `agents/openai/local-tools.ts` | OpenAI bots, below |
+| `agents/claude/team.ts` | `query()` with `resume`, `cwd` = the bot's workdir, `permissionMode` from the bot (`bypassPermissions` also sets `allowDangerouslySkipPermissions`), `sandbox` only when the bot has it on (writes limited to the workdir, reads of taskq's data and config denied, network to `allowed_domains`), `plugins` from the snapshot, `settingSources: []` so the user's own Claude settings never apply, `strictMcpConfig` unless the bot has plugins, the in-process MCP server `team`, the gate as a PreToolUse hook, and a `canUseTool` that refuses anything that would wait for an approval, since nobody watches a bot's turn |
+
+### Bot tools
+
+| Tool | What it does |
+|---|---|
+| `list_agents` | the enabled bots with role, description and whether each is busy |
+| `send_message` | a message to a bot, or to the user if the bot may; `deliver_at` schedules it |
+| `start_discussion`, `discuss`, `conclude_discussion` | bounded discussions, below |
+| `create_task`, `assign_task` | record a task with an owner; hand it on |
+| `start_task`, `finish_task` | work on an owned task within one turn |
+| `list_tasks`, `get_task` | read tasks and their last run |
+| `wiki_list`, `wiki_search`, `wiki_read`, `wiki_write` | the shared wiki |
+| `memory_write` | replace or append to the bot's own memory, which is appended to its system prompt every turn (16,000 characters at most) |
+| `list_workflows` | the workflows (name, steps) and the bot's own runs still going |
+| `run_workflow` | starts a run of a workflow that the bot itself executes, without a task |
+| `workflow_status` | the steps of a run with their state (ready, running, succeeded, failed, skipped), the run status, and whether the workflow was deleted |
+| `workflow_step` | reports one step: `running`, then `succeeded` (a `check` step needs `evidence`; an `approval` step only the user can approve), `failed` or `skipped` (with the reason). A failed step fails the run; the run succeeds when every step is done |
+
+### Messages to a working bot
+
+A message never waits for the bot to answer the sender. It lands in `team_messages`; if the bot has no open turn, the hub starts one. If a Claude bot is working, the hub's next tick takes the new messages into the running turn (`joinTurn`, at most 20 at once and 10 times per turn) and pushes them into the session's input stream, the way Claude Code takes a message typed mid-turn. Past 10 joins the messages wait for the next turn, which goes through the budget and loop guards again. An OpenAI bot has no streaming input, so its messages wait for the next turn. `GET /bots` reports `queued` per bot: deliverable messages no turn has taken; the conversation and the sidebar show it.
+
+### Compose bar and slash commands
+
+Under a bot's input: a refresh button (reload the bot's skills and plugins, then read the catalog again) and menus for model, effort and permission mode (`GET /bots/:name/catalog`, saved with `PUT /bots/:name`, applied from the next turn). Typing `/` lists the bot's commands: its registered skills and, for Claude bots, the commands the SDK reports for its plugins. The bot's system prompt says that a user message starting with `/name` asks it to run that skill.
+
+### Workflows
+
+A workflow is a named graph of steps (`kind`: `do`, `check`, `handoff` to a named bot, `approval` by the user; `needs` lists the steps that come first; no loops). The Workflows view edits it as a left-to-right graph like n8n and keeps the run history like Argo. A run copies the definition (`snapshot`), records the bot that executes it and the task if any, and has one row per step.
+
+- Start: a bot that `start_task`s a task with `data.workflow_id` starts the run (or continues the one left from an earlier turn) and gets the steps in the tool answer; `POST /workflows/:id/run` or the bot's `run_workflow` starts one directly. The queue does not run a task that has a workflow and no owner: only a bot executes workflows.
+- Progress: the bot reports steps with `workflow_step`. taskq refuses a step whose `needs` are not done, a `check` without evidence, and an `approval` the bot tries to close itself.
+- Success: decided by taskq, not the bot. One failed step fails the run (the rest are skipped); every step succeeded or skipped succeeds it. `finish_task` with done or review is refused while the task's run has not succeeded; failed ends the run as failed.
+- Approval: the user answers in the run view, `taskq workflows approve` or `POST /workflow-runs/:id/steps/:step/approve`; the bot is told.
+- Delete: soft (`deleted_at`). Runs keep their snapshot and show the workflow as deleted (`workflow_deleted`); a bot running it gets a message. A cancelled run tells its bot too.
+
+### OpenAI bots
+
+A bot with `sdk: openai` runs on `agents/openai/team.ts` with the same hub, mailbox, team tools, limits and gate. The Responses API keeps the conversation; the bot's `session_id` is the last response id and the next turn passes it as `previousResponseId`. The SDK has no permission modes and no auto mode, so the mode picks the tools taskq gives it: `plan` gets `read_file` and `list_dir`, `acceptEdits` adds `write_file` (only inside its workdir and the shared folder), `bypassPermissions` adds `shell` unless its sandbox setting is on. Every call goes through `botGate` like a Claude tool call. A turn's cost is estimated from token usage and `bots.openaiInputPerMTok` and `bots.openaiOutputPerMTok`. It needs `OPENAI_API_KEY` in taskq's environment; without it the turn fails with that message and the messages are retried, then set aside.
+
+### CLI and MCP
+
+`src/ops/operations.ts` names every API route as an operation. `taskq api <operation> key=value...` and the MCP server's `taskq_<operation>` tools call the route in their own process (`ops/local-api.ts`) against the same database, with the same validation as the UI. `taskq workflows` is a readable front for the workflow operations. What needs the running taskq reaches it through the database: a bot cancel leaves a marker (`meta.bot_cancel:<name>`) that the hub reads on its next tick, as a task cancel does. `test/ops-coverage.test.ts` fails when a route has no operation; the UI's live event stream is the one exception.
+
+### Working, cancelling, attachments
+
+- A bot is working while its turn row is open. `GET /bots` gives `working_since` and `running_tasks`; the sidebar turns a ring around the avatar and counts seconds, and the conversation shows a working bar with Stop.
+- Stop, Esc in the input, or the menu's Cancel call `POST /bots/:name/cancel`. The hub aborts the turn; `endTurn` records `cancelled`, the turn's messages count as handled (not retried), and a task the bot had running becomes `cancelled` (a task status, retryable like `failed`).
+- Attachments are uploaded with `POST /files` into `shared/attachments/` and named in the message (`team_messages.attachments`) or the task (`data.attachments`). A bot's prompt and a task's prompt list their absolute paths. Task runs may read the shared folder for every type and never write it; bots read and write it (`additionalDirectories`).
+- Search: `team_messages_fts` (trigram, kept by triggers) answers `GET /bots/search`. The wiki has its own index (below).
+
+### Settings that persist
+
+Everything the user changes in the app is in the SQLite file under `TASKQ_HOME`: bots and their settings and memory (`team_agents`), the skill and plugin registry, limits (`meta.limit_*`), appearance (`ui_font_family`, `ui_font_size`, `ui_language` with `ko` as the default, `ui_theme`), `queue_autorun` and desktop notifications. A restart or a new release binary opens the same file, so nothing is lost; `taskq.config.json` only supplies starting values for the limits. `test/bots-extras.test.ts` checks this with a second connection to the file.
+
+### Queue and run button
+
+The runner claims only ready tasks with no owner (`nextEligible`), and only while `queue_autorun` (Settings, on by default) is on. A bot's task waits for that bot. The run button (`POST /api/tasks/:id/run`) still runs any task once through the runner, whoever owns it; the run has no `bot`, and its result is posted to the owner. Stale recovery skips tasks claimed by a bot.
+
+### Ownership
+
+`create_task` records a task and gives it an owner (the caller by default; another owner is told). It checks the repo (in `trustedRepos` or under `bots.readRoots`, by real path), the count of agent-owned tasks in ready, running, needs_approval or needs_auth against `bots.maxOpenTasks` (draft and review wait for the user and do not count), and duplicates: every task in draft, ready, running, needs_approval or needs_auth whose intent has character-trigram Jaccard similarity of 0.5 or more is named with its owner, and the call is refused unless the caller lists it in `not_duplicate_of`. The check is advisory: rewording can slip past it and similar wording for different work can trip it (examples in `tools-tasks.ts`). Ownership is what keeps two bots off one task: only the owner can start it. Bot priority is capped at 0. A task with an ops type, `access_skill` or `target_profile` is always a draft, and a bot cannot start such a draft; the user promotes it.
+
+`assign_task` moves a task to another bot. The current owner may do it; the orchestrator and bots with the planner role may do it for any unfinished task, the user's included. The update compares the old owner, so two concurrent moves cannot both win. The new and old owners get a message; when the old owner was the user, the user gets an alert. `tasks.owner_since` records when the current owner took the task. The user sets the owner from the task detail dialog, `POST /api/bots/tasks/:id/owner` or `taskq bots assign`.
+
+### Discussions
+
+`start_discussion` opens a thread with 2 to 4 participants and 1 to 3 rounds; at most 3 threads are open at once. Only the participant whose turn it is (`participants[posts % count]`) can `discuss`; each post is delivered to the next speaker, whose prompt carries the thread so far in a `<discussion>` block. A speaker whose turn ends without posting passes. After the last post the thread is `concluding` and the moderator is asked to `conclude_discussion`, which closes it and can write the conclusion to a wiki page. Participants are told not to create tasks inside a discussion. Only a turn that ended normally counts as a pass; a failed turn keeps the floor. A moderator who ends the turn that asked it to conclude without concluding, or who is disabled, gets the thread closed without a conclusion and the user gets an alert; the user can also close a thread (`POST /api/bots/threads/:id/close`, `taskq bots close`).
+
+### Search
+
+`hybridSearch` splits the query into terms of two or more characters. Terms of three or more go to the trigram FTS index, which matches any substring, so a Korean stem finds a word with a particle; shorter terms use `LIKE`. A two-letter Latin term ("pr") scores only as a whole word. Each candidate is scored in JavaScript: 3 per term in the title or slug, 1 + log2(count) per term in the body, times (0.5 + share of terms matched). The five best hits are expanded one hop along `wiki_links` in both directions at 0.4 of the parent's score and marked `via`. Agents are told to read `TASKQ_HOME/wiki/graphify-out/GRAPH_REPORT.md` when it exists.
+
+### Guards and failures
+
+| Guard | Effect |
+|---|---|
+| Daily budget | Agent turns plus runs of agent-owned tasks started after the agent took them, since local midnight (or since the last resume, whichever is later), plus `turnBudgetUsd` reserved for each running turn. A new turn that would pass `dailyBudgetUsd` does not start; with nothing running the team pauses |
+| Hourly turns | An agent with `hourlyTurnsPerAgent` turns in the last hour (or since the last resume) pauses the team |
+| Retry | A failed turn with no effect returns its messages; after `maxAttempts` they are set aside with an alert. A turn that failed after an effect (message, task, wiki write) is not retried, because a retry would repeat it; its messages are set aside with an alert. The same holds for a turn open at a crash. A failed turn costs 60 s before the agent's next turn |
+| Unknown cost | A turn that ends without a cost figure is charged `turnBudgetUsd` |
+| Tamper | A call that reaches taskq's data directory or config ends the turn and pauses the bots with a `security_finding` alert, whatever the bot's settings |
+| Login | A model login failure pauses the team |
+
+Every pause raises one alert and only the user resumes. Pausing the bots stops bot turns. A task a bot started stays running until the bot finishes it or taskq restarts. A message to oneself needs `deliver_at` at least 10 minutes ahead, and a `deliver_at` in the past is refused, so an agent cannot wake itself in a loop. Resuming restarts the budget and loop windows from that moment. A resumed session that no longer exists is dropped and the next turn starts a new one; a reset made while a turn runs is not overwritten when it ends.
+
+`bots.personaSkill`, when set, is named in the prompts. The orchestrator is told to read it before deciding something on the user's behalf, and the reviewers before reviewing, and both are told not to copy its text anywhere. Its judgement is never an approval.
 
 ## Worker
 
@@ -397,7 +526,7 @@ The approval input is the one exemption. The exact text is stored in `approvals.
 
 ## Critical tests
 
-`npm run test:critical` runs only the tests whose name contains `[critical]`, and pull requests run only these. The full suite (`npm test`) runs everything. Each row below is one invariant and the tests that guard it. The gate rows are cases of the `decide table` and `access skill folder` tables in `test/gate.test.ts`. The aws-guard rows are cases of the `isReadOnlyAws` tables in `test/aws-guard.test.ts`.
+`npm run test:critical` runs only the tests whose name contains `[critical]`, and pull requests run only these. The full suite (`npm test`) runs everything. Both run test files in parallel (`node --test` uses one process per file, about 30 s on 4 cores against 80 s one file at a time). In CI the type check and the docs and operations coverage run in one job, and the tests in two shard jobs (`--test-shard=1/2`, `2/2`) next to it. Each row below is one invariant and the tests that guard it. The gate rows are cases of the `decide table` and `access skill folder` tables in `test/gate.test.ts`. The aws-guard rows are cases of the `isReadOnlyAws` tables in `test/aws-guard.test.ts`.
 
 | Invariant | Test |
 |---|---|
@@ -444,12 +573,12 @@ Writes (any non-GET under `/api`) must send `Content-Type: application/json`, op
 |---|---|
 | `GET /tasks?status=` `POST /tasks` | list with computed `blocked`, create. A POST is a draft unless the body says `"status":"ready"`. `access_skill` must name a registered skill (400 otherwise) |
 | `GET /tasks/:id` `PATCH /tasks/:id` | task with runs, deps, alerts and `pending_approval` (`{ request_id, tool, input, bytes, created_at }`, or null); edit data, priority, draft to ready. `access_skill` is checked as on create |
-| `POST /tasks/:id/approve` `deny` | body `{ "request_id": "…" }`. 400 when missing, 409 when it is not the task's open request. Returns the task |
+| `POST /tasks/:id/approve` `POST /tasks/:id/deny` | body `{ "request_id": "…" }`. 400 when missing, 409 when it is not the task's open request. Returns the task |
 | `GET /approvals` | open requests across tasks: `[{ task_id, task_title, request_id, tool, input, bytes, created_at }]` |
 | `GET /handoffs?task_id=` | up to 50 handoff records, pending first, optionally filtered by sender or receiver |
 | `POST /handoffs/:id/accept` | accept a current pending handoff and record the timestamp and manual method |
 | `POST /tasks/:id/handoff-mode` | set the receiving mode with `{"auto_accept":true}` or `{"auto_accept":false}` |
-| `POST /tasks/:id/resume` `done` | state transitions |
+| `POST /tasks/:id/resume` `POST /tasks/:id/done` | state transitions |
 | `POST /tasks/:id/run` | run now, from any status but `running` and `needs_approval`. 409 while the queue is paused or a `blocks` dependency is not done. See "Run now" |
 | `GET /runs?from=&to=&type=&lock_key=&outcome=` | runs that overlap the range (started before `to`, not ended before `from`). Each row has `task_title`, `task_type`, `lock_key` and `waits`. Returns `{ runs, truncated }`, newest first, capped at 500 |
 | `GET /runs/:id` | run with events, alerts and waits |
@@ -458,17 +587,45 @@ Writes (any non-GET under `/api`) must send `Content-Type: application/json`, op
 | `GET /alerts?all=1` `POST /alerts/:id/ack` | unacked first, by severity. Rows carry `task_title` and `ref` (the request id of an approval_required alert) |
 | `GET /events?task_id=&run_id=&after=&order=asc\|desc&limit=` | log. `limit` 1 to 500, default 200. `order=desc` returns the newest first |
 | `GET /events/stream` | SSE. Starts at the current tail. `Last-Event-ID` or `?after=` resumes. Each event has an `id:` field. Also takes `?token=` |
-| `GET /proposals?status=` `POST /proposals/:id/apply` `reject` | memory and skill proposals |
+| `GET /proposals?status=` `POST /proposals/:id/apply` `POST /proposals/:id/reject` | memory and skill proposals |
 | `GET /search?q=` | FTS over past runs. Rows carry `task_title` |
 | `GET /graph` | nodes with `blocked`, `title`, `last_outcome` (latest run, null while running) and `stale_count`; deps |
 | `GET /queue` `POST /queue/pause` `POST /queue/resume` | pause state with `pause_by`. Pause takes `{ "reason" }`, see "Pause, cancel and retry" |
 | `POST /tasks/:id/cancel` | cancel a running, needs_approval or needs_auth task. 200 with the task; 409 in other statuses; 404 when unknown |
 | `POST /tasks/:id/retry` | retry a failed task. Body `{ "draft": true }` and `{ "resume": true }`, both optional. 200 with the task; 409 in other statuses |
-| `GET /settings` | `{ config, home, db_path, access_skills, desktop_notifications }`. `db_path` is the absolute path of the SQLite file, shown read-only in Settings. `config` is the read-only list of keys in `CONFIG_KEYS` (`src/skills/registry.ts`). Each access skill is `{ name, path, description, ok }`; `ok` is false when `SKILL.md` is gone |
+| `GET /settings` | `{ config, home, db_path, access_skills, desktop_notifications, queue_autorun, appearance, font_families, bot_skills, bot_plugins }`. `db_path` is the absolute path of the SQLite file, shown read-only in Settings. `config` is the read-only list of keys in `CONFIG_KEYS` (`src/skills/registry.ts`). Each access skill is `{ name, path, description, ok }`; `ok` is false when `SKILL.md` is gone |
 | `POST /settings/desktop-notifications` | persist the desktop notification preference with `{"enabled":true}` or `{"enabled":false}` |
+| `POST /settings/limits` | any of `daily_budget_usd`, `turns_per_hour_total`, `max_concurrent_turns`, `bot_turns_per_hour`, `turn_budget_usd`, `turn_max_turns`; all are checked before any is saved |
+| `POST /files` | upload `{ "name", "data": base64 }` up to 20 MB; saved under `shared/attachments/<day>/<id>-<name>`; returns `{ path }` relative to the shared folder |
+| `GET /shared?dir=` `GET /shared/file?path=` | list a folder of the shared folder (up to 500 entries, symlinks left out); download a file. A path outside the shared folder is 400 |
+| `POST /open-folder` | `{ "target": "shared" | "home" | "sessions" | "bot", "bot"? }` opens that folder in the desktop file manager and returns its path. Only folders taskq names; 404 when it does not exist yet |
+| `GET /plugins/catalog` | the official plugin marketplace (`anthropics/claude-plugins-official`), fetched on demand and cached for an hour, as `{ plugins: [{ name, description, anthropic, source, homepage }], fetched_at }`. Listed only; nothing is installed. 502 when it cannot be fetched |
+| `POST /settings/queue-autorun` | `{ "enabled": false }` stops the queue from running unowned tasks on its own |
+| `POST /settings/appearance` | any of `font_family` (listed in `font_families`), `font_size` (12 to 20), `language` (`ko`, the default, or `en`), `theme` (`system`, `dark`, `light`) |
+| `POST /bot-skills` `DELETE /bot-skills/:name` `POST /bot-skills/:name/update` `POST /bot-plugins` `DELETE /bot-plugins/:name` `POST /bot-plugins/:name/update` | register `{ "path": "/abs/dir" }` (201, 400 with the reason, 409 when taken), remove (204), or update a skill or plugin for bots. Update runs `git pull --ff-only` when the folder is a git checkout (else re-reads the description), then reloads every bot that uses it; returns `{ method, output, reloaded }` |
 | `GET /skills/discover` | `[{ name, path, description, registered }]` found one level deep under `$CLAUDE_CONFIG_DIR/skills` (or `~/.claude/skills`) and `skillsDir`. Capped at 200 |
 | `POST /access-skills` | body `{ "path": "/abs/dir" }`. 201 with the stored row; 400 with the reason; 409 when the name or path is already registered |
 | `DELETE /access-skills/:name` | 204. 404 when unknown; 409 when a task in draft, ready, running, needs_approval or needs_auth names it (up to 5 ids listed). Never touches the skill's files |
+| `GET /bots` `POST /bots` | list `{ enabled, paused, pause_reason, agents, tasks, threads, turns }`; create `{ name, preset?, ...settings }` (201; 409 for a taken name) |
+| `GET /bots/:name` `PUT /bots/:name` `DELETE /bots/:name` | one bot with all settings; save settings (rebuilds the skill and plugin copy; 409 when disabling taskq); delete (409 for taskq; its open tasks become the user's) |
+| `GET /bots/search?q=` | every bot conversation: trigram FTS for terms of three characters or more, LIKE for shorter ones, all terms must match, newest first, at most 100 `{ id, sender, recipient, created_at, snippet }` |
+| `POST /bots/:name/cancel` | stop the bot's running turn: the turn ends `cancelled`, its messages count as handled, its running task becomes `cancelled`. 409 when it is not working or the bots are not running in this process |
+| `GET /bots/:name/memory` `PUT /bots/:name/memory` | the bot's memory text, at most 16,000 characters |
+| `POST /bots/:name/reload` `POST /bots/:name/reset` | body `{ "kind": "skill" | "plugin" | "all" }` re-copies and returns what loaded and what is missing; reset starts a new session next turn |
+| `GET /bots/:name/catalog` | the models (with their effort levels), permission modes and slash commands for the compose bar. Read from an idle SDK session and cached 10 minutes; `?refresh=1` reads again. `fallback: true` marks the built-in list used when the SDK cannot answer |
+| `GET /workflows` `POST /workflows` | list (`?deleted=1` includes deleted) and create. Body `{ name, description, definition: { steps: [{ id, name, kind: do\|check\|handoff\|approval, instructions, needs, to? }] } }`; a loop, an unknown need or a duplicate name is refused |
+| `GET /workflows/:id` `PUT /workflows/:id` `DELETE /workflows/:id` | read by id or name, replace, soft delete. Delete answers `{ deleted, told }`: the bots running it get a message; runs keep their copy |
+| `POST /workflows/:id/run` | body `{ bot, task_id? }`: starts a run executed by that bot, which gets the steps as a message |
+| `GET /workflow-runs` `GET /workflow-runs/:id` | run history (`?workflow=`, `?bot=`, `?task=`) with the bot, status and whether the workflow was deleted; one run with every step's status, output and evidence |
+| `POST /workflow-runs/:id/cancel` `POST /workflow-runs/:id/steps/:step/approve` | cancel a running run (the bot is told); the user's answer to an approval step `{ approved, note }` |
+| `GET /bots/presets` | role, description and instructions for planner, coder, reviewer, doc-reviewer |
+| `GET /bots` fields | Agents carry `busy`, `last_message` and `unread` (messages to the user not yet read) and no `instructions`; `tasks` are unfinished agent-owned tasks with `owner` and `task_title`. Creates the orchestrator when it is missing |
+| `POST /bots/tasks/:id/owner` | body `{ "owner": "coder" }` or `{ "owner": null }`. 409 for a done or failed task or an unknown agent |
+| `GET /bots/messages?agent=&limit=` `POST /bots/messages` | log, newest first; send `{ "to": "taskq", "body": "…" }` as the user (`to` defaults to taskq). 404 for an unknown or disabled bot |
+| `POST /bots/messages/read` | mark unread messages to the user as read; body `{ "agent": "coder" }` limits it to one bot |
+| `POST /bots/threads/:id/close` | close a discussion without a conclusion. 409 when already closed |
+| `POST /bots/pause` `POST /bots/resume` | pause state of the bots, separate from the queue |
+| `GET /bots/wiki?q=` `GET /bots/wiki/page?slug=` | list pages, or search them with `hybridSearch` (`{ slug, title, score, snippet, via? }`); read one page |
 
 `type` and `outcome` are checked against the enum lists in `src/api/params.ts` and anything else returns 400. A date (`from`, `to`) must name a real calendar day, so `2026-13-40` is 400. `output_path` must be a relative path inside `outputs/`, and `repo` an absolute path to an existing directory. The CLI `add` applies the same checks. `lock_key` is limited to 100 characters. Every SQL statement binds request values as parameters. `ORDER BY` and `LIMIT` text comes from fixed strings, and `limit` is an integer validated against 1 to 500.
 

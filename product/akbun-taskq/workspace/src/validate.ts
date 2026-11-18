@@ -74,6 +74,19 @@ function checkPaths(data: Partial<TaskData>): void {
   }
 }
 
+// Attachments are paths the upload API returned, relative to the shared folder. Only the form is checked here; the
+// worker reads them through the gate, which confines reads to that folder.
+function optAttachments(value: unknown): string[] | undefined {
+  if (value === undefined || value === null) return undefined
+  if (!Array.isArray(value) || value.length > 20) throw new InputError('attachments must be an array of up to 20 paths')
+  for (const path of value) {
+    if (typeof path !== 'string' || path.length > 300 || isAbsolute(path) || path.split('/').includes('..') || !path.startsWith('attachments/')) {
+      throw new InputError('attachments must be paths under attachments/ returned by the upload')
+    }
+  }
+  return value.length ? value as string[] : undefined
+}
+
 function optIds(value: unknown, key: string): string[] {
   if (value === undefined || value === null) return []
   if (!Array.isArray(value) || value.length > 50) throw new InputError(`${key} must be an array of up to 50 task ids`)
@@ -110,6 +123,8 @@ export function parseTaskInput(body: unknown, known: SkillLookup): Parsed<TaskIn
       throw new InputError('auto_accept_handoffs must be a boolean')
     }
     data.auto_accept_handoffs = o.auto_accept_handoffs
+    data.attachments = optAttachments(o.attachments)
+    data.workflow_id = optText(o.workflow_id, 'workflow_id', 100) || undefined
     data.max_turns = optInt(o.max_turns, 'max_turns', 1, 1000)
     data.max_budget_usd = optNumber(o.max_budget_usd, 'max_budget_usd', 100)
     checkPaths(data)
@@ -144,6 +159,8 @@ export function parseTaskPatch(body: unknown, known: SkillLookup): Parsed<TaskPa
     data.target_profile = optText(o.target_profile, 'target_profile', 100)
     data.repo = optText(o.repo, 'repo', 500)
     data.output_path = optText(o.output_path, 'output_path', 500)
+    // null or '' removes the workflow from the task.
+    if (o.workflow_id !== undefined) data.workflow_id = optText(o.workflow_id, 'workflow_id', 100) ?? ''
     checkPaths(data)
     return {
       ok: true,

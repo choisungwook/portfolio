@@ -10,8 +10,23 @@
   "maxTurns": 60,
   "maxBudgetUsd": 5,
   "autoMode": true,
-  "sandbox": { "enabled": true, "allowedDomains": [], "allowWrite": [] },
+  "sandbox": {
+    "enabled": true,
+    "allowedDomains": [],
+    "allowWrite": []
+  },
   "prodLockKeys": [],
   "trustedRepos": [],
-  "retrospect": true
+  "retrospect": true,
+  "bots": {
+    "enabled": false,
+    "maxConcurrentTurns": 2,
+    "turnMaxTurns": 30,
+    "turnBudgetUsd": 1,
+    "dailyBudgetUsd": 10,
+    "hourlyTurnsPerAgent": 20,
+    "maxOpenTasks": 10,
+    "maxAttempts": 3,
+    "readRoots": []
+  }
 }

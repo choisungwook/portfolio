@@ -16,7 +16,7 @@ const skillDir = join(home, 'example-readonly')
 mkdirSync(skillDir)
 
 const task: Task = {
-  id: 't-7', type: 'ops_change', status: 'running', priority: 0, lock_key: null, claimed_by: null, heartbeat_at: null,
+  id: 't-7', type: 'ops_change', status: 'running', priority: 0, lock_key: null, claimed_by: null, heartbeat_at: null, owner: null,
   session_id: null, data: { intent: 'check the example account', access_skill: 'example-readonly' }, created_at: 0, updated_at: 0,
 }
 
