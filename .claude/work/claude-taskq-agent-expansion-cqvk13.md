@@ -11,10 +11,10 @@
 - [x] 4. wiki export(zip level 9)와 소화하는 import를 이어 하기 가능한 백그라운드 job으로
 - [x] 5. Plugins 메뉴를 Claude / OpenAI 하위 메뉴로
 - [x] 6. n8n처럼 끌어서 편집하는 workflow 편집기
-- [ ] 7. 스키마 009: kiro SDK, OpenAI provider, turn별 토큰, bot별 context
-- [ ] 8. OpenAI provider 선택(API 키, Bedrock, ChatGPT 구독 = Codex SDK)과 `taskq mcp --bot`
-- [ ] 9. Kiro backend(AWS SSO device flow 로그인, headless kiro-cli)
-- [ ] 10. 글로벌 설정 Usage, bot별 context window 원
+- [x] 7. 스키마 009: kiro SDK, OpenAI provider, turn별 토큰, bot별 context
+- [x] 8. OpenAI provider 선택(API 키, Bedrock, ChatGPT 구독 = Codex SDK)과 `taskq mcp --bot`
+- [x] 9. Kiro backend(AWS SSO device flow 로그인, headless kiro-cli)
+- [x] 10. 글로벌 설정 Usage, bot별 context window 원
 - [ ] 11. 0.10.0 CHANGELOG·문서, 첫 리뷰 지적 반영, 두 번째 리뷰, PR, squash merge
 
 ## 다음 세션이 알아야 할 것

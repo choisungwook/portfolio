@@ -59,6 +59,13 @@ taskq calls the SDK from three places. All three run the Claude Code executable 
 | SDK memory files (`memory` on agent definitions, CLAUDE.md) | They load from Claude settings, which bots do not read. taskq keeps each bot's memory in SQLite and appends it to the system prompt |
 | Session stores | Sessions stay in Claude Code's own transcript folder (`~/.claude/projects/`); Settings opens it |
 
+## Claude usage and context
+
+| SDK API | How taskq uses it |
+|---|---|
+| `SDKAssistantMessage.message.usage` | The last model call's `input_tokens + cache_read_input_tokens + cache_creation_input_tokens` is the bot's context size for the context ring |
+| `SDKResultMessage.usage`, `modelUsage[model].contextWindow` | Tokens of the turn (summed over its results) for the Usage page, and the model's context window |
+
 ## OpenAI Agents SDK
 
 OpenAI bots (`sdk: openai`) run on `src/agents/openai/team.ts`. The hub, mailbox, team tools, guards and gate are the same as for Claude bots; only the session and the tools differ.
@@ -69,9 +76,15 @@ OpenAI bots (`sdk: openai`) run on `src/agents/openai/team.ts`. The hub, mailbox
 | `Agent({ name, instructions, model, modelSettings, tools })` | `instructions` is the same system text a Claude bot gets; `model` is the bot's model or `gpt-5`; `modelSettings.reasoning.effort` is the bot's effort |
 | `tool({ name, description, parameters, strict: false, execute })` | The 20 team tools (zod shape turned into JSON schema with `z.toJSONSchema`) and the file and shell tools of `local-tools.ts`. A `ToolError` is returned to the model as text; a gate stop aborts the run |
 | `previousResponseId`, `result.lastResponseId` | The conversation lives on OpenAI's side (Responses API). The last response id is the bot's session id; a `previous_response_not_found` error drops it so the next turn starts fresh |
+| `OpenAIProvider({ apiKey, baseURL, useResponses: false })` | A Bedrock bot: Chat Completions at `https://bedrock-runtime.<region>.amazonaws.com/openai/v1` with `AWS_BEARER_TOKEN_BEDROCK`. No server-side conversation, so the turn's input is the saved `result.history` plus the new message (`user()`), and the history is saved after the turn |
+| `result.rawResponses.at(-1).usage` | The last call's input tokens: the context ring |
 | `MCPServerStdio` (`Agent({ mcpServers })`) | The registered MCP servers the bot picked, started in the bot's working directory for the turn and closed after it |
 | `maxTurns`, `signal` | The bot's turn limit, and cancel (Stop, Esc, disable, delete, shutdown) |
 | `result.runContext.usage` | `inputTokens`, `outputTokens`, `requests`: the turn count and the cost estimate from `bots.openaiInputPerMTok` and `bots.openaiOutputPerMTok` |
 | `MaxTurnsExceededError`, an error with `status` 401 | A failed turn with a reason; 401 pauses the bots like a Claude login failure |
 
 Not used: the realtime package, handoffs between agents (bots hand work over through taskq's mailbox, which survives restarts and shows in the UI), hosted tools, and the SDK's sessions (the Responses API's own conversation state is enough). Model list: `GET https://api.openai.com/v1/models` with the key, filtered to `gpt-*` and `o*`; without a key the built-in list is shown.
+
+## Codex CLI (ChatGPT plan) and Kiro CLI
+
+Neither is an SDK taskq imports: both are CLIs the user installs and signs in to, run once per turn. Their arguments, records and limits are in [architecture.md](architecture.md) under "OpenAI providers, Kiro and the runtimes taskq drives as processes". taskq does not depend on `@openai/codex-sdk`, which installs a platform Codex binary of about 400 MB; it passes the same `codex exec` arguments that package does. Kiro's stream-json record format is not documented, so its parser takes only fields it recognises by name.

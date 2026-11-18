@@ -327,6 +327,10 @@ bot과 대화할 때 쓰는 기능은 아래와 같다.
 | 저장소에서 안전하게 일 시키기 | 새 작업에서 저장소를 고르고 "새 git worktree에서 작업"을 켠 채 둔다(기본). 작업은 `TASKQ_HOME/worktrees/`의 자기 폴더와 `taskq/<작업 id>` 브랜치에서 일하고 내 checkout은 그대로다. 작업 상세 오른쪽에서 바뀐 파일과 diff, PR 링크를 보고 VS Code로 연다 |
 | 문서를 bot이 쓰게 넣기 | Wiki에서 가져오기로 zip, 파일, 폴더를 넣는다. 문서가 절 단위 페이지와 링크로 바뀌고 색인 페이지가 생긴다. 멈추면 "마지막 단계부터 다시" |
 | wiki 백업 | Wiki에서 zip으로 내보내기. 공용 폴더의 `exports/`에 생기고, 다른 taskq에서 가져오기로 그대로 복원된다 |
+| OpenAI bot을 다른 방식으로 쓰기 | bot 설정에서 Agent SDK를 OpenAI로 두고 Sign in with를 고른다. API 키는 `OPENAI_API_KEY`, Bedrock은 `AWS_BEARER_TOKEN_BEDROCK`(Bedrock API 키)와 설정 파일의 `bots.bedrockRegion`, ChatGPT 구독은 Codex CLI를 설치하고 `codex login`에서 Sign in with ChatGPT |
+| Kiro bot 쓰기 | kiro-cli를 설치하고 설정의 Kiro 절에 IAM Identity Center start URL과 region을 넣어 AWS SSO로 로그인한다(화면의 URL에서 코드 입력). 그다음 bot 설정에서 Agent SDK를 Kiro로 고른다 |
+| 얼마나 썼는지 보기 | 설정의 사용량. SDK별 합계와 bot 세션별 토큰·비용이 보인다 |
+| context가 얼마나 찼는지 보기 | 입력창 아래 원과 %, 왼쪽 bot 이름 옆 작은 원. 85%를 넘으면 빨갛게 보이니 bot 메뉴의 새 세션으로 비운다 |
 | bot에게 MCP server 주기 | Plugins 메뉴에서 MCP server를 등록하고 bot 설정에서 고른다. Claude와 OpenAI bot 모두 쓴다 |
 | 일하는 bot에게 더 말하기 | 그냥 보낸다. Claude bot은 진행 중인 turn에서 바로 받아 처리하고, OpenAI bot과 자리가 없는 bot은 메시지를 쌓아 두었다가 다음 turn에 처리한다. 쌓인 수가 대화 아래에 보인다 |
 | 모델, effort, 권한 바꾸기 | 입력창 아래 메뉴. 다음 turn부터 적용된다. ↻는 skill·plugin을 다시 읽고 모델과 명령 목록을 새로 불러온다 |

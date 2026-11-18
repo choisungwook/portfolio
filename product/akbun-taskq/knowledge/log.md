@@ -2,6 +2,10 @@
 
 concept를 추가·수정·삭제할 때마다 오늘 날짜 섹션을 맨 위에 만들고 한 줄 남긴다. 구분은 `**Creation**`, `**Update**`, `**Deletion**`이다.
 
+## 2026-11-19
+
+* **Creation**: [ChatGPT-plan and Kiro bots run their own CLIs per turn](decisions/2026-11-bot-runtimes-beyond-sdks.md) 결정 기록. provider 선택, codex exec, kiro-cli headless와 SSO, `taskq mcp --bot`, Usage와 context.
+
 ## 2026-11-18
 
 * **Creation**: [A code task in a git repository works in its own worktree](decisions/2026-11-task-worktrees.md) 결정 기록. 생성 시점 worktree, data.repo 교체, 삭제 후 경로 유지, 토큰 없는 PR 링크.
