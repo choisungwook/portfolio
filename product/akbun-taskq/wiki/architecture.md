@@ -367,6 +367,10 @@ user --bot chat / taskq bots say--> team_messages --hub--> bot turn (resumed Cla
 | `list_tasks`, `get_task` | read tasks and their last run |
 | `wiki_list`, `wiki_search`, `wiki_read`, `wiki_write` | the shared wiki |
 | `memory_write` | replace or append to the bot's own memory, which is appended to its system prompt every turn (16,000 characters at most) |
+| `list_workflows` | the workflows (name, steps) and the bot's own runs still going |
+| `run_workflow` | starts a run of a workflow that the bot itself executes, without a task |
+| `workflow_status` | the steps of a run with their state (ready, running, succeeded, failed, skipped), the run status, and whether the workflow was deleted |
+| `workflow_step` | reports one step: `running`, then `succeeded` (a `check` step needs `evidence`; an `approval` step only the user can approve), `failed` or `skipped` (with the reason). A failed step fails the run; the run succeeds when every step is done |
 
 ### Working, cancelling, attachments
 
@@ -579,6 +583,11 @@ Writes (any non-GET under `/api`) must send `Content-Type: application/json`, op
 | `GET /bots/:name/memory` `PUT /bots/:name/memory` | the bot's memory text, at most 16,000 characters |
 | `POST /bots/:name/reload` `POST /bots/:name/reset` | body `{ "kind": "skill" | "plugin" | "all" }` re-copies and returns what loaded and what is missing; reset starts a new session next turn |
 | `GET /bots/:name/catalog` | the models (with their effort levels), permission modes and slash commands for the compose bar. Read from an idle SDK session and cached 10 minutes; `?refresh=1` reads again. `fallback: true` marks the built-in list used when the SDK cannot answer |
+| `GET /workflows` `POST /workflows` | list (`?deleted=1` includes deleted) and create. Body `{ name, description, definition: { steps: [{ id, name, kind: do\|check\|handoff\|approval, instructions, needs, to? }] } }`; a loop, an unknown need or a duplicate name is refused |
+| `GET /workflows/:id` `PUT /workflows/:id` `DELETE /workflows/:id` | read by id or name, replace, soft delete. Delete answers `{ deleted, told }`: the bots running it get a message; runs keep their copy |
+| `POST /workflows/:id/run` | body `{ bot, task_id? }`: starts a run executed by that bot, which gets the steps as a message |
+| `GET /workflow-runs` `GET /workflow-runs/:id` | run history (`?workflow=`, `?bot=`, `?task=`) with the bot, status and whether the workflow was deleted; one run with every step's status, output and evidence |
+| `POST /workflow-runs/:id/cancel` `POST /workflow-runs/:id/steps/:step/approve` | cancel a running run (the bot is told); the user's answer to an approval step `{ approved, note }` |
 | `GET /bots/presets` | role, description and instructions for planner, coder, reviewer, doc-reviewer |
 | `GET /bots` fields | Agents carry `busy`, `last_message` and `unread` (messages to the user not yet read) and no `instructions`; `tasks` are unfinished agent-owned tasks with `owner` and `task_title`. Creates the orchestrator when it is missing |
 | `POST /bots/tasks/:id/owner` | body `{ "owner": "coder" }` or `{ "owner": null }`. 409 for a done or failed task or an unknown agent |

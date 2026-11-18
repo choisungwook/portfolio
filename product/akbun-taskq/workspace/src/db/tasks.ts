@@ -1,4 +1,5 @@
 import { inTransaction, type Db } from './open.ts'
+import { getWorkflow } from './workflows.ts'
 import type { Task, TaskData, TaskStatus, TaskType } from '../types.ts'
 import { newId } from '../ids.ts'
 import { nowSec } from '../time.ts'
@@ -65,11 +66,12 @@ export function listDeps(db: Db): { task_id: string; depends_on: string; kind: s
 }
 
 // Ready tasks whose handoffs are accepted and whose lock_key has no active task.
-// The queue runs only tasks no bot owns; a bot's task waits for that bot. Run-now (claimTask) is not limited this way:
+// The queue runs only tasks no bot owns; a bot's task waits for that bot. A task with a workflow waits for a bot too: only
+// a bot executes workflows. Run-now (claimTask) is not limited this way:
 // it is the user's one-off run, whoever owns the task.
 export function nextEligible(db: Db): Task | undefined {
   const row = db.prepare(`SELECT t.* FROM tasks t
-    WHERE t.status = 'ready' AND t.owner IS NULL
+    WHERE t.status = 'ready' AND t.owner IS NULL AND coalesce(json_extract(t.data, '$.workflow_id'), '') = ''
       AND NOT ${BLOCKED_SQL}
       AND NOT EXISTS (SELECT 1 FROM tasks o WHERE t.lock_key IS NOT NULL AND o.lock_key = t.lock_key
         AND o.id != t.id AND o.status IN ('running', 'needs_approval', 'needs_auth'))
@@ -137,6 +139,7 @@ export function createFromInput(db: Db, input: TaskInput, owner: string | null =
   for (const id of input.depends_on) {
     if (!getTask(db, id)) throw new Error(`unknown dependency: ${id}`)
   }
+  if (input.data.workflow_id) input = { ...input, data: { ...input.data, workflow_id: workflowIdOf(db, input.data.workflow_id) } }
   return inTransaction(db, () => insertTask(db, {
     type: input.type, status: input.status, priority: input.priority, lock_key: input.lock_key, owner, data: input.data,
     deps: input.depends_on.map((depends_on) => ({ depends_on, kind: 'blocks' as const })),
@@ -174,4 +177,11 @@ export function graphNodes(db: Db) {
 export function listLockKeys(db: Db): string[] {
   return (db.prepare('SELECT DISTINCT lock_key FROM tasks WHERE lock_key IS NOT NULL ORDER BY lock_key').all() as { lock_key: string }[])
     .map((row) => row.lock_key)
+}
+
+// A workflow given by id or name, stored by id. A deleted or unknown workflow is refused.
+export function workflowIdOf(db: Db, ref: string): string {
+  const workflow = getWorkflow(db, ref)
+  if (!workflow || workflow.deleted_at !== null) throw new Error(`unknown workflow: ${ref}`)
+  return workflow.id
 }

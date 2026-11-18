@@ -4,6 +4,8 @@ import { getAgent, postMessage } from '../db/team.ts'
 import { createFromInput, getTask, TASK_TITLE_SQL } from '../db/tasks.ts'
 import { findAccessSkill } from '../db/access-skills.ts'
 import { parseTaskInput, TASK_TYPES } from '../validate.ts'
+import { describeRun } from '../db/workflows.ts'
+import { WORKFLOW_HOW } from './workflow-work.ts'
 import { queueChanged, teamChanged } from '../wake.ts'
 import { raiseAlert } from '../alerts/rules.ts'
 import type { TaskType } from '../types.ts'
@@ -54,6 +56,7 @@ export function taskTools(scope: ScopedTools): TeamTool[] {
         owner: z.string().max(80).optional(),
         draft: z.boolean().optional(),
         not_duplicate_of: z.array(TASK_ID).max(10).optional(),
+        workflow: z.string().max(100).optional().describe('a workflow (name or id) the owner runs for this task; list_workflows shows them'),
       },
       readOnly: false,
       handler(args) {
@@ -74,8 +77,8 @@ export function taskTools(scope: ScopedTools): TeamTool[] {
         }
         const touchesAccount = type === 'ops_read' || type === 'ops_change' || args.access_skill !== undefined || args.target_profile !== undefined
         const draft = args.draft === true || touchesAccount
-        const { owner: _owner, draft: _draft, not_duplicate_of: _nd, ...input } = args
-        const parsed = parseTaskInput({ ...input, status: draft ? 'draft' : 'ready' }, (name) => findAccessSkill(db, name) !== undefined)
+        const { owner: _owner, draft: _draft, not_duplicate_of: _nd, workflow, ...input } = args
+        const parsed = parseTaskInput({ ...input, workflow_id: workflow, status: draft ? 'draft' : 'ready' }, (name) => findAccessSkill(db, name) !== undefined)
         if (!parsed.ok) throw new ToolError(parsed.error)
         let task
         try {
@@ -130,7 +133,11 @@ export function taskTools(scope: ScopedTools): TeamTool[] {
         const started = startBotTask(db, agent, String(args.task_id), self().session_id)
         if (!started.ok) throw new ToolError(started.error)
         wrote()
-        return { task_id: args.task_id, status: 'running', run_id: started.runId }
+        if (!started.workflow) return { task_id: args.task_id, status: 'running', run_id: started.runId }
+        return {
+          task_id: args.task_id, status: 'running', run_id: started.runId, workflow_run_id: started.workflow.id,
+          workflow: describeRun(started.workflow), how: WORKFLOW_HOW,
+        }
       },
     },
     {

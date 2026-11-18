@@ -23,6 +23,7 @@ export interface TaskData {
   base_commit?: string       // code: HEAD before the run
   max_turns?: number
   max_budget_usd?: number
+  workflow_id?: string       // the workflow the owner bot runs for this task; '' or absent: none
 }
 
 export interface Task {

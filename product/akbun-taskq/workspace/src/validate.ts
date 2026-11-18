@@ -124,6 +124,7 @@ export function parseTaskInput(body: unknown, known: SkillLookup): Parsed<TaskIn
     }
     data.auto_accept_handoffs = o.auto_accept_handoffs
     data.attachments = optAttachments(o.attachments)
+    data.workflow_id = optText(o.workflow_id, 'workflow_id', 100) || undefined
     data.max_turns = optInt(o.max_turns, 'max_turns', 1, 1000)
     data.max_budget_usd = optNumber(o.max_budget_usd, 'max_budget_usd', 100)
     checkPaths(data)
@@ -158,6 +159,8 @@ export function parseTaskPatch(body: unknown, known: SkillLookup): Parsed<TaskPa
     data.target_profile = optText(o.target_profile, 'target_profile', 100)
     data.repo = optText(o.repo, 'repo', 500)
     data.output_path = optText(o.output_path, 'output_path', 500)
+    // null or '' removes the workflow from the task.
+    if (o.workflow_id !== undefined) data.workflow_id = optText(o.workflow_id, 'workflow_id', 100) ?? ''
     checkPaths(data)
     return {
       ok: true,

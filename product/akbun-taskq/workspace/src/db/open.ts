@@ -5,7 +5,7 @@ import { resourcePath } from '../resources.ts'
 
 export type Db = DatabaseSync
 
-const MIGRATIONS = ['001_init.sql', '002_approvals.sql', '003_access_skills.sql', '004_handoffs.sql', '005_team.sql']
+const MIGRATIONS = ['001_init.sql', '002_approvals.sql', '003_access_skills.sql', '004_handoffs.sql', '005_team.sql', '006_workflows.sql']
 
 function schemaFile(name: string): string {
   const file = resourcePath(`src/db/schema/${name}`)
@@ -73,7 +73,9 @@ function migrate(db: Db): void {
   }
 }
 
+// Inside a transaction already, fn joins it: one caller's transaction covers the helpers it calls.
 export function inTransaction<T>(db: Db, fn: () => T): T {
+  if (db.isTransaction) return fn()
   db.exec('BEGIN IMMEDIATE')
   try {
     const result = fn()

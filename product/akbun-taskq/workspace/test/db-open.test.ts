@@ -25,7 +25,7 @@ test('six processes opening the same new database at once all succeed', async ()
     const results = await Promise.allSettled(Array.from({ length: 6 }, () => run(process.execPath, [script, home])))
     const failures = results.flatMap((r) => (r.status === 'rejected' ? [String(r.reason.stderr ?? r.reason)] : []))
     assert.deepEqual(failures, [])
-    for (const r of results) assert.equal((r as PromiseFulfilledResult<{ stdout: string }>).value.stdout.trim(), '5')
+    for (const r of results) assert.equal((r as PromiseFulfilledResult<{ stdout: string }>).value.stdout.trim(), '6')
   } finally {
     rmSync(dir, { recursive: true, force: true })
   }
