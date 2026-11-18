@@ -9,6 +9,7 @@ import { knownNames } from '../db/bot-registry.ts'
 import { BOT_NAME, parseBotSettings } from '../team/bot-settings.ts'
 import { noteReload, reload, reloadAll } from '../team/bot-plugin.ts'
 import { PRESETS } from '../team/roster.ts'
+import { releaseBotTasks } from '../team/bot-work.ts'
 import { exportWiki } from '../team/wiki-files.ts'
 import { setOwner } from '../team/owner.ts'
 import { ROSTER } from '../team/roster.ts'
@@ -116,7 +117,9 @@ export const bots: Command = ({ config, db }, args) => {
     case 'delete': {
       const [name] = rest
       if (name === ORCHESTRATOR) throw new Error(`${ORCHESTRATOR} cannot be deleted`)
-      if (!name || !deleteAgent(db, name)) throw new Error(`no bot named ${name ?? ''}`)
+      if (!name || !getAgent(db, name)) throw new Error(`no bot named ${name ?? ''}`)
+      releaseBotTasks(db, name, 'the bot was deleted', 'draft')
+      deleteAgent(db, name)
       console.log(`bot ${name} deleted`)
       return
     }

@@ -2,6 +2,7 @@ import type { Db } from '../db/open.ts'
 import { SYSTEM, firstAgentWithRole, getAgent, postMessage } from '../db/team.ts'
 import type { Task, TaskStatus, WorkerResult } from '../types.ts'
 import { teamChanged } from '../wake.ts'
+import { insertTask } from '../db/tasks.ts'
 
 // Called inside finishRun's transaction. A task an agent owns reports back to that agent's inbox, so the agent
 // continues in its next turn without polling the queue.
@@ -34,4 +35,19 @@ export function notifyOwner(db: Db, task: Task): void {
   if (!task.owner || !getAgent(db, task.owner)) return
   postMessage(db, { sender: SYSTEM, recipient: task.owner, task_id: task.id, body: `Task ${task.id} is now yours: ${task.data.intent}` })
   teamChanged.notify()
+}
+
+// The security review that follows a finished code task, from a queue run or a bot's own work.
+export function queueSecurityReview(db: Db, task: Task): Task {
+  const review = insertTask(db, {
+    type: 'security_review', status: 'ready',
+    data: {
+      intent: `Review the changes made by ${task.id} since base_commit`,
+      review_of: task.id, repo: task.data.repo, base_commit: task.data.base_commit,
+    },
+    owner: reviewOwner(db, task),
+    deps: [{ depends_on: task.id, kind: 'discovered_from' }],
+  })
+  notifyOwner(db, review)
+  return review
 }

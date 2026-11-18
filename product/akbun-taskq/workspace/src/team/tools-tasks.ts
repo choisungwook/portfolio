@@ -100,6 +100,7 @@ export function taskTools(scope: ScopedTools): TeamTool[] {
         const task = getTask(db, String(args.task_id))
         if (!task) throw new ToolError('task not found')
         if (task.status === 'done' || task.status === 'failed') throw new ToolError(`task is ${task.status}; create a new one instead`)
+        if (task.status === 'running') throw new ToolError('task is running; it can change hands after it finishes')
         if (task.owner !== agent && !COORDINATORS.has(me.role)) {
           throw new ToolError(`task ${task.id} is owned by ${task.owner ?? 'the user'}; ask them or taskq`)
         }

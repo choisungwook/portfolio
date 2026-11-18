@@ -5,6 +5,7 @@ import { getTask, releaseTask } from '../db/tasks.ts'
 import { insertEvent } from '../db/events.ts'
 import { postMessage, SYSTEM } from '../db/team.ts'
 import { raiseAlert } from '../alerts/rules.ts'
+import { queueSecurityReview } from './report.ts'
 import { newId } from '../ids.ts'
 import { nowSec } from '../time.ts'
 import type { TaskStatus } from '../types.ts'
@@ -25,13 +26,12 @@ export function startBotTask(db: Db, bot: string, taskId: string, sessionId: str
     if (!task) return { ok: false, error: 'task not found' }
     if (task.owner !== bot) return { ok: false, error: `task ${taskId} is owned by ${task.owner ?? 'the user'}, not you` }
     if (task.status === 'running' && task.claimed_by === botClaim(bot)) return { ok: false, error: 'you already started this task; finish it with finish_task' }
-    if (task.status !== 'ready' && task.status !== 'draft') return { ok: false, error: `task is ${task.status}` }
-    if (task.status === 'draft' && (task.type === 'ops_read' || task.type === 'ops_change' || task.data.access_skill || task.data.target_profile)) {
-      return { ok: false, error: 'this draft touches an account; the user must promote it before anyone starts it' }
-    }
+    // A draft is a note the user has not released for work, whoever owns it. Only the user promotes it to ready.
+    if (task.status === 'draft') return { ok: false, error: 'this task is a draft; the user must promote it to ready before anyone starts it' }
+    if (task.status !== 'ready') return { ok: false, error: `task is ${task.status}` }
     const now = nowSec()
     const changed = db.prepare(`UPDATE tasks AS t SET status = 'running', claimed_by = ?, heartbeat_at = NULL, updated_at = ?
-      WHERE id = ? AND status IN ('ready', 'draft') AND NOT ${BLOCKED}`).run(botClaim(bot), now, taskId).changes
+      WHERE id = ? AND status = 'ready' AND NOT ${BLOCKED}`).run(botClaim(bot), now, taskId).changes
     if (changed !== 1) return { ok: false, error: 'a task it depends on is not done yet' }
     const runId = newId()
     insertRun(db, { id: runId, task_id: taskId, session_id: sessionId, started_at: now, output_path: task.data.output_path, bot })
@@ -55,22 +55,41 @@ export function finishBotTask(db: Db, bot: string, taskId: string, outcome: BotO
     insertEvent(db, { task_id: taskId, run_id: run ? String(run.id) : null, kind: 'finished', payload: { outcome, bot } })
     if (outcome === 'failed') raiseAlert(db, { task_id: taskId, kind: 'failed', message: `${bot} failed: ${summary.slice(0, 200)}` })
     if (outcome === 'review') raiseAlert(db, { task_id: taskId, kind: 'review_ready', message: `${bot} asks you to review: ${task.data.intent.slice(0, 120)}` })
+    // The same automatic security review a queue run of a code task gets, owned by a bot other than the author.
+    if (task.type === 'code' && outcome === 'done') queueSecurityReview(db, task)
     return { ok: true }
   })
 }
 
-// After a restart no bot is mid-turn, so a task a bot had started goes back to ready and the bot is told to pick it up.
-export function recoverBotTasks(db: Db): number {
-  const rows = db.prepare(`SELECT id, claimed_by FROM tasks WHERE status = 'running' AND claimed_by LIKE 'bot:%'`).all()
-  for (const row of rows) {
-    const id = String(row.id)
-    const bot = String(row.claimed_by).slice(4)
+// Hands back the tasks a bot holds as running. `ready` keeps the bot as owner (it may start again); `draft` also clears
+// the owner, so half-done work of a deleted bot waits for the user instead of being picked up by the queue.
+export function releaseBotTasks(db: Db, bot: string, why: string, to: 'ready' | 'draft'): string[] {
+  const ids = db.prepare(`SELECT id FROM tasks WHERE status = 'running' AND claimed_by = ?`).all(botClaim(bot)).map((row) => String(row.id))
+  for (const id of ids) {
     inTransaction(db, () => {
-      db.prepare(`UPDATE runs SET ended_at = ?, outcome = 'stale', summary = 'taskq stopped while the bot was working' WHERE task_id = ? AND bot = ? AND ended_at IS NULL`)
-        .run(nowSec(), id, bot)
-      releaseTask(db, id, 'ready', botClaim(bot))
-      postMessage(db, { sender: SYSTEM, recipient: bot, task_id: id, body: `taskq restarted while you were working on task ${id}. It is ready again; start_task to continue.` })
+      db.prepare(`UPDATE runs SET ended_at = ?, outcome = 'stale', summary = ? WHERE task_id = ? AND bot = ? AND ended_at IS NULL`)
+        .run(nowSec(), why, id, bot)
+      releaseTask(db, id, to, botClaim(bot))
+      if (to === 'draft') db.prepare('UPDATE tasks SET owner = NULL, owner_since = NULL WHERE id = ?').run(id)
+      insertEvent(db, { task_id: id, run_id: null, kind: 'finished', payload: { outcome: 'stale', bot, why } })
     })
   }
-  return rows.length
+  return ids
+}
+
+// After a restart no bot is mid-turn. A task an enabled bot had started goes back to ready and the bot is told; one held
+// by a bot that is gone or disabled becomes an unowned draft for the user.
+export function recoverBotTasks(db: Db): number {
+  const rows = db.prepare(`SELECT DISTINCT claimed_by FROM tasks WHERE status = 'running' AND claimed_by LIKE 'bot:%'`).all()
+  let count = 0
+  for (const row of rows) {
+    const bot = String(row.claimed_by).slice(4)
+    const enabled = db.prepare('SELECT 1 FROM team_agents WHERE name = ? AND enabled = 1').get(bot) !== undefined
+    const ids = releaseBotTasks(db, bot, 'taskq stopped while the bot was working', enabled ? 'ready' : 'draft')
+    count += ids.length
+    for (const id of enabled ? ids : []) {
+      postMessage(db, { sender: SYSTEM, recipient: bot, task_id: id, body: `taskq restarted while you were working on task ${id}. It is ready again; start_task to continue.` })
+    }
+  }
+  return count
 }

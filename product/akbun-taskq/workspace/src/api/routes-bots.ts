@@ -7,6 +7,7 @@ import { knownNames } from '../db/bot-registry.ts'
 import { BOT_NAME, parseBotSettings } from '../team/bot-settings.ts'
 import { noteReload, reload, reloadAll } from '../team/bot-plugin.ts'
 import { PRESETS } from '../team/roster.ts'
+import { releaseBotTasks } from '../team/bot-work.ts'
 import { getPage, listPages } from '../db/wiki.ts'
 import { forceClose, listThreads } from '../db/threads.ts'
 import { hybridSearch } from '../team/search.ts'
@@ -144,6 +145,7 @@ export function registerBotsRoutes(api: Hono, { db, config }: ApiDeps): void {
     if (!parsed.ok) throw new HttpError(400, parsed.error)
     if (current.system && !parsed.value.enabled) throw new HttpError(409, `${ORCHESTRATOR} cannot be disabled; pause the bots instead`)
     updateAgent(db, name, parsed.value)
+    if (current.enabled && !parsed.value.enabled) releaseBotTasks(db, name, 'the bot was disabled', 'ready')
     noteReload(db, name, reloadAll(db, config, name))
     teamChanged.notify()
     return c.json(getAgent(db, name))
@@ -152,7 +154,9 @@ export function registerBotsRoutes(api: Hono, { db, config }: ApiDeps): void {
   api.delete('/bots/:name', (c) => {
     const name = c.req.param('name')
     if (getAgent(db, name)?.system) throw new HttpError(409, `${ORCHESTRATOR} cannot be deleted`)
-    if (!deleteAgent(db, name)) throw new HttpError(404, 'no such bot')
+    if (!getAgent(db, name)) throw new HttpError(404, 'no such bot')
+    releaseBotTasks(db, name, 'the bot was deleted', 'draft')
+    deleteAgent(db, name)
     teamChanged.notify()
     return c.body(null, 204)
   })

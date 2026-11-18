@@ -1,5 +1,5 @@
-import { cpSync, existsSync, mkdirSync, rmSync, writeFileSync } from 'node:fs'
-import { basename, join } from 'node:path'
+import { cpSync, existsSync, lstatSync, mkdirSync, realpathSync, rmSync, writeFileSync } from 'node:fs'
+import { basename, join, relative, sep } from 'node:path'
 import type { Config } from '../config.ts'
 import type { Db } from '../db/open.ts'
 import { entryOk, listEntries, type RegistryKind } from '../db/bot-registry.ts'
@@ -32,11 +32,31 @@ export function pluginsDir(config: Config, bot: string): string {
   return join(snapshotRoot(config, bot), 'plugins')
 }
 
-// Clears one snapshot folder. The path is checked first because it is about to be removed recursively.
+// Clears one snapshot folder, which is about to be removed recursively. A bot can write in its own folder, so it could
+// plant a symlink there (`.taskq -> ~/.claude`). Every component from TASKQ_HOME/team down to the folder is therefore
+// checked with lstat, and the real path must still be inside TASKQ_HOME/team; a symlink anywhere refuses the reload.
 function reset(config: Config, dir: string): void {
-  if (!under(dir, join(config.home, 'team'))) throw new Error(`refusing to clear ${dir}`)
+  const root = join(config.home, 'team')
+  mkdirSync(root, { recursive: true })
+  if (!under(dir, root)) throw new Error(`refusing to clear ${dir}`)
+  let path = root
+  for (const part of relative(root, dir).split(sep)) {
+    path = join(path, part)
+    if (existsSync(path) || isLink(path)) {
+      if (isLink(path)) throw new Error(`refusing to reload: ${path} is a symbolic link`)
+    }
+  }
+  if (existsSync(dir) && !under(realpathSync(dir), realpathSync(root))) throw new Error(`refusing to clear ${dir}: it resolves outside ${root}`)
   rmSync(dir, { recursive: true, force: true })
   mkdirSync(dir, { recursive: true })
+}
+
+function isLink(path: string): boolean {
+  try {
+    return lstatSync(path).isSymbolicLink()
+  } catch {
+    return false
+  }
 }
 
 function copy(from: string, to: string): void {

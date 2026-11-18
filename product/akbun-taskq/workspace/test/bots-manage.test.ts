@@ -6,9 +6,13 @@ import { createApp } from '../src/api/server.ts'
 import { getAgent, listMessages } from '../src/db/team.ts'
 import { getTask, insertTask } from '../src/db/tasks.ts'
 import { setQueueAutorun } from '../src/db/meta.ts'
-import { blockedBy } from '../src/team/bot-gate.ts'
-import { finishBotTask, recoverBotTasks, startBotTask } from '../src/team/bot-work.ts'
-import { pluginPaths, skillsPluginDir } from '../src/team/bot-plugin.ts'
+import { blockedBy, botGate } from '../src/team/bot-gate.ts'
+import { finishBotTask, recoverBotTasks, releaseBotTasks, startBotTask } from '../src/team/bot-work.ts'
+import { pluginPaths, reloadAll, skillsPluginDir } from '../src/team/bot-plugin.ts'
+import { symlinkSync } from 'node:fs'
+import { homedir } from 'node:os'
+import { teamTools } from '../src/team/tools.ts'
+import { hybridSearch } from '../src/team/search.ts'
 import { createRunner } from '../src/runner/runner.ts'
 import { fakeWorker, result, seedTestBots, setup, sleep, statusOf, waitFor, TOKEN, type TestEnv } from './helpers.ts'
 
@@ -136,11 +140,57 @@ describe('bots working on tasks', () => {
     assert.equal(env.db.prepare('SELECT bot FROM runs WHERE task_id = ?').get(mine.id)?.bot, null)
   })
 
-  test('blocked command patterns match each segment, and * is the only wildcard', () => {
-    assert.equal(blockedBy('cd app && git push origin main', ['git push*']), 'git push*')
+  test('blocked command patterns match anywhere in the command, and * is the only wildcard', () => {
+    for (const command of ['cd app && git push origin main', 'sudo git push', 'x=1 git push', 'bash -c "git push"', 'true\ngit push', 'echo $(git push)']) {
+      assert.equal(blockedBy(command, ['git push*']), 'git push*', command)
+    }
     assert.equal(blockedBy('git status', ['git push*']), null)
-    assert.equal(blockedBy('rm -rf /tmp/x', ['rm -rf *']), 'rm -rf *')
+    assert.equal(blockedBy('/bin/rm -rf /tmp/x', ['rm -rf *']), 'rm -rf *')
     assert.equal(blockedBy('echo a.b', ['echo a?b']), null)
     assert.ok(existsSync(env.home))
+  })
+
+  test('[critical] a shell command naming taskq data or config stops the turn even with no sandbox and no blocked commands', () => {
+    const bot = getAgent(env.db, 'coder')!
+    const gate = (command: string) => botGate(env.config, bot, env.home, 'Bash', { command }).action
+    assert.equal(gate(`sqlite3 ${join(env.home, 'data', 'taskq.db')} "UPDATE meta SET value = '0'"`), 'stop')
+    assert.equal(gate(`sed -i s/10/1000/ ${join(env.home, 'taskq.config.json')}`), 'stop')
+    assert.equal(gate('cat taskq.db'), 'stop')
+    assert.equal(gate(`echo x > ${join(homedir(), '.claude', 'settings.json')}`), 'deny')
+    assert.equal(gate('echo x > ~/.claude/settings.json'), 'deny')
+    assert.equal(gate('npm test'), 'allow')
+  })
+
+  test('[critical] reload refuses a snapshot folder that a bot replaced with a symlink, and deletes nothing outside', () => {
+    const victim = join(env.home, 'victim')
+    mkdirSync(join(victim, 'plugins', 'keep'), { recursive: true })
+    mkdirSync(join(env.home, 'team', 'coder'), { recursive: true })
+    symlinkSync(victim, join(env.home, 'team', 'coder', '.taskq'))
+    assert.throws(() => reloadAll(env.db, env.config, 'coder'), /symbolic link/)
+    assert.ok(existsSync(join(victim, 'plugins', 'keep')))
+  })
+
+  test('[critical] a task left running when a turn ends, or held by a deleted bot, is handed back', () => {
+    const a = insertTask(env.db, { type: 'research', status: 'ready', owner: 'coder', data: { intent: 'one' } })
+    startBotTask(env.db, 'coder', a.id, null)
+    assert.deepEqual(releaseBotTasks(env.db, 'coder', 'the turn ended without finish_task', 'ready'), [a.id])
+    assert.equal(getTask(env.db, a.id)?.status, 'ready')
+    assert.equal(getTask(env.db, a.id)?.owner, 'coder')
+    startBotTask(env.db, 'coder', a.id, null)
+    releaseBotTasks(env.db, 'coder', 'the bot was deleted', 'draft')
+    assert.equal(getTask(env.db, a.id)?.status, 'draft')
+    assert.equal(getTask(env.db, a.id)?.owner, null)
+  })
+
+  test('[critical] a bot cannot start a draft; a running task cannot change hands; a finished code task gets a review by another bot', () => {
+    const draft = insertTask(env.db, { type: 'research', status: 'draft', owner: 'coder', data: { intent: 'just a note' } })
+    assert.match((startBotTask(env.db, 'coder', draft.id, null) as { error: string }).error, /draft/)
+    const code = insertTask(env.db, { type: 'code', status: 'ready', owner: 'coder', data: { intent: 'change code' } })
+    startBotTask(env.db, 'coder', code.id, null)
+    const assign = teamTools({ db: env.db, config: env.config, agent: 'taskq', search: hybridSearch(env.db) }).find((t) => t.name === 'assign_task')!
+    assert.throws(() => assign.handler({ task_id: code.id, to: 'reviewer' }), /running/)
+    finishBotTask(env.db, 'coder', code.id, 'done', 'changed; npm test passed')
+    const review = env.db.prepare(`SELECT owner FROM tasks WHERE type = 'security_review' AND json_extract(data, '$.review_of') = ?`).get(code.id)
+    assert.equal(review?.owner, 'reviewer')
   })
 })

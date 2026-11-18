@@ -3,7 +3,7 @@ import { join } from 'node:path'
 import type { Config } from '../config.ts'
 import type { Db } from '../db/open.ts'
 import {
-  agentsWithMail, endTurn, getAgent, listAgents, nextDelivery, recoverTurns, replaceAgentSession, seedAgents, spentSince,
+  SYSTEM, agentsWithMail, endTurn, getAgent, postMessage, listAgents, nextDelivery, recoverTurns, replaceAgentSession, seedAgents, spentSince,
   startTurn, turnsSince, type TeamMessage, type TurnEnd,
 } from '../db/team.ts'
 import { closeUnconcluded, passStalled, skipDisabledSpeakers } from '../db/threads.ts'
@@ -17,7 +17,7 @@ import { hybridSearch } from './search.ts'
 import { teamTools } from './tools.ts'
 import { wikiDir } from './wiki-files.ts'
 import { pluginPaths } from './bot-plugin.ts'
-import { recoverBotTasks } from './bot-work.ts'
+import { recoverBotTasks, releaseBotTasks } from './bot-work.ts'
 import type { TeamBackend, TurnResult } from './types.ts'
 
 export interface HubOptions {
@@ -143,6 +143,14 @@ export function createTeamHub({ db, config, backend, retryAfterSec = RETRY_AFTER
     reportSetAside(name, end, result.error)
     if (result.tampered) pauseTeam(db, `${name} tried to reach taskq itself: ${result.tampered}`, 'security_finding')
     if (result.auth_failed) pauseTeam(db, `model provider login failed for ${name}`)
+    // Work on a task happens inside one turn. A task still running when the turn ends goes back to ready, and the bot is
+    // reminded, so a forgotten finish_task does not hold the task (and the run button) forever.
+    if (outcome !== 'interrupted') {
+      const left = releaseBotTasks(db, name, 'the turn ended without finish_task', 'ready')
+      if (left.length > 0 && outcome === 'done') {
+        postMessage(db, { sender: SYSTEM, recipient: name, body: `Your turn ended while task${left.length > 1 ? 's' : ''} ${left.join(', ')} ${left.length > 1 ? 'were' : 'was'} running without finish_task. ${left.length > 1 ? 'They are' : 'It is'} ready again; start_task and finish_task within one turn.` })
+      }
+    }
     // Only a turn that ran to its end counts as choosing not to speak. A failed turn (provider outage) keeps the floor,
     // and its messages come back for the retry.
     if (outcome === 'done') {

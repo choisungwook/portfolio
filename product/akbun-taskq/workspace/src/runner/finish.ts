@@ -8,7 +8,7 @@ import { getTask, insertTask, moveStatus, releaseTask } from '../db/tasks.ts'
 import { pauseQueue } from '../db/meta.ts'
 import { raiseAlert } from '../alerts/rules.ts'
 import { nowSec } from '../time.ts'
-import { notifyOwner, reportToOwner, reviewOwner } from '../team/report.ts'
+import { queueSecurityReview, reportToOwner } from '../team/report.ts'
 
 const REVIEW_TYPES = new Set(['research', 'security_review'])
 
@@ -78,18 +78,7 @@ export function finishRun(db: Db, config: Config, task: Task, runId: string, run
         deps: [{ depends_on: task.id, kind: 'discovered_from' }],
       })
     }
-    if (task.type === 'code' && result.outcome === 'done') {
-      const review = insertTask(db, {
-        type: 'security_review', status: 'ready',
-        data: {
-          intent: `Review the changes made by ${task.id} since base_commit`,
-          review_of: task.id, repo: task.data.repo, base_commit: task.data.base_commit,
-        },
-        owner: reviewOwner(db, task),
-        deps: [{ depends_on: task.id, kind: 'discovered_from' }],
-      })
-      notifyOwner(db, review)
-    }
+    if (task.type === 'code' && result.outcome === 'done') queueSecurityReview(db, task)
     if (task.type === 'security_review' && task.data.review_of && result.alerts.some((a) => a.severity === 'critical')) {
       const original = getTask(db, task.data.review_of)
       if (original) {

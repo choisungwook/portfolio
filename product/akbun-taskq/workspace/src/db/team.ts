@@ -97,7 +97,7 @@ export function deleteAgent(db: Db, name: string): boolean {
   return inTransaction(db, () => {
     const row = db.prepare('SELECT system FROM team_agents WHERE name = ?').get(name)
     if (!row || row.system === 1) return false
-    db.prepare(`UPDATE tasks SET owner = NULL, owner_since = NULL WHERE owner = ? AND status NOT IN ('done', 'failed')`).run(name)
+    db.prepare(`UPDATE tasks SET owner = NULL, owner_since = NULL WHERE owner = ? AND status NOT IN ('done', 'failed', 'running')`).run(name)
     db.prepare(`UPDATE team_messages SET failed_at = ? WHERE recipient = ? AND read_at IS NULL AND failed_at IS NULL`).run(nowSec(), name)
     db.prepare('DELETE FROM team_agents WHERE name = ?').run(name)
     return true
