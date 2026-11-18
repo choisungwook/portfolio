@@ -13,7 +13,7 @@
     {
       "id": "akbun-taskq",
       "name": "akbun-taskq",
-      "description": "Claude 세션이 태스크를 병렬로 처리하고, 산출물 인계와 실행·알림 기록을 화면과 CLI로 관리하는 개인용 에이전트 태스크 큐",
+      "description": "Claude 세션이 태스크를 처리하고, 역할을 가진 상주 bot이 태스크를 나눠 맡아 대화하듯 일하며, 실행·알림·인계 기록을 화면과 CLI로 관리하는 개인용 에이전트 태스크 큐",
       "kind": "backend",
       "tags": ["typescript", "claude", "agent-sdk", "sqlite", "cli", "mcp"],
       "released": "2026-11-15"

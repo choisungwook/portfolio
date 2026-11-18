@@ -355,6 +355,30 @@ user --bot chat / taskq bots say--> team_messages --hub--> bot turn (resumed Cla
 | `team/report.ts` | Inside `finishRun`'s transaction, posts a queue run's outcome to the task's owner. The automatic security review of a bot's code task is created owned by the first enabled reviewer, else the orchestrator, never the author, and that bot is told |
 | `agents/claude/team.ts` | `query()` with `resume`, `cwd` = the bot's workdir, `permissionMode` from the bot (`bypassPermissions` also sets `allowDangerouslySkipPermissions`), `sandbox` only when the bot has it on (writes limited to the workdir, reads of taskq's data and config denied, network to `allowed_domains`), `plugins` from the snapshot, `settingSources: []` so the user's own Claude settings never apply, `strictMcpConfig` unless the bot has plugins, the in-process MCP server `team`, the gate as a PreToolUse hook, and a `canUseTool` that refuses anything that would wait for an approval, since nobody watches a bot's turn |
 
+### Bot tools
+
+| Tool | What it does |
+|---|---|
+| `list_agents` | the enabled bots with role, description and whether each is busy |
+| `send_message` | a message to a bot, or to the user if the bot may; `deliver_at` schedules it |
+| `start_discussion`, `discuss`, `conclude_discussion` | bounded discussions, below |
+| `create_task`, `assign_task` | record a task with an owner; hand it on |
+| `start_task`, `finish_task` | work on an owned task within one turn |
+| `list_tasks`, `get_task` | read tasks and their last run |
+| `wiki_list`, `wiki_search`, `wiki_read`, `wiki_write` | the shared wiki |
+| `memory_write` | replace or append to the bot's own memory, which is appended to its system prompt every turn (16,000 characters at most) |
+
+### Working, cancelling, attachments
+
+- A bot is working while its turn row is open. `GET /bots` gives `working_since` and `running_tasks`; the sidebar turns a ring around the avatar and counts seconds, and the conversation shows a working bar with Stop.
+- Stop, Esc in the input, or the menu's Cancel call `POST /bots/:name/cancel`. The hub aborts the turn; `endTurn` records `cancelled`, the turn's messages count as handled (not retried), and a task the bot had running becomes `cancelled` (a task status, retryable like `failed`).
+- Attachments are uploaded with `POST /files` into `shared/attachments/` and named in the message (`team_messages.attachments`) or the task (`data.attachments`). A bot's prompt and a task's prompt list their absolute paths. Task runs may read the shared folder for every type and never write it; bots read and write it (`additionalDirectories`).
+- Search: `team_messages_fts` (trigram, kept by triggers) answers `GET /bots/search`. The wiki has its own index (below).
+
+### Settings that persist
+
+Everything the user changes in the app is in the SQLite file under `TASKQ_HOME`: bots and their settings and memory (`team_agents`), the skill and plugin registry, limits (`meta.limit_*`), appearance (`ui_font_family`, `ui_font_size`, `ui_language` with `ko` as the default, `ui_theme`), `queue_autorun` and desktop notifications. A restart or a new release binary opens the same file, so nothing is lost; `taskq.config.json` only supplies starting values for the limits. `test/bots-extras.test.ts` checks this with a second connection to the file.
+
 ### Queue and run button
 
 The runner claims only ready tasks with no owner (`nextEligible`), and only while `queue_autorun` (Settings, on by default) is on. A bot's task waits for that bot. The run button (`POST /api/tasks/:id/run`) still runs any task once through the runner, whoever owns it; the run has no `bot`, and its result is posted to the owner. Stale recovery skips tasks claimed by a bot.
@@ -515,12 +539,12 @@ Writes (any non-GET under `/api`) must send `Content-Type: application/json`, op
 |---|---|
 | `GET /tasks?status=` `POST /tasks` | list with computed `blocked`, create. A POST is a draft unless the body says `"status":"ready"`. `access_skill` must name a registered skill (400 otherwise) |
 | `GET /tasks/:id` `PATCH /tasks/:id` | task with runs, deps, alerts and `pending_approval` (`{ request_id, tool, input, bytes, created_at }`, or null); edit data, priority, draft to ready. `access_skill` is checked as on create |
-| `POST /tasks/:id/approve` `deny` | body `{ "request_id": "…" }`. 400 when missing, 409 when it is not the task's open request. Returns the task |
+| `POST /tasks/:id/approve` `POST /tasks/:id/deny` | body `{ "request_id": "…" }`. 400 when missing, 409 when it is not the task's open request. Returns the task |
 | `GET /approvals` | open requests across tasks: `[{ task_id, task_title, request_id, tool, input, bytes, created_at }]` |
 | `GET /handoffs?task_id=` | up to 50 handoff records, pending first, optionally filtered by sender or receiver |
 | `POST /handoffs/:id/accept` | accept a current pending handoff and record the timestamp and manual method |
 | `POST /tasks/:id/handoff-mode` | set the receiving mode with `{"auto_accept":true}` or `{"auto_accept":false}` |
-| `POST /tasks/:id/resume` `done` | state transitions |
+| `POST /tasks/:id/resume` `POST /tasks/:id/done` | state transitions |
 | `POST /tasks/:id/run` | run now, from any status but `running` and `needs_approval`. 409 while the queue is paused or a `blocks` dependency is not done. See "Run now" |
 | `GET /runs?from=&to=&type=&lock_key=&outcome=` | runs that overlap the range (started before `to`, not ended before `from`). Each row has `task_title`, `task_type`, `lock_key` and `waits`. Returns `{ runs, truncated }`, newest first, capped at 500 |
 | `GET /runs/:id` | run with events, alerts and waits |
@@ -529,7 +553,7 @@ Writes (any non-GET under `/api`) must send `Content-Type: application/json`, op
 | `GET /alerts?all=1` `POST /alerts/:id/ack` | unacked first, by severity. Rows carry `task_title` and `ref` (the request id of an approval_required alert) |
 | `GET /events?task_id=&run_id=&after=&order=asc\|desc&limit=` | log. `limit` 1 to 500, default 200. `order=desc` returns the newest first |
 | `GET /events/stream` | SSE. Starts at the current tail. `Last-Event-ID` or `?after=` resumes. Each event has an `id:` field. Also takes `?token=` |
-| `GET /proposals?status=` `POST /proposals/:id/apply` `reject` | memory and skill proposals |
+| `GET /proposals?status=` `POST /proposals/:id/apply` `POST /proposals/:id/reject` | memory and skill proposals |
 | `GET /search?q=` | FTS over past runs. Rows carry `task_title` |
 | `GET /graph` | nodes with `blocked`, `title`, `last_outcome` (latest run, null while running) and `stale_count`; deps |
 | `GET /queue` `POST /queue/pause` `POST /queue/resume` | pause state with `pause_by`. Pause takes `{ "reason" }`, see "Pause, cancel and retry" |
@@ -537,14 +561,21 @@ Writes (any non-GET under `/api`) must send `Content-Type: application/json`, op
 | `POST /tasks/:id/retry` | retry a failed task. Body `{ "draft": true }` and `{ "resume": true }`, both optional. 200 with the task; 409 in other statuses |
 | `GET /settings` | `{ config, home, db_path, access_skills, desktop_notifications, queue_autorun, appearance, font_families, bot_skills, bot_plugins }`. `db_path` is the absolute path of the SQLite file, shown read-only in Settings. `config` is the read-only list of keys in `CONFIG_KEYS` (`src/skills/registry.ts`). Each access skill is `{ name, path, description, ok }`; `ok` is false when `SKILL.md` is gone |
 | `POST /settings/desktop-notifications` | persist the desktop notification preference with `{"enabled":true}` or `{"enabled":false}` |
+| `POST /settings/limits` | any of `daily_budget_usd`, `turns_per_hour_total`, `max_concurrent_turns`, `bot_turns_per_hour`, `turn_budget_usd`, `turn_max_turns`; all are checked before any is saved |
+| `POST /files` | upload `{ "name", "data": base64 }` up to 20 MB; saved under `shared/attachments/<day>/<id>-<name>`; returns `{ path }` relative to the shared folder |
+| `GET /shared?dir=` `GET /shared/file?path=` | list a folder of the shared folder (up to 500 entries, symlinks left out); download a file. A path outside the shared folder is 400 |
+| `POST /open-folder` | `{ "target": "shared" | "home" | "sessions" | "bot", "bot"? }` opens that folder in the desktop file manager and returns its path. Only folders taskq names; 404 when it does not exist yet |
 | `POST /settings/queue-autorun` | `{ "enabled": false }` stops the queue from running unowned tasks on its own |
-| `POST /settings/appearance` | `{ "font_family": "pretendard", "font_size": 16 }`; families are listed in `font_families`, size 12 to 20 |
-| `POST /bot-skills` `DELETE /bot-skills/:name` `POST /bot-plugins` `DELETE /bot-plugins/:name` | register `{ "path": "/abs/dir" }` (201, 400 with the reason, 409 when taken) or remove (204) a skill or plugin for bots |
+| `POST /settings/appearance` | any of `font_family` (listed in `font_families`), `font_size` (12 to 20), `language` (`ko`, the default, or `en`), `theme` (`system`, `dark`, `light`) |
+| `POST /bot-skills` `DELETE /bot-skills/:name` `POST /bot-skills/:name/update` `POST /bot-plugins` `DELETE /bot-plugins/:name` `POST /bot-plugins/:name/update` | register `{ "path": "/abs/dir" }` (201, 400 with the reason, 409 when taken), remove (204), or update a skill or plugin for bots. Update runs `git pull --ff-only` when the folder is a git checkout (else re-reads the description), then reloads every bot that uses it; returns `{ method, output, reloaded }` |
 | `GET /skills/discover` | `[{ name, path, description, registered }]` found one level deep under `$CLAUDE_CONFIG_DIR/skills` (or `~/.claude/skills`) and `skillsDir`. Capped at 200 |
 | `POST /access-skills` | body `{ "path": "/abs/dir" }`. 201 with the stored row; 400 with the reason; 409 when the name or path is already registered |
 | `DELETE /access-skills/:name` | 204. 404 when unknown; 409 when a task in draft, ready, running, needs_approval or needs_auth names it (up to 5 ids listed). Never touches the skill's files |
 | `GET /bots` `POST /bots` | list `{ enabled, paused, pause_reason, agents, tasks, threads, turns }`; create `{ name, preset?, ...settings }` (201; 409 for a taken name) |
 | `GET /bots/:name` `PUT /bots/:name` `DELETE /bots/:name` | one bot with all settings; save settings (rebuilds the skill and plugin copy; 409 when disabling taskq); delete (409 for taskq; its open tasks become the user's) |
+| `GET /bots/search?q=` | every bot conversation: trigram FTS for terms of three characters or more, LIKE for shorter ones, all terms must match, newest first, at most 100 `{ id, sender, recipient, created_at, snippet }` |
+| `POST /bots/:name/cancel` | stop the bot's running turn: the turn ends `cancelled`, its messages count as handled, its running task becomes `cancelled`. 409 when it is not working or the bots are not running in this process |
+| `GET /bots/:name/memory` `PUT /bots/:name/memory` | the bot's memory text, at most 16,000 characters |
 | `POST /bots/:name/reload` `POST /bots/:name/reset` | body `{ "kind": "skill" | "plugin" | "all" }` re-copies and returns what loaded and what is missing; reset starts a new session next turn |
 | `GET /bots/presets` | role, description and instructions for planner, coder, reviewer, doc-reviewer |
 | `GET /bots` fields | Agents carry `busy`, `last_message` and `unread` (messages to the user not yet read) and no `instructions`; `tasks` are unfinished agent-owned tasks with `owner` and `task_title`. Creates the orchestrator when it is missing |

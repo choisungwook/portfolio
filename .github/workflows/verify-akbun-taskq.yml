@@ -56,6 +56,13 @@ jobs:
       - name: Build
         run: npm run build
 
+      # Docs an agent relies on must cover the code: every API route, every Agent SDK option and every bot tool, plus a
+      # changelog entry with an SDK section for the version being built. Missing one fails the build on any event.
+      - name: Check docs cover routes, SDK options and the changelog
+        run: node --test test/docs-coverage.test.ts
+        env:
+          TASKQ_NO_NOTIFY: '1'
+
       # Pull requests run only the tests marked [critical]: the invariants whose
       # failure is an incident (approval, gating, auth, masking, claim, paths).
       # Worker, SDK and notifier are fakes, so no credentials and no model call.
