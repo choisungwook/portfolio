@@ -97,6 +97,8 @@ export function prepareRun(db: Db, id: string): Task {
   if (!RUNNABLE.includes(task.status)) throw new OperatorError(`task is ${task.status}; it is already running`)
   if (isQueuePaused(db)) throw new OperatorError('the queue is paused; resume the queue to run tasks')
   if (isBlocked(db, id)) throw new OperatorError('task waits for a dependency to finish or for a handoff to be accepted')
+  // A one-off run has no bot session to report the workflow's steps, so it would skip them all.
+  if (task.data.workflow_id) throw new OperatorError('this task has a workflow; only a bot runs workflows: give the task to a bot (owner)')
   inTransaction(db, () => {
     const keepSession = task.status === 'needs_auth' || task.status === 'draft' || task.status === 'ready'
     const sessionClause = keepSession ? '' : ', session_id = NULL'

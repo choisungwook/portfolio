@@ -25,7 +25,8 @@ export interface TurnResult {
   error?: string
   session_id?: string
   turns?: number
-  cost_usd?: number
+  cost_usd?: number          // this turn's cost
+  session_total_usd?: number // or the session's running total (Claude); the hub subtracts what the session had before
   auth_failed?: boolean     // the model provider login failed; the hub pauses the team
   session_missing?: boolean // the resumed session no longer exists; the hub starts a new one next time
   tampered?: string         // a tool call reached taskq itself (data directory, config); the hub pauses the team

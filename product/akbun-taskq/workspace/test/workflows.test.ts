@@ -100,6 +100,22 @@ describe('workflows', () => {
     assert.equal(listRuns(env.db)[0].status, 'cancelled')
   })
 
+  test('[critical] a bot cannot skip a check or an approval, nor close a task whose run failed or a blocked start', async () => {
+    createWorkflow(env.db, { name: 'release', definition: RELEASE })
+    const task = createFromInput(env.db, { type: 'code', status: 'ready', priority: 0, lock_key: null, data: { intent: 'x', workflow_id: 'release' }, depends_on: [] }, 'coder')
+    const { workflow_run_id: runId } = tool('coder', 'start_task')({ task_id: task.id }) as { workflow_run_id: string }
+    const step = tool('coder', 'workflow_step')
+    step({ run_id: runId, step_id: 'build', status: 'succeeded', output: 'ok' })
+    assert.throws(() => step({ run_id: runId, step_id: 'test', status: 'skipped', output: 'not needed' }), /cannot be skipped/)
+    assert.equal((await call('POST', `/workflow-runs/${runId}/cancel`)).status, 200)
+    assert.throws(() => tool('coder', 'finish_task')({ task_id: task.id, outcome: 'done', summary: 'done' }), /cancelled .*outcome failed/)
+    assert.equal((await call('POST', `/tasks/${task.id}/run`)).status, 409, 'run now refuses a workflow task')
+    const blocker = createFromInput(env.db, { type: 'research', status: 'ready', priority: 0, lock_key: null, data: { intent: 'first' }, depends_on: [] })
+    const later = createFromInput(env.db, { type: 'code', status: 'ready', priority: 0, lock_key: null, data: { intent: 'later', workflow_id: 'release' }, depends_on: [blocker.id] }, 'coder')
+    assert.throws(() => tool('coder', 'start_task')({ task_id: later.id }), /depends on/)
+    assert.equal(listRuns(env.db, { taskId: later.id }).length, 0, 'a refused start leaves no run behind')
+  })
+
   test('the queue leaves a task with a workflow and no owner alone; only a bot executes workflows', () => {
     createWorkflow(env.db, { name: 'release', definition: RELEASE })
     createFromInput(env.db, { type: 'code', status: 'ready', priority: 0, lock_key: null, data: { intent: 'x', workflow_id: 'release' }, depends_on: [] })

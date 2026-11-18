@@ -26,7 +26,7 @@ function fake(script: (options: Options) => unknown[] | Promise<unknown[]>) {
         const next = await input.next()
         if (next.done) return
         prompts.push(String(next.value.message.content))
-        yield done({ num_turns: 1, total_cost_usd: 0.01 }) as unknown as SDKMessage
+        yield done({ num_turns: 1, total_cost_usd: 0.03, user_message_uuids: [next.value.uuid] }) as unknown as SDKMessage
       }
     })()
   }
@@ -62,8 +62,24 @@ describe('claude team backend', () => {
     assert.deepEqual(f.prompts, ['1 new message', '2 new messages'])
     assert.equal(result.outcome, 'done')
     assert.equal(result.turns, 4)
-    assert.equal(result.cost_usd, 0.03)
+    assert.equal(result.session_total_usd, 0.03, 'the latest running total, not a sum')
     assert.equal(live.push('too late'), false)
+  })
+
+  test('[critical] one result that answers two merged inputs ends the turn', async () => {
+    const live = new LiveInput()
+    const query: TeamQueryFn = ({ prompt }) => (async function* () {
+      const input = (prompt as AsyncIterable<SDKUserMessage>)[Symbol.asyncIterator]()
+      const first = (await input.next()).value as SDKUserMessage
+      live.push('second')
+      const second = (await input.next()).value as SDKUserMessage
+      // The SDK folded the second message into the running turn: one result names both.
+      yield done({ user_message_uuids: [first.uuid, second.uuid], queued_turn_count: 0 }) as unknown as SDKMessage
+      await new Promise(() => {})
+    })()
+    const result = await createClaudeTeamBackend(query).runTurn(env.config, { ...request, live })
+    assert.equal(result.outcome, 'done')
+    assert.equal(live.isClosed(), true)
   })
 
   test('effort reaches the session when the bot sets it', async () => {
@@ -75,7 +91,7 @@ describe('claude team backend', () => {
   test('a turn resumes the session in auto mode, unsandboxed, with no user settings by default', async () => {
     const f = fake(() => [{ type: 'system', subtype: 'init', session_id: 'sess-1' }, done()])
     const result = await createClaudeTeamBackend(f.query).runTurn(env.config, request)
-    assert.deepEqual(result, { outcome: 'done', session_id: 'sess-1', turns: 3, cost_usd: 0.02 })
+    assert.deepEqual(result, { outcome: 'done', session_id: 'sess-1', turns: 3, session_total_usd: 0.02 })
     const options = f.calls[0]
     assert.equal(options.resume, 'sess-0')
     assert.equal(options.tools, undefined)
@@ -134,7 +150,7 @@ describe('claude team backend', () => {
     const result = await createClaudeTeamBackend(f.query).runTurn(env.config, request)
     assert.equal(result.outcome, 'failed')
     assert.equal(result.session_id, 'sess-1')
-    assert.equal(result.cost_usd, 0.02)
+    assert.equal(result.session_total_usd, 0.02)
   })
 
   test('a resumed session that no longer exists is reported, not retried', async () => {

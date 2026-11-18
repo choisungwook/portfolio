@@ -1,6 +1,6 @@
 import { test, describe } from 'node:test'
 import assert from 'node:assert/strict'
-import { mkdirSync, readFileSync } from 'node:fs'
+import { mkdirSync, readFileSync, symlinkSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { createOpenAITeamBackend, type OpenAIRunArgs, type OpenAIRunFn } from '../src/agents/openai/team.ts'
 import { getAgent, listTurns, postMessage, USER, updateAgent } from '../src/db/team.ts'
@@ -85,6 +85,14 @@ describe('openai team backend', () => {
     })
     await createOpenAITeamBackend(writes.run).runTurn(env.config, request)
     assert.equal(readFileSync(join(request.cwd, 'notes.md'), 'utf8'), 'hi')
+    const outside = join(env.home, 'outside.txt')
+    writeFileSync(outside, 'keep')
+    symlinkSync(outside, join(request.sharedDir, 'link.md'))
+    const link = fake(async (args) => {
+      assert.match(await toolNamed(args, 'write_file').run({ path: join(request.sharedDir, 'link.md'), content: 'x' }), /^error: /)
+    })
+    await createOpenAITeamBackend(link.run).runTurn(env.config, request)
+    assert.equal(readFileSync(outside, 'utf8'), 'keep', 'a symlink at the file name is not followed')
     const reach = fake(async (args) => {
       await toolNamed(args, 'read_file').run({ path: join(env.home, 'data', 'taskq.db') }).catch(() => {})
       assert.equal(args.signal.aborted, true)

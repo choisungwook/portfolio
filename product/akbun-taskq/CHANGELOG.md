@@ -45,14 +45,16 @@
 - bot은 사용자의 Claude 설정(`settingSources: []`)을 읽지 않는다.
 - skill·plugin 다시 불러오기는 bot 폴더 경로에 symlink가 있으면 거부한다(bot이 심은 symlink로 TASKQ_HOME 밖을 지우는 것을 막음).
 - 업로드와 공용 폴더 경로는 공용 폴더 밖으로 나갈 수 없다.
+- bot의 셸에서 `taskq` 명령은 거부한다. `taskq api`로 자기 권한, 예산, 승인을 바꿀 수 있기 때문이다(글자 검사라 우회 가능).
+- workflow의 검증·승인 단계는 bot이 건너뛸 수 없고, 실행이 실패하거나 취소된 task는 failed로만 닫힌다. workflow가 있는 task는 시작 버튼(일회성 실행)으로 돌릴 수 없다.
 - OpenAI bot의 파일·셸 도구도 Claude bot과 같은 게이트를 거친다. `write_file`은 작업 디렉터리와 공용 폴더 안에만 쓰고, `shell`은 bypass 모드이면서 샌드박스를 끈 bot에게만 준다(taskq는 자식 프로세스를 Claude Code처럼 샌드박스에 넣지 못함).
 
 ### SDK
 
 `@anthropic-ai/claude-agent-sdk`를 어떻게 쓰는지의 전체 표는 `wiki/sdk-usage.md`에 있다. 이 버전에서 새로 쓰거나 쓰는 방식이 바뀐 것:
 
-- `query()`와 `resume`: bot 한 turn이 query 한 번이다. 세션 id를 `team_agents.session_id`에 두고 다음 turn에 이어 붙인다. 세션이 사라졌다는 오류면 다음 turn에 새 세션을 시작한다.
-- 스트리밍 입력(`AsyncIterable<SDKUserMessage>`): in-process MCP 도구는 스트리밍 입력에서만 동작한다. stream을 turn 동안 열어 두고, 일하는 중에 온 메시지를 같은 stream에 넣는다(`src/team/live-input.ts`). 세션은 넣은 메시지마다 `result`를 하나씩 내고, 받은 메시지 수만큼 `result`가 오면 stream을 닫아 turn을 끝낸다. turn 수와 비용은 result를 모두 더한다.
+- `query()`와 `resume`: bot 한 turn이 query 한 번이다. 세션 id를 `team_agents.session_id`에 두고 다음 turn에 이어 붙인다. 세션이 사라졌다는 오류면 다음 turn에 새 세션을 시작한다. resume한 세션의 `total_cost_usd`는 이전 turn까지의 누적을 포함하므로, 세션의 직전 누적(`team_agents.session_cost_usd`)과의 차이를 turn 비용으로 기록한다.
+- 스트리밍 입력(`AsyncIterable<SDKUserMessage>`): in-process MCP 도구는 스트리밍 입력에서만 동작한다. stream을 turn 동안 열어 두고, 일하는 중에 온 메시지를 같은 stream에 넣는다(`src/team/live-input.ts`). 넣는 메시지마다 `uuid`를 붙이고, `result`의 `user_message_uuids`로 답한 메시지를 지운다(SDK가 가까이 온 메시지를 한 turn으로 합칠 수 있음). 답하지 않은 메시지가 없고 `queued_turn_count`가 0이면 stream을 닫아 turn을 끝낸다. `num_turns`는 result마다 더하고, `total_cost_usd`는 세션 누적값이라 마지막 값을 쓴다.
 - `Query.supportedModels()`와 `supportedCommands()`: 프롬프트 없이 연 세션에서 모델 목록(effort 지원 여부 포함)과 slash command를 읽어 입력창 메뉴에 쓴다(10분 캐시, 새로고침으로 다시 읽음). 읽지 못하면 내장 목록을 쓰고 그렇다고 표시한다.
 - `effort`: bot별 effort(low부터 max)를 세션에 넘긴다.
 - `createSdkMcpServer()`와 `tool()`: bot 도구 20개(메시지, 토론, task, wiki, 메모리, workflow)를 `team` 서버로 노출한다. 입력 zod 스키마는 taskq도 handler 전에 다시 검사한다.
@@ -73,8 +75,8 @@
 
 ### Not verified with a real model
 
-- resume한 turn의 `total_cost_usd`가 turn 비용인지 세션 누적인지, resume한 세션에도 `PreToolUse` 거부와 플러그인이 그대로 적용되는지, auto 모드가 셸로 taskq 파일을 건드리는 시도를 막는지. 테스트는 가짜 SDK로 돈다.
-- 실행 중인 turn에 넣은 메시지마다 `result`가 하나씩 오는지, 프롬프트 없는 세션에서 `supportedModels()`가 응답하는지(응답하지 않으면 20초 뒤 내장 목록으로 대체).
+- resume한 세션의 transcript에 누적 비용이 없을 때의 비용 계산(직전 누적보다 작으면 전체를 turn 비용으로 봄), resume한 세션에도 `PreToolUse` 거부와 플러그인이 그대로 적용되는지, auto 모드가 셸로 taskq 파일을 건드리는 시도를 막는지. 테스트는 가짜 SDK로 돈다.
+- 실행 중인 turn에 넣은 메시지가 `user_message_uuids`로 돌아오는지(돌아오지 않으면 가장 오래된 메시지를 답한 것으로 봄), 프롬프트 없는 세션에서 `supportedModels()`가 응답하는지(응답하지 않으면 20초 뒤 내장 목록으로 대체).
 - OpenAI bot은 실제 API로 돌려 보지 않았다. 비용은 설정한 단가로 계산한 추정치다.
 
 ## 0.8.0

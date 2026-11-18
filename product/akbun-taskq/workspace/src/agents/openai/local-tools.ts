@@ -1,5 +1,5 @@
 import { execFile } from 'node:child_process'
-import { mkdirSync, readdirSync, readFileSync, statSync, writeFileSync } from 'node:fs'
+import { closeSync, constants, mkdirSync, openSync, readdirSync, readFileSync, statSync, writeSync } from 'node:fs'
 import { dirname, resolve } from 'node:path'
 import type { Config } from '../../config.ts'
 import type { TeamAgent } from '../../db/team.ts'
@@ -75,7 +75,13 @@ export function localTools(config: Config, agent: TeamAgent, cwd: string, shared
         const real = realPath(dirname(path))
         if (![cwd, sharedDir].some((root) => under(real, realPath(root)))) throw new Error(`write_file is limited to ${cwd} and ${sharedDir}`)
         mkdirSync(dirname(path), { recursive: true })
-        writeFileSync(path, String(args.content ?? ''))
+        // O_NOFOLLOW: a symlink planted at the file's own name (shared/notes.md -> ~/.zshrc) is refused, not followed.
+        const fd = openSync(path, constants.O_WRONLY | constants.O_CREAT | constants.O_TRUNC | constants.O_NOFOLLOW, 0o644)
+        try {
+          writeSync(fd, String(args.content ?? ''))
+        } finally {
+          closeSync(fd)
+        }
         return `wrote ${path}`
       },
     })

@@ -26,6 +26,14 @@ import { HttpError, idParam, optionalJson, readJson, type ApiDeps } from './http
 // The UI, CLI, API and config call the resident agents bots; the code and tables call them the team.
 export function registerBotsRoutes(api: Hono, { db, config, bots }: ApiDeps): void {
   const search = hybridSearch(db)
+  // Stops the bot's running turn: directly when the hub runs in this process, else through the marker it reads.
+  const stopTurn = (name: string): boolean => {
+    if (bots) return bots.cancel(name)
+    const open = db.prepare('SELECT id FROM team_turns WHERE agent = ? AND ended_at IS NULL').get(name)
+    if (!open) return false
+    requestBotCancel(db, name, Number(open.id))
+    return true
+  }
   const catalog = bots?.catalog ?? createCatalog(db, config, () => undefined)
   const queued = () => queuedCounts(db, Math.floor(Date.now() / 1000))
   // The sidebar shows each bot like a chat: the latest message it sent or received, and how many it sent the user unread.
@@ -168,7 +176,7 @@ export function registerBotsRoutes(api: Hono, { db, config, bots }: ApiDeps): vo
     if (current.system && !parsed.value.enabled) throw new HttpError(409, `${ORCHESTRATOR} cannot be disabled; pause the bots instead`)
     updateAgent(db, name, parsed.value)
     if (current.enabled && !parsed.value.enabled) {
-      bots?.cancel(name)
+      stopTurn(name)
       releaseBotTasks(db, name, 'the bot was disabled', 'ready')
     }
     noteReload(db, name, reloadAll(db, config, name))
@@ -180,7 +188,7 @@ export function registerBotsRoutes(api: Hono, { db, config, bots }: ApiDeps): vo
     const name = c.req.param('name')
     if (getAgent(db, name)?.system) throw new HttpError(409, `${ORCHESTRATOR} cannot be deleted`)
     if (!getAgent(db, name)) throw new HttpError(404, 'no such bot')
-    bots?.cancel(name)
+    stopTurn(name)
     releaseBotTasks(db, name, 'the bot was deleted', 'draft')
     deleteAgent(db, name)
     teamChanged.notify()
@@ -202,15 +210,9 @@ export function registerBotsRoutes(api: Hono, { db, config, bots }: ApiDeps): vo
   api.post('/bots/:name/cancel', (c) => {
     const name = c.req.param('name')
     if (!getAgent(db, name)) throw new HttpError(404, 'no such bot')
-    if (bots) {
-      if (!bots.cancel(name)) throw new HttpError(409, `${name} is not working right now`)
-      return c.json({ ok: true })
-    }
-    // The CLI and the MCP server run in another process than the bots: leave a marker the hub picks up on its next tick.
-    const open = db.prepare('SELECT id FROM team_turns WHERE agent = ? AND ended_at IS NULL').get(name)
-    if (!open) throw new HttpError(409, `${name} is not working right now`)
-    requestBotCancel(db, name, Number(open.id))
-    return c.json({ ok: true, requested: true })
+    // The CLI and the MCP server run in another process than the bots: there the cancel is a marker the hub reads.
+    if (!stopTurn(name)) throw new HttpError(409, `${name} is not working right now`)
+    return c.json(bots ? { ok: true } : { ok: true, requested: true })
   })
 
   api.get('/bots/:name/memory', (c) => {

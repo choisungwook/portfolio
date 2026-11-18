@@ -13,6 +13,11 @@ export const WORKFLOW_HOW = 'Do the ready steps in order. Report each one with w
 export function startWorkflowFor(db: Db, workflowRef: string, bot: string, taskId: string | null = null): { ok: true; run: WorkflowRun } | { ok: false; error: string } {
   const workflow = getWorkflow(db, workflowRef)
   if (!workflow || workflow.deleted_at !== null) return { ok: false, error: `no workflow ${workflowRef}` }
+  if (taskId !== null) {
+    if (!db.prepare('SELECT 1 FROM tasks WHERE id = ?').get(taskId)) return { ok: false, error: `no task ${taskId}` }
+    const running = runningRunForTask(db, taskId)
+    if (running) return { ok: false, error: `task ${taskId} already has workflow run ${running.id} going` }
+  }
   const agent = getAgent(db, bot)
   if (!agent) return { ok: false, error: `no bot ${bot}` }
   if (!agent.enabled) return { ok: false, error: `${bot} is disabled` }
@@ -25,14 +30,22 @@ export function startWorkflowFor(db: Db, workflowRef: string, bot: string, taskI
   return { ok: true, run }
 }
 
-// A task with a workflow, started by its owner: the run starts with it, or the run left from an earlier turn continues.
-export function workflowForTask(db: Db, task: { id: string; data: { workflow_id?: string } }, bot: string): WorkflowRun | { error: string } | undefined {
+// What starting a task with a workflow does, decided before anything is written: continue the run left from an earlier
+// turn, start a new one, or refuse. The caller writes the run only after the task itself was claimed.
+export type WorkflowPlan = { run: WorkflowRun } | { start: Workflow } | { error: string } | undefined
+
+export function planWorkflow(db: Db, task: { id: string; data: { workflow_id?: string } }, bot: string): WorkflowPlan {
   if (!task.data.workflow_id) return undefined
   const existing = runningRunForTask(db, task.id)
-  if (existing) return existing.bot === bot ? existing : { error: `workflow run ${existing.id} of this task is executed by ${existing.bot}` }
+  if (existing) return existing.bot === bot ? { run: existing } : { error: `workflow run ${existing.id} of this task is executed by ${existing.bot}; ask the user to cancel it` }
   const workflow = getWorkflow(db, task.data.workflow_id)
   if (!workflow || workflow.deleted_at !== null) return { error: `the task's workflow ${task.data.workflow_id} was deleted; ask the user to pick another or remove it from the task` }
-  return startRun(db, { workflow, bot, taskId: task.id })
+  return { start: workflow }
+}
+
+export function applyWorkflowPlan(db: Db, plan: WorkflowPlan, bot: string, taskId: string): WorkflowRun | undefined {
+  if (!plan || 'error' in plan) return undefined
+  return 'run' in plan ? plan.run : startRun(db, { workflow: plan.start, bot, taskId })
 }
 
 export function removeWorkflow(db: Db, workflow: Workflow): { deleted: boolean; told: string[] } {

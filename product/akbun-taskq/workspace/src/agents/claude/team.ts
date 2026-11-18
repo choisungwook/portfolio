@@ -48,23 +48,25 @@ async function runTurn(config: Config, request: TurnRequest, runQuery: TeamQuery
   let sessionId: string | undefined
   let authFailed = false
   const state: { tampered?: string } = {}
-  // Every message sent into the session gets its own result. The turn ends when the session has answered all of them:
-  // the first prompt and whatever the hub pushed while the bot was working. Cost and turns add up over the results.
+  // The turn ends when the session has answered every input: the first prompt and whatever the hub pushed while the bot
+  // was working. One result may answer several inputs (user_message_uuids). num_turns is per result, so it adds up;
+  // total_cost_usd is the session's running total, so the latest one is kept and the hub turns it into this turn's cost.
   const live = request.live ?? new LiveInput()
-  let answered = 0
   let turns = 0
-  let cost = 0
+  let total = 0
   try {
     for await (const message of runQuery({ prompt: userMessages(live, request.prompt), options: optionsFor(config, request, abort, state) })) {
       if (message.type === 'system' && message.subtype === 'init') sessionId = message.session_id
       else if (message.type === 'assistant' && message.error && INFERENCE_AUTH_ERRORS.has(message.error)) authFailed = true
       else if (message.type === 'result') {
-        answered += 1
         turns += message.num_turns
-        cost += message.total_cost_usd
-        const base = { session_id: sessionId ?? message.session_id, turns, cost_usd: cost }
+        total = message.total_cost_usd
+        const ids = message.user_message_uuids ?? (message.user_message_uuid ? [message.user_message_uuid] : undefined)
+        live.answer(ids, !ids && message.queued_turn_count === 0)
+        const base = { session_id: sessionId ?? message.session_id, turns, session_total_usd: total }
         const failed = message.subtype !== 'success'
-        if (state.tampered || authFailed || failed || answered >= live.given) live.close()
+        const pending = live.unanswered() > 0 || (message.queued_turn_count ?? 0) > 0
+        if (state.tampered || authFailed || failed || !pending) live.close()
         if (state.tampered) return { ...base, outcome: 'failed', error: state.tampered, tampered: state.tampered }
         if (authFailed) return { ...base, outcome: 'failed', error: 'model provider login failed', auth_failed: true }
         if (failed) return { ...base, outcome: 'failed', error: message.errors.length > 0 ? message.errors.join('; ').slice(0, 300) : message.subtype }
@@ -165,16 +167,21 @@ export async function call(t: TeamTool, args: Record<string, unknown>): Promise<
 // Custom SDK MCP tools need the streaming input form of the prompt. The stream stays open while the turn runs, so the
 // hub can add messages that arrive meanwhile; it closes once the session has answered them all.
 async function* userMessages(live: LiveInput, first: string): AsyncIterable<SDKUserMessage> {
-  for await (const text of live.texts(first)) {
-    yield { type: 'user', message: { role: 'user', content: text }, parent_tool_use_id: null }
+  for await (const input of live.texts(first)) {
+    yield { type: 'user', message: { role: 'user', content: input.text }, parent_tool_use_id: null, uuid: input.uuid as SDKUserMessage['uuid'] }
   }
 }
 
 // The models the account can use and the slash commands the bot's plugins bring, read from a session that is started
 // and closed without a prompt: no model call, no cost. Used by the model menu and the slash command list.
+const CATALOG_TIMEOUT_MS = 18_000
+
 async function claudeCatalog(config: Config, request: CatalogRequest, runQuery: TeamQueryFn): Promise<Catalog> {
   let release: () => void = () => {}
   const idle = new Promise<void>((resolve) => { release = resolve })
+  // The catalog gives up after 20 s; the session is ended here too so a slow SDK does not leave a process behind.
+  const abort = new AbortController()
+  const timer = setTimeout(() => { release(); abort.abort() }, CATALOG_TIMEOUT_MS)
   async function* nothing(): AsyncIterable<SDKUserMessage> {
     await idle
   }
@@ -182,7 +189,7 @@ async function claudeCatalog(config: Config, request: CatalogRequest, runQuery: 
     prompt: nothing(),
     options: {
       cwd: request.cwd, env: buildEnv(config), pathToClaudeCodeExecutable: claudeExecutable(), settingSources: [],
-      plugins: request.plugins.map((path) => ({ type: 'local' as const, path, skipMcpDiscovery: true })), tools: [],
+      plugins: request.plugins.map((path) => ({ type: 'local' as const, path, skipMcpDiscovery: true })), tools: [], abortController: abort,
     },
   }) as AsyncIterable<SDKMessage> & { supportedModels?: () => Promise<ModelInfo[]>; supportedCommands?: () => Promise<SlashCommand[]> }
   try {
@@ -192,7 +199,12 @@ async function claudeCatalog(config: Config, request: CatalogRequest, runQuery: 
       commands: commands.map((c) => ({ name: c.name, description: c.description, hint: c.argumentHint })),
     }
   } finally {
+    clearTimeout(timer)
     release()
-    for await (const _ of q) { /* drain until the session exits */ }
+    try {
+      for await (const _ of q) { /* drain until the session exits */ }
+    } catch {
+      // An aborted session ends with an error; it is closed either way.
+    }
   }
 }

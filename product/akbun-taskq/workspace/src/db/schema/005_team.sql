@@ -24,6 +24,7 @@ CREATE TABLE team_agents (
   turn_max_turns INTEGER,
   memory TEXT NOT NULL DEFAULT '',
   session_id TEXT,
+  session_cost_usd REAL NOT NULL DEFAULT 0,  -- the SDK's running cost total of session_id, to cost each turn as a difference
   created_at INTEGER NOT NULL
 );
 

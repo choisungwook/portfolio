@@ -17,12 +17,12 @@ taskq calls the SDK from three places. All three run the Claude Code executable 
 
 | SDK API | Where | How taskq uses it |
 |---|---|---|
-| `query()` | all three | Runs one session. The worker passes a string prompt; a bot turn passes an `AsyncIterable<SDKUserMessage>`, because in-process MCP tools need streaming input. The stream stays open during the turn: a message that arrives for a working bot is pushed into it (`src/team/live-input.ts`), the session answers it with its own `result`, and the turn ends once every message sent in has a result |
+| `query()` | all three | Runs one session. The worker passes a string prompt; a bot turn passes an `AsyncIterable<SDKUserMessage>`, because in-process MCP tools need streaming input. The stream stays open during the turn: a message that arrives for a working bot is pushed into it (`src/team/live-input.ts`), each input carries a `uuid`; a `result` lists the inputs it answered in `user_message_uuids` (the SDK may merge inputs sent close together), and the turn ends when no input is unanswered and `queued_turn_count` is 0 |
 | `createSdkMcpServer()`, `tool()` | `team.ts` | The bots' own tools (messages, tasks, discussions, wiki, memory, workflows) as an in-process MCP server named `team`. Each tool's zod shape is also checked by taskq before the handler runs |
 | `HookCallback` (`PreToolUse`) | `worker/gate.ts` via `claude/hooks.ts`, `team/bot-gate.ts` via `team.ts` | The gate runs before the permission mode, and its deny holds in every mode. Task runs: path and command policy per task type, tamper stop. Bots: tamper stop (file paths and shell text), blocked commands |
 | `Query.supportedModels()`, `Query.supportedCommands()` | `team.ts` | The model list (with `supportsEffort` and `supportedEffortLevels`) and slash commands for a bot's compose bar. A command of the bot's skill plugin (`taskq-<bot>-skills:<skill>`) is shown by its skill name |
 | `CanUseTool` | `worker.ts`, `team.ts` | Task runs of type ops_change wait for the user's approval through it. Bots refuse at once, since nobody watches a bot's turn |
-| Messages read | all three | `system`/`init` gives the session id; `result` gives `subtype`, `num_turns`, `total_cost_usd`, `errors` and `structured_output`; an `assistant` message with `error` `authentication_failed` or `cloud_credential_error` means the model login failed |
+| Messages read | all three | `system`/`init` gives the session id; `result` gives `subtype`, `num_turns`, `total_cost_usd` (a running total of the session, also across a resume: a bot turn's cost is the difference to the total after the session's previous turn), `user_message_uuids`, `queued_turn_count`, `errors` and `structured_output`; an `assistant` message with `error` `authentication_failed` or `cloud_credential_error` means the model login failed |
 
 ## Options
 

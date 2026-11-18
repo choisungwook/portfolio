@@ -6,8 +6,8 @@ import { insertEvent } from '../db/events.ts'
 import { postMessage, SYSTEM } from '../db/team.ts'
 import { raiseAlert } from '../alerts/rules.ts'
 import { queueSecurityReview } from './report.ts'
-import { endRun, runningRunForTask, type WorkflowRun } from '../db/workflows.ts'
-import { workflowForTask } from './workflow-work.ts'
+import { endRun, latestRunForTask, type WorkflowRun } from '../db/workflows.ts'
+import { applyWorkflowPlan, planWorkflow } from './workflow-work.ts'
 import { newId } from '../ids.ts'
 import { nowSec } from '../time.ts'
 import type { TaskStatus } from '../types.ts'
@@ -31,12 +31,13 @@ export function startBotTask(db: Db, bot: string, taskId: string, sessionId: str
     // A draft is a note the user has not released for work, whoever owns it. Only the user promotes it to ready.
     if (task.status === 'draft') return { ok: false, error: 'this task is a draft; the user must promote it to ready before anyone starts it' }
     if (task.status !== 'ready') return { ok: false, error: `task is ${task.status}` }
-    const workflow = workflowForTask(db, task, bot)
-    if (workflow && 'error' in workflow) return { ok: false, error: workflow.error }
+    const plan = planWorkflow(db, task, bot)
+    if (plan && 'error' in plan) return { ok: false, error: plan.error }
     const now = nowSec()
     const changed = db.prepare(`UPDATE tasks AS t SET status = 'running', claimed_by = ?, heartbeat_at = NULL, updated_at = ?
       WHERE id = ? AND status = 'ready' AND NOT ${BLOCKED}`).run(botClaim(bot), now, taskId).changes
     if (changed !== 1) return { ok: false, error: 'a task it depends on is not done yet' }
+    const workflow = applyWorkflowPlan(db, plan, bot, taskId)
     const runId = newId()
     insertRun(db, { id: runId, task_id: taskId, session_id: sessionId, started_at: now, output_path: task.data.output_path, bot })
     insertEvent(db, { task_id: taskId, run_id: runId, kind: 'claimed', payload: { bot } })
@@ -48,13 +49,21 @@ export function finishBotTask(db: Db, bot: string, taskId: string, outcome: BotO
   return inTransaction(db, () => {
     const task = getTask(db, taskId)
     if (!task || task.claimed_by !== botClaim(bot) || task.status !== 'running') return { ok: false, error: 'you have not started this task' }
-    // A task with a workflow is done only when taskq says the run succeeded, not when the bot says so.
-    const flow = runningRunForTask(db, taskId)
-    if (flow && outcome !== 'failed') {
-      const left = flow.steps.filter((s) => s.status !== 'succeeded' && s.status !== 'skipped').map((s) => `${s.step_id} (${s.status})`)
-      return { ok: false, error: `workflow run ${flow.id} has not succeeded; steps left: ${left.join(', ')}. Report them with workflow_step, or finish with outcome failed` }
+    // A task with a workflow is done only when taskq says its latest run succeeded, not when the bot says so. A run that
+    // failed or was cancelled does not count either: the task can only finish as failed.
+    if (task.data.workflow_id) {
+      const flow = latestRunForTask(db, taskId)
+      if (outcome !== 'failed') {
+        if (!flow) return { ok: false, error: 'this task has a workflow and no run of it; start_task starts one' }
+        if (flow.status === 'running') {
+          const left = flow.steps.filter((s) => s.status !== 'succeeded' && s.status !== 'skipped').map((s) => `${s.step_id} (${s.status})`)
+          return { ok: false, error: `workflow run ${flow.id} has not succeeded; steps left: ${left.join(', ')}. Report them with workflow_step, or finish with outcome failed` }
+        }
+        if (flow.status !== 'succeeded') return { ok: false, error: `workflow run ${flow.id} ${flow.status} (${flow.summary ?? ''}); finish with outcome failed` }
+      } else if (flow?.status === 'running') {
+        endRun(db, flow.id, 'failed', `task finished as failed: ${summary.slice(0, 200)}`)
+      }
     }
-    if (flow) endRun(db, flow.id, 'failed', `task finished as failed: ${summary.slice(0, 200)}`)
     const run = db.prepare('SELECT id FROM runs WHERE task_id = ? AND bot = ? AND ended_at IS NULL ORDER BY started_at DESC LIMIT 1').get(taskId, bot)
     if (run) {
       endTaskRun(db, {

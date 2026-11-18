@@ -7,6 +7,7 @@ import { realPath, under } from '../worker/paths.ts'
 import { resolve } from 'node:path'
 
 const WRITE_TOOLS = new Set(['Write', 'Edit', 'MultiEdit', 'NotebookEdit'])
+const TASKQ_CLI = /(^|[\s;&|(`'"/])taskq(\s|$|['"`;&|)])/
 
 // The per-bot command gate. Two layers:
 // 1. Always on, for every bot: a call that reaches taskq itself ends the turn and pauses the bots. File tools are
@@ -61,6 +62,8 @@ export function botGate(config: Config, agent: TeamAgent, cwd: string, tool: str
     if (names.deny.some((name) => String(input.command).includes(name))) {
       return { action: 'deny', reason: 'Commands that touch the user\'s Claude Code settings (~/.claude) are not allowed for bots.' }
     }
+    // The taskq CLI could change a bot's own permissions, the budget or approvals. Bots use their team tools instead.
+    if (TASKQ_CLI.test(String(input.command))) return { action: 'deny', reason: 'Bots do not run the taskq command; use your team tools.' }
     const pattern = blockedBy(input.command, agent.blocked_commands)
     if (pattern !== null) return { action: 'deny', reason: `This bot's settings block commands containing "${pattern}".` }
   }

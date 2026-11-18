@@ -204,7 +204,7 @@ export function createTeamHub({ db, config, backend: claude, backends = {}, retr
     const wasCancelled = cancelled.delete(name)
     const outcome = wasCancelled ? 'cancelled' : aborted ? 'interrupted' : result.outcome
     // A turn that ended without a cost figure (abort, crash) is charged its whole budget rather than nothing.
-    const cost = result.cost_usd ?? (outcome === 'done' ? 0 : limits(db, config).turn_budget_usd)
+    const cost = turnCost(name, session, result) ?? (outcome === 'done' ? 0 : limits(db, config).turn_budget_usd)
     const end = endTurn(db, turnId, {
       outcome, error: result.error, turns: result.turns, cost_usd: cost, session_id: result.session_id,
     }, config.bots.maxAttempts)
@@ -234,6 +234,18 @@ export function createTeamHub({ db, config, backend: claude, backends = {}, retr
         raiseAlert(db, { task_id: null, kind: 'team_message', message: `Discussion #${id} was closed without a conclusion: its moderator ${name} ended a turn without concluding it.` })
       }
     }
+  }
+
+  // Claude reports the session's running cost total, and a resumed session starts from the total its transcript saved.
+  // The turn's cost is the difference to the total recorded after the session's previous turn. A total below that one
+  // means the transcript kept no total, so the whole figure is this turn's.
+  function turnCost(name: string, session: string | null, result: TurnResult): number | undefined {
+    if (result.session_total_usd === undefined) return result.cost_usd
+    const before = session !== null && result.session_id === session
+      ? Number(db.prepare('SELECT session_cost_usd FROM team_agents WHERE name = ?').get(name)?.session_cost_usd ?? 0)
+      : 0
+    db.prepare('UPDATE team_agents SET session_cost_usd = ? WHERE name = ?').run(result.session_total_usd, name)
+    return result.session_total_usd >= before ? result.session_total_usd - before : result.session_total_usd
   }
 
   function reportSetAside(name: string, end: TurnEnd, error: string | undefined): void {

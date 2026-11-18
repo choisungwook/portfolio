@@ -215,6 +215,11 @@ export function runningRunForTask(db: Db, taskId: string): WorkflowRun | undefin
   return row ? getRun(db, String(row.id)) : undefined
 }
 
+export function latestRunForTask(db: Db, taskId: string): WorkflowRun | undefined {
+  const row = db.prepare('SELECT id FROM workflow_runs WHERE task_id = ? ORDER BY started_at DESC, rowid DESC LIMIT 1').get(taskId)
+  return row ? getRun(db, String(row.id)) : undefined
+}
+
 const DONE: StepStatus[] = ['succeeded', 'skipped']
 
 // Steps whose needs are all done and that have not started.
@@ -243,6 +248,8 @@ export function reportStep(db: Db, runId: string, bot: string, stepId: string, r
       return { ok: false, error: `step ${stepId} is a check: report the command you ran and its output as evidence` }
     }
     if (report.status === 'succeeded' && step.kind === 'approval') return { ok: false, error: `step ${stepId} needs the user's approval; set it running and ask the user` }
+    // Skipping would let a check pass without evidence and an approval pass without the user.
+    if (report.status === 'skipped' && (step.kind === 'check' || step.kind === 'approval')) return { ok: false, error: `step ${stepId} is a ${step.kind} step and cannot be skipped` }
     if (report.status === 'skipped' && !report.output?.trim()) return { ok: false, error: 'say in output why the step is skipped' }
     const now = nowSec()
     const ended = report.status === 'running' ? null : now

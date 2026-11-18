@@ -102,6 +102,22 @@ describe('team hub', () => {
     await waitFor(() => listTurns(db, 5)[0]?.outcome === 'cancelled')
   })
 
+  test('[critical] a Claude turn costs the difference of the session running total, not the total', async () => {
+    const { db, config } = env
+    const totals = [0.5, 0.8]
+    const { backend } = fakeBackend(() => ({ outcome: 'done', session_id: 'sess-t', session_total_usd: totals.shift(), turns: 1 }))
+    hub = createTeamHub({ db, config, backend, retryAfterSec: 0 })
+    await hub.start()
+    postMessage(db, { sender: USER, recipient: 'taskq', body: 'one' })
+    teamChanged.notify()
+    await waitFor(() => listTurns(db, 5).filter((t) => t.ended_at !== null).length === 1)
+    postMessage(db, { sender: USER, recipient: 'taskq', body: 'two' })
+    teamChanged.notify()
+    await waitFor(() => listTurns(db, 5).filter((t) => t.ended_at !== null).length === 2)
+    const costs = listTurns(db, 5).map((t) => Math.round((t.cost_usd ?? 0) * 100) / 100).sort()
+    assert.deepEqual(costs, [0.3, 0.5])
+  })
+
   test('the team pauses when the daily budget is spent', async () => {
     const { db, config } = env
     config.bots.dailyBudgetUsd = 0.1
