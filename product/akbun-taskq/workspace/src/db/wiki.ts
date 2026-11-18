@@ -1,5 +1,4 @@
 import { inTransaction, type Db } from './open.ts'
-import { ftsMatch } from './search.ts'
 import { mask } from '../mask.ts'
 import { nowSec } from '../time.ts'
 
@@ -29,11 +28,19 @@ export function listPages(db: Db): Omit<WikiPage, 'body'>[] {
   return db.prepare('SELECT slug, title, revision, updated_by, updated_at FROM wiki_pages ORDER BY slug').all() as unknown as Omit<WikiPage, 'body'>[]
 }
 
-export function searchPages(db: Db, query: string): { slug: string; title: string; snippet: string }[] {
-  const match = ftsMatch(query, ' OR ')
-  if (!match) return []
-  return db.prepare(`SELECT slug, title, snippet(wiki_fts, 2, '[', ']', '...', 16) AS snippet FROM wiki_fts
-    WHERE wiki_fts MATCH ? ORDER BY rank LIMIT 20`).all(match) as { slug: string; title: string; snippet: string }[]
+const LINK = /\[\[([a-z0-9][a-z0-9/-]{0,249})\]\]/g
+
+// [[slug]] references in a body, the edges search follows.
+export function linksOf(body: string): string[] {
+  return [...new Set([...body.matchAll(LINK)].map((m) => m[1]).filter((slug) => SLUG_PATTERN.test(slug)))]
+}
+
+export function neighbors(db: Db, slugs: string[]): { slug: string; via: string }[] {
+  if (slugs.length === 0) return []
+  const marks = slugs.map(() => '?').join(', ')
+  return db.prepare(`SELECT target AS slug, source AS via FROM wiki_links WHERE source IN (${marks})
+    UNION SELECT source AS slug, target AS via FROM wiki_links WHERE target IN (${marks})`)
+    .all(...slugs, ...slugs) as { slug: string; via: string }[]
 }
 
 // Optimistic concurrency: a writer names the revision it read. Two agents editing one page cannot silently overwrite
@@ -59,6 +66,9 @@ export function writePage(db: Db, page: { slug: string; title: string; body: str
       .run(page.slug, next, title, body, page.author, now)
     db.prepare('DELETE FROM wiki_fts WHERE slug = ?').run(page.slug)
     db.prepare('INSERT INTO wiki_fts (slug, title, body) VALUES (?, ?, ?)').run(page.slug, title, body)
+    db.prepare('DELETE FROM wiki_links WHERE source = ?').run(page.slug)
+    const link = db.prepare('INSERT OR IGNORE INTO wiki_links (source, target) VALUES (?, ?)')
+    for (const target of linksOf(body)) if (target !== page.slug) link.run(page.slug, target)
     return { ok: true, revision: next }
   })
 }

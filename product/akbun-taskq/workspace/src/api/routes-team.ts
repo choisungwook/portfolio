@@ -1,13 +1,19 @@
 import type { Hono } from 'hono'
 import { USER, getAgent, listAgents, listMessages, listTurns, markRead, openTurnAgents, postMessage, seedAgents } from '../db/team.ts'
-import { getPage, listPages, searchPages } from '../db/wiki.ts'
+import { getPage, listPages } from '../db/wiki.ts'
+import { listThreads } from '../db/threads.ts'
+import { hybridSearch } from '../team/search.ts'
+import { setOwner } from '../team/owner.ts'
 import { DEFAULT_ROSTER } from '../team/roster.ts'
 import { isTeamPaused, pauseTeam, resumeTeam, teamPauseReason } from '../team/hub.ts'
 import { teamChanged } from '../wake.ts'
 import { intParam } from './params.ts'
+import { TASK_TITLE_SQL } from '../db/tasks.ts'
 import { HttpError, readJson, type ApiDeps } from './http.ts'
 
 export function registerTeamRoutes(api: Hono, { db, config }: ApiDeps): void {
+  const search = hybridSearch(db)
+
   api.get('/team', (c) => {
     seedAgents(db, DEFAULT_ROSTER)
     const busy = new Set(openTurnAgents(db))
@@ -16,6 +22,9 @@ export function registerTeamRoutes(api: Hono, { db, config }: ApiDeps): void {
       paused: isTeamPaused(db),
       pause_reason: teamPauseReason(db),
       agents: listAgents(db).map(({ instructions: _instructions, ...agent }) => ({ ...agent, busy: busy.has(agent.name) })),
+      tasks: db.prepare(`SELECT t.id, t.type, t.status, t.owner, ${TASK_TITLE_SQL} FROM tasks t
+        WHERE t.owner IS NOT NULL AND t.status NOT IN ('done', 'failed') ORDER BY t.updated_at DESC LIMIT 200`).all(),
+      threads: listThreads(db, 20),
       turns: listTurns(db, 20),
     })
   })
@@ -42,6 +51,19 @@ export function registerTeamRoutes(api: Hono, { db, config }: ApiDeps): void {
     return c.json({ ok: true })
   })
 
+  // The user gives a task to an agent (owner: name) or takes it back (owner: null).
+  api.post('/team/tasks/:id/owner', async (c) => {
+    const body = await readJson(c) as { owner?: unknown } | null
+    const owner = body?.owner
+    if (owner !== null && typeof owner !== 'string') throw new HttpError(400, 'owner must be an agent name or null')
+    try {
+      setOwner(db, c.req.param('id'), owner, USER)
+    } catch (error) {
+      throw new HttpError(409, error instanceof Error ? error.message : String(error))
+    }
+    return c.json({ owner })
+  })
+
   api.post('/team/pause', (c) => {
     pauseTeam(db, 'paused by the user')
     return c.json({ paused: true })
@@ -54,7 +76,7 @@ export function registerTeamRoutes(api: Hono, { db, config }: ApiDeps): void {
 
   api.get('/team/wiki', (c) => {
     const query = c.req.query('q')
-    return c.json(query ? searchPages(db, query) : listPages(db))
+    return c.json(query ? search(query, 30) : listPages(db))
   })
 
   // The slug may hold slashes, so it is a query parameter rather than a path segment.

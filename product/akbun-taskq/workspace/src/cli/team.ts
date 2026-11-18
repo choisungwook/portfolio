@@ -3,6 +3,10 @@ import {
   USER, getAgent, listAgents, listMessages, listTurns, markRead, postMessage, seedAgents, setAgentEnabled, setAgentSession,
 } from '../db/team.ts'
 import { getPage, listPages } from '../db/wiki.ts'
+import { listThreads, speakerOf } from '../db/threads.ts'
+import { hybridSearch } from '../team/search.ts'
+import { exportWiki } from '../team/wiki-files.ts'
+import { setOwner } from '../team/owner.ts'
 import { DEFAULT_ROSTER } from '../team/roster.ts'
 import { isTeamPaused, pauseTeam, resumeTeam, teamPauseReason } from '../team/hub.ts'
 import { teamChanged } from '../wake.ts'
@@ -15,6 +19,10 @@ const USAGE = `usage: taskq team <action>
   log [--agent NAME] [--limit N]
   turns [--limit N]
   wiki [SLUG]                  list pages, or print one
+  search QUERY...              search the wiki the way agents do
+  export                       rewrite the markdown mirror under TASKQ_HOME/wiki/ (for graphify and other folder tools)
+  assign TASK AGENT|user       give a task to an agent, or take it back
+  threads                      discussions and whose turn it is
   pause [--reason TEXT]        resume
   enable NAME    disable NAME    reset NAME (start a new session next turn)`
 
@@ -82,6 +90,31 @@ export const team: Command = ({ config, db }, args) => {
       const page = getPage(db, slug)
       if (!page) throw new Error('no such page')
       console.log(`# ${page.title}\n(revision ${page.revision} by ${page.updated_by})\n\n${page.body}`)
+      return
+    }
+    case 'search': {
+      const query = rest.join(' ').trim()
+      if (!query) throw new Error('usage: taskq team search QUERY...')
+      for (const hit of hybridSearch(db)(query, 20)) {
+        console.log(`${hit.score.toFixed(2).padStart(6)} ${hit.slug}${hit.via ? ` (via ${hit.via})` : ''}  ${hit.snippet.replaceAll('\n', ' ')}`)
+      }
+      return
+    }
+    case 'export':
+      console.log(`${exportWiki(db, config)} pages written`)
+      return
+    case 'assign': {
+      const [taskId, to] = rest
+      if (!taskId || !to) throw new Error('usage: taskq team assign TASK AGENT|user')
+      setOwner(db, taskId, to === USER ? null : to, USER)
+      console.log(`task ${taskId} is now owned by ${to}`)
+      return
+    }
+    case 'threads': {
+      for (const t of listThreads(db, 20)) {
+        const turn = t.status === 'open' ? `next: ${speakerOf(t)}` : t.status === 'concluding' ? `waiting for ${t.moderator} to conclude` : 'closed'
+        console.log(`#${t.id} [${t.status}] ${t.topic} — ${t.participants.join(', ')} · ${t.posts}/${t.rounds * t.participants.length} posts · ${turn}`)
+      }
       return
     }
     case 'pause': {

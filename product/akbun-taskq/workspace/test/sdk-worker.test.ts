@@ -17,9 +17,9 @@ const config = resolveConfig(home)
 const outputs = join(home, 'outputs')
 const repo = '/work/example-repo'
 
-function taskOf(type: TaskType, extra: Partial<Task> = {}): Task {
+function taskOf(type: TaskType, extra: Partial<Omit<Task, 'owner'>> = {}): Task {
   return {
-    id: 't-9', type, status: 'running', priority: 0, lock_key: null, claimed_by: null, heartbeat_at: null,
+    id: 't-9', type, status: 'running', priority: 0, lock_key: null, claimed_by: null, heartbeat_at: null, owner: null,
     session_id: null, data: { intent: 'check the example instances', repo }, created_at: 0, updated_at: 0,
     ...extra,
   }

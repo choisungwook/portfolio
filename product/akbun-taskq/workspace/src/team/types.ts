@@ -23,6 +23,7 @@ export interface TurnResult {
   cost_usd?: number
   auth_failed?: boolean     // the model provider login failed; the hub pauses the team
   session_missing?: boolean // the resumed session no longer exists; the hub starts a new one next time
+  tampered?: string         // a tool call reached taskq itself (data directory, config); the hub pauses the team
 }
 
 export interface TeamBackend {

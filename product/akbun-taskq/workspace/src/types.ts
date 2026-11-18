@@ -18,7 +18,6 @@ export interface TaskData {
   repo?: string              // cwd for code tasks
   output_path?: string       // under outputs/
   auto_accept_handoffs?: boolean
-  assignee?: string          // team agent that asked for this task; its result is posted to that agent's inbox
   review_of?: string         // security_review: id of the code task
   base_commit?: string       // code: HEAD before the run
   max_turns?: number
@@ -28,6 +27,7 @@ export interface TaskData {
 export interface Task {
   id: string; type: TaskType; status: TaskStatus; priority: number
   lock_key: string | null; claimed_by: string | null; heartbeat_at: number | null
+  owner: string | null       // team agent that owns the task and gets its result; null for the user's own task
   session_id: string | null; data: TaskData; created_at: number; updated_at: number
 }
 

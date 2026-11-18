@@ -3,21 +3,26 @@ import { join } from 'node:path'
 import type { Config } from '../config.ts'
 import type { Db } from '../db/open.ts'
 import {
-  agentsWithMail, endTurn, getAgent, listAgents, recoverTurns, seedAgents, setAgentSession, spentSince, startTurn, turnsSince,
+  agentsWithMail, endTurn, getAgent, listAgents, nextDelivery, recoverTurns, replaceAgentSession, seedAgents, spentSince,
+  startTurn, turnsSince, type TeamMessage, type TurnEnd,
 } from '../db/team.ts'
+import { passStalled } from '../db/threads.ts'
 import { getMeta, setMeta } from '../db/meta.ts'
 import { raiseAlert } from '../alerts/rules.ts'
 import { nowSec } from '../time.ts'
 import { teamChanged } from '../wake.ts'
 import { DEFAULT_ROSTER } from './roster.ts'
 import { agentDir, promptFor, systemFor } from './prompt.ts'
+import { hybridSearch } from './search.ts'
 import { teamTools } from './tools.ts'
+import { wikiDir } from './wiki-files.ts'
 import type { TeamBackend, TurnResult } from './types.ts'
 
 export interface HubOptions {
   db: Db
   config: Config
   backend: TeamBackend
+  retryAfterSec?: number
 }
 
 export interface TeamHub {
@@ -25,8 +30,9 @@ export interface TeamHub {
   stop(): Promise<void>
 }
 
-const BATCH = 20
-const STOP_GRACE_MS = 3000
+const BATCH = 20                // messages handed to one turn; the rest wait for the next turn
+const STOP_GRACE_MS = 3000      // same grace the task runner gives its runs on shutdown
+const RETRY_AFTER_SEC = 60      // wait after a failed turn, so an outage does not use up every attempt at once
 
 export function isTeamPaused(db: Db): boolean {
   return getMeta(db, 'team_paused') === '1'
@@ -36,16 +42,23 @@ export function teamPauseReason(db: Db): string | null {
   return isTeamPaused(db) ? getMeta(db, 'team_pause_reason') : null
 }
 
-export function pauseTeam(db: Db, reason: string): void {
+export function pauseTeam(db: Db, reason: string, kind: 'team_paused' | 'security_finding' = 'team_paused'): void {
   if (isTeamPaused(db)) return
   setMeta(db, 'team_paused', '1')
   setMeta(db, 'team_pause_reason', reason)
-  raiseAlert(db, { task_id: null, kind: 'team_paused', message: `Team paused: ${reason}` })
+  raiseAlert(db, { task_id: null, kind, message: `Team paused: ${reason}` })
 }
 
+// Resuming is the user's decision to accept what tripped the guard, so the budget and loop windows restart from now.
+// Without that, a resumed team would pause again on its next turn for the same reason.
 export function resumeTeam(db: Db): void {
   setMeta(db, 'team_paused', '0')
+  setMeta(db, 'team_resumed_at', String(nowSec()))
   teamChanged.notify()
+}
+
+function resumedAt(db: Db): number {
+  return Number(getMeta(db, 'team_resumed_at') ?? 0)
 }
 
 function localMidnight(): number {
@@ -53,22 +66,26 @@ function localMidnight(): number {
   return Math.floor(new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime() / 1000)
 }
 
-// Delivers mail to resident agents. An agent with undelivered messages and no open turn gets one turn that resumes its
+// Delivers mail to resident agents. An agent with deliverable messages and no open turn gets one turn that resumes its
 // session; the turn sees every message that arrived since its last turn. At most maxConcurrentTurns run at once.
-export function createTeamHub({ db, config, backend }: HubOptions): TeamHub {
+export function createTeamHub({ db, config, backend, retryAfterSec = RETRY_AFTER_SEC }: HubOptions): TeamHub {
   const active = new Map<string, { controller: AbortController; done: Promise<void> }>()
   const stopped = new AbortController()
+  const search = hybridSearch(db)
   let running = false
 
   // Budget and loop guards stop the whole team rather than one agent: a loop involves at least two agents, and the
-  // user should see one alert, not one per agent.
+  // user should see one alert, not one per agent. Each running turn reserves its full per-turn budget, so turns
+  // started together cannot overshoot the daily limit by more than what a single turn may spend.
   function guardsHold(name: string): boolean {
     const t = config.team
-    if (spentSince(db, localMidnight()) >= t.dailyBudgetUsd) {
-      pauseTeam(db, `daily budget of $${t.dailyBudgetUsd} is spent`)
+    const since = Math.max(localMidnight(), resumedAt(db))
+    const committed = spentSince(db, since) + active.size * t.turnBudgetUsd
+    if (committed + t.turnBudgetUsd > t.dailyBudgetUsd) {
+      if (active.size === 0) pauseTeam(db, `daily budget of $${t.dailyBudgetUsd} is spent ($${spentSince(db, since).toFixed(2)} on turns and owned tasks)`)
       return false
     }
-    const recent = turnsSince(db, name, nowSec() - 3600)
+    const recent = turnsSince(db, name, Math.max(nowSec() - 3600, resumedAt(db)))
     if (recent >= t.hourlyTurnsPerAgent) {
       pauseTeam(db, `${name} took ${recent} turns in the last hour; agents may be messaging each other in a loop`)
       return false
@@ -83,19 +100,21 @@ export function createTeamHub({ db, config, backend }: HubOptions): TeamHub {
     const controller = new AbortController()
     const cwd = agentDir(config, name)
     mkdirSync(cwd, { recursive: true })
-    const readRoots = [join(config.home, 'outputs'), ...config.trustedRepos, ...config.team.readRoots]
+    const wiki = wikiDir(config)
+    mkdirSync(wiki, { recursive: true })
+    const readRoots = [join(config.home, 'outputs'), wiki, ...config.trustedRepos, ...config.team.readRoots]
     const done = backend.runTurn(config, {
       agent,
-      system: systemFor(agent, listAgents(db), config, readRoots),
-      prompt: promptFor(started.messages),
-      tools: teamTools({ db, config, agent: name }),
+      system: systemFor(agent, listAgents(db), config, readRoots, wiki),
+      prompt: promptFor(db, started.messages),
+      tools: teamTools({ db, config, agent: name, search, turnId: started.turn.id }),
       cwd,
       readRoots: config.team.personaSkill ? [...readRoots, config.team.personaSkill] : readRoots,
       resume: agent.session_id,
       signal: controller.signal,
     })
       .catch((error: unknown): TurnResult => ({ outcome: 'failed', error: error instanceof Error ? error.message : String(error) }))
-      .then((result) => finish(name, started.turn.id, result, controller.signal.aborted))
+      .then((result) => finish(name, started.turn.id, agent.session_id, started.messages, result, controller.signal.aborted))
       .catch((error: unknown) => console.error(`taskq: team turn of ${name} crashed: ${String(error)}`))
       .finally(() => {
         active.delete(name)
@@ -104,25 +123,38 @@ export function createTeamHub({ db, config, backend }: HubOptions): TeamHub {
     active.set(name, { controller, done })
   }
 
-  function finish(name: string, turnId: number, result: TurnResult, aborted: boolean): void {
-    if (result.session_id) setAgentSession(db, name, result.session_id)
-    if (result.session_missing) setAgentSession(db, name, null)
+  function finish(name: string, turnId: number, session: string | null, messages: TeamMessage[], result: TurnResult, aborted: boolean): void {
+    if (result.session_missing) replaceAgentSession(db, name, session, null)
+    else if (result.session_id) replaceAgentSession(db, name, session, result.session_id)
     const outcome = aborted ? 'interrupted' : result.outcome
-    const setAside = endTurn(db, turnId, {
-      outcome, error: result.error, turns: result.turns, cost_usd: result.cost_usd, session_id: result.session_id,
+    // A turn that ended without a cost figure (abort, crash) is charged its whole budget rather than nothing.
+    const cost = result.cost_usd ?? (outcome === 'done' ? 0 : config.team.turnBudgetUsd)
+    const end = endTurn(db, turnId, {
+      outcome, error: result.error, turns: result.turns, cost_usd: cost, session_id: result.session_id,
     }, config.team.maxAttempts)
+    reportSetAside(name, end, result.error)
+    if (result.tampered) pauseTeam(db, `${name} tried to reach taskq itself: ${result.tampered}`, 'security_finding')
     if (result.auth_failed) pauseTeam(db, `model provider login failed for ${name}`)
-    for (const message of setAside) {
-      raiseAlert(db, {
-        task_id: message.task_id, kind: 'team_message',
-        message: `Message #${message.id} from ${message.sender} to ${name} was set aside after ${config.team.maxAttempts} failed turns: ${result.error ?? 'unknown error'}`,
-      })
+    if (outcome !== 'interrupted') {
+      passStalled(db, name, messages.map((m) => m.thread_id).filter((id): id is number => id !== null))
     }
+  }
+
+  function reportSetAside(name: string, end: TurnEnd, error: string | undefined): void {
+    if (end.setAside.length === 0) return
+    const ids = end.setAside.map((m) => `#${m.id}`).join(', ')
+    const why = end.reason === 'writes'
+      ? 'the turn failed after it had already sent messages or created tasks, so it is not retried (a retry would repeat them)'
+      : `${config.team.maxAttempts} turns failed on them`
+    raiseAlert(db, {
+      task_id: end.setAside[0].task_id, kind: 'team_message',
+      message: `Messages ${ids} to ${name} were set aside: ${why}. Last error: ${error ?? 'interrupted'}. Check taskq team log and resend if needed.`,
+    })
   }
 
   function tick(): void {
     if (isTeamPaused(db)) return
-    for (const name of agentsWithMail(db)) {
+    for (const name of agentsWithMail(db, nowSec(), retryAfterSec)) {
       if (active.size >= config.team.maxConcurrentTurns) return
       if (active.has(name)) continue
       if (!guardsHold(name)) return
@@ -130,9 +162,13 @@ export function createTeamHub({ db, config, backend }: HubOptions): TeamHub {
     }
   }
 
+  // Wakes on an in-process change, at the next scheduled delivery, or every pollSec for writes from the CLI.
   async function loop(seen: number): Promise<void> {
     while (running) {
-      await teamChanged.wait(config.pollSec * 1000, stopped.signal, seen)
+      const now = nowSec()
+      const due = nextDelivery(db, now)
+      const untilDue = due === undefined ? Infinity : (due - now) * 1000
+      await teamChanged.wait(Math.min(config.pollSec * 1000, untilDue + 50), stopped.signal, seen)
       if (!running) return
       seen = teamChanged.version()
       try {
@@ -146,7 +182,7 @@ export function createTeamHub({ db, config, backend }: HubOptions): TeamHub {
   return {
     async start() {
       seedAgents(db, DEFAULT_ROSTER)
-      recoverTurns(db)
+      for (const { agent, end } of recoverTurns(db)) reportSetAside(agent, end, 'taskq stopped during the turn')
       running = true
       const seen = teamChanged.version()
       tick()

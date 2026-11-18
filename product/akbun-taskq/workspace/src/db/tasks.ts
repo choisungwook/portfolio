@@ -11,6 +11,7 @@ export interface NewTask {
   status: TaskStatus
   priority?: number
   lock_key?: string | null
+  owner?: string | null
   data: TaskData
   deps?: DepInput[]
 }
@@ -35,9 +36,9 @@ export function insertTask(db: Db, input: NewTask): Task {
   const id = newId()
   const now = nowSec()
   const data = JSON.stringify(input.data)
-  db.prepare(`INSERT INTO tasks (id, type, status, priority, lock_key, data, created_at, updated_at)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?)`)
-    .run(id, input.type, input.status, input.priority ?? 0, input.lock_key ?? null, data, now, now)
+  db.prepare(`INSERT INTO tasks (id, type, status, priority, lock_key, owner, data, created_at, updated_at)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`)
+    .run(id, input.type, input.status, input.priority ?? 0, input.lock_key ?? null, input.owner ?? null, data, now, now)
   for (const dep of input.deps ?? []) {
     db.prepare('INSERT INTO deps (task_id, depends_on, kind) VALUES (?, ?, ?)').run(id, dep.depends_on, dep.kind)
   }
@@ -128,12 +129,12 @@ export function staleCandidates(db: Db, cutoff: number, all: boolean): Task[] {
 }
 
 // Creates a task from validated input. Dependencies are blocks-type and must name existing tasks.
-export function createFromInput(db: Db, input: TaskInput): Task {
+export function createFromInput(db: Db, input: TaskInput, owner: string | null = null): Task {
   for (const id of input.depends_on) {
     if (!getTask(db, id)) throw new Error(`unknown dependency: ${id}`)
   }
   return inTransaction(db, () => insertTask(db, {
-    type: input.type, status: input.status, priority: input.priority, lock_key: input.lock_key, data: input.data,
+    type: input.type, status: input.status, priority: input.priority, lock_key: input.lock_key, owner, data: input.data,
     deps: input.depends_on.map((depends_on) => ({ depends_on, kind: 'blocks' as const })),
   }))
 }

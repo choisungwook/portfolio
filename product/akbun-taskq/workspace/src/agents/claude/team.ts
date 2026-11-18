@@ -6,7 +6,7 @@ import {
 import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js'
 import type { Config } from '../../config.ts'
 import { claudeExecutable } from '../../resources.ts'
-import { decideTeamRead } from '../../worker/gate.ts'
+import { decideTeamRead, tamperOf } from '../../worker/gate.ts'
 import { ToolError, type TeamTool } from '../../team/tools.ts'
 import type { TeamBackend, TurnRequest, TurnResult } from '../../team/types.ts'
 import { buildEnv } from './auth.ts'
@@ -43,24 +43,30 @@ async function runTurn(config: Config, request: TurnRequest, runQuery: TeamQuery
   request.signal.addEventListener('abort', onAbort, { once: true })
   let sessionId: string | undefined
   let authFailed = false
+  const state: { tampered?: string } = {}
   try {
-    for await (const message of runQuery({ prompt: once(request.prompt), options: optionsFor(config, request, abort) })) {
+    for await (const message of runQuery({ prompt: once(request.prompt), options: optionsFor(config, request, abort, state) })) {
       if (message.type === 'system' && message.subtype === 'init') sessionId = message.session_id
       else if (message.type === 'assistant' && message.error && INFERENCE_AUTH_ERRORS.has(message.error)) authFailed = true
       else if (message.type === 'result') {
         const base = { session_id: sessionId ?? message.session_id, turns: message.num_turns, cost_usd: message.total_cost_usd }
+        if (state.tampered) return { ...base, outcome: 'failed', error: state.tampered, tampered: state.tampered }
         if (authFailed) return { ...base, outcome: 'failed', error: 'model provider login failed', auth_failed: true }
         if (message.subtype === 'success') return { ...base, outcome: 'done' }
         return { ...base, outcome: 'failed', error: message.errors.length > 0 ? message.errors.join('; ').slice(0, 300) : message.subtype }
       }
     }
+  } catch (error) {
+    // The abort the read hook triggers on a tamper attempt surfaces as an error; report the attempt, not the abort.
+    if (state.tampered) return { outcome: 'failed', error: state.tampered, tampered: state.tampered, session_id: sessionId }
+    throw error
   } finally {
     request.signal.removeEventListener('abort', onAbort)
   }
   return { outcome: 'failed', error: 'session ended without a result', session_id: sessionId, auth_failed: authFailed || undefined }
 }
 
-function optionsFor(config: Config, request: TurnRequest, abort: AbortController): Options {
+function optionsFor(config: Config, request: TurnRequest, abort: AbortController, state: { tampered?: string }): Options {
   return {
     cwd: request.cwd,
     env: buildEnv(config),
@@ -74,7 +80,7 @@ function optionsFor(config: Config, request: TurnRequest, abort: AbortController
     mcpServers: { [SERVER]: serverFor(request.tools) },
     permissionMode: 'dontAsk',
     allowedTools: [...READ_TOOLS, ...request.tools.map((t) => `mcp__${SERVER}__${t.name}`)],
-    hooks: { PreToolUse: [{ hooks: [readGate(config, request)] }] },
+    hooks: { PreToolUse: [{ hooks: [readGate(config, request, abort, state)] }] },
     maxTurns: config.team.turnMaxTurns,
     maxBudgetUsd: config.team.turnBudgetUsd,
     resume: request.resume ?? undefined,
@@ -84,17 +90,23 @@ function optionsFor(config: Config, request: TurnRequest, abort: AbortController
 }
 
 // allowedTools lets every Read through the permission check, so the path rule lives in a hook, which runs first and
-// whose deny holds in every permission mode. A hook that throws denies.
-function readGate(config: Config, request: TurnRequest): HookCallback {
+// whose deny holds in every permission mode. A hook that throws denies. A read of taskq's own data or config ends the
+// turn as tampered, as it ends a task run (knowledge/decisions/2026-11-tamper-stops-run.md).
+function readGate(config: Config, request: TurnRequest, abort: AbortController, state: { tampered?: string }): HookCallback {
   return async (input) => {
     if (input.hook_event_name !== 'PreToolUse') return {}
     if (input.tool_name.startsWith(`mcp__${SERVER}__`)) return {}
     let allowed = false
     try {
       const toolInput = typeof input.tool_input === 'object' && input.tool_input !== null ? input.tool_input as Record<string, unknown> : {}
-      allowed = decideTeamRead(input.tool_name, toolInput, {
-        cwd: request.cwd, roots: request.readRoots, dataDir: join(config.home, 'data'),
-      }) === 'allow'
+      const dataDir = join(config.home, 'data')
+      const tamper = tamperOf(input.tool_name, toolInput, { cwd: request.cwd, outputs: request.cwd, dataDir })
+      if (tamper !== null) {
+        state.tampered ??= tamper
+        abort.abort()
+      } else {
+        allowed = decideTeamRead(input.tool_name, toolInput, { cwd: request.cwd, roots: request.readRoots, dataDir }) === 'allow'
+      }
     } catch {
       allowed = false
     }

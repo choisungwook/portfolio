@@ -19,7 +19,8 @@ CREATE TABLE team_turns (
   outcome TEXT CHECK (outcome IN ('done', 'failed', 'interrupted')),
   error TEXT,
   turns INTEGER,
-  cost_usd REAL
+  cost_usd REAL,
+  writes INTEGER NOT NULL DEFAULT 0
 );
 CREATE INDEX team_turns_agent ON team_turns(agent, id);
 CREATE INDEX team_turns_time ON team_turns(started_at);
@@ -31,7 +32,9 @@ CREATE TABLE team_messages (
   body TEXT NOT NULL,
   task_id TEXT,
   reply_to INTEGER,
+  thread_id INTEGER,
   created_at INTEGER NOT NULL,
+  deliver_at INTEGER NOT NULL,
   turn_id INTEGER,
   attempts INTEGER NOT NULL DEFAULT 0,
   read_at INTEGER,
@@ -39,6 +42,7 @@ CREATE TABLE team_messages (
 );
 CREATE INDEX team_messages_inbox ON team_messages(recipient, id) WHERE read_at IS NULL AND failed_at IS NULL;
 CREATE INDEX team_messages_turn ON team_messages(turn_id);
+CREATE INDEX team_messages_thread ON team_messages(thread_id) WHERE thread_id IS NOT NULL;
 
 CREATE TABLE wiki_pages (
   slug TEXT PRIMARY KEY,
@@ -59,4 +63,34 @@ CREATE TABLE wiki_revisions (
   PRIMARY KEY (slug, revision)
 );
 
-CREATE VIRTUAL TABLE wiki_fts USING fts5(slug UNINDEXED, title, body);
+-- unicode61 splits on spaces only, so a Korean word with a particle ("검색률이") never matches its stem ("검색률").
+-- The trigram index matches any substring of three or more characters; shorter terms are matched with LIKE.
+CREATE VIRTUAL TABLE wiki_fts USING fts5(slug UNINDEXED, title, body, tokenize = 'trigram');
+
+-- [[slug]] references between pages. Search follows them one hop.
+CREATE TABLE wiki_links (
+  source TEXT NOT NULL,
+  target TEXT NOT NULL,
+  PRIMARY KEY (source, target)
+);
+CREATE INDEX wiki_links_target ON wiki_links(target);
+
+-- One owner per task: the team agent that gets the task's result. NULL is a task the user added and nobody claimed.
+ALTER TABLE tasks ADD COLUMN owner TEXT;
+CREATE INDEX tasks_owner ON tasks(owner) WHERE owner IS NOT NULL;
+
+-- A bounded discussion: participants speak in a fixed order for a fixed number of rounds, then the moderator concludes.
+-- posts counts contributions and passes; the next speaker is participants[posts % count].
+CREATE TABLE team_threads (
+  id INTEGER PRIMARY KEY,
+  topic TEXT NOT NULL,
+  moderator TEXT NOT NULL,
+  participants TEXT NOT NULL,
+  rounds INTEGER NOT NULL,
+  posts INTEGER NOT NULL DEFAULT 0,
+  status TEXT NOT NULL DEFAULT 'open' CHECK (status IN ('open', 'concluding', 'closed')),
+  conclusion TEXT,
+  wiki_slug TEXT,
+  created_at INTEGER NOT NULL,
+  closed_at INTEGER
+);

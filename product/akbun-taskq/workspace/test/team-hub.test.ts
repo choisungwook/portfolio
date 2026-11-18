@@ -42,7 +42,7 @@ describe('team hub', () => {
       if (request.agent.name === 'lead' && request.prompt.includes('from="planner"')) call('send_message', { to: USER, body: 'survey scheduled' })
       return { outcome: 'done', session_id: `sess-${request.agent.name}`, cost_usd: 0.01, turns: 1 }
     })
-    hub = createTeamHub({ db, config, backend })
+    hub = createTeamHub({ db, config, backend, retryAfterSec: 0 })
     await hub.start()
     postMessage(db, { sender: USER, recipient: 'lead', body: 'please survey X' })
     teamChanged.notify()
@@ -57,9 +57,10 @@ describe('team hub', () => {
 
   test('the team pauses when the daily budget is spent', async () => {
     const { db, config } = env
-    config.team.dailyBudgetUsd = 0.05
-    const { backend, requests } = fakeBackend(() => ({ outcome: 'done', cost_usd: 0.05 }))
-    hub = createTeamHub({ db, config, backend })
+    config.team.dailyBudgetUsd = 0.1
+    config.team.turnBudgetUsd = 0.05
+    const { backend, requests } = fakeBackend(() => ({ outcome: 'done', cost_usd: 0.06 }))
+    hub = createTeamHub({ db, config, backend, retryAfterSec: 0 })
     await hub.start()
     postMessage(db, { sender: USER, recipient: 'lead', body: 'one' })
     teamChanged.notify()
@@ -78,7 +79,7 @@ describe('team hub', () => {
       call('send_message', { to: request.agent.name === 'lead' ? 'planner' : 'lead', body: 'your turn' })
       return { outcome: 'done', cost_usd: 0 }
     })
-    hub = createTeamHub({ db, config, backend })
+    hub = createTeamHub({ db, config, backend, retryAfterSec: 0 })
     await hub.start()
     postMessage(db, { sender: USER, recipient: 'lead', body: 'go' })
     teamChanged.notify()
@@ -93,7 +94,7 @@ describe('team hub', () => {
     const { db, config } = env
     config.team.maxAttempts = 2
     const { backend, requests } = fakeBackend(() => ({ outcome: 'failed', error: 'model error' }))
-    hub = createTeamHub({ db, config, backend })
+    hub = createTeamHub({ db, config, backend, retryAfterSec: 0 })
     await hub.start()
     postMessage(db, { sender: USER, recipient: 'coder', body: 'do it' })
     teamChanged.notify()
@@ -113,7 +114,7 @@ describe('team hub', () => {
       return { outcome: 'done', session_id: 'fresh' }
     })
     db.prepare("UPDATE team_agents SET session_id = 'gone' WHERE name = 'lead'").run()
-    hub = createTeamHub({ db, config, backend })
+    hub = createTeamHub({ db, config, backend, retryAfterSec: 0 })
     await hub.start()
     postMessage(db, { sender: USER, recipient: 'lead', body: 'hi' })
     teamChanged.notify()
@@ -124,7 +125,7 @@ describe('team hub', () => {
   test('a login failure pauses the team until the user resumes it', async () => {
     const { db, config } = env
     const { backend } = fakeBackend(() => ({ outcome: 'failed', auth_failed: true, error: 'login' }))
-    hub = createTeamHub({ db, config, backend })
+    hub = createTeamHub({ db, config, backend, retryAfterSec: 0 })
     await hub.start()
     postMessage(db, { sender: USER, recipient: 'lead', body: 'hi' })
     teamChanged.notify()
