@@ -1,6 +1,7 @@
 import type { Db } from './open.ts'
 import { inTransaction } from './open.ts'
 import { insertEvent } from './events.ts'
+import { desktopNotificationsEnabled } from './meta.ts'
 import type { HandoffRecord, TaskHandoff } from '../types.ts'
 import { nowSec } from '../time.ts'
 
@@ -59,7 +60,7 @@ export function setHandoffMode(db: Db, taskId: string, automatic: boolean): bool
   })
 }
 
-export function takeHandoffNotices(db: Db): { id: number; target_task_id: string; message: string }[] {
+export function takeHandoffNotices(db: Db) {
   return inTransaction(db, () => {
     const rows = db.prepare(`SELECT h.id, h.target_task_id, a.message, a.acked_at FROM handoffs h JOIN alerts a
       ON a.task_id = h.target_task_id AND a.kind = 'handoff_received' AND a.ref = CAST(h.id AS TEXT)
@@ -67,6 +68,6 @@ export function takeHandoffNotices(db: Db): { id: number; target_task_id: string
         id: number; target_task_id: string; message: string; acked_at: number | null
       }[]
     if (rows.length > 0) db.prepare('UPDATE handoffs SET notification_processed_at = ? WHERE notification_processed_at IS NULL').run(nowSec())
-    return rows.filter((row) => row.acked_at === null)
+    return { notices: rows.filter((row) => row.acked_at === null), enabled: desktopNotificationsEnabled(db) }
   })
 }

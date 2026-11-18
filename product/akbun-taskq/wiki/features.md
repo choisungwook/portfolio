@@ -27,6 +27,7 @@
 | 승인 대기 목록 | `pending-approvals`, `pending-list` | `GET /api/approvals` | 확인 필요 패널 위에 열린 승인 요청을 모은다. 각 행은 명령 앞 120자와 Review 버튼만 가진다. Approve는 두지 않는다. 요청이 없으면 영역을 숨긴다 |
 | 큐 일시정지 배너 | `queue-banner`, `queue-text`, `queue-toggle` | `GET /api/queue`, `POST /api/queue/{pause,resume}` | 배너는 항상 보인다. 큐가 도는 동안은 Queue running과 Pause queue 버튼을, 멈춘 동안은 이유와 Resume queue 버튼을 보여준다. 버튼 하나가 두 역할을 바꿔 가진다 |
 | 설정 버튼 | `settings-button` | 없음 | 헤더의 톱니 아이콘이다. 누르면 설정 dialog가 열리고, 닫으면 포커스가 이 버튼으로 돌아간다. Escape로 닫는다 |
+| 데스크톱 알림 설정 | `desktop-notifications` | `GET /api/settings`, `POST /api/settings/desktop-notifications` | 인계와 중요 경고의 OS 알림을 켜거나 끈다. 설정은 SQLite에 저장되고 앱 내 이력은 계속 기록된다 |
 | 설정 dialog | `settings-dialog` | `GET /api/settings` | 접근 스킬 목록과 읽기 전용 구성 값을 보여준다. 두 영역으로 나뉜다 |
 | 접근 스킬 목록 | `access-skills` | `GET /api/settings`, `DELETE /api/access-skills/:name` | 등록된 스킬마다 이름, 설명, 경로(고정폭)를 보인다. SKILL.md가 없으면 `missing` 표시가 붙는다. `−`를 누르면 같은 행에 `Remove` 확인 버튼이 나오고, 두 번째 클릭에서만 삭제한다. 409 메시지는 그 행에 보인다. 등록된 스킬이 없으면 설명 문구를 보인다 |
 | 접근 스킬 추가 | `access-skill-add`, `access-skill-picker`, `access-skill-found`, `access-skill-path-form`, `access-skill-error` | `GET /api/skills/discover`, `POST /api/access-skills` | `+`를 누르면 열린다. 위에는 찾은 스킬 중 등록되지 않은 것을 `Add` 버튼과 함께 보이고, 아래에는 절대 경로를 입력하는 칸과 `Add` 버튼이 있다. 오류는 그 행이나 입력 칸 바로 아래에 보인다 |
