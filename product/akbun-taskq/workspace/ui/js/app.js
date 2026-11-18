@@ -14,6 +14,7 @@ import { initSearch } from './views/search.js'
 import { initSettings } from './views/settings-dialog.js'
 import { initTaskDetail } from './views/task-detail.js'
 import { initTaskForm } from './views/task-form.js'
+import { initTeam } from './views/team.js'
 import { initTokenNotice } from './views/token-notice.js'
 
 function initTabs() {
@@ -54,6 +55,7 @@ initSearch()
 initTaskDetail()
 initTaskForm()
 initSettings()
+initTeam()
 initTabs()
 if (hasToken) {
   startLive()

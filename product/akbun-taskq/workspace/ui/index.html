@@ -50,6 +50,7 @@
       <button type="button" role="tab" id="tab-board" data-tab="board" aria-controls="view-board">Board</button>
       <button type="button" role="tab" id="tab-graph" data-tab="graph" aria-controls="view-graph">Graph</button>
       <button type="button" role="tab" id="tab-proposals" data-tab="proposals" aria-controls="view-proposals">Proposals</button>
+      <button type="button" role="tab" id="tab-team" data-tab="team" aria-controls="view-team">Team</button>
     </nav>
 
     <section id="view-calendar" role="tabpanel" aria-labelledby="tab-calendar" data-area="calendar">
@@ -97,6 +98,28 @@
 
     <section id="view-proposals" role="tabpanel" aria-labelledby="tab-proposals" data-area="proposals" hidden>
       <div data-area="proposal-list"></div>
+    </section>
+
+    <section id="view-team" role="tabpanel" aria-labelledby="tab-team" data-area="team" hidden>
+      <div class="team-status" data-area="team-status"></div>
+      <div class="team-layout">
+        <div class="team-main">
+          <form class="team-compose" data-area="team-compose">
+            <label>To <select data-area="team-to"></select></label>
+            <label class="team-body-label">Message <textarea data-area="team-body" rows="3" maxlength="8000" required></textarea></label>
+            <button type="submit">Send</button>
+          </form>
+          <h2>Messages</h2>
+          <div data-area="team-messages"></div>
+        </div>
+        <div class="team-side">
+          <h2>Agents</h2>
+          <ul class="team-agents" data-area="team-agents"></ul>
+          <h2>Wiki</h2>
+          <ul class="team-wiki" data-area="team-wiki"></ul>
+          <section class="team-page" data-area="team-page" hidden></section>
+        </div>
+      </div>
     </section>
   </main>
 
