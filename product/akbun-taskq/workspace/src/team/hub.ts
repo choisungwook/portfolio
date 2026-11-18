@@ -6,7 +6,7 @@ import {
   agentsWithMail, endTurn, getAgent, listAgents, nextDelivery, recoverTurns, replaceAgentSession, seedAgents, spentSince,
   startTurn, turnsSince, type TeamMessage, type TurnEnd,
 } from '../db/team.ts'
-import { passStalled } from '../db/threads.ts'
+import { passStalled, skipDisabledSpeakers } from '../db/threads.ts'
 import { getMeta, setMeta } from '../db/meta.ts'
 import { raiseAlert } from '../alerts/rules.ts'
 import { nowSec } from '../time.ts'
@@ -154,6 +154,7 @@ export function createTeamHub({ db, config, backend, retryAfterSec = RETRY_AFTER
 
   function tick(): void {
     if (isTeamPaused(db)) return
+    skipDisabledSpeakers(db)
     for (const name of agentsWithMail(db, nowSec(), retryAfterSec)) {
       if (active.size >= config.team.maxConcurrentTurns) return
       if (active.has(name)) continue

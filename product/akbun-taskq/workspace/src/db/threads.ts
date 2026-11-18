@@ -93,3 +93,19 @@ export function passStalled(db: Db, speaker: string, threadIds: number[]): numbe
   }
   return passed
 }
+
+// A speaker disabled after the discussion opened would hold the floor forever, since a disabled agent gets no turns.
+export function skipDisabledSpeakers(db: Db): number[] {
+  const skipped: number[] = []
+  const open = db.prepare(`SELECT id FROM team_threads WHERE status = 'open'`).all().map((row) => Number(row.id))
+  for (const id of open) {
+    for (let guard = 0; guard < 16; guard++) {
+      const thread = getThread(db, id)
+      const speaker = thread ? speakerOf(thread) : null
+      if (!speaker || db.prepare('SELECT 1 FROM team_agents WHERE name = ? AND enabled = 1').get(speaker)) break
+      takeTurn(db, id, speaker, '(skipped: this agent is disabled)')
+      skipped.push(id)
+    }
+  }
+  return skipped
+}
