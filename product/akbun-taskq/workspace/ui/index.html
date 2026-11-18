@@ -329,9 +329,10 @@
       <label data-area="bot-name-row">Name <input name="name" type="text" maxlength="32" pattern="[a-z][a-z0-9\-]*" autocomplete="off" spellcheck="false" placeholder="coder"></label>
       <label data-area="bot-preset-row">Start from <select name="preset" data-area="bot-preset"><option value="">Blank</option></select></label>
       <label>Role <input name="role" type="text" maxlength="40" autocomplete="off"></label>
-      <label>Agent SDK <select name="sdk" data-area="bot-sdk"><option value="claude">Claude Agent SDK</option><option value="openai">OpenAI Agents SDK</option></select></label>
+      <label>Agent SDK <select name="sdk" data-area="bot-sdk"><option value="claude">Claude Agent SDK</option><option value="openai">OpenAI</option><option value="kiro">Kiro (AWS)</option></select></label>
+      <label data-area="bot-provider-row" hidden>Sign in with <select name="provider"><option value="api">OpenAI API key (Agents SDK)</option><option value="bedrock">Amazon Bedrock (Agents SDK)</option><option value="chatgpt">ChatGPT plan (Codex CLI)</option></select></label>
       <label>Model <input name="model" type="text" maxlength="100" autocomplete="off" placeholder="config default"></label>
-      <p class="meta wide" data-area="bot-sdk-hint" hidden>OpenAI bots have no auto mode. Their permission mode picks their tools: plan reads files, accept edits also writes in its folder and the shared folder, bypass also runs shell commands. Set OPENAI_API_KEY where taskq runs.</p>
+      <p class="meta wide" data-area="bot-sdk-hint" hidden></p>
       <label class="wide">Description <span class="meta">Other bots hand work to this bot by this text.</span><textarea name="description" rows="2" maxlength="500" required></textarea></label>
       <label class="wide">Instructions <textarea name="instructions" rows="5" maxlength="8000"></textarea></label>
       <label class="wide">Working directory <input name="workdir" type="text" maxlength="500" autocomplete="off" spellcheck="false" placeholder="the bot's own folder"></label>
@@ -406,6 +407,31 @@
       <h3 id="limits-title" data-i18n="settings.limits">Rate limits</h3>
       <p class="meta" data-i18n="settings.limits.hint">Limits for all bots together, and the defaults each bot uses unless its own settings say otherwise.</p>
       <form class="limits-form" data-area="limits-form"></form>
+    </section>
+    <section class="settings-section" aria-labelledby="usage-title">
+      <div class="plugins-head">
+        <h3 id="usage-title" data-i18n="settings.usage">Usage</h3>
+        <select data-area="usage-period" aria-label="Period">
+          <option value="today" data-i18n="usage.today">Today</option>
+          <option value="7d" selected data-i18n="usage.7d">Last 7 days</option>
+          <option value="30d" data-i18n="usage.30d">Last 30 days</option>
+          <option value="all" data-i18n="usage.all">All time</option>
+        </select>
+      </div>
+      <p class="meta" data-i18n="usage.hint">Tokens and cost of every bot session, by SDK. OpenAI cost is estimated from the prices in taskq.config.json; the ChatGPT plan has no per-turn price; Kiro reports credits when kiro-cli gives them.</p>
+      <div data-area="usage-report"></div>
+    </section>
+    <section class="settings-section" aria-labelledby="kiro-title">
+      <h3 id="kiro-title">Kiro (AWS)</h3>
+      <p class="meta" data-i18n="kiro.hint">Kiro bots use your AWS IAM Identity Center session. Enter your SSO start URL and region and sign in: kiro-cli shows a code to approve in the browser and keeps the session; taskq stores no token.</p>
+      <p data-area="kiro-status"></p>
+      <form class="mcp-form kiro-form" data-area="kiro-form">
+        <label>SSO start URL <input name="start_url" type="url" required placeholder="https://your-org.awsapps.com/start" autocomplete="off" spellcheck="false"></label>
+        <label>Region <input name="region" type="text" required placeholder="us-east-1" autocomplete="off" spellcheck="false"></label>
+        <button type="submit" data-i18n="kiro.sign_in">Sign in with AWS SSO</button>
+        <button type="button" data-area="kiro-check" data-i18n="kiro.check">Check status</button>
+      </form>
+      <div data-area="kiro-login"></div>
     </section>
     <section class="settings-section" aria-labelledby="folders-title">
       <h3 id="folders-title" data-i18n="settings.folders">Folders</h3>

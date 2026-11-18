@@ -103,3 +103,19 @@ button[type="submit"].quiet:hover:not(:disabled) { background: var(--secondary-h
 .official-item { display: grid; gap: 4px; padding: 8px 12px; border-radius: var(--radius); background: var(--panel-soft); }
 .official-item p { margin: 2px 0 0; }
 .official-item .badge { margin-left: 6px; }
+
+/* Usage: a card per SDK and a table per bot session. */
+.usage-cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); gap: 8px; margin-bottom: 10px; }
+.usage-card { display: grid; gap: 2px; padding: 10px 12px; border-radius: var(--radius-l, 12px); background: var(--panel-soft); border-left: 4px solid var(--border-strong); }
+.usage-card[data-sdk="claude"] { border-left-color: var(--accent); }
+.usage-card[data-sdk="openai"] { border-left-color: var(--fg); }
+.usage-card[data-sdk="kiro"] { border-left-color: var(--link); }
+.usage-money { font-size: 1.3em; font-weight: 700; }
+.usage-table { width: 100%; border-collapse: collapse; font-size: 0.85em; }
+.usage-table th, .usage-table td { text-align: left; padding: 6px 8px; border-bottom: 1px solid var(--border); white-space: nowrap; }
+.usage-table .mono { font-family: var(--font-mono); }
+.usage-bot > span { display: inline-flex; gap: 6px; align-items: center; }
+.kiro-form { display: flex; gap: 8px; flex-wrap: wrap; align-items: end; }
+.kiro-form label { display: grid; gap: 4px; flex: 1 1 200px; }
+[data-area="usage-report"] { overflow-x: auto; }
+dialog[data-area="settings-dialog"] { width: min(960px, calc(100vw - 32px)); }

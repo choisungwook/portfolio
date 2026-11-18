@@ -48,3 +48,4 @@ ALTER TABLE team_turns ADD COLUMN input_tokens INTEGER;
 ALTER TABLE team_turns ADD COLUMN output_tokens INTEGER;
 ALTER TABLE team_turns ADD COLUMN cache_read_tokens INTEGER;
 ALTER TABLE team_turns ADD COLUMN cache_write_tokens INTEGER;
+ALTER TABLE team_turns ADD COLUMN credits REAL;      -- Kiro bills in credits, not dollars

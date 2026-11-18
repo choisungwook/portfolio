@@ -8,9 +8,9 @@ export function recordUsage(db: Db, turnId: number, bot: string, result: TurnRes
   const agent = getAgent(db, bot)
   const u = result.usage
   db.prepare(`UPDATE team_turns SET sdk = ?, provider = ?, model = ?, input_tokens = ?, output_tokens = ?, cache_read_tokens = ?,
-    cache_write_tokens = ? WHERE id = ?`).run(agent?.sdk ?? null, agent?.sdk === 'openai' ? agent.provider ?? 'api' : null,
+    cache_write_tokens = ?, credits = ? WHERE id = ?`).run(agent?.sdk ?? null, agent?.sdk === 'openai' ? agent.provider ?? 'api' : null,
     result.model ?? agent?.model ?? null, u?.input_tokens ?? null, u?.output_tokens ?? null, u?.cache_read_tokens ?? null,
-    u?.cache_write_tokens ?? null, turnId)
+    u?.cache_write_tokens ?? null, u?.credits ?? null, turnId)
   if (result.context) {
     db.prepare('UPDATE team_agents SET context_tokens = ?, context_window = COALESCE(?, context_window) WHERE name = ?')
       .run(result.context.tokens, result.context.window, bot)
@@ -37,7 +37,7 @@ export interface UsageRow {
 
 const SUMS = `count(*) AS turns, coalesce(sum(input_tokens), 0) AS input_tokens, coalesce(sum(output_tokens), 0) AS output_tokens,
   coalesce(sum(cache_read_tokens), 0) AS cache_read_tokens, coalesce(sum(cache_write_tokens), 0) AS cache_write_tokens,
-  coalesce(sum(cost_usd), 0) AS cost_usd`
+  coalesce(sum(cost_usd), 0) AS cost_usd, sum(credits) AS credits`
 
 // Per SDK (and OpenAI provider), per bot session, and the one-off task runs (Claude) over a period.
 export function usageReport(db: Db, period: Period) {

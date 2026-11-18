@@ -7,6 +7,7 @@ import { startServer } from '../api/server.ts'
 import { createRetrospector } from '../memory/retrospect.ts'
 import { createTeamHub, type TeamHub } from '../team/hub.ts'
 import { createOpenAITeamBackend } from '../agents/openai/team.ts'
+import { createKiroTeamBackend } from '../agents/kiro/team.ts'
 import { createJobRunner } from '../jobs/runner.ts'
 import { JOB_HANDLERS } from '../jobs/handlers.ts'
 
@@ -45,5 +46,5 @@ function teamHub(config: Config, db: Db, agent: ReturnType<typeof agentFor>): Te
     return undefined
   }
   // OpenAI bots run on their own backend next to the Claude one; it needs OPENAI_API_KEY only when such a bot works.
-  return createTeamHub({ db, config, backend: agent.team, backends: { openai: createOpenAITeamBackend() } })
+  return createTeamHub({ db, config, backend: agent.team, backends: { openai: createOpenAITeamBackend(), kiro: createKiroTeamBackend() } })
 }

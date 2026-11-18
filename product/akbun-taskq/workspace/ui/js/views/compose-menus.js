@@ -5,6 +5,7 @@ import { api, mutate, notify } from '../core/api.js'
 import { area, clear, el } from '../core/dom.js'
 import { emit } from '../core/bus.js'
 import { t } from '../core/i18n.js'
+import { contextLabel, contextRing } from './context-ring.js'
 
 const MODE_LABEL = {
   auto: ['perm.auto', 'Auto'], acceptEdits: ['perm.acceptEdits', 'Accept edits'], default: ['perm.default', 'Ask (refuse)'],
@@ -68,6 +69,7 @@ function render(agent) {
       type: 'button', class: 'icon-button', title: t('compose.refresh', 'Reload skills and plugins, then the model and command lists'),
       'aria-label': t('compose.refresh', 'Reload skills and plugins, then the model and command lists'), text: '↻', onclick: refresh,
     }),
+    el('span', { class: 'compose-context', title: t('ctx.title', 'How full the context is after the last turn') }, contextRing(agent, 20), el('span', { text: contextLabel(agent) })),
     catalog?.commands?.length ? el('span', { class: 'meta', text: `/ ${catalog.commands.length} ${t('compose.commands', 'commands')}` }) : null,
     el('span', { class: 'compose-spacer' }),
     source ? el('span', { class: 'meta', title: catalog.error ?? '', text: source }) : null,

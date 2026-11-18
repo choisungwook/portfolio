@@ -116,3 +116,14 @@ mark.find.current { background: var(--accent); color: var(--on-accent); }
 .slash-list li { padding: 6px 10px; border-radius: 8px; cursor: pointer; display: flex; flex-wrap: wrap; gap: 4px 8px; align-items: baseline; }
 .slash-list li.active, .slash-list li:hover { background: var(--panel-soft); }
 .slash-desc { flex-basis: 100%; color: var(--muted); font-size: 0.85em; }
+
+/* Context ring: share of the model's context window the bot's last turn ended with. */
+.context-ring { flex: none; vertical-align: middle; }
+.context-ring circle { fill: none; stroke-width: 3; }
+.context-track { stroke: var(--border); }
+.context-bar { stroke: var(--accent); stroke-linecap: round; transition: stroke-dasharray var(--ease); }
+.context-ring[data-level="mid"] .context-bar { stroke: var(--needs-approval); }
+.context-ring[data-level="high"] .context-bar { stroke: var(--failed); }
+.context-ring[data-level="none"] .context-track { stroke-dasharray: 2 3; }
+.compose-context { display: inline-flex; align-items: center; gap: 4px; color: var(--muted); }
+.side-bot .context-ring { margin-left: 4px; }

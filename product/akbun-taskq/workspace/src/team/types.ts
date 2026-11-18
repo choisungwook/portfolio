@@ -1,5 +1,5 @@
 import type { Config } from '../config.ts'
-import type { TeamAgent } from '../db/team.ts'
+import type { BotSdk, TeamAgent } from '../db/team.ts'
 import type { TeamTool } from './tools.ts'
 import type { LiveInput } from './live-input.ts'
 import type { McpServerEntry } from '../db/mcp-registry.ts'
@@ -43,6 +43,7 @@ export interface TokenUsage {
   output_tokens: number
   cache_read_tokens?: number
   cache_write_tokens?: number
+  credits?: number          // Kiro: credits used, when kiro-cli reports them
 }
 
 export interface CatalogRequest {
@@ -58,7 +59,7 @@ export interface Catalog {
 }
 
 export interface TeamBackend {
-  sdk?: 'claude' | 'openai'   // which SDK the backend runs; a bot whose sdk differs is not started by it
+  sdk?: BotSdk                // which SDK the backend runs; a bot whose sdk differs is not started by it
   runTurn(config: Config, request: TurnRequest): Promise<TurnResult>
   supportsLiveInput?: boolean   // can take messages into a running turn (Claude streaming input); otherwise they wait
   catalog?(config: Config, request: CatalogRequest): Promise<Catalog>
