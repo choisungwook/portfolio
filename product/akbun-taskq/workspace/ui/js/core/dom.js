@@ -28,6 +28,12 @@ export function clear(node) {
   return node
 }
 
+// Replaces a node's children, skipping null, undefined and false the way el() does.
+export function fill(node, ...children) {
+  node.replaceChildren(...children.flat().filter((child) => child !== null && child !== undefined && child !== false))
+  return node
+}
+
 export function area(name, root = document) {
   const node = root.querySelector(`[data-area="${name}"]`)
   if (!node) throw new Error(`missing data-area ${name}`)

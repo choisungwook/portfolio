@@ -2,7 +2,7 @@
 // worktree, a repository or a folder), the branch, the changed files with their diffs, the pull request or compare
 // link, and buttons to open the folder in VS Code or the file manager.
 import { api, mutate, notify } from '../core/api.js'
-import { clear, el } from '../core/dom.js'
+import { el, fill } from '../core/dom.js'
 import { t } from '../core/i18n.js'
 
 const STATUS_MARK = { added: 'A', modified: 'M', deleted: 'D', untracked: 'U', renamed: 'R' }
@@ -20,7 +20,7 @@ async function load(task, aside, onChange) {
   try {
     ws = await api.get(`/tasks/${task.id}/workspace`)
   } catch (error) {
-    clear(aside).append(el('h3', { text: t('ws.title', 'Workspace') }), el('p', { class: 'error', text: error.message }))
+    fill(aside, el('h3', { text: t('ws.title', 'Workspace') }), el('p', { class: 'error', text: error.message }))
     return
   }
   const copy = (text) => navigator.clipboard?.writeText(text).then(() => notify(t('ws.copied', 'Copied')))
@@ -32,7 +32,7 @@ async function load(task, aside, onChange) {
       onclick: async () => {
         try {
           const text = await api.text(`/tasks/${task.id}/workspace/diff?file=${encodeURIComponent(file.path)}`)
-          clear(diff).append(...text.split('\n').map((line) => el('span', {
+          fill(diff, ...text.split('\n').map((line) => el('span', {
             class: line.startsWith('+') && !line.startsWith('+++') ? 'add' : line.startsWith('-') && !line.startsWith('---') ? 'del' : line.startsWith('@@') ? 'hunk' : '',
             text: `${line}\n`,
           })))
@@ -46,7 +46,7 @@ async function load(task, aside, onChange) {
     el('span', { class: 'ws-mark', dataset: { status: file.status }, text: STATUS_MARK[file.status] ?? '?' }),
     el('span', { class: 'ws-path', text: file.path }),
     file.additions === null ? null : el('span', { class: 'ws-count' }, el('span', { class: 'add', text: `+${file.additions}` }), ' ', el('span', { class: 'del', text: `-${file.deletions}` })))))
-  clear(aside).append(
+  fill(aside, 
     el('h3', { text: t('ws.title', 'Workspace') }),
     el('p', {}, el('span', { class: 'badge', text: kindText }), ws.removed ? el('span', { class: 'badge', text: t('ws.removed', 'removed') }) : null),
     el('dl', { class: 'facts ws-facts' },

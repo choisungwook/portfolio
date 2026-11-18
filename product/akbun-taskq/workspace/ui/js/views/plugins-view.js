@@ -2,7 +2,7 @@
 // official marketplace listed for reference. Which bots use an entry is shown next to it, so removing one is not a
 // surprise.
 import { api, mutate, notify } from '../core/api.js'
-import { area, clear, el } from '../core/dom.js'
+import { area, clear, el, fill } from '../core/dom.js'
 import { on } from '../core/bus.js'
 import { t } from '../core/i18n.js'
 
@@ -63,10 +63,10 @@ async function load() {
 function renderRegistry(kind, entries, users) {
   const list = area(`registry-${kind}`)
   if (entries.length === 0) {
-    clear(list).append(el('li', { class: 'meta', text: `No ${kind}s registered.` }))
+    fill(list, el('li', { class: 'meta', text: `No ${kind}s registered.` }))
     return
   }
-  clear(list).append(...entries.map((entry) => {
+  fill(list, ...entries.map((entry) => {
     const usedBy = users(kind, entry.name)
     return el('li', { class: 'skill-row' },
       el('div', {},
@@ -123,10 +123,10 @@ function showSdk(sdk) {
 function renderMcp(entries, users) {
   const list = area('registry-mcp')
   if (entries.length === 0) {
-    clear(list).append(el('li', { class: 'meta', text: 'No MCP servers registered.' }))
+    fill(list, el('li', { class: 'meta', text: 'No MCP servers registered.' }))
     return
   }
-  clear(list).append(...entries.map((entry) => {
+  fill(list, ...entries.map((entry) => {
     const usedBy = users('mcp', entry.name)
     return el('li', { class: 'skill-row' },
       el('div', {},

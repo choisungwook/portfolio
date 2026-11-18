@@ -2,7 +2,7 @@
 // progress, with Cancel while it runs and Resume (from the last step) after a cancel or a failure. A finished export
 // links its zip in the shared folder.
 import { api, mutate, notify } from '../core/api.js'
-import { area, clear, el } from '../core/dom.js'
+import { area, el, fill } from '../core/dom.js'
 import { on } from '../core/bus.js'
 import { t } from '../core/i18n.js'
 import { fmtDateTime } from '../core/time.js'
@@ -80,7 +80,7 @@ async function refresh() {
   } catch {
     return
   }
-  clear(box).append(...jobs.map(row))
+  fill(box, ...jobs.map(row))
 }
 
 function row(job) {

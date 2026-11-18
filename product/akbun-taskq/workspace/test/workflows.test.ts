@@ -41,6 +41,8 @@ describe('workflows', () => {
     assert.match((parseDefinition({ steps: [step('a', [], { kind: 'handoff' })] }) as { error: string }).error, /names the bot/)
     assert.match((parseDefinition({ steps: [] }) as { error: string }).error, /at least one/)
     assert.equal(parseDefinition(RELEASE).ok, true)
+    const placed = parseDefinition({ steps: [{ ...step('a', []), position: { x: 10.4, y: 'x' } }, { ...step('b', ['a']), position: { x: 300, y: 40 } }] })
+    assert.deepEqual(placed.ok && placed.value.steps.map((s) => s.position), [undefined, { x: 300, y: 40 }], 'the editor\'s node positions are kept; a bad one is dropped')
   })
 
   test('[critical] a task with a workflow is done only when taskq says the run succeeded', async () => {
