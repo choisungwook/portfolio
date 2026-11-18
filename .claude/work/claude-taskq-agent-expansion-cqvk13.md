@@ -12,7 +12,7 @@
 - [x] 5. finish.ts: assignee 작업 결과를 mailbox로 전달
 - [x] 6. CLI(team), API(/api/team), run.ts 연결
 - [x] 7. 테스트
-- [ ] 8. wiki, knowledge decision, CHANGELOG, manual, 버전 0.9.0
+- [x] 8. wiki, knowledge decision, CHANGELOG, manual, 버전 0.9.0
 - [ ] 9. akbun-persona 리뷰 모드로 서브에이전트 비판 → 수정
 
 ## 다음 세션이 알아야 할 것
