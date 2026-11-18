@@ -4,6 +4,7 @@ export type Outcome = 'done' | 'failed' | 'needs_approval' | 'needs_auth' | 'rev
 export type Severity = 'critical' | 'high' | 'normal'
 export type AlertKind = 'approval_required' | 'security_finding' | 'prod_touch' | 'worker_flag'
   | 'auth_required' | 'failed' | 'stale_repeat' | 'budget_exceeded' | 'review_ready' | 'proposal_pending' | 'handoff_received'
+  | 'team_message' | 'team_paused'
 export type EventKind = 'claimed' | 'tool_call' | 'tool_result' | 'permission_request' | 'approved' | 'denied'
   | 'auth_required' | 'progress' | 'error' | 'finished' | 'cancel_requested' | 'tamper_blocked'
   | 'run_requested' | 'handoff_received' | 'handoff_accepted'
@@ -17,6 +18,7 @@ export interface TaskData {
   repo?: string              // cwd for code tasks
   output_path?: string       // under outputs/
   auto_accept_handoffs?: boolean
+  assignee?: string          // team agent that asked for this task; its result is posted to that agent's inbox
   review_of?: string         // security_review: id of the code task
   base_commit?: string       // code: HEAD before the run
   max_turns?: number

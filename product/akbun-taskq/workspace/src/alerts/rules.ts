@@ -18,6 +18,8 @@ export const SEVERITY: Record<AlertKind, Severity> = {
   review_ready: 'normal',
   proposal_pending: 'normal',
   handoff_received: 'normal',
+  team_message: 'normal',
+  team_paused: 'high',
 }
 
 // The notification is shown outside the database, so it gets the masked message too. notify is injectable for tests.

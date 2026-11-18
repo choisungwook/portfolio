@@ -42,3 +42,5 @@ export function createWakeSignal(): WakeSignal {
 // The runner waits on it. eventWritten: a row reached the events table. Approval waits and the SSE stream wait on it.
 export const queueChanged = createWakeSignal()
 export const eventWritten = createWakeSignal()
+// teamChanged: an agent may now have mail (a message was posted, a turn ended). The team hub waits on it.
+export const teamChanged = createWakeSignal()

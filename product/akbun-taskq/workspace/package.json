@@ -22,7 +22,8 @@
     "@anthropic-ai/claude-agent-sdk": "^0.3.325",
     "@hono/node-server": "^1.19.0",
     "@modelcontextprotocol/sdk": "^1.32.2",
-    "hono": "^4.10.0"
+    "hono": "^4.10.0",
+    "zod": "^4.0.0"
   },
   "devDependencies": {
     "@types/node": "^24.10.0",

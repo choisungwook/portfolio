@@ -23,6 +23,7 @@ const WORDS = {
   approval_required: 'Approval needed', security_finding: 'Security finding', prod_touch: 'Production error',
   worker_flag: 'Flagged by the agent', auth_required: 'Login needed', stale_repeat: 'Interrupted repeatedly',
   budget_exceeded: 'Budget exceeded', review_ready: 'Ready to review', proposal_pending: 'Proposal waiting',
+  team_message: 'Message from the team', team_paused: 'Team paused',
   blocks: 'Blocks', discovered_from: 'Found while working on', memory: 'Memory note', skill: 'Skill note',
   pending: 'Waiting', applied: 'Applied', rejected: 'Rejected',
 }

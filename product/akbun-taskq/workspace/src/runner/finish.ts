@@ -8,6 +8,7 @@ import { getTask, insertTask, moveStatus, releaseTask } from '../db/tasks.ts'
 import { pauseQueue } from '../db/meta.ts'
 import { raiseAlert } from '../alerts/rules.ts'
 import { nowSec } from '../time.ts'
+import { reportToAssignee, reviewAssignee } from '../team/report.ts'
 
 const REVIEW_TYPES = new Set(['research', 'security_review'])
 
@@ -83,6 +84,7 @@ export function finishRun(db: Db, config: Config, task: Task, runId: string, run
         data: {
           intent: `Review the changes made by ${task.id} since base_commit`,
           review_of: task.id, repo: task.data.repo, base_commit: task.data.base_commit,
+          assignee: reviewAssignee(db, task),
         },
         deps: [{ depends_on: task.id, kind: 'discovered_from' }],
       })
@@ -95,6 +97,7 @@ export function finishRun(db: Db, config: Config, task: Task, runId: string, run
         raiseAlert(db, { task_id: original.id, run_id: runId, kind: 'security_finding', message: `Security review: ${result.summary}` })
       }
     }
+    reportToAssignee(db, task, runId, result, plan.status)
     return true
   })
 }

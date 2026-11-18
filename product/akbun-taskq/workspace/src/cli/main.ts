@@ -9,6 +9,7 @@ import { runCommand } from './run.ts'
 import { skills } from './skills.ts'
 import * as operator from './operator.ts'
 import { handoff, handoffs } from './handoffs.ts'
+import { team } from './team.ts'
 import type { Command } from './types.ts'
 
 const COMMANDS: Record<string, Command> = {
@@ -29,6 +30,7 @@ const COMMANDS: Record<string, Command> = {
   retry: operator.retry,
   handoff,
   handoffs,
+  team,
 }
 
 const USAGE = `usage: taskq <command> [options]
@@ -39,7 +41,8 @@ const USAGE = `usage: taskq <command> [options]
   alerts               log [--date YYYY-MM-DD]    search QUERY    run    version
   skills list | add PATH | remove NAME | discover
   handoffs [--task TASK]    handoff accept ID    handoff mode TASK [auto|manual]    mcp
-  pause [--reason TEXT]    unpause    cancel ID    retry ID [--draft] [--resume]`
+  pause [--reason TEXT]    unpause    cancel ID    retry ID [--draft] [--resume]
+  team list | say [--to NAME] TEXT | inbox | log | turns | wiki [SLUG] | pause | resume | enable | disable | reset`
 
 export async function main(argv: string[]): Promise<void> {
   const [name, ...args] = argv

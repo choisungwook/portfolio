@@ -138,3 +138,14 @@ function gitReadOnly(command: string, repo: string | undefined): boolean {
   if (sub !== 'log' && !(args.includes('--no-ext-diff') && args.includes('--no-textconv'))) return false
   return true
 }
+
+// A resident team agent has Read, Glob and Grep only, confined to its own folder and the read roots. The same path
+// resolution and sensitive-path checks as task sessions apply.
+export function decideTeamRead(tool: string, input: Input, ctx: { cwd: string; roots: string[]; dataDir: string }): Decision {
+  if (!READ.has(tool)) return 'deny'
+  const gate: GateContext = { cwd: ctx.cwd, outputs: ctx.cwd, dataDir: ctx.dataDir }
+  if (tamperOf(tool, input, gate) !== null) return 'deny'
+  const touches = touchesOf(tool, input, gate)
+  if (touches.some((touch) => blocked(touch.real, false, { dataDir: realPath(ctx.dataDir) }))) return 'deny'
+  return inside(touches, [ctx.cwd, ...ctx.roots].map((root) => realPath(root))) ? 'allow' : 'deny'
+}

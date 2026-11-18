@@ -11,6 +11,20 @@ export interface SandboxConfig {
   allowWrite: string[]
 }
 
+// The resident agent team. Off by default: every turn is a paid model call that nobody asked for directly.
+export interface TeamConfig {
+  enabled: boolean
+  maxConcurrentTurns: number   // agent turns running at once, separate from maxConcurrent for tasks
+  turnMaxTurns: number         // model turns inside one agent turn
+  turnBudgetUsd: number        // cost limit of one agent turn
+  dailyBudgetUsd: number       // all agent turns since local midnight; the team pauses when it is spent
+  hourlyTurnsPerAgent: number  // stops two agents from messaging each other in a loop
+  maxOpenTasks: number         // tasks created by agents that are not done or failed
+  maxAttempts: number          // a message whose turn failed this many times is set aside
+  readRoots: string[]          // absolute directories agents may Read besides their own folder and outputs/
+  personaSkill?: string        // absolute path of a skill folder that speaks for the user when a choice is the user's
+}
+
 export interface Config {
   home: string                 // TASKQ_HOME: holds taskq.config.json, data/, outputs/, memory/
   agent: AgentName             // which agent SDK runs the tasks
@@ -32,6 +46,7 @@ export interface Config {
   trustedRepos: string[]       // absolute paths; a code task in one of these may load that repository's own Claude settings
   skillsDir?: string
   retrospect: boolean
+  team: TeamConfig
 }
 
 export const DEFAULTS: Omit<Config, 'home'> = {
@@ -51,13 +66,21 @@ export const DEFAULTS: Omit<Config, 'home'> = {
   prodLockKeys: [],
   trustedRepos: [],
   retrospect: true,
+  team: {
+    enabled: false, maxConcurrentTurns: 2, turnMaxTurns: 30, turnBudgetUsd: 1, dailyBudgetUsd: 10,
+    hourlyTurnsPerAgent: 20, maxOpenTasks: 10, maxAttempts: 3, readRoots: [],
+  },
 }
 
 // Kept here rather than read from the registry: the registry imports every backend, and config must load without them.
 const AGENTS: AgentName[] = ['claude']
 
 export function resolveConfig(home: string, overrides: Partial<Config> = {}): Config {
-  return { ...DEFAULTS, home, ...overrides, sandbox: { ...DEFAULTS.sandbox, ...overrides.sandbox } }
+  return {
+    ...DEFAULTS, home, ...overrides,
+    sandbox: { ...DEFAULTS.sandbox, ...overrides.sandbox },
+    team: { ...DEFAULTS.team, ...overrides.team },
+  }
 }
 
 export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
@@ -72,5 +95,10 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
   if (config.trustedRepos.some((repo) => !isAbsolute(repo))) throw new Error('trustedRepos must be absolute paths')
   if (config.caBundle !== undefined && !isAbsolute(config.caBundle)) throw new Error('caBundle must be an absolute path')
   if (config.caBundle !== undefined && !existsSync(config.caBundle)) throw new Error(`caBundle ${config.caBundle} does not exist`)
+  const team = config.team
+  if (team.readRoots.some((root) => !isAbsolute(root))) throw new Error('team.readRoots must be absolute paths')
+  if (team.personaSkill !== undefined && !(isAbsolute(team.personaSkill) && existsSync(join(team.personaSkill, 'SKILL.md')))) {
+    throw new Error('team.personaSkill must be an absolute path to a folder with SKILL.md')
+  }
   return config
 }
