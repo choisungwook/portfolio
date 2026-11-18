@@ -8,6 +8,7 @@ import { statusIndicator } from '../core/status.js'
 import { runNowButton } from '../core/run-now.js'
 import { approvalPanel } from './approval-panel.js'
 import { ownerValue } from './owner-picker.js'
+import { workflowValue } from './task-workflow.js'
 import { download } from './bot-chat.js'
 import { operatorControls } from './operator-controls.js'
 
@@ -20,6 +21,7 @@ export function initTaskDetail() {
   dialog = area('task-detail')
   body = area('task-body')
   dialog.querySelector('[data-close]').addEventListener('click', () => dialog.close())
+  on('open-workflow-run', () => dialog.close())
   on('open-task', openTask)
   // The Review button on an approval alert or in the must-check list: open the task at its approval panel.
   on('review-approval', (id) => {
@@ -78,6 +80,9 @@ function sections(task, events, graph, titles, settings) {
       el('dt', { text: 'Session' }), el('dd', { text: task.session_id ?? 'none' }),
       el('dt', { text: 'Access skill' }), el('dd', {}, accessSkillValue(data, settings)),
       el('dt', { text: 'Owner' }), ownerValue(task, () => {
+        if (dialog.open && currentId === task.id) fill(task.id)
+      }),
+      el('dt', { text: 'Workflow' }), workflowValue(task, () => {
         if (dialog.open && currentId === task.id) fill(task.id)
       }),
     ),

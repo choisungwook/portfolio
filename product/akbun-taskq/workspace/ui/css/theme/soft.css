@@ -117,6 +117,7 @@
 
 @media (prefers-color-scheme: light) {
   :root:not([data-theme="dark"]) {
+    color-scheme: light;
     --bg: #f6f5f2;
     --panel: #ffffff;
     --panel-soft: #f0efeb;

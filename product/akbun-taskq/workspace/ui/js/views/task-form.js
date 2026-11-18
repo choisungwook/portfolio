@@ -8,7 +8,7 @@ import { autosize } from '../core/autosize.js'
 import { attachments } from '../core/attach.js'
 import { emit, on } from '../core/bus.js'
 
-const TEXT_FIELDS = ['title', 'intent', 'cautions', 'lock_key', 'access_skill', 'target_profile', 'repo', 'output_path']
+const TEXT_FIELDS = ['title', 'intent', 'cautions', 'lock_key', 'access_skill', 'target_profile', 'repo', 'output_path', 'workflow_id']
 
 let dialog
 let form
@@ -36,6 +36,7 @@ export function initTaskForm() {
     error.textContent = ''
     dialog.showModal()
     loadSkillOptions()
+    loadBotOptions()
   })
   dialog.querySelector('[data-close]').addEventListener('click', () => dialog.close())
   form.addEventListener('submit', submit)
@@ -43,8 +44,26 @@ export function initTaskForm() {
   files = attachments({ zone: area('task-attach-zone'), button: area('task-attach'), chips: area('task-attachments'), pasteTarget: form })
   form.addEventListener('change', (event) => {
     if (event.target.name === 'kind') showKind()
+    if (event.target.name === 'workflow_id' || event.target.name === 'owner') showWorkflowHint()
   })
   on('settings-closed', loadSkillOptions)
+}
+
+// Bots that can own the task and the workflows it can follow. A workflow without a bot would never run.
+async function loadBotOptions() {
+  try {
+    const [bots, workflows] = await Promise.all([api.get('/bots'), api.get('/workflows')])
+    form.elements.owner.replaceChildren(el('option', { value: '', text: 'none (the queue runs it)' }),
+      ...bots.agents.filter((a) => a.enabled).map((a) => el('option', { value: a.name, text: a.name })))
+    form.elements.workflow_id.replaceChildren(el('option', { value: '', text: 'none' }), ...workflows.map((w) => el('option', { value: w.id, text: w.name })))
+  } catch {
+    // Without the lists the task is still added; owner and workflow can be set in its detail.
+  }
+  showWorkflowHint()
+}
+
+function showWorkflowHint() {
+  area('task-workflow-hint').hidden = !(form.elements.workflow_id.value && !form.elements.owner.value)
 }
 
 // The access skill list comes from the registry. A name that is no longer registered falls back to none.
@@ -91,11 +110,13 @@ async function submit(event) {
   event.preventDefault()
   error.textContent = ''
   const payload = body()
+  const owner = form.elements.owner.value
   const created = await mutate(() => api.post('/tasks', payload), 'Task added')
   if (!created) {
     error.textContent = 'The task was not added. See the message at the top.'
     return
   }
+  if (owner) await mutate(() => api.post(`/bots/tasks/${created.id}/owner`, { owner }))
   files.clear()
   dialog.close()
   emit('open-task', created.id)

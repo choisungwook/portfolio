@@ -20,6 +20,7 @@ import { initNav } from './core/nav.js'
 import { initSearchView } from './views/search-view.js'
 import { initSharedFolder } from './views/shared-folder.js'
 import { initPluginsView } from './views/plugins-view.js'
+import { initWorkflowsView } from './views/workflows-view.js'
 import { initGlobalSettings, loadGlobalSettings } from './views/global-settings.js'
 import { initTokenNotice } from './views/token-notice.js'
 
@@ -43,6 +44,7 @@ initSharedViews()
 initSearchView()
 initSharedFolder()
 initPluginsView()
+initWorkflowsView()
 initNav()
 if (hasToken) {
   loadGlobalSettings()

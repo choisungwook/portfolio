@@ -12,6 +12,7 @@
 <link rel="stylesheet" href="css/panels.css">
 <link rel="stylesheet" href="css/nav.css">
 <link rel="stylesheet" href="css/chat.css">
+<link rel="stylesheet" href="css/workflows.css">
 <link rel="stylesheet" href="css/settings.css">
 </head>
 <body>
@@ -265,6 +266,9 @@
           <div class="attach-chips" data-area="task-attachments" hidden></div>
         </div>
         <label class="wide" data-area="task-skill-field">Access skill <select name="access_skill"><option value="">none</option></select></label>
+        <label>Bot <select name="owner" data-area="task-owner-select"><option value="">none (the queue runs it)</option></select></label>
+        <label>Workflow <select name="workflow_id" data-area="task-workflow-select"><option value="">none</option></select></label>
+        <p class="meta wide" data-area="task-workflow-hint" hidden>Only a bot runs workflows: pick the bot that runs it.</p>
         <label class="check wide"><input name="draft" type="checkbox" checked> Save as draft</label>
         <details class="wide more" data-area="task-more">
           <summary>More options</summary>
