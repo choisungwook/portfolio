@@ -115,15 +115,33 @@ describe('openai team backend', () => {
     }
     const bedrock = { ...request, agent: { ...request.agent, provider: 'bedrock' as const } }
     const first = await createOpenAITeamBackend(run).runTurn(env.config, { ...bedrock, resume: null })
-    assert.equal(first.session_id, 'local:coder')
+    assert.match(first.session_id ?? '', /^local:coder:\d+$/, 'a new session id for each session')
     assert.deepEqual(first.context, { tokens: 900, window: 128_000 })
     assert.equal(seen[0].provider, 'bedrock')
     assert.equal(seen[0].model, 'openai.gpt-oss-120b-1:0')
     assert.equal(seen[0].previousResponseId, undefined)
-    await createOpenAITeamBackend(run).runTurn(env.config, { ...bedrock, resume: 'local:coder', prompt: 'second' })
+    const second = await createOpenAITeamBackend(run).runTurn(env.config, { ...bedrock, resume: first.session_id ?? null, prompt: 'second' })
     assert.equal(seen[1].history?.length, 2, 'the second turn carries the first')
+    assert.equal(second.session_id, first.session_id)
     await createOpenAITeamBackend(run).runTurn(env.config, { ...bedrock, resume: null, prompt: 'after reset' })
     assert.deepEqual(seen[2].history, [])
+    await createOpenAITeamBackend(run).runTurn(env.config, { ...bedrock, resume: 'resp_from_the_api_key_provider', prompt: 'switched' })
+    assert.deepEqual(seen[3].history, [], 'a session of another provider is not loaded as history')
+  })
+
+  test('a Bedrock turn longer than the history limit keeps itself whole from its user message', async () => {
+    const long = [{ role: 'user', content: 'old' }, { role: 'assistant', content: 'a' },
+      { role: 'user', content: 'task' }, ...Array.from({ length: 250 }, (_, i) => ({ type: 'function_call_result', callId: String(i) }))]
+    const seen: OpenAIRunArgs[] = []
+    const run: OpenAIRunFn = async (args) => {
+      seen.push(args)
+      return { inputTokens: 1, outputTokens: 1, requests: 1, history: seen.length === 1 ? long : [...(args.history ?? [])] }
+    }
+    const bedrock = { ...request, agent: { ...request.agent, provider: 'bedrock' as const } }
+    const first = await createOpenAITeamBackend(run).runTurn(env.config, { ...bedrock, resume: null })
+    await createOpenAITeamBackend(run).runTurn(env.config, { ...bedrock, resume: first.session_id ?? null })
+    assert.equal(seen[1].history?.length, 251)
+    assert.deepEqual(seen[1].history?.[0], { role: 'user', content: 'task' })
   })
 
   test('[critical] a ChatGPT-plan bot runs codex exec with its sandbox, team tools over MCP, and resumes its thread', async () => {
@@ -135,7 +153,7 @@ describe('openai team backend', () => {
       yield JSON.stringify({ type: 'turn.completed', usage: { input_tokens: 5000, cached_input_tokens: 4000, output_tokens: 300 } })
     }
     const agent = { ...request.agent, provider: 'chatgpt' as const, permission_mode: 'acceptEdits' as const, effort: 'high' as const }
-    const result = await createOpenAITeamBackend(undefined, fetch, codex).runTurn(env.config, { ...request, agent, resume: 'th-0' })
+    const result = await createOpenAITeamBackend(undefined, fetch, codex).runTurn(env.config, { ...request, agent, resume: 'th-0', turnId: 42 })
     assert.equal(result.outcome, 'done')
     assert.equal(result.session_id, 'th-1')
     assert.equal(result.cost_usd, 0, 'the plan has no per-turn price')
@@ -148,11 +166,23 @@ describe('openai team backend', () => {
     assert.ok(args.join(' ').includes(`mcp_servers.taskq.args=`) && args.join(' ').includes('"--bot", "coder"'))
     assert.ok(args.includes('approval_policy="never"') && args.includes('model_reasoning_effort="high"'))
     assert.deepEqual(args.slice(-2), ['resume', 'th-0'])
+    assert.ok(args.includes('mcp_servers.taskq.env.TASKQ_TURN_ID="42"'), 'team tool writes count for the turn')
+    assert.equal(result.context, undefined, 'turn.completed sums every call, so the context size is unknown')
     const failing: CodexSpawn = async function* () {
       yield* failWith('spawn codex ENOENT')
     }
     const missing = await createOpenAITeamBackend(undefined, fetch, failing).runTurn(env.config, { ...request, agent })
     assert.match(missing.error ?? '', /Codex CLI was not found/)
+    assert.equal(missing.cost_usd, 0, 'a failed plan turn is not charged the turn budget')
+    const offline: CodexSpawn = async function* () {
+      yield* failWith('codex exited with code 1: stream error: could not reach the login server; retrying')
+    }
+    assert.notEqual((await createOpenAITeamBackend(undefined, fetch, offline).runTurn(env.config, { ...request, agent })).auth_failed, true,
+      'a message that only mentions login is not a lost login')
+    const signedOut: CodexSpawn = async function* () {
+      yield* failWith('codex exited with code 1: Not logged in. Please run `codex login`')
+    }
+    assert.equal((await createOpenAITeamBackend(undefined, fetch, signedOut).runTurn(env.config, { ...request, agent })).auth_failed, true)
   })
 
   test('errors: no key, a rejected key, and a lost conversation', async () => {

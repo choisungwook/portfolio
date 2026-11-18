@@ -101,6 +101,9 @@ export function createAgent(db: Db, name: string, settings: BotSettings, system 
 }
 
 export function updateAgent(db: Db, name: string, settings: BotSettings): boolean {
+  // A session of one runtime cannot be resumed by another: a new SDK or OpenAI provider starts a new session.
+  db.prepare(`UPDATE team_agents SET session_id = NULL, session_cost_usd = 0, context_tokens = NULL, context_window = NULL
+    WHERE name = ? AND (sdk IS NOT ? OR coalesce(provider, 'api') IS NOT coalesce(?, 'api'))`).run(name, settings.sdk, settings.provider ?? null)
   return db.prepare(`UPDATE team_agents SET role = ?, description = ?, instructions = ?, may_message_user = ?, enabled = ?,
     permission_mode = ?, sandbox = ?, allowed_domains = ?, blocked_commands = ?, workdir = ?, skills = ?, plugins = ?, model = ?,
     sdk = ?, hourly_turns = ?, turn_budget_usd = ?, turn_max_turns = ?, effort = ?, mcp_servers = ?, provider = ?
@@ -142,6 +145,11 @@ export function getAgent(db: Db, name: string): TeamAgent | undefined {
 
 export function setAgentSession(db: Db, name: string, sessionId: string | null): void {
   db.prepare('UPDATE team_agents SET session_id = ? WHERE name = ?').run(sessionId, name)
+}
+
+// The user's reset: the next turn starts a new session with an empty context.
+export function resetAgentSession(db: Db, name: string): void {
+  db.prepare('UPDATE team_agents SET session_id = NULL, session_cost_usd = 0, context_tokens = NULL WHERE name = ?').run(name)
 }
 
 // Used when a turn ends: the session is replaced only if nobody reset it while the turn ran.
@@ -199,10 +207,12 @@ export function startTurn(db: Db, agent: string, limit: number): { turn: TeamTur
     const messages = db.prepare(`SELECT * FROM team_messages m WHERE recipient = ? AND ${DELIVERABLE}
       ORDER BY id LIMIT ?`).all(agent, nowSec(), limit) as unknown as TeamMessage[]
     if (messages.length === 0) return undefined
-    const session = getAgent(db, agent)?.session_id ?? null
     const now = nowSec()
-    const id = Number(db.prepare('INSERT INTO team_turns (agent, session_id, started_at) VALUES (?, ?, ?)')
-      .run(agent, session, now).lastInsertRowid)
+    const bot = getAgent(db, agent)
+    const session = bot?.session_id ?? null
+    // The runtime is recorded when the turn starts: a settings change mid-turn must not move it to another SDK in Usage.
+    const id = Number(db.prepare('INSERT INTO team_turns (agent, session_id, started_at, sdk, provider) VALUES (?, ?, ?, ?, ?)')
+      .run(agent, session, now, bot?.sdk ?? null, bot?.sdk === 'openai' ? bot.provider ?? 'api' : null).lastInsertRowid)
     const mark = db.prepare('UPDATE team_messages SET read_at = ?, turn_id = ?, attempts = attempts + 1 WHERE id = ?')
     for (const message of messages) mark.run(now, id, message.id)
     const turn: TeamTurn = {

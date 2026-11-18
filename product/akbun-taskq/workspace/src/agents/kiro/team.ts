@@ -16,19 +16,27 @@ import type { Catalog, TeamBackend, TurnRequest, TurnResult } from '../../team/t
 //   trusts all calls. Tools outside the trust list are refused, since a headless run cannot ask. The sandbox setting
 //   adds --sandbox. taskq's gate does not see Kiro's own tool calls: Kiro's permissions and sandbox are the boundary.
 // - Session: Kiro keys sessions by folder, so the bot's own folder holds only its sessions; a later turn resumes with
-//   --resume-id when the output named the session, else --resume (the newest one there).
+//   --resume-id when the output named the session, else --resume (the newest one there). The prompt goes in on stdin.
 // - Usage: read from the stream-json records when they carry tokens or credits; the record format is not documented,
 //   so the parser takes the fields it recognises and leaves the rest.
 
-export type KiroSpawn = (command: string, args: string[], cwd: string, env: NodeJS.ProcessEnv, signal: AbortSignal) => AsyncIterable<string>
+// The prompt goes in on stdin, not argv: a long batch of messages would pass the OS limit on argument length.
+export type KiroSpawn = (command: string, args: string[], input: string, cwd: string, env: NodeJS.ProcessEnv, signal: AbortSignal) => AsyncIterable<string>
 
-const LATEST = 'kiro:latest'
+// A session id taskq makes up when Kiro's output names none: `kiro:<ms>`, one per session so Usage groups its turns. A
+// later turn with such an id resumes the newest session in the bot's folder.
+const LOCAL = 'kiro:'
+// What kiro-cli prints when it has no login (or the login expired). Narrow on purpose: an auth failure turns the bot off.
+const KIRO_SIGNED_OUT = /not logged in|kiro-cli login|login (is )?required|session (has )?expired|token (has )?expired|unauthori[sz]ed/i
 
 export function agentFile(config: Config, request: TurnRequest): { dir: string; name: string; body: Record<string, unknown> } {
   const agent = request.agent
   const self = selfCommand()
   const servers: Record<string, unknown> = {
-    taskq: { command: self.command, args: [...self.args, 'mcp', '--bot', agent.name], env: { TASKQ_HOME: config.home } },
+    taskq: {
+      command: self.command, args: [...self.args, 'mcp', '--bot', agent.name],
+      env: { TASKQ_HOME: config.home, ...(request.turnId === undefined ? {} : { TASKQ_TURN_ID: String(request.turnId) }) },
+    },
   }
   for (const s of request.mcpServers ?? []) servers[s.name] = { command: s.command, args: s.args }
   const mcp = Object.keys(servers).map((n) => `@${n}`)
@@ -51,23 +59,24 @@ export function kiroArgs(request: TurnRequest, name: string): string[] {
   const args = ['chat', '--v3', '--no-interactive', '--output-format', 'stream-json', '--agent', name]
   if (agent.model && agent.model !== 'auto') args.push('--model', agent.model)
   if (agent.effort) args.push('--effort', agent.effort)
-  if (request.resume === LATEST) args.push('--resume')
+  if (request.resume?.startsWith(LOCAL)) args.push('--resume')
   else if (request.resume) args.push('--resume-id', request.resume)
   if (agent.permission_mode === 'bypassPermissions') args.push('--trust-all-tools')
   else args.push(`--trust-tools=${agent.permission_mode === 'acceptEdits' ? '@builtin,@mcp' : 'read*,grep*,glob*,list*,@mcp'}`)
   if (agent.sandbox) args.push('--sandbox')
-  args.push(request.prompt)
   return args
 }
 
-export const spawnKiro: KiroSpawn = async function* (command, args, cwd, env, signal) {
-  const child = spawn(command, args, { cwd, env, signal, stdio: ['ignore', 'pipe', 'pipe'] })
+export const spawnKiro: KiroSpawn = async function* (command, args, input, cwd, env, signal) {
+  const child = spawn(command, args, { cwd, env, signal, stdio: ['pipe', 'pipe', 'pipe'] })
   const stderr: Buffer[] = []
   child.stderr.on('data', (chunk: Buffer) => stderr.push(chunk))
   const exit = new Promise<{ code: number | null; error?: Error }>((resolve) => {
     child.once('error', (error) => resolve({ code: null, error }))
     child.once('exit', (code) => resolve({ code }))
   })
+  child.stdin.on('error', () => {})
+  child.stdin.end(input)
   const lines = createInterface({ input: child.stdout, crlfDelay: Infinity })
   try {
     for await (const line of lines) yield line
@@ -128,7 +137,7 @@ export function createKiroTeamBackend(run: KiroSpawn = spawnKiro): TeamBackend {
       writeFileSync(join(file.dir, '.kiro', 'agents', `${file.name}.json`), `${JSON.stringify(file.body, null, 2)}\n`)
       const seen: Seen = { input: 0, output: 0 }
       try {
-        for await (const line of run(config.bots.kiroPath, kiroArgs(request, file.name), file.dir, { ...process.env, TASKQ_HOME: config.home }, request.signal)) {
+        for await (const line of run(config.bots.kiroPath, kiroArgs(request, file.name), request.prompt, file.dir, { ...process.env, TASKQ_HOME: config.home }, request.signal)) {
           try {
             scan(JSON.parse(line), seen)
           } catch {
@@ -137,20 +146,23 @@ export function createKiroTeamBackend(run: KiroSpawn = spawnKiro): TeamBackend {
         }
       } catch (error) {
         const message = error instanceof Error ? error.message : String(error)
-        if (request.signal.aborted) return { outcome: 'failed', error: 'stopped' }
-        if (/ENOENT/.test(message)) return { outcome: 'failed', error: `kiro-cli was not found (${config.bots.kiroPath}); install it and sign in under Settings > Kiro` }
-        if (/not logged in|login|sign in|unauthori[sz]ed|expired/i.test(message)) {
-          return { outcome: 'failed', error: 'Kiro is not signed in: sign in with your AWS SSO session under Settings > Kiro', auth_failed: true }
-        }
+        // Kiro bills credits, not dollars: a failed turn costs 0 here, not the turn budget.
+        const failed = { outcome: 'failed' as const, cost_usd: 0 }
+        if (request.signal.aborted) return { ...failed, error: 'stopped' }
+        if (/ENOENT/.test(message)) return { ...failed, error: `kiro-cli was not found (${config.bots.kiroPath}); install it and sign in under Settings > Kiro` }
         if (request.resume && /session/i.test(message) && /not found|no such|invalid/i.test(message)) {
-          return { outcome: 'failed', error: 'the Kiro session is gone; the next turn starts a new one', session_missing: true }
+          return { ...failed, error: 'the Kiro session is gone; the next turn starts a new one', session_missing: true }
         }
-        return { outcome: 'failed', error: message.slice(0, 300) }
+        if (KIRO_SIGNED_OUT.test(message)) {
+          return { ...failed, error: 'Kiro is not signed in: sign in with your AWS SSO session under Settings > Kiro', auth_failed: true }
+        }
+        return { ...failed, error: message.slice(0, 300) }
       }
       const usage = { input_tokens: seen.input, output_tokens: seen.output, ...(seen.credits === undefined ? {} : { credits: seen.credits }) }
+      // Kiro reports a share of the context, not tokens: window 100 marks a percentage, which the ring shows as is.
       const context = seen.context !== undefined ? { tokens: seen.context, window: null }
-        : seen.contextPercent !== undefined ? { tokens: Math.round(seen.contextPercent * 10), window: 1000 } : undefined
-      const base = { session_id: seen.session ?? LATEST, turns: 1, cost_usd: 0, usage, model: seen.model ?? request.agent.model ?? 'auto', context }
+        : seen.contextPercent !== undefined ? { tokens: Math.round(seen.contextPercent), window: 100 } : undefined
+      const base = { session_id: seen.session ?? request.resume ?? `${LOCAL}${Date.now()}`, turns: 1, cost_usd: 0, usage, model: seen.model ?? request.agent.model ?? 'auto', context }
       return seen.error ? { ...base, outcome: 'failed', error: seen.error.slice(0, 300) } : { ...base, outcome: 'done' }
     },
     async catalog(): Promise<Catalog> {

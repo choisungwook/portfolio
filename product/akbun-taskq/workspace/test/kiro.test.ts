@@ -45,41 +45,53 @@ describe('kiro bots', () => {
     })
 
   test('[critical] a turn writes the bot as a Kiro agent and runs kiro-cli headless with its trust list; usage is read from the records', async () => {
-    const calls: { command: string; args: string[]; cwd: string }[] = []
-    const kiro: KiroSpawn = async function* (command, args, cwd) {
-      calls.push({ command, args, cwd })
+    const calls: { command: string; args: string[]; input: string; cwd: string }[] = []
+    const kiro: KiroSpawn = async function* (command, args, input, cwd) {
+      calls.push({ command, args, input, cwd })
       yield 'warning: plain text'
       yield JSON.stringify({ type: 'session', sessionId: 'k-1' })
       yield JSON.stringify({ type: 'completion', usage: { input_tokens: 700, output_tokens: 90 }, credits: 0.4, contextUsagePercentage: 12.5 })
     }
-    const result = await createKiroTeamBackend(kiro).runTurn(env.config, request)
+    const result = await createKiroTeamBackend(kiro).runTurn(env.config, { ...request, turnId: 7 })
     assert.equal(result.outcome, 'done')
     assert.equal(result.session_id, 'k-1')
     assert.deepEqual(result.usage, { input_tokens: 700, output_tokens: 90, credits: 0.4 })
-    assert.deepEqual(result.context, { tokens: 125, window: 1000 })
-    const { command, args, cwd } = calls[0]
+    assert.deepEqual(result.context, { tokens: 13, window: 100 }, 'Kiro reports a percentage')
+    const { command, args, input, cwd } = calls[0]
     assert.equal(command, 'kiro-cli')
     assert.equal(cwd, join(env.home, 'team', 'coder'))
     assert.deepEqual(args.slice(0, 7), ['chat', '--v3', '--no-interactive', '--output-format', 'stream-json', '--agent', 'taskq-coder'])
     assert.ok(args.includes('--trust-tools=@builtin,@mcp'))
-    assert.equal(args.at(-1), '1 new message')
+    assert.equal(input, '1 new message', 'the prompt goes in on stdin, not argv')
+    assert.ok(!args.includes('1 new message'))
     const agent = JSON.parse(readFileSync(join(cwd, '.kiro', 'agents', 'taskq-coder.json'), 'utf8')) as Record<string, unknown>
     assert.equal(agent.prompt, 'You are coder.')
     assert.deepEqual(agent.tools, ['read', 'write', '@taskq', '@github'])
     assert.deepEqual(agent.resources, ['skill:///skills/notes/SKILL.md'])
-    assert.deepEqual((agent.mcpServers as Record<string, { args: string[] }>).taskq.args.slice(-3), ['mcp', '--bot', 'coder'])
+    const taskq = (agent.mcpServers as Record<string, { args: string[]; env: Record<string, string> }>).taskq
+    assert.deepEqual(taskq.args.slice(-3), ['mcp', '--bot', 'coder'])
+    assert.equal(taskq.env.TASKQ_TURN_ID, '7', 'team tool writes count for the turn')
 
     await createKiroTeamBackend(kiro).runTurn(env.config, { ...request, resume: 'k-1' })
     assert.ok(calls[1].args.join(' ').includes('--resume-id k-1'))
-    await createKiroTeamBackend(kiro).runTurn(env.config, { ...request, resume: 'kiro:latest', agent: { ...request.agent, permission_mode: 'bypassPermissions', sandbox: true } })
-    assert.ok(calls[2].args.includes('--resume') && calls[2].args.includes('--trust-all-tools') && calls[2].args.includes('--sandbox'))
+    const unnamed: KiroSpawn = async function* (command, args, input, cwd) {
+      calls.push({ command, args, input, cwd })
+      yield JSON.stringify({ type: 'completion' })
+    }
+    const fresh = await createKiroTeamBackend(unnamed).runTurn(env.config, request)
+    assert.match(fresh.session_id ?? '', /^kiro:\d+$/, 'an unnamed session gets its own id')
+    await createKiroTeamBackend(unnamed).runTurn(env.config, { ...request, resume: fresh.session_id ?? null, agent: { ...request.agent, permission_mode: 'bypassPermissions', sandbox: true } })
+    assert.ok(!calls[2].args.includes('--resume'))
+    assert.ok(calls[3].args.includes('--resume') && calls[3].args.includes('--trust-all-tools') && calls[3].args.includes('--sandbox'))
   })
 
   test('a missing kiro-cli and a lost login are reported; the hub runs Kiro bots on the Kiro backend', async () => {
     const missing: KiroSpawn = async function* () {
       yield* failWith('spawn kiro-cli ENOENT')
     }
-    assert.match((await createKiroTeamBackend(missing).runTurn(env.config, request)).error ?? '', /kiro-cli was not found/)
+    const notFound = await createKiroTeamBackend(missing).runTurn(env.config, request)
+    assert.match(notFound.error ?? '', /kiro-cli was not found/)
+    assert.equal(notFound.cost_usd, 0, 'a failed Kiro turn is not charged the turn budget')
     const expired: KiroSpawn = async function* () {
       yield* failWith('kiro-cli exited with code 1: Not logged in. Run kiro-cli login')
     }

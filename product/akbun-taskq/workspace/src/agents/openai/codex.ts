@@ -13,7 +13,8 @@ import { selfCommand } from '../../mcp/server.ts'
 //   and the registered MCP servers the bot picked, given as `mcp_servers.*` config overrides.
 // - Permissions: plan is a read-only sandbox, acceptEdits writes only the bot's folder, the shared folder and the task
 //   worktrees (workspace-write), bypassPermissions is danger-full-access. Approvals are never asked: nobody watches.
-// - Usage: tokens from turn.completed; the plan has no per-turn price, so the cost is 0.
+// - Usage: tokens from turn.completed; the plan has no per-turn price, so the cost is 0, failed turns included.
+//   turn.completed sums every model call of the turn, so it does not tell the context size: the ring stays unknown.
 
 export interface CodexEvent {
   type: string
@@ -25,9 +26,10 @@ export interface CodexEvent {
 
 export type CodexSpawn = (command: string, args: string[], input: string, env: NodeJS.ProcessEnv, signal: AbortSignal) => AsyncIterable<string>
 
+// What Codex prints when it has no ChatGPT login (or the login expired). Narrow on purpose: an auth failure turns the bot off.
+const CODEX_SIGNED_OUT = /not logged in|please (run )?`?codex login|401 unauthori[sz]ed|token (has )?expired|refresh token/i
+
 const SANDBOX = { plan: 'read-only', acceptEdits: 'workspace-write', bypassPermissions: 'danger-full-access' } as const
-// The context window of Codex models, for the context ring; the CLI does not report it.
-const CODEX_WINDOW = 272_000
 
 function toml(value: unknown): string {
   if (Array.isArray(value)) return `[${value.map(toml).join(', ')}]`
@@ -43,6 +45,7 @@ export function codexArgs(config: Config, request: TurnRequest): string[] {
   override('mcp_servers.taskq.command', self.command)
   override('mcp_servers.taskq.args', [...self.args, 'mcp', '--bot', agent.name])
   override('mcp_servers.taskq.env.TASKQ_HOME', config.home)
+  if (request.turnId !== undefined) override('mcp_servers.taskq.env.TASKQ_TURN_ID', String(request.turnId))
   for (const server of request.mcpServers ?? []) {
     override(`mcp_servers.${server.name}.command`, server.command)
     override(`mcp_servers.${server.name}.args`, server.args)
@@ -86,7 +89,6 @@ export async function runCodexTurn(config: Config, request: TurnRequest, run: Co
   let threadId = request.resume ?? undefined
   const usage = { input_tokens: 0, output_tokens: 0, cache_read_tokens: 0, cache_write_tokens: 0 }
   let failure: string | undefined
-  let lastInput = 0
   try {
     for await (const line of run(config.bots.codexPath, codexArgs(config, request), request.prompt, env, request.signal)) {
       let event: CodexEvent
@@ -101,20 +103,20 @@ export async function runCodexTurn(config: Config, request: TurnRequest, run: Co
         usage.output_tokens += event.usage.output_tokens
         usage.cache_read_tokens += event.usage.cached_input_tokens ?? 0
         usage.cache_write_tokens += event.usage.cache_write_input_tokens ?? 0
-        lastInput = event.usage.input_tokens
       } else if (event.type === 'turn.failed') failure = event.error?.message ?? 'the Codex turn failed'
       else if (event.type === 'error') failure = event.message ?? 'Codex reported an error'
     }
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error)
-    if (request.signal.aborted) return { outcome: 'failed', error: 'stopped', session_id: threadId }
-    if (/ENOENT/.test(message)) return { outcome: 'failed', error: `the Codex CLI was not found (${config.bots.codexPath}); install it and run codex once to sign in with ChatGPT` }
-    if (/not logged in|login|unauthori[sz]ed|401/i.test(message)) return { outcome: 'failed', error: 'Codex is not signed in: run `codex login` and choose Sign in with ChatGPT', auth_failed: true }
+    const failed = { outcome: 'failed' as const, cost_usd: 0, usage }
+    if (request.signal.aborted) return { ...failed, error: 'stopped', session_id: threadId }
+    if (/ENOENT/.test(message)) return { ...failed, error: `the Codex CLI was not found (${config.bots.codexPath}); install it and run codex once to sign in with ChatGPT` }
+    if (CODEX_SIGNED_OUT.test(message)) return { ...failed, error: 'Codex is not signed in: run `codex login` and choose Sign in with ChatGPT', auth_failed: true }
     if (request.resume && /resume|thread|session/i.test(message) && /not found|no such/i.test(message)) {
-      return { outcome: 'failed', error: 'the Codex thread is gone; the next turn starts a new one', session_missing: true }
+      return { ...failed, error: 'the Codex thread is gone; the next turn starts a new one', session_missing: true }
     }
-    return { outcome: 'failed', error: message.slice(0, 300), session_id: threadId }
+    return { ...failed, error: message.slice(0, 300), session_id: threadId }
   }
-  const base = { session_id: threadId, turns: 1, cost_usd: 0, usage, context: { tokens: lastInput, window: CODEX_WINDOW } }
+  const base = { session_id: threadId, turns: 1, cost_usd: 0, usage }
   return failure ? { ...base, outcome: 'failed', error: failure.slice(0, 300) } : { ...base, outcome: 'done' }
 }

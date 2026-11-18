@@ -21,6 +21,7 @@ export interface TurnRequest {
   mcpServers?: McpServerEntry[]  // the registered MCP servers the bot picked, started over stdio
   skills?: { name: string; description: string; path: string }[]  // the bot's skills, for a backend without plugins (OpenAI)
   signal: AbortSignal
+  turnId?: number           // the turn's row; a runtime in its own process hands it to `taskq mcp --bot` as TASKQ_TURN_ID
 }
 
 export interface TurnResult {
@@ -30,7 +31,7 @@ export interface TurnResult {
   turns?: number
   cost_usd?: number          // this turn's cost
   session_total_usd?: number // or the session's running total (Claude); the hub subtracts what the session had before
-  auth_failed?: boolean     // the model provider login failed; the hub pauses the team
+  auth_failed?: boolean     // the model provider login failed: a Claude bot pauses the team, another bot is turned off
   session_missing?: boolean // the resumed session no longer exists; the hub starts a new one next time
   tampered?: string         // a tool call reached taskq itself (data directory, config); the hub pauses the team
   model?: string            // the model that answered

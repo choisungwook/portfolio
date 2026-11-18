@@ -1,5 +1,6 @@
 // How full a bot's context is, as a ring like the one next to Claude Desktop's input: the share of the model's context
-// window its last turn ended with. Grey when the size is not known yet.
+// window its last turn ended with. Grey when the size is not known yet. A window of 100 is a runtime that reports only a
+// percentage (Kiro), so the label has no token counts.
 import { t } from '../core/i18n.js'
 
 const SVG = 'http://www.w3.org/2000/svg'
@@ -16,9 +17,10 @@ export function contextRing(agent, size = 22) {
   svg.setAttribute('height', String(size))
   svg.setAttribute('class', 'context-ring')
   svg.dataset.level = level
-  const label = known
-    ? `${t('ctx.context', 'Context')} ${Math.round(share * 100)}% · ${Math.round(agent.context_tokens / 1000)}k / ${Math.round(agent.context_window / 1000)}k`
-    : t('ctx.unknown', 'Context size not known yet')
+  const percentOnly = agent?.context_window === 100
+  const label = !known ? t('ctx.unknown', 'Context size not known yet')
+    : percentOnly ? `${t('ctx.context', 'Context')} ${Math.round(share * 100)}%`
+      : `${t('ctx.context', 'Context')} ${Math.round(share * 100)}% · ${Math.round(agent.context_tokens / 1000)}k / ${Math.round(agent.context_window / 1000)}k`
   svg.setAttribute('role', 'img')
   svg.setAttribute('aria-label', label)
   const title = document.createElementNS(SVG, 'title')

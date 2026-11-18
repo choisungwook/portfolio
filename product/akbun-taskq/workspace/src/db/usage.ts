@@ -7,8 +7,9 @@ import type { TurnResult } from '../team/types.ts'
 export function recordUsage(db: Db, turnId: number, bot: string, result: TurnResult): void {
   const agent = getAgent(db, bot)
   const u = result.usage
-  db.prepare(`UPDATE team_turns SET sdk = ?, provider = ?, model = ?, input_tokens = ?, output_tokens = ?, cache_read_tokens = ?,
-    cache_write_tokens = ?, credits = ? WHERE id = ?`).run(agent?.sdk ?? null, agent?.sdk === 'openai' ? agent.provider ?? 'api' : null,
+  // sdk and provider were set when the turn started; this fills them only for a turn row from before that.
+  db.prepare(`UPDATE team_turns SET provider = CASE WHEN sdk IS NULL THEN ? ELSE provider END, sdk = coalesce(sdk, ?), model = ?, input_tokens = ?, output_tokens = ?, cache_read_tokens = ?,
+    cache_write_tokens = ?, credits = ? WHERE id = ?`).run(agent?.sdk === 'openai' ? agent.provider ?? 'api' : null, agent?.sdk ?? null,
     result.model ?? agent?.model ?? null, u?.input_tokens ?? null, u?.output_tokens ?? null, u?.cache_read_tokens ?? null,
     u?.cache_write_tokens ?? null, u?.credits ?? null, turnId)
   if (result.context) {

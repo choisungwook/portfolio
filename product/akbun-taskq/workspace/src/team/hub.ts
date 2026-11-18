@@ -3,7 +3,7 @@ import { join } from 'node:path'
 import type { Config } from '../config.ts'
 import type { Db } from '../db/open.ts'
 import {
-  SYSTEM, agentsWithMail, endTurn, getAgent, joinTurn, leaveTurn, postMessage, listAgents, nextDelivery, recoverTurns, replaceAgentSession, seedAgents, spentSince,
+  SYSTEM, agentsWithMail, endTurn, getAgent, joinTurn, leaveTurn, postMessage, listAgents, nextDelivery, recoverTurns, replaceAgentSession, seedAgents, setAgentEnabled, spentSince,
   startTurn, turnsSince, type BotSdk, type TeamMessage, type TurnEnd,
 } from '../db/team.ts'
 import { closeUnconcluded, passStalled, skipDisabledSpeakers } from '../db/threads.ts'
@@ -184,6 +184,7 @@ export function createTeamHub({ db, config, backend: claude, backends = {}, retr
         budgetUsd: agent.turn_budget_usd ?? t.turn_budget_usd,
         resume: agent.session_id,
         signal: controller.signal,
+        turnId: started.turn.id,
         live,
       })
         .catch((error: unknown): TurnResult => ({ outcome: 'failed', error: error instanceof Error ? error.message : String(error) }))
@@ -215,7 +216,7 @@ export function createTeamHub({ db, config, backend: claude, backends = {}, retr
     recordUsage(db, turnId, name, result)
     reportSetAside(name, end, result.error)
     if (result.tampered) pauseTeam(db, `${name} tried to reach taskq itself: ${result.tampered}`, 'security_finding')
-    if (result.auth_failed) pauseTeam(db, `model provider login failed for ${name}`)
+    if (result.auth_failed) signedOut(name)
     // Work on a task happens inside one turn. A task still running when the turn ends goes back to ready, and the bot is
     // reminded, so a forgotten finish_task does not hold the task (and the run button) forever.
     if (outcome === 'cancelled') {
@@ -251,6 +252,19 @@ export function createTeamHub({ db, config, backend: claude, backends = {}, retr
       : 0
     db.prepare('UPDATE team_agents SET session_cost_usd = ? WHERE name = ?').run(result.session_total_usd, name)
     return result.session_total_usd >= before ? result.session_total_usd - before : result.session_total_usd
+  }
+
+  // Claude bots share one login, so a failed Claude login pauses the team. An OpenAI or Kiro login belongs to that bot's
+  // runtime (an API key, Codex, kiro-cli): only that bot is turned off until the user signs in and turns it back on.
+  function signedOut(name: string): void {
+    const agent = getAgent(db, name)
+    if (!agent || agent.sdk === 'claude') {
+      pauseTeam(db, `model provider login failed for ${name}`)
+      return
+    }
+    setAgentEnabled(db, name, false)
+    const runtime = agent.sdk === 'openai' ? `OpenAI (${agent.provider ?? 'api'})` : 'Kiro'
+    raiseAlert(db, { task_id: null, kind: 'auth_required', message: `${name} was turned off: its ${runtime} login failed. Sign in, then turn the bot on again.` })
   }
 
   function reportSetAside(name: string, end: TurnEnd, error: string | undefined): void {

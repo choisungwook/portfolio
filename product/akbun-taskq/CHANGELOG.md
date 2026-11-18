@@ -27,6 +27,8 @@
 
 - 왼쪽 bot 목록은 bot이 많으면 목록 안에서 스크롤되고 아래 메뉴는 그대로 보인다.
 - 라이트 테마에서 체크박스가 어둡게 보이던 문제(`color-scheme`)와 새 작업 종류 버튼의 대비를 고쳤다.
+- OpenAI(로그인 방식별)나 Kiro bot의 로그인이 실패하면 팀 전체를 멈추지 않고 그 bot만 끄고 Must check에 알린다. Claude bot은 로그인을 함께 쓰므로 지금처럼 팀을 멈춘다. Codex와 Kiro의 실패한 turn은 turn 예산을 비용으로 잡지 않는다(0).
+- bot의 Agent SDK나 OpenAI 로그인 방식을 바꾸면 세션을 새로 시작한다. 다른 런타임의 세션 id로 resume하지 않는다. 세션 초기화는 context 원과 세션 비용도 비운다.
 - 짙은 보조 버튼(헤더와 Wiki의 검색 버튼, 눌린 버튼 묶음)에 짙은 글씨가 쓰이던 문제를 고쳤다. 테마 토큰에 `--on-secondary`와 `--on-danger`를 더해, 라이트 모드는 밝은 버튼에 짙은 글씨, 다크 모드는 짙은 버튼에 밝은 글씨를 쓰고, 빨간 버튼 글씨는 흰색이다.
 
 ### Security
@@ -62,7 +64,7 @@ Kiro CLI: `kiro-cli chat --v3 --no-interactive --output-format stream-json --age
 ### Not verified with a real model
 
 - Codex, Kiro, Bedrock은 실제 계정으로 돌려 보지 않았다. 특히 Kiro의 stream-json 기록 형식은 문서에 없어 세션 id, 토큰, credit, context를 아는 이름의 필드에서만 읽는다(못 찾으면 빈 값). Kiro headless가 SSO 로그인 세션으로 도는지는 문서가 말하지 않는다(문서는 API 키를 권하고, 로그인 세션이 API 키보다 먼저 쓰인다고 적는다).
-- Codex의 context window(272k)와 OpenAI 모델의 window는 taskq가 아는 값으로 그린 추정이다.
+- OpenAI 모델의 context window는 taskq가 아는 값으로 그린 추정이다. Codex는 `turn.completed`가 turn의 모든 호출을 더한 값이라 context 원을 그리지 않는다. Kiro는 보고하는 비율(%)만 그린다.
 - bot이 `start_task`가 알려 준 worktree 경로에서 실제로 일하고 커밋하는지, OpenAI bot이 MCP server 도구와 `read_skill`을 쓰는지. 테스트는 가짜 SDK로 돈다.
 - MCP server 시작은 실제 서버로 돌려 보지 않았다. 테스트는 세션 옵션과 turn 요청에 들어가는지만 본다.
 

@@ -110,11 +110,15 @@ describe('wiki export and import', () => {
     assert.ok(hybridSearch(env.db)('롤백 절차').some((hit) => hit.slug.startsWith('import/team-docs/guide-ops')))
   })
 
-  test('[critical] nothing is dropped or overwritten: long text without sections, index.md, a stray %, foreign front matter', async () => {
+  test('[critical] nothing is dropped or overwritten: long text without sections, a long intro, index.md, a stray %, foreign front matter', async () => {
     const docs = join(env.home, 'edge')
     mkdirSync(join(docs, 'wiki'), { recursive: true })
     const words = Array.from({ length: 4000 }, (_, i) => `word${i}`).join(' ')
     writeFileSync(join(docs, 'long.txt'), `${words}\n\nTHE-LAST-PARAGRAPH`)
+    const para = 'x'.repeat(390)
+    const intro = Array.from({ length: 20 }, () => para).join('\n\n')
+    const sections = Array.from({ length: 10 }, (_, i) => `## Part ${i}\n\n${'y'.repeat(900)}`).join('\n\n')
+    writeFileSync(join(docs, 'guide.md'), `# Guide\n\nINTRO-START\n\n${intro}\n\nINTRO-END\n\n${sections}`)
     writeFileSync(join(docs, 'index.md'), '# Docs home\n\nStart here. Sale: [50% off](50%.md)')
     writeFileSync(join(docs, 'wiki', 'intro.md'), '---\nslug: intro\ntitle: Intro\n---\n\nHugo page')
     writePage(env.db, { slug: 'intro', title: 'Mine', body: 'my own page', author: 'taskq', base_revision: 0 })
@@ -123,6 +127,8 @@ describe('wiki export and import', () => {
     assert.equal(getJob(env.db, job.id)?.status, 'done', getJob(env.db, job.id)?.error ?? '')
     const all = listPages(env.db).map((p) => getPage(env.db, p.slug)!)
     assert.ok(all.some((p) => p.body.includes('THE-LAST-PARAGRAPH')), 'the end of a long text without ## is kept')
+    assert.match(getPage(env.db, 'import/edge/guide')?.body ?? '', /INTRO-START/)
+    assert.ok(all.some((p) => p.body.includes('INTRO-END')), 'the end of a long intro before the first ## is kept')
     assert.match(getPage(env.db, 'import/edge/index-2')?.body ?? '', /Start here/, 'index.md does not take the import index slug')
     assert.match(getPage(env.db, 'import/edge/index')!.body, /\[\[import\/edge\/index-2\]\]/)
     assert.equal(getPage(env.db, 'intro')?.body, 'my own page', 'front matter outside a taskq export does not overwrite pages')

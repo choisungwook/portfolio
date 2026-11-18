@@ -70,8 +70,11 @@ function historyFile(config: Config, request: TurnRequest): string {
   mkdirSync(dir, { recursive: true })
   return join(dir, '.openai-history.json')
 }
+// The session id of a Bedrock bot is `local:<bot>:<ms>`, new for each session so Usage groups its turns; an id of another
+// runtime (a Responses id from before the bot switched provider) starts an empty history.
+const LOCAL = 'local:'
 function loadHistory(config: Config, request: TurnRequest): unknown[] {
-  if (!request.resume) return []
+  if (!request.resume?.startsWith(LOCAL)) return []
   try {
     return JSON.parse(readFileSync(historyFile(config, request), 'utf8')) as unknown[]
   } catch {
@@ -79,11 +82,13 @@ function loadHistory(config: Config, request: TurnRequest): unknown[] {
   }
 }
 function saveHistory(config: Config, request: TurnRequest, history: unknown[]): void {
-  // Keep the newest items, starting at a user message so the model never sees a tool result without its call.
-  let kept = history.slice(-HISTORY_ITEMS)
-  const start = kept.findIndex((item) => (item as { role?: string }).role === 'user')
-  if (start > 0) kept = kept.slice(start)
-  writeFileSync(historyFile(config, request), JSON.stringify(kept))
+  // Keep the newest items, starting at a user message so the model never sees a tool result without its call. When the
+  // last turn alone is longer than the limit, it is kept whole from its user message.
+  const isUser = (item: unknown) => (item as { role?: string }).role === 'user'
+  const from = Math.max(0, history.length - HISTORY_ITEMS)
+  let start = history.findIndex((item, i) => i >= from && isUser(item))
+  if (start < 0) start = history.findLastIndex(isUser)
+  writeFileSync(historyFile(config, request), JSON.stringify(history.slice(Math.max(0, start))))
 }
 
 // API key: the Responses API keeps the conversation (previousResponseId). Bedrock: its OpenAI-compatible endpoint with a
@@ -236,7 +241,9 @@ export function createOpenAITeamBackend(runFn?: OpenAIRunFn, fetcher: typeof fet
         const model = request.agent.model ?? (provider === 'bedrock' ? BEDROCK_DEFAULT_MODEL : DEFAULT_OPENAI_MODEL)
         if (result.history) saveHistory(config, request, result.history)
         const base = {
-          session_id: provider === 'bedrock' ? `local:${request.agent.name}` : result.lastResponseId ?? request.resume ?? undefined,
+          session_id: provider === 'bedrock'
+            ? request.resume?.startsWith(LOCAL) ? request.resume : `${LOCAL}${request.agent.name}:${Date.now()}`
+            : result.lastResponseId ?? request.resume ?? undefined,
           turns: result.requests, cost_usd: cost(result), model,
           usage: { input_tokens: result.inputTokens, output_tokens: result.outputTokens },
           context: result.lastInputTokens === undefined ? undefined : { tokens: result.lastInputTokens, window: windowOf(model) },

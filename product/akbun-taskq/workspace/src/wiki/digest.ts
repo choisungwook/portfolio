@@ -28,6 +28,7 @@ const CODE: Record<string, string> = {
   '.ts': 'ts', '.tsx': 'tsx', '.js': 'js', '.mjs': 'js', '.py': 'python', '.go': 'go', '.rs': 'rust', '.java': 'java', '.kt': 'kotlin',
   '.sh': 'bash', '.sql': 'sql', '.tf': 'hcl', '.rb': 'ruby', '.c': 'c', '.h': 'c', '.cpp': 'cpp', '.cs': 'csharp', '.swift': 'swift',
 }
+const HEAD_LIMIT = 4000
 export const PAGE_LIMIT = 18_000      // under the wiki's 20,000-character body limit, leaving room for the source line
 const SPLIT_AT = 12_000               // a markdown document longer than this is split at its ## headings
 
@@ -156,10 +157,12 @@ export function digestFile(file: SourceFile, slugs: Map<string, string>, when: s
     return [{ slug, title, body: `${origin}\n\nThis document is split into ${parts.length} pages:\n\n${parts.map((p) => `- [[${p.slug}]]`).join('\n')}`, source: file.path }, ...parts]
   }
   const pages: PageDraft[] = []
-  // A long text before the first ## heading becomes its own parts, linked first.
-  const introPieces = chunks(intro, PAGE_LIMIT)
-  introPieces.slice(1).forEach((piece, i) => {
-    pages.push({ slug: `${slug}--p${i + 2}`, title: `${title} (intro ${i + 2}/${introPieces.length})`, body: `${origin} Part of [[${slug}]].\n\n${piece}`, source: file.path })
+  // The document page keeps the start of the text before the first ## heading; the rest of it becomes its own parts,
+  // linked first.
+  const [head = '', ...afterHead] = chunks(intro, HEAD_LIMIT)
+  const introPieces = afterHead.length > 0 ? chunks(afterHead.join('\n\n'), PAGE_LIMIT) : []
+  introPieces.forEach((piece, i) => {
+    pages.push({ slug: `${slug}--p${i + 2}`, title: `${title} (intro ${i + 2}/${introPieces.length + 1})`, body: `${origin} Part of [[${slug}]].\n\n${piece}`, source: file.path })
   })
   sections.forEach((section, i) => {
     const pieces = chunks(section.body, PAGE_LIMIT)
@@ -174,7 +177,6 @@ export function digestFile(file: SourceFile, slugs: Map<string, string>, when: s
   // The document page holds the start of the intro and the section list; a list too long for one page is cut at a whole
   // line and points to the import's index page, which lists every page.
   const lines = pages.map((p) => `- ${p.title.slice(title.length + 2) || p.title} [[${p.slug}]]`)
-  const head = (introPieces[0] ?? '').slice(0, 4000)
   let toc = ''
   for (const line of lines) {
     if (origin.length + head.length + toc.length + line.length + 200 > PAGE_LIMIT) {

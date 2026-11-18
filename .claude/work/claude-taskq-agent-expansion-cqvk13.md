@@ -15,7 +15,9 @@
 - [x] 8. OpenAI provider 선택(API 키, Bedrock, ChatGPT 구독 = Codex SDK)과 `taskq mcp --bot`
 - [x] 9. Kiro backend(AWS SSO device flow 로그인, headless kiro-cli)
 - [x] 10. 글로벌 설정 Usage, bot별 context window 원
-- [ ] 11. 0.10.0 CHANGELOG·문서, 첫 리뷰 지적 반영, 두 번째 리뷰, PR, squash merge
+- [x] 11. 0.10.0 CHANGELOG·문서, 첫 리뷰 지적 반영
+- [x] 12. 두 번째 리뷰 지적 반영(TASKQ_TURN_ID, Kiro stdin, 런타임 변경 시 세션 초기화, 로그인 실패 범위, 도입부 분할)
+- [ ] 13. PR, squash merge
 
 ## 다음 세션이 알아야 할 것
 
