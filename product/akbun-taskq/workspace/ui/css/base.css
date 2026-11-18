@@ -124,6 +124,7 @@ textarea { width: 100%; padding: 8px 12px; }
   font-size: var(--text-small); margin-right: 4px; background: var(--control); color: var(--fg);
 }
 .badge.blocked { color: var(--muted); }
+.badge.owner { background: var(--info-soft); }
 .sev-critical { color: var(--failed); }
 .sev-high { color: var(--high); }
 .sev-normal { color: var(--muted); }

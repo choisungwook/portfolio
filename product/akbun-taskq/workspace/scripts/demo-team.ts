@@ -2,9 +2,10 @@ import type { Db } from '../src/db/open.ts'
 import { USER, postMessage, seedAgents, setAgentSession } from '../src/db/team.ts'
 import { writePage } from '../src/db/wiki.ts'
 import { DEFAULT_ROSTER } from '../src/team/roster.ts'
+import { openThread, takeTurn } from '../src/db/threads.ts'
 
 // Invented team traffic for the Team tab. No turn row is written, so the demo shows no spend and no running agent.
-export function seedTeam(db: Db, taskId: string): void {
+export function seedTeam(db: Db, taskId: string, openTaskIds: string[]): void {
   seedAgents(db, DEFAULT_ROSTER)
   for (const name of ['lead', 'planner', 'coder']) setAgentSession(db, name, `demo-${name}`)
   const say = (sender: string, recipient: string, body: string, task_id?: string) => postMessage(db, { sender, recipient, body, task_id })
@@ -17,10 +18,24 @@ export function seedTeam(db: Db, taskId: string): void {
   say('lead', USER, 'The export job now stops after 3 retries. Review found nothing blocking. One decision is yours: should a stopped job page someone?', taskId)
   writePage(db, {
     slug: 'projects/export-retry', title: 'Export job retry limit', author: 'lead', base_revision: 0,
-    body: 'Goal: stop after 3 retries.\nOwner: coder (code), reviewer (review).\nStatus: done, waiting for the user on paging.\nSource: user message #1.',
+    body: 'Goal: stop after 3 retries.\nOwner: coder (code), reviewer (review).\nStatus: done, waiting for the user on paging.\nRepository notes: [[repos/demo]]. Paging question: [[decisions/paging]].\nSource: user message #1.',
   })
   writePage(db, {
     slug: 'repos/demo', title: 'Demo repository conventions', author: 'coder', base_revision: 0,
     body: 'Tests: npm test. Lint: none configured.\nSource: package.json scripts.',
   })
+  writePage(db, {
+    slug: 'decisions/paging', title: 'Should a stopped export job page someone?', author: 'lead', base_revision: 0,
+    body: 'Open. Discussion #1 recommends a ticket, not a page, because a retry stop is not an outage.\nWaiting for the user.',
+  })
+  // Each open demo task gets one owner, so the Board badges and the Team tab show who holds what.
+  const ownerOf: Record<string, string> = { code: 'coder', security_review: 'reviewer', research: 'doc-reviewer', ops_read: 'planner', ops_change: 'planner' }
+  for (const id of openTaskIds) db.prepare(`UPDATE tasks SET owner = ? WHERE id = ?`).run(ownerOf[String(db.prepare('SELECT type FROM tasks WHERE id = ?').get(id)?.type)] ?? 'planner', id)
+  const thread = openThread(db, {
+    topic: 'Should a stopped export job page someone?', moderator: 'lead', participants: ['reviewer', 'planner'], rounds: 1,
+    context: 'The job now stops after 3 retries. Is that an incident?',
+  })
+  takeTurn(db, thread.id, 'reviewer', 'A ticket is enough: data is intact and the next run retries. A page trains people to ignore pages.')
+  db.prepare('UPDATE team_messages SET read_at = created_at WHERE thread_id = ?').run(thread.id)
+  postMessage(db, { sender: 'planner', recipient: 'planner', body: 'Check whether the nightly export ran.', deliver_at: Math.floor(Date.now() / 1000) + 8 * 3600 })
 }

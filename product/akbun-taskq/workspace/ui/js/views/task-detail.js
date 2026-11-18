@@ -7,6 +7,7 @@ import { ACTION_STATUS, label, outcomeOf, parseField, TYPE_MARK } from '../core/
 import { statusIndicator } from '../core/status.js'
 import { runNowButton } from '../core/run-now.js'
 import { approvalPanel } from './approval-panel.js'
+import { ownerValue } from './owner-picker.js'
 import { operatorControls } from './operator-controls.js'
 
 let dialog
@@ -75,6 +76,9 @@ function sections(task, events, graph, titles, settings) {
       el('dt', { text: 'Claimed by' }), el('dd', { text: task.claimed_by ?? 'none' }),
       el('dt', { text: 'Session' }), el('dd', { text: task.session_id ?? 'none' }),
       el('dt', { text: 'Access skill' }), el('dd', {}, accessSkillValue(data, settings)),
+      el('dt', { text: 'Owner' }), ownerValue(task, () => {
+        if (dialog.open && currentId === task.id) fill(task.id)
+      }),
     ),
     actionButtons(task),
     operatorControls(task, () => {

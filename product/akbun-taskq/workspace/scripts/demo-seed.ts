@@ -139,7 +139,9 @@ export async function seedDemo(db: Db, config: Config, home: string, configDir: 
   const { runs, controller } = seedRuns(db, config, tasks, now)
   seedProposals(db, tasks, now)
   seedAlerts(db, tasks, runs)
-  seedTeam(db, ([...tasks.values()].find((t) => t.type === 'code') ?? [...tasks.values()][0]).id)
+  const all = [...tasks.values()]
+  seedTeam(db, (all.find((t) => t.type === 'code') ?? all[0]).id,
+    all.filter((t) => !['done', 'failed'].includes(t.status)).slice(0, 6).map((t) => t.id))
   await pauseLikeRunner(db, config)
   return controller
 }

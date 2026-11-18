@@ -51,6 +51,7 @@ function card(task) {
     el('button', { type: 'button', class: `card status-${task.status}`, onclick: () => emit('open-task', task.id) },
       el('span', { class: 'card-title', text: title }),
       el('span', { class: 'meta', text: `${TYPE_MARK[task.type] ?? label(task.type)} · ${task.lock_key ?? 'no account or repo'}` }),
+      task.owner ? el('span', { class: 'badge owner', text: `@${task.owner}`, title: `Owned by team agent ${task.owner}` }) : null,
       task.blocked ? el('span', { class: 'badge blocked', text: 'blocked' }) : null),
     RUNNABLE.includes(task.status) ? runNowButton(task) : null)
 }
