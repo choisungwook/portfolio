@@ -4,6 +4,8 @@ concept를 추가·수정·삭제할 때마다 오늘 날짜 섹션을 맨 위�
 
 ## 2026-11-18
 
+* **Creation**: [Bots work on their own tasks with per-bot permissions](decisions/2026-11-bots-execute-tasks.md) 결정 기록. bot이 task를 직접 처리, bot별 권한 모드·샌드박스·차단 명령, 시작 버튼은 일회성, taskq 오케스트레이터.
+* **Update**: [Resident role agents are resumed sessions with a mailbox](decisions/2026-11-resident-agent-team.md) 결정 기록. 읽기 전용 bot 설계가 bot별 권한 설정으로 바뀐 것을 기록.
 * **Creation**: [The UI uses a soft messenger theme and a left sidebar where bots read like chats](decisions/2026-11-soft-theme-sidebar.md) 결정 기록. Team을 Bots로, 탭을 사이드바와 bot별 채팅으로, 기본 테마를 soft로.
 * **Update**: [The taskq UI follows IBM Carbon through a token interface](decisions/2026-11-carbon-design-system.md) 결정 기록. 기본 테마가 soft로 바뀌고 Carbon은 패턴과 두 번째 테마로 남음.
 * **Creation**: [A task has one owner agent; several agents meet only in a bounded discussion](decisions/2026-11-task-ownership-and-discussions.md) 결정 기록. owner 열, 중복 작업 검사, 순서와 라운드가 정해진 토론.

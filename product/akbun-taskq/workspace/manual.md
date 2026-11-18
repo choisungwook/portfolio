@@ -87,7 +87,8 @@ cp taskq.config.example.json taskq.config.json
 
 ```bash
 node bin/taskq run
-taskq bots list | say [--to NAME] TEXT | inbox | log | turns | threads | wiki [SLUG] | search QUERY | export
+taskq bots list | new NAME [--preset P] | delete NAME | reload NAME [skill|plugin] | say [--to NAME] TEXT | inbox | log | turns
+taskq bots threads | close THREAD | wiki [SLUG] | search QUERY | export
 taskq bots assign TASK AGENT|user | pause | resume | enable NAME | disable NAME | reset NAME
 ```
 
@@ -214,25 +215,42 @@ taskq run
 
 ## 10. bot에게 맡기기
 
-태스크를 하나씩 만드는 대신 lead에게 목표를 말하면, 역할 bot들이 나눠 맡고 필요한 태스크를 큐에 넣는다. 끝나면 lead가 결과를 알려준다. 화면 왼쪽 메뉴의 Bots에서 bot을 누르면 그 bot과의 대화를 메신저처럼 본다.
+bot은 역할을 가진 상주 Claude 세션이다. 태스크는 내 작업 노트이고, bot이 자기가 맡은(owner) 태스크를 가져가 직접 처리한 뒤 결과를 남긴다. 처음에는 오케스트레이터 bot `taskq` 하나만 있다. taskq에게 목표를 말하면 태스크로 나눠 알맞은 bot에게 맡기고, 끝나면 결과를 알려준다. 다른 bot은 내가 만든다.
 
-| bot | 하는 일 |
+화면 왼쪽 메뉴의 Bots에서 bot을 누르면 그 bot과의 대화를 메신저처럼 본다. `+`로 bot을 만들고, bot의 톱니나 오른쪽 버튼 메뉴로 설정, skill·plugin 다시 불러오기, 새 세션, 끄기, 지우기를 한다. taskq는 맨 위에 고정되고 지우거나 끌 수 없다.
+
+태스크의 시작 버튼은 bot과 상관없는 일회성 실행이다. 지금까지처럼 태스크 종류별 권한과 승인 절차로 한 번 돌고 끝난다. bot이 맡은 태스크도 시작 버튼으로 한 번 돌릴 수 있고, 그 결과는 맡은 bot에게 전달된다.
+
+bot을 만들 때 고를 수 있는 시작 프리셋은 아래와 같다. 만든 뒤 모두 바꿀 수 있다.
+
+| 프리셋 | 하는 일 |
 |---|---|
-| lead | 나와 대화하는 유일한 agent. 요청을 나눠 다른 agent에게 넘기고 결과를 모아 보고한다 |
-| planner | 태스크의 종류, 순서(depends_on), 우선순위, 결과를 받을 agent를 정해 큐에 넣는다 |
-| coder | code 태스크로 코드를 고치고, 결과에 테스트 명령과 출력이 있는지 확인한다 |
-| reviewer | 코드 변경과 security review 결과를 보고 근거를 붙여 지적한다 |
-| doc-reviewer | 문서와 조사 결과에서 근거 없는 주장과 재현되지 않는 절차를 찾는다 |
+| planner | 일을 태스크로 나누고 순서(depends_on)와 우선순위를 정해 bot에게 맡긴다 |
+| coder | 코드 태스크를 맡아 작업 디렉터리에서 고치고 테스트를 돌린 뒤 결과를 남긴다 |
+| reviewer | 변경을 보고 file:line 근거를 붙여 지적한다 |
+| doc-reviewer | 문서와 계획에서 근거 없는 주장과 재현되지 않는 절차를 찾는다 |
+
+bot 설정에서 정하는 것은 아래와 같다.
+
+| 설정 | 기본값 | 뜻 |
+|---|---|---|
+| 권한 모드 | Auto | Claude가 판단하고 위험한 호출은 거절한다. Accept edits, Ask(승인이 필요한 호출은 거절), Plan only, Bypass도 고를 수 있다. bot은 지켜보는 사람이 없으므로 승인을 기다리지 않고 거절한다 |
+| 샌드박스 | 끔 | 켜면 명령이 샌드박스에서 돌고, 쓰기는 작업 디렉터리로, 네트워크는 허용 호스트로 제한된다 |
+| 차단 명령 | 없음 | 줄마다 패턴 하나. `*`만 와일드카드다. `git push*`를 넣으면 `cd app && git push`도 막힌다. 변수나 스크립트 파일로 우회할 수 있으니 꼭 막아야 할 것은 샌드박스로 막는다 |
+| 작업 디렉터리 | bot 폴더 | bot이 일하는 곳. 저장소에서 일할 bot은 저장소 경로를 넣는다 |
+| skill, plugin | 없음 | 설정에 등록된 것 중에서 고른다 |
+
+설정과 관계없이 모든 bot은 taskq의 데이터와 설정 파일을 건드릴 수 없다. 건드리려 하면 그 turn이 멈추고 bot 전체가 멈추며 보안 알림이 뜬다.
 
 bot은 계속 떠 있는 프로세스가 아니다. 메시지가 올 때마다 그 bot의 세션을 이어서 한 번 일하고 멈춘다. 그래서 taskq를 다시 시작해도 대화가 이어지고, 메시지가 없으면 비용이 들지 않는다. 메시지 없이 스스로 깨어나지는 않는다. 나중에 할 일은 bot이 시각을 정한 메시지(`deliver_at`)로 예약하고, 그 시각에 깨어난다. 자기 자신에게는 10분 이상 뒤로만 예약할 수 있다.
 
-작업 하나는 bot 하나가 맡는다(owner). Board 카드의 `@coder` 같은 배지와 bot 대화 위의 작업 칩이 누가 무엇을 맡았는지 보여준다. 작업 상세의 Owner에서 다른 bot에게 넘기거나 되찾는다. lead나 planner가 내 작업을 가져가면 Must check에 알림이 뜬다. bot이 열려 있는 작업과 비슷한 작업을 만들려 하면 거절되고 그 작업의 owner와 이야기하라는 답을 받는다. 이 비슷함 검사는 글자 겹침으로만 판단해서 표현이 다르면 놓치고, 비슷한 문장의 다른 작업을 잘못 막기도 한다.
+작업 하나는 bot 하나가 맡는다(owner). 맡은 bot만 그 태스크를 시작할 수 있고, 시작하면 Board에서 실행 중으로 바뀌고 Calendar에 그 bot의 실행으로 남는다. 계정을 건드리는 초안은 내가 Queued로 바꿔야 bot이 시작할 수 있다. Board 카드의 `@coder` 같은 배지와 bot 대화 위의 작업 칩이 누가 무엇을 맡았는지 보여준다. 작업 상세의 Owner에서 다른 bot에게 넘기거나 되찾는다. taskq나 planner 역할 bot이 내 작업을 가져가면 Must check에 알림이 뜬다. bot이 열려 있는 작업과 비슷한 작업을 만들려 하면 거절되고 그 작업의 owner와 이야기하라는 답을 받는다. 이 비슷함 검사는 글자 겹침으로만 판단해서 표현이 다르면 놓치고, 비슷한 문장의 다른 작업을 잘못 막기도 한다.
 
 여러 bot의 의견이 필요한 질문은 토론으로 한다. 토론을 연 bot이 참가자와 라운드 수를 정하고, 참가자는 순서대로 앞사람의 말을 보고 의견을 낸다. 라운드가 끝나면 연 bot이 결론을 wiki에 남기고 필요한 작업을 맡긴다. 결론을 내지 않으면 토론은 결론 없이 닫히고 알림이 뜬다. Discussions 화면이나 `taskq bots close`로 직접 닫을 수도 있다.
 
 agent는 파일을 읽기만 한다. 코드 수정, 명령 실행, 웹 조회는 태스크로 만들어 지금과 같은 샌드박스와 승인 절차를 지난다. agent가 만든 계정 조회·변경 태스크는 항상 초안으로 들어가므로, Board에서 내가 보고 Queued로 바꿔야 실행된다.
 
-설정에 `bots`를 넣고 다시 시작한다.
+bot을 쓰려면 설정 파일에 `bots`를 넣고 다시 시작한다.
 
 ```json
 "bots": {
@@ -251,10 +269,10 @@ agent는 파일을 읽기만 한다. 코드 수정, 명령 실행, 웹 조회는
 | `maxOpenTasks` | 10 | bot이 맡은 태스크 중 대기, 실행, 승인 대기, 로그인 대기 상태인 것의 최대 개수. 초안과 리뷰 대기는 세지 않는다 |
 | `maxConcurrentTurns` | 2 | 동시에 일하는 bot 수 |
 | `maxAttempts` | 3 | 같은 메시지로 실패한 턴이 이 횟수가 되면 그 메시지를 내려놓고 알림을 띄운다 |
-| `readRoots` | [] | bot이 읽을 수 있고 code 태스크의 저장소로 쓸 수 있는 디렉터리. `trustedRepos`와 `outputs/`는 따로 넣지 않아도 읽는다 |
-| `personaSkill` | 없음 | 나 대신 판단할 기준을 담은 skill 폴더의 절대 경로. lead는 내 결정이 아닌 선택을 할 때, reviewer와 doc-reviewer는 리뷰할 때 읽는다. 승인을 대신하지 않는다 |
+| `readRoots` | [] | bot이 만드는 code 태스크의 저장소로 쓸 수 있는 디렉터리. 시작 버튼으로 돌 때의 권한 경계다 |
+| `personaSkill` | 없음 | 나 대신 판단할 기준을 담은 skill 폴더의 절대 경로. taskq는 내 결정이 아닌 선택을 할 때, reviewer와 doc-reviewer는 리뷰할 때 읽는다. 승인을 대신하지 않는다 |
 
-일을 맡기고 결과를 받는 명령은 아래와 같다. 화면에서는 왼쪽 메뉴의 lead를 눌러 같은 일을 한다.
+일을 맡기고 결과를 받는 명령은 아래와 같다. 화면에서는 왼쪽 메뉴의 taskq를 눌러 같은 일을 한다.
 
 ```bash
 taskq bots say "README의 설치 절차를 실제로 따라 해 보고 틀린 곳을 고쳐줘. 저장소는 /Users/me/work/app"
@@ -263,7 +281,7 @@ taskq bots log
 taskq bots wiki
 ```
 
-lead가 나에게 보낸 메시지는 Must check에도 "Message from a bot"으로 뜨고, 메뉴의 lead 옆에 파란 점이 붙는다. CLI로 보낸 메시지는 실행 중인 taskq가 `pollSec`(기본 60초) 안에 가져가고, 화면에서 보낸 메시지는 바로 전달된다.
+taskq가 나에게 보낸 메시지는 Must check에도 "Message from a bot"으로 뜨고, 메뉴의 taskq 옆에 파란 점이 붙는다. CLI로 보낸 메시지는 실행 중인 taskq가 `pollSec`(기본 60초) 안에 가져가고, 화면에서 보낸 메시지는 바로 전달된다.
 
 bot이 공유하는 기억은 wiki다. bot은 일을 시작하기 전에 wiki를 찾고, 결정과 출처가 있는 사실, 진행 상태를 적는다. 세션을 새로 시작해도(`taskq bots reset NAME`) wiki는 남는다.
 
@@ -274,6 +292,14 @@ taskq bots search 검색률
 taskq bots export
 ```
 
+글로벌 설정(헤더의 Settings)에서 정하는 것은 아래와 같다.
+
+- Appearance: 글꼴과 글자 크기. 바꾸는 즉시 앱 전체에 적용된다.
+- Queue: 맡은 bot이 없는 태스크를 큐가 스스로 실행할지. 끄면 시작 버튼을 눌러야만 실행된다.
+- Skills for bots, Plugins for bots: bot이 쓸 skill 폴더와 plugin 폴더를 등록한다. 각 bot은 자기 설정에서 고른다. bot은 고른 것을 복사해 두고 쓰므로, skill 파일을 고친 뒤에는 bot의 오른쪽 버튼 메뉴에서 Reload skills를 눌러야 반영된다.
+
+bot은 내 Claude Code 설정(~/.claude의 권한 규칙, hook, skill)을 읽지 않는다. bot 설정 화면에 보이는 것만으로 동작한다.
+
 멈춘 bot을 Resume하면 예산과 턴 수 계산이 그 시점부터 다시 시작된다. 상한에 걸린 원인을 확인하고 켠다. 메시지를 보내거나 작업을 만든 뒤 실패한 턴은 같은 일을 반복하지 않도록 다시 돌리지 않는다. 이때 Must check에 어떤 메시지를 내려놓았는지 뜨므로, 필요하면 다시 보낸다.
 
 ## 11. 처음 쓸 때 직접 확인할 것
@@ -283,7 +309,7 @@ taskq bots export
 - 조회 태스크의 AWS 명령이 샌드박스 안에서 엔드포인트에 닿는지. 안 닿으면 `sandbox.allowedDomains`에 호스트를 추가한다.
 - `auto` 권한 모드를 내 계정과 모델에서 쓸 수 있는지. 안 되면 `autoMode`를 false로 둔다.
 - 변경 태스크가 변경 명령 앞에서 승인을 묻는지. 내 Claude 설정에 allow 규칙이 있어도 묻는지 본다.
-- bot을 켰다면 `taskq bots say "hello"` 뒤 `taskq bots turns`에 턴이 done으로 남는지, `taskq bots inbox`에 lead의 답이 오는지. 세션 이어받기, bot 도구 호출, 읽기 경로 제한은 가짜 SDK로만 시험했다.
+- bot을 켰다면 `taskq bots say "hello"` 뒤 `taskq bots turns`에 턴이 done으로 남는지, `taskq bots inbox`에 taskq의 답이 오는지. 세션 이어받기, bot 도구 호출, 읽기 경로 제한은 가짜 SDK로만 시험했다.
 
 ## 12. 자주 겪는 문제
 

@@ -306,9 +306,9 @@ After a `code` task finishes `done`, the runner creates a `security_review` task
 The UI reads its colors, shapes and type through a token interface, the same way agents sit behind `AgentBackend`. The decision is [the soft theme and sidebar](../knowledge/decisions/2026-11-soft-theme-sidebar.md).
 
 - `ui/css/theme/contract.css` names every token component CSS may read (surfaces, text, interaction, notification washes, status colors, bot avatar colors, shape, motion, type). Each is `initial` there.
-- `ui/css/theme/soft.css` is the theme `index.html` loads: dark first with a light variant, 16 px corners on cards and bubbles, 10 px on controls, bold type, one color per bot. `ui/css/theme/carbon.css` is the earlier IBM Carbon theme (Apache-2.0, `LICENSE-carbon.txt` beside it), kept as a second implementation; swapping the `<link>` in `index.html` switches back.
+- `ui/css/theme/soft.css` is the theme `index.html` loads: dark first with a light variant, 16 px corners on cards and bubbles, 10 px on controls, bold type, one color per bot (avatars are plain circles with the bot's initial). The font family and size in Settings override `--font-sans`, `--text-body` and `--text-small` on `:root` at run time; sidebar and chat sizes are in `em` so they follow. `ui/css/theme/carbon.css` is the earlier IBM Carbon theme (Apache-2.0, `LICENSE-carbon.txt` beside it), kept as a second implementation; swapping the `<link>` in `index.html` switches back.
 - `test/ui-tokens.test.ts` fails when a component reads a token outside the contract or a theme leaves one out. Both theme files are in its list.
-- Layout: a left sidebar (`css/nav.css`) holds the views, the bots list and the shared views; `<main>` shows one view; the Must check panel is on the right (under the sidebar below 1280 px, on top below 800 px). The bot conversation, discussions and wiki views are in `css/chat.css`. `ui/js/core/nav.js` switches views and emits `tab` (view name) and `bot` (bot name).
+- Layout: a left sidebar (`css/nav.css`) holds the views, the bots list (orchestrator first, a gear on each bot, a right-click menu, and `+` to add one) and the shared views; `<main>` shows one view; the Must check panel is on the right (under the sidebar below 1280 px, on top below 800 px). The bot conversation, discussions and wiki views are in `css/chat.css`. `ui/js/core/nav.js` switches views and emits `tab` (view name) and `bot` (bot name).
 - Component patterns kept from Carbon: inline notifications that never dismiss on a timer, danger buttons that need a second click, status indicators that pair a symbol and a word with color, one primary button per view.
 
 ## Agent backends
@@ -325,35 +325,45 @@ Adding a backend: put it under `src/agents/<name>/`, add the name to `AgentName`
 
 ## Bots
 
-Resident role agents sit on top of the queue. The UI, CLI (`taskq bots`), API (`/api/bots`) and config key (`bots`) call them bots; the code (`src/team/`), tables (`team_*`) and wake signal (`teamChanged`) call them the team. The design records are [the team decision](../knowledge/decisions/2026-11-resident-agent-team.md), [ownership and discussions](../knowledge/decisions/2026-11-task-ownership-and-discussions.md) and [wiki search](../knowledge/decisions/2026-11-wiki-hybrid-search.md). They are off by default (`bots.enabled`).
+Bots are resident Claude sessions with a role. Tasks are the user's notes of work; a bot takes a task it owns, works on it in its own session and closes it. The run button on a task is separate: a one-off run that belongs to no bot. The UI, CLI (`taskq bots`), API (`/api/bots`) and config key (`bots`) call them bots; the code (`src/team/`), tables (`team_*`) and wake signal (`teamChanged`) call them the team. The design records are [bots execute tasks](../knowledge/decisions/2026-11-bots-execute-tasks.md), [resumed sessions and the mailbox](../knowledge/decisions/2026-11-resident-agent-team.md), [ownership and discussions](../knowledge/decisions/2026-11-task-ownership-and-discussions.md) and [wiki search](../knowledge/decisions/2026-11-wiki-hybrid-search.md). They are off by default (`bots.enabled`).
 
 ```text
-user --taskq bots say / bot chat--> team_messages --hub--> agent turn (resumed Claude session)
-                                        ^                    |- team tools: messages, tasks, discussions, wiki
-                                        |                    '- Read, Glob, Grep in its folder and read roots
-                 finishRun: result of a task with an owner
+user --bot chat / taskq bots say--> team_messages --hub--> bot turn (resumed Claude session in its workdir)
+                                         ^                   |- team tools: messages, tasks (start/finish), discussions, wiki
+                                         |                   |- built-in tools, per the bot's permission mode, sandbox and gate
+                                         |                   '- skills and plugins from the bot's snapshot
+                  a task run by the run button reports to the task's owner
 ```
 
 | Part | What it does |
 |---|---|
-| `team_agents` | Roster: name, role, description (what others delegate by), instructions, allowed task types, `may_message_user`, `session_id`. Seeded from `team/roster.ts` with `INSERT OR IGNORE`, so edits to rows survive restarts |
-| `team_messages` | Mailbox. `sender` and `recipient` are agent names, `user` or `taskq`. `deliver_at` holds a message back until that time. A turn claims every deliverable message of one agent (`turn_id`, `read_at`, `attempts`) |
-| `team_turns` | One row per agent turn with outcome, cost, session id and `writes` (tool calls with an effect). An open row means the agent is busy |
-| `tasks.owner` | The one agent that owns a task and gets its result. NULL is the user's own task |
+| `team_agents` | One row per bot: role, description (what others delegate by), instructions, `may_message_user`, `enabled`, `system` (the orchestrator), `permission_mode` (default `auto`), `sandbox` (default off), `allowed_domains`, `blocked_commands` (default none), `workdir`, `skills`, `plugins`, `model`, `session_id`. Listed with `system` first |
+| Orchestrator | `taskq`, created on first start from `team/roster.ts`. It may message the user, cannot be deleted or disabled, and is pinned first in the sidebar. Every other bot is created by the user, optionally from a preset (planner, coder, reviewer, doc-reviewer) |
+| `bot_skills`, `bot_plugins` | The global registry (Settings). A skill is a folder with `SKILL.md`; a plugin is a folder with `.claude-plugin/plugin.json`. Removing an entry takes it off every bot |
+| `team_messages` | Mailbox. `sender` and `recipient` are bot names, `user` or `queue` (a run's report). `deliver_at` holds a message back until that time. A turn claims every deliverable message of one bot (`turn_id`, `read_at`, `attempts`) |
+| `team_turns` | One row per bot turn with outcome, cost, session id and `writes` (tool calls with an effect). An open row means the bot is busy |
+| `tasks.owner`, `tasks.owner_since` | The one bot that owns a task, and since when. NULL is the user's own task |
+| `runs.bot` | Set on a run a bot did in its own session; NULL on a run from the queue or the run button |
 | `team_threads` | Discussions: moderator, ordered participants, rounds, `posts`, status `open`, `concluding`, `closed` |
 | `wiki_pages`, `wiki_revisions`, `wiki_fts` (trigram), `wiki_links` | Shared memory. `writePage` needs the revision the writer read; a stale write returns the current page. `[[slug]]` references are stored as links |
-| `team/hub.ts` | Waits on `teamChanged`, the next `deliver_at`, or `pollSec`. For each enabled agent with deliverable mail, no open turn and no failed turn in the last 60 s, up to `team.maxConcurrentTurns`, checks the guards, opens a turn and calls `TeamBackend.runTurn` |
-| `team/tools*.ts` | SDK-neutral tool handlers, each input checked against its zod schema before the handler runs. `tools-talk.ts`: messages and discussions. `tools-tasks.ts`: create, assign, list, read tasks. `tools-wiki.ts`: list, search, read (with links and backlinks), write (and mirror) |
-| `team/search.ts` | `WikiSearch` interface and `hybridSearch`, see below |
-| `team/wiki-files.ts` | Writes each page to `TASKQ_HOME/wiki/<slug>.md` after every write; `taskq team export` rewrites all. The files are a mirror for folder tools such as graphify; edits to them are not read back |
-| `team/report.ts` | Inside `finishRun`'s transaction, posts the run outcome to the task's owner. The automatic security review of an agent's code task goes to the first enabled reviewer, else the lead, never back to the author |
-| `agents/claude/team.ts` | `query()` with `resume`, `tools: Read, Glob, Grep`, `settingSources: []`, `strictMcpConfig`, an in-process MCP server named `team`, and a PreToolUse hook that confines reads (`decideTeamRead`) and ends the turn as tampered when a call reaches taskq's data or config (`tamperOf`). The prompt is a one-message stream because SDK MCP tools need streaming input |
+| `team/hub.ts` | Waits on `teamChanged`, the next `deliver_at`, or `pollSec`. For each enabled bot with deliverable mail, no open turn and no failed turn in the last 60 s, up to `bots.maxConcurrentTurns`, checks the guards, opens a turn and calls `TeamBackend.runTurn` with the bot's workdir and plugin folders |
+| `team/tools*.ts` | SDK-neutral tool handlers, each input checked against its zod schema. `tools-talk.ts`: messages and discussions. `tools-tasks.ts`: create, assign, start, finish, list, read tasks. `tools-wiki.ts`: list, search, read, write (and mirror) |
+| `team/bot-work.ts` | `start_task`: only the owner, only a ready task (or a draft that touches no account) whose blocking dependencies are done; sets running with `claimed_by = 'bot:<name>'` and opens a run with `bot`. `finish_task`: closes the run, sets done, review or failed, raises the failed or review alert. On start, a task a bot had running goes back to ready and the bot gets a message |
+| `team/bot-gate.ts` | Always: a call that reaches taskq's data directory, config, Claude Code settings (write) or turns the sandbox off ends the turn and pauses the bots (`security_finding`). Per bot: a Bash command whose whole text or any segment of a pipeline or list matches a `blocked_commands` pattern (`*` is the only wildcard) is refused |
+| `team/bot-plugin.ts` | Copies the bot's selected skills into one local plugin (`team/<bot>/.taskq/skills-plugin/skills/<name>`) and its selected plugins into `team/<bot>/.taskq/plugins/<name>`. Saving settings and Reload rebuild the copy; a turn loads the copy, so a skill edited on disk reaches the bot at the next Reload, not mid-work. `node_modules` and `.git` are not copied |
+| `team/search.ts`, `team/wiki-files.ts` | Wiki search (below) and the markdown mirror under `TASKQ_HOME/wiki/` for folder tools such as graphify |
+| `team/report.ts` | Inside `finishRun`'s transaction, posts a queue run's outcome to the task's owner. The automatic security review of a bot's code task is created owned by the first enabled reviewer, else the orchestrator, never the author, and that bot is told |
+| `agents/claude/team.ts` | `query()` with `resume`, `cwd` = the bot's workdir, `permissionMode` from the bot (`bypassPermissions` also sets `allowDangerouslySkipPermissions`), `sandbox` only when the bot has it on (writes limited to the workdir, reads of taskq's data and config denied, network to `allowed_domains`), `plugins` from the snapshot, `settingSources: []` so the user's own Claude settings never apply, `strictMcpConfig` unless the bot has plugins, the in-process MCP server `team`, the gate as a PreToolUse hook, and a `canUseTool` that refuses anything that would wait for an approval, since nobody watches a bot's turn |
+
+### Queue and run button
+
+The runner claims only ready tasks with no owner (`nextEligible`), and only while `queue_autorun` (Settings, on by default) is on. A bot's task waits for that bot. The run button (`POST /api/tasks/:id/run`) still runs any task once through the runner, whoever owns it; the run has no `bot`, and its result is posted to the owner. Stale recovery skips tasks claimed by a bot.
 
 ### Ownership
 
-`create_task` checks the role's task types, the repo (in `trustedRepos` or under `bots.readRoots`, by real path), the count of agent-owned tasks in ready, running, needs_approval or needs_auth against `bots.maxOpenTasks` (draft and review wait for the user and do not count), and duplicates: every task in draft, ready, running, needs_approval or needs_auth whose intent has character-trigram Jaccard similarity of 0.5 or more is named with its owner, and the call is refused unless the caller lists it in `not_duplicate_of`. The check is advisory: rewording can slip past it and similar wording for different work can trip it (examples in `tools-tasks.ts`). Ownership is what keeps two agents off one task. Agent priority is capped at 0. A task with an ops type, `access_skill` or `target_profile` is always a draft.
+`create_task` records a task and gives it an owner (the caller by default; another owner is told). It checks the repo (in `trustedRepos` or under `bots.readRoots`, by real path), the count of agent-owned tasks in ready, running, needs_approval or needs_auth against `bots.maxOpenTasks` (draft and review wait for the user and do not count), and duplicates: every task in draft, ready, running, needs_approval or needs_auth whose intent has character-trigram Jaccard similarity of 0.5 or more is named with its owner, and the call is refused unless the caller lists it in `not_duplicate_of`. The check is advisory: rewording can slip past it and similar wording for different work can trip it (examples in `tools-tasks.ts`). Ownership is what keeps two bots off one task: only the owner can start it. Bot priority is capped at 0. A task with an ops type, `access_skill` or `target_profile` is always a draft, and a bot cannot start such a draft; the user promotes it.
 
-`assign_task` moves a task to another agent. The current owner may do it; lead and planner may do it for any unfinished task, the user's included. The update compares the old owner, so two concurrent moves cannot both win. The new and old owners get a message; when the old owner was the user, the user gets an alert. `tasks.owner_since` records when the current owner took the task. The user sets the owner from the task detail dialog, `POST /api/bots/tasks/:id/owner` or `taskq bots assign`.
+`assign_task` moves a task to another bot. The current owner may do it; the orchestrator and bots with the planner role may do it for any unfinished task, the user's included. The update compares the old owner, so two concurrent moves cannot both win. The new and old owners get a message; when the old owner was the user, the user gets an alert. `tasks.owner_since` records when the current owner took the task. The user sets the owner from the task detail dialog, `POST /api/bots/tasks/:id/owner` or `taskq bots assign`.
 
 ### Discussions
 
@@ -371,12 +381,12 @@ user --taskq bots say / bot chat--> team_messages --hub--> agent turn (resumed C
 | Hourly turns | An agent with `hourlyTurnsPerAgent` turns in the last hour (or since the last resume) pauses the team |
 | Retry | A failed turn with no effect returns its messages; after `maxAttempts` they are set aside with an alert. A turn that failed after an effect (message, task, wiki write) is not retried, because a retry would repeat it; its messages are set aside with an alert. The same holds for a turn open at a crash. A failed turn costs 60 s before the agent's next turn |
 | Unknown cost | A turn that ends without a cost figure is charged `turnBudgetUsd` |
-| Tamper | A read of taskq's data directory or config ends the turn and pauses the team with a `security_finding` alert |
+| Tamper | A call that reaches taskq's data directory or config ends the turn and pauses the bots with a `security_finding` alert, whatever the bot's settings |
 | Login | A model login failure pauses the team |
 
-Every pause raises one alert and only the user resumes. Pausing the bots stops agent turns only; tasks they already queued keep running unless the queue is paused too. A message to oneself needs `deliver_at` at least 10 minutes ahead, and a `deliver_at` in the past is refused, so an agent cannot wake itself in a loop. Resuming restarts the budget and loop windows from that moment. A resumed session that no longer exists is dropped and the next turn starts a new one; a reset made while a turn runs is not overwritten when it ends.
+Every pause raises one alert and only the user resumes. Pausing the bots stops bot turns. A task a bot started stays running until the bot finishes it or taskq restarts. A message to oneself needs `deliver_at` at least 10 minutes ahead, and a `deliver_at` in the past is refused, so an agent cannot wake itself in a loop. Resuming restarts the budget and loop windows from that moment. A resumed session that no longer exists is dropped and the next turn starts a new one; a reset made while a turn runs is not overwritten when it ends.
 
-`bots.personaSkill`, when set, is added to the read roots. The lead is told to read it before deciding something on the user's behalf, and the reviewers before reviewing, and both are told not to copy its text anywhere. Its judgement is never an approval.
+`bots.personaSkill`, when set, is named in the prompts. The orchestrator is told to read it before deciding something on the user's behalf, and the reviewers before reviewing, and both are told not to copy its text anywhere. Its judgement is never an approval.
 
 ## Worker
 
@@ -525,15 +535,22 @@ Writes (any non-GET under `/api`) must send `Content-Type: application/json`, op
 | `GET /queue` `POST /queue/pause` `POST /queue/resume` | pause state with `pause_by`. Pause takes `{ "reason" }`, see "Pause, cancel and retry" |
 | `POST /tasks/:id/cancel` | cancel a running, needs_approval or needs_auth task. 200 with the task; 409 in other statuses; 404 when unknown |
 | `POST /tasks/:id/retry` | retry a failed task. Body `{ "draft": true }` and `{ "resume": true }`, both optional. 200 with the task; 409 in other statuses |
-| `GET /settings` | `{ config, home, db_path, access_skills, desktop_notifications }`. `db_path` is the absolute path of the SQLite file, shown read-only in Settings. `config` is the read-only list of keys in `CONFIG_KEYS` (`src/skills/registry.ts`). Each access skill is `{ name, path, description, ok }`; `ok` is false when `SKILL.md` is gone |
+| `GET /settings` | `{ config, home, db_path, access_skills, desktop_notifications, queue_autorun, appearance, font_families, bot_skills, bot_plugins }`. `db_path` is the absolute path of the SQLite file, shown read-only in Settings. `config` is the read-only list of keys in `CONFIG_KEYS` (`src/skills/registry.ts`). Each access skill is `{ name, path, description, ok }`; `ok` is false when `SKILL.md` is gone |
 | `POST /settings/desktop-notifications` | persist the desktop notification preference with `{"enabled":true}` or `{"enabled":false}` |
+| `POST /settings/queue-autorun` | `{ "enabled": false }` stops the queue from running unowned tasks on its own |
+| `POST /settings/appearance` | `{ "font_family": "pretendard", "font_size": 16 }`; families are listed in `font_families`, size 12 to 20 |
+| `POST /bot-skills` `DELETE /bot-skills/:name` `POST /bot-plugins` `DELETE /bot-plugins/:name` | register `{ "path": "/abs/dir" }` (201, 400 with the reason, 409 when taken) or remove (204) a skill or plugin for bots |
 | `GET /skills/discover` | `[{ name, path, description, registered }]` found one level deep under `$CLAUDE_CONFIG_DIR/skills` (or `~/.claude/skills`) and `skillsDir`. Capped at 200 |
 | `POST /access-skills` | body `{ "path": "/abs/dir" }`. 201 with the stored row; 400 with the reason; 409 when the name or path is already registered |
 | `DELETE /access-skills/:name` | 204. 404 when unknown; 409 when a task in draft, ready, running, needs_approval or needs_auth names it (up to 5 ids listed). Never touches the skill's files |
-| `GET /bots` | `{ enabled, paused, pause_reason, agents, tasks, threads, turns }`. Agents carry `busy`, `last_message` and `unread` (messages to the user not yet read) and no `instructions`; `tasks` are unfinished agent-owned tasks with `owner` and `task_title`. Seeds the roster when it is empty |
+| `GET /bots` `POST /bots` | list `{ enabled, paused, pause_reason, agents, tasks, threads, turns }`; create `{ name, preset?, ...settings }` (201; 409 for a taken name) |
+| `GET /bots/:name` `PUT /bots/:name` `DELETE /bots/:name` | one bot with all settings; save settings (rebuilds the skill and plugin copy; 409 when disabling taskq); delete (409 for taskq; its open tasks become the user's) |
+| `POST /bots/:name/reload` `POST /bots/:name/reset` | body `{ "kind": "skill" | "plugin" | "all" }` re-copies and returns what loaded and what is missing; reset starts a new session next turn |
+| `GET /bots/presets` | role, description and instructions for planner, coder, reviewer, doc-reviewer |
+| `GET /bots` fields | Agents carry `busy`, `last_message` and `unread` (messages to the user not yet read) and no `instructions`; `tasks` are unfinished agent-owned tasks with `owner` and `task_title`. Creates the orchestrator when it is missing |
 | `POST /bots/tasks/:id/owner` | body `{ "owner": "coder" }` or `{ "owner": null }`. 409 for a done or failed task or an unknown agent |
-| `GET /bots/messages?agent=&limit=` `POST /bots/messages` | log, newest first; send `{ "to": "lead", "body": "…" }` as the user. 404 for an unknown or disabled agent |
-| `POST /bots/messages/read` | mark unread messages to the user as read; body `{ "agent": "lead" }` limits it to one bot |
+| `GET /bots/messages?agent=&limit=` `POST /bots/messages` | log, newest first; send `{ "to": "taskq", "body": "…" }` as the user (`to` defaults to taskq). 404 for an unknown or disabled bot |
+| `POST /bots/messages/read` | mark unread messages to the user as read; body `{ "agent": "coder" }` limits it to one bot |
 | `POST /bots/threads/:id/close` | close a discussion without a conclusion. 409 when already closed |
 | `POST /bots/pause` `POST /bots/resume` | pause state of the bots, separate from the queue |
 | `GET /bots/wiki?q=` `GET /bots/wiki/page?slug=` | list pages, or search them with `hybridSearch` (`{ slug, title, score, snippet, via? }`); read one page |

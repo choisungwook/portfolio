@@ -8,7 +8,7 @@ generated: { by: claude-code/claude-opus-5-5, at: 2026-11-18T12:00:00Z }
 
 ## 결정
 
-- 작업 하나에는 owner agent가 하나다(`tasks.owner`). owner가 결과를 받고, 작업을 넘기는 것은 owner와 조정 역할(lead, planner)만 할 수 있다. 사용자는 작업 상세 화면이나 CLI에서 owner를 바꾼다.
+- 작업 하나에는 owner bot이 하나다(`tasks.owner`). owner만 그 작업을 시작해 처리하고, 작업을 넘기는 것은 owner와 조정 역할(오케스트레이터 taskq, planner)만 할 수 있다. 사용자는 작업 상세 화면이나 CLI에서 owner를 바꾼다.
 - 작업을 만들기 전에 끝나지 않은 모든 작업과 intent를 비교한다. 글자 trigram Jaccard 유사도가 0.5 이상이면 그 작업과 owner를 알려 주며 거절하고, 다르다고 판단한 agent가 `not_duplicate_of`에 그 id를 적어야 만든다.
 - 여러 agent가 같은 주제를 다뤄야 하는 경우는 작업이 아니라 토론(`team_threads`)으로 한다. 참가자 2~4명이 정해진 순서로 1~3라운드 말하고, 열어 둔 agent(moderator)가 결론을 내려 닫는다. 토론 중에는 작업을 만들지 않고, 결론 뒤 moderator가 작업을 만들거나 넘긴다.
 - Board 카드에 `@owner` 배지를, Team 탭에 agent별 열린 작업과 토론 진행 상황을 보인다.
