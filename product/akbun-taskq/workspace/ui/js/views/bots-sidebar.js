@@ -9,6 +9,7 @@ import { botAvatar, setRoster } from './avatar.js'
 import { openBotMenu } from './bot-menu.js'
 import { openBotSettings } from './bot-settings.js'
 import { t } from '../core/i18n.js'
+import { contextRing } from './context-ring.js'
 
 const POLL_MS = 5000
 
@@ -81,7 +82,8 @@ function render(team) {
     el('span', { class: 'side-bot-text' },
       el('span', { class: 'side-bot-top' },
         el('strong', { text: a.name }),
-        el('time', { class: 'meta', text: a.last_message ? shortTime(a.last_message.created_at) : '' })),
+        el('time', { class: 'meta', text: a.last_message ? shortTime(a.last_message.created_at) : '' }),
+        a.context_window ? contextRing(a, 16) : null),
       a.busy
         ? el('span', { class: 'side-bot-working', dataset: { since: String(a.working_since ?? '') } }, el('span', { class: 'pulse', 'aria-hidden': 'true' }), el('span', { class: 'working-text', text: workingText(a.working_since) }))
         : el('span', { class: 'side-bot-preview', text: preview(a) })),

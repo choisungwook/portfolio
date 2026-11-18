@@ -10,6 +10,8 @@ export const BOT_DEFAULTS: Omit<BotSettings, 'role' | 'description' | 'instructi
   blocked_commands: [],
   workdir: null,
   skills: [],
+  mcp_servers: [],
+  provider: null,
   plugins: [],
   model: null,
   effort: null,

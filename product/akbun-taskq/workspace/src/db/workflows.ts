@@ -24,6 +24,7 @@ export interface WorkflowStep {
   instructions: string
   needs: string[]       // steps that must succeed (or be skipped) first
   to?: string           // handoff: the bot that gets the work
+  position?: { x: number; y: number }   // where the editor draws the node
 }
 
 export interface WorkflowDefinition {
@@ -88,7 +89,9 @@ export function parseDefinition(input: unknown): { ok: true; value: WorkflowDefi
     const needs = Array.isArray(raw.needs) ? raw.needs.map(String) : []
     const to = raw.to === undefined || raw.to === null || raw.to === '' ? undefined : String(raw.to)
     if (kind === 'handoff' && !to) return { ok: false, error: `step ${id}: a handoff step names the bot it hands work to (to)` }
-    out.push({ id, name, kind, instructions, needs: [...new Set(needs)], ...(to ? { to } : {}) })
+    const p = raw.position as { x?: unknown; y?: unknown } | undefined
+    const position = p && Number.isFinite(p.x) && Number.isFinite(p.y) ? { x: Math.round(Number(p.x)), y: Math.round(Number(p.y)) } : undefined
+    out.push({ id, name, kind, instructions, needs: [...new Set(needs)], ...(to ? { to } : {}), ...(position ? { position } : {}) })
   }
   for (const step of out) {
     const unknown = step.needs.filter((n) => !ids.has(n))

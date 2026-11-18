@@ -1,7 +1,7 @@
 import { mkdirSync } from 'node:fs'
 import type { Config } from '../config.ts'
 import type { Db } from '../db/open.ts'
-import { EFFORTS, PERMISSION_MODES, getAgent, type BotPermissionMode, type BotSdk, type TeamAgent } from '../db/team.ts'
+import { EFFORTS, PERMISSION_MODES, getAgent, type BotPermissionMode, type BotProvider, type BotSdk, type TeamAgent } from '../db/team.ts'
 import { listEntries } from '../db/bot-registry.ts'
 import { pluginPaths } from './bot-plugin.ts'
 import { agentDir } from './prompt.ts'
@@ -28,7 +28,8 @@ const ALL = [...EFFORTS]
 // each call); taskq builds the OpenAI bot's tools from the mode instead: see src/agents/openai/team.ts.
 export const PERMISSIONS_BY_SDK: Record<BotSdk, BotPermissionMode[]> = {
   claude: [...PERMISSION_MODES],
-  openai: ['plan', 'dontAsk', 'acceptEdits', 'bypassPermissions'],
+  openai: ['plan', 'acceptEdits', 'bypassPermissions'],
+  kiro: ['plan', 'acceptEdits', 'bypassPermissions'],
 }
 export const STATIC_MODELS: Record<BotSdk, Catalog['models']> = {
   claude: [
@@ -41,6 +42,22 @@ export const STATIC_MODELS: Record<BotSdk, Catalog['models']> = {
     { id: 'gpt-5', name: 'GPT-5', description: 'OpenAI flagship', efforts: ['low', 'medium', 'high'] },
     { id: 'gpt-5-mini', name: 'GPT-5 mini', description: 'Smaller and cheaper', efforts: ['low', 'medium', 'high'] },
   ],
+  // Kiro picks a model when none is given; others are typed in the bot's settings as kiro-cli names them.
+  kiro: [{ id: 'auto', name: 'Auto', description: 'Kiro chooses', efforts: [] }],
+}
+
+// An OpenAI bot's models depend on how it signs in.
+export const PROVIDER_MODELS: Record<BotProvider, Catalog['models']> = {
+  api: STATIC_MODELS.openai,
+  bedrock: [
+    { id: 'openai.gpt-oss-120b-1:0', name: 'gpt-oss-120b (Bedrock)', description: 'Open-weight, on Amazon Bedrock', efforts: ['low', 'medium', 'high'] },
+    { id: 'openai.gpt-oss-20b-1:0', name: 'gpt-oss-20b (Bedrock)', description: 'Smaller open-weight', efforts: ['low', 'medium', 'high'] },
+  ],
+  chatgpt: [{ id: '', name: 'Codex default', description: 'The model your ChatGPT plan gives Codex', efforts: ['low', 'medium', 'high', 'xhigh'] }],
+}
+
+export function staticModels(agent: { sdk: BotSdk; provider?: BotProvider | null }): Catalog['models'] {
+  return agent.sdk === 'openai' ? PROVIDER_MODELS[agent.provider ?? 'api'] : STATIC_MODELS[agent.sdk]
 }
 
 // The bot's registered skills, named the way the SDK names a plugin's skill. Shown even when the SDK did not answer.
@@ -79,17 +96,17 @@ export function createCatalog(db: Db, config: Config, backendFor: (sdk: BotSdk) 
     const backend = backendFor(agent.sdk)
     const base = { sdk: agent.sdk, fetched_at: now, permission_modes: PERMISSIONS_BY_SDK[agent.sdk] }
     if (!backend?.catalog) {
-      return { ...base, fallback: true, error: `the ${agent.sdk} backend is not running`, models: STATIC_MODELS[agent.sdk], commands: skillCommands(db, agent) }
+      return { ...base, fallback: true, error: `the ${agent.sdk} backend is not running`, models: staticModels(agent), commands: skillCommands(db, agent) }
     }
     try {
       const cwd = agent.workdir ?? agentDir(config, name)
       mkdirSync(cwd, { recursive: true })
       const answer = await withTimeout(backend.catalog(config, { agent, cwd, plugins: pluginPaths(db, config, name) }), ASK_TIMEOUT_MS)
-      const result: BotCatalog = { ...base, fallback: answer.models.length === 0, models: answer.models.length ? answer.models : STATIC_MODELS[agent.sdk], commands: answer.commands }
+      const result: BotCatalog = { ...base, fallback: answer.models.length === 0, models: answer.models.length ? answer.models : staticModels(agent), commands: answer.commands }
       cache.set(name, result)
       return { ...result, commands: merge(agent, skillCommands(db, agent), result.commands) }
     } catch (error) {
-      return { ...base, fallback: true, error: error instanceof Error ? error.message : String(error), models: STATIC_MODELS[agent.sdk], commands: skillCommands(db, agent) }
+      return { ...base, fallback: true, error: error instanceof Error ? error.message : String(error), models: staticModels(agent), commands: skillCommands(db, agent) }
     }
   }
 }

@@ -5,6 +5,7 @@ import type { Config } from '../../config.ts'
 import type { TeamAgent } from '../../db/team.ts'
 import { botGate } from '../../team/bot-gate.ts'
 import { realPath, under } from '../../worker/paths.ts'
+import { worktreesDir } from '../../workspace/worktree.ts'
 
 // The file and shell tools of an OpenAI bot. The OpenAI Agents SDK has no built-in coding tools and no permission
 // modes, so taskq writes them and decides from the bot's permission mode which ones the bot gets:
@@ -73,7 +74,8 @@ export function localTools(config: Config, agent: TeamAgent, cwd: string, shared
         const path = pathOf(args)
         gate('Write', { file_path: path })
         const real = realPath(dirname(path))
-        if (![cwd, sharedDir].some((root) => under(real, realPath(root)))) throw new Error(`write_file is limited to ${cwd} and ${sharedDir}`)
+        const roots = [cwd, sharedDir, worktreesDir(config)]
+        if (!roots.some((root) => under(real, realPath(root)))) throw new Error(`write_file is limited to ${roots.join(', ')}`)
         mkdirSync(dirname(path), { recursive: true })
         // O_NOFOLLOW: a symlink planted at the file's own name (shared/notes.md -> ~/.zshrc) is refused, not followed.
         const fd = openSync(path, constants.O_WRONLY | constants.O_CREAT | constants.O_TRUNC | constants.O_NOFOLLOW, 0o644)

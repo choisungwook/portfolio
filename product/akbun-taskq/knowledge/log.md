@@ -2,8 +2,16 @@
 
 concept를 추가·수정·삭제할 때마다 오늘 날짜 섹션을 맨 위에 만들고 한 줄 남긴다. 구분은 `**Creation**`, `**Update**`, `**Deletion**`이다.
 
+## 2026-11-19
+
+* **Update**: [ChatGPT-plan and Kiro bots run their own CLIs per turn](decisions/2026-11-bot-runtimes-beyond-sdks.md)에 로그인 실패 범위(bot만 끔)와 런타임 변경 시 세션 초기화의 이유를 더함.
+* **Creation**: [ChatGPT-plan and Kiro bots run their own CLIs per turn](decisions/2026-11-bot-runtimes-beyond-sdks.md) 결정 기록. provider 선택, codex exec, kiro-cli headless와 SSO, `taskq mcp --bot`, Usage와 context.
+
 ## 2026-11-18
 
+* **Creation**: [A code task in a git repository works in its own worktree](decisions/2026-11-task-worktrees.md) 결정 기록. 생성 시점 worktree, data.repo 교체, 삭제 후 경로 유지, 토큰 없는 PR 링크.
+* **Creation**: [Wiki export and import run as resumable background jobs](decisions/2026-11-wiki-transfer-jobs.md) 결정 기록. checkpoint job, deflate level 9, 소화하는 가져오기.
+* **Update**: [OpenAI bots plug in behind TeamBackend](decisions/2026-11-openai-bot-backend.md) 결정 기록. skill은 read_skill, MCP server는 MCPServerStdio로 두 SDK가 공유.
 * **Creation**: [Workflows are step graphs a bot executes and taskq judges](decisions/2026-11-workflows-run-by-bots.md) 결정 기록. 단계 그래프, bot 실행, taskq 판정, snapshot과 삭제 표시.
 * **Creation**: [OpenAI bots plug in behind TeamBackend](decisions/2026-11-openai-bot-backend.md) 결정 기록. Responses API 대화, 권한 모드로 도구 선택, 토큰 기반 비용 추정.
 * **Creation**: [The CLI and MCP server reach every route through one table of operations](decisions/2026-11-operations-for-cli-and-mcp.md) 결정 기록. operation 표, 프로세스 안 호출, DB marker로 취소.

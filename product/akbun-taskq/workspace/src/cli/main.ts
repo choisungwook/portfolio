@@ -44,7 +44,7 @@ const USAGE = `usage: taskq <command> [options]
   approve ID [--request REQUEST_ID --yes]    deny ID [--request REQUEST_ID --yes]
   alerts               log [--date YYYY-MM-DD]    search QUERY    run    version
   skills list | add PATH | remove NAME | discover
-  handoffs [--task TASK]    handoff accept ID    handoff mode TASK [auto|manual]    mcp
+  handoffs [--task TASK]    handoff accept ID    handoff mode TASK [auto|manual]    mcp [--bot NAME]
   pause [--reason TEXT]    unpause    cancel ID    retry ID [--draft] [--resume]
   bots list | say [--to NAME] TEXT | inbox | log | turns | threads | wiki [SLUG] | search | export | assign | pause | resume | enable | disable | reset
   workflows list | show | create FILE | update | delete | run ID --bot NAME | runs | run-show | cancel | approve
@@ -68,8 +68,11 @@ export async function main(argv: string[]): Promise<void> {
   }
   if (name === 'mcp') {
     try {
-      const { serveMcp } = await import('../mcp/server.ts')
-      await serveMcp(db, config, pkg.version)
+      const { serveBotMcp, serveMcp } = await import('../mcp/server.ts')
+      // `taskq mcp --bot NAME`: that bot's own tools, for Codex and Kiro turns. Plain `taskq mcp`: every operation.
+      const bot = args[0] === '--bot' ? args[1] : undefined
+      if (bot) await serveBotMcp(db, config, bot, pkg.version)
+      else await serveMcp(db, config, pkg.version)
     } finally {
       db.close()
     }

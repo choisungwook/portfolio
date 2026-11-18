@@ -3,6 +3,7 @@ import { existsSync, readFileSync, realpathSync, statSync } from 'node:fs'
 import { promisify } from 'node:util'
 import { basename, isAbsolute, join } from 'node:path'
 import type { Db } from './open.ts'
+import { listMcpServers } from './mcp-registry.ts'
 import { inspectSkill, skillFileOk, SkillError } from '../skills/inspect.ts'
 import { nowSec } from '../time.ts'
 
@@ -79,10 +80,11 @@ export function listEntries(db: Db, kind: RegistryKind): RegistryEntry[] {
     .map((row) => ({ ...row, ok: entryOk(kind, row.path) }))
 }
 
-export function knownNames(db: Db): { skills: Set<string>; plugins: Set<string> } {
+export function knownNames(db: Db): { skills: Set<string>; plugins: Set<string>; mcp: Set<string> } {
   return {
     skills: new Set(listEntries(db, 'skill').map((e) => e.name)),
     plugins: new Set(listEntries(db, 'plugin').map((e) => e.name)),
+    mcp: new Set(listMcpServers(db).map((e) => e.name)),
   }
 }
 

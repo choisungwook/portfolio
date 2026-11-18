@@ -42,7 +42,8 @@
 .bots-state-label[data-state="running"] { color: var(--done); }
 .bots-state-label[data-state="paused"] { color: var(--needs-approval); }
 .bots-state button { min-height: 28px; padding: 0 8px; font-size: var(--text-small); }
-.side-bots { margin-bottom: 8px; }
+/* Many bots scroll inside their own list, so the menu items below stay in reach. */
+.side-bots { margin-bottom: 8px; max-height: min(46vh, 520px); overflow-y: auto; overscroll-behavior: contain; scrollbar-width: thin; }
 .side-bot { min-height: 64px; padding: 8px 10px; gap: 12px; position: relative; }
 .side-bot .avatar { flex: none; }
 .side-bot[data-enabled="false"] { opacity: 0.5; }

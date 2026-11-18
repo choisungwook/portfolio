@@ -1,7 +1,7 @@
 import type { Hono } from 'hono'
 import {
   ORCHESTRATOR, USER, createAgent, deleteAgent, getAgent, listAgents, listMessages, listTurns, markRead, openTurnAgents, postMessage,
-  queuedCounts, seedAgents, setAgentSession, updateAgent,
+  queuedCounts, resetAgentSession, seedAgents, updateAgent,
 } from '../db/team.ts'
 import { createCatalog } from '../team/catalog.ts'
 import { knownNames } from '../db/bot-registry.ts'
@@ -240,7 +240,7 @@ export function registerBotsRoutes(api: Hono, { db, config, bots }: ApiDeps): vo
   api.post('/bots/:name/reset', (c) => {
     const name = c.req.param('name')
     if (!getAgent(db, name)) throw new HttpError(404, 'no such bot')
-    setAgentSession(db, name, null)
+    resetAgentSession(db, name)
     return c.json({ ok: true })
   })
 }

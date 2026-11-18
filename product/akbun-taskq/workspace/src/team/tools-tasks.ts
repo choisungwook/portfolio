@@ -82,7 +82,7 @@ export function taskTools(scope: ScopedTools): TeamTool[] {
         if (!parsed.ok) throw new ToolError(parsed.error)
         let task: Task
         try {
-          task = createFromInput(db, parsed.value, owner)
+          task = createFromInput(db, parsed.value, owner, config)
         } catch (error) {
           throw new ToolError(error instanceof Error ? error.message : String(error))
         }
@@ -133,9 +133,19 @@ export function taskTools(scope: ScopedTools): TeamTool[] {
         const started = startBotTask(db, agent, String(args.task_id), self().session_id)
         if (!started.ok) throw new ToolError(started.error)
         wrote()
-        if (!started.workflow) return { task_id: args.task_id, status: 'running', run_id: started.runId }
+        const task = getTask(db, String(args.task_id))!
+        // A code task in a repository has its own worktree: the bot works and commits there, never in the user's checkout.
+        const where = task.data.worktree
+          ? {
+            workspace: task.data.repo, branch: task.data.worktree.branch,
+            note: self().sandbox
+              ? `Work in ${task.data.repo} (branch ${task.data.worktree.branch}), not in ${task.data.source_repo}. Your sandbox cannot write the repository's .git, so leave the changes uncommitted; the user sees them in the task.`
+              : `Work and commit in ${task.data.repo} (branch ${task.data.worktree.branch}), not in ${task.data.source_repo}. If you open a pull request, put its URL in the finish_task summary.`,
+          }
+          : task.data.repo ? { workspace: task.data.repo } : {}
+        if (!started.workflow) return { task_id: args.task_id, status: 'running', run_id: started.runId, ...where }
         return {
-          task_id: args.task_id, status: 'running', run_id: started.runId, workflow_run_id: started.workflow.id,
+          task_id: args.task_id, status: 'running', run_id: started.runId, ...where, workflow_run_id: started.workflow.id,
           workflow: describeRun(started.workflow), how: WORKFLOW_HOW,
         }
       },

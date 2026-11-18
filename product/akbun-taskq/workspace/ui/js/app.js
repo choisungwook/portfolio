@@ -21,6 +21,8 @@ import { initSearchView } from './views/search-view.js'
 import { initSharedFolder } from './views/shared-folder.js'
 import { initPluginsView } from './views/plugins-view.js'
 import { initWorkflowsView } from './views/workflows-view.js'
+import { initWikiTransfer } from './views/wiki-transfer.js'
+import { initUsageSettings } from './views/usage-settings.js'
 import { initGlobalSettings, loadGlobalSettings } from './views/global-settings.js'
 import { initTokenNotice } from './views/token-notice.js'
 
@@ -45,6 +47,8 @@ initSearchView()
 initSharedFolder()
 initPluginsView()
 initWorkflowsView()
+initWikiTransfer()
+initUsageSettings()
 initNav()
 if (hasToken) {
   loadGlobalSettings()

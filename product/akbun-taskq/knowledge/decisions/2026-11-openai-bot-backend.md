@@ -3,7 +3,7 @@ type: Decision
 title: OpenAI bots plug in behind TeamBackend, with tools chosen by permission mode
 description: An OpenAI Agents SDK backend runs bots with the same hub, tools, limits and gate; the Responses API keeps the conversation, the permission mode picks file and shell tools, and cost is estimated from tokens.
 tags: [bots, agent-sdk, openai]
-generated: { by: claude-code/claude-opus-5-5, at: 2026-11-18T23:00:00Z }
+generated: { by: claude-code/claude-opus-5-5, at: 2026-11-18T23:30:00Z }
 ---
 
 ## 결정
@@ -14,6 +14,7 @@ generated: { by: claude-code/claude-opus-5-5, at: 2026-11-18T23:00:00Z }
 - OpenAI Agents SDK에는 권한 모드와 auto 모드가 없다. taskq가 파일·셸 도구를 직접 만들고 권한 모드로 준다. plan은 읽기, accept edits는 bot 폴더와 공용 폴더 쓰기, bypass는 셸까지다. 샌드박스를 켠 bot에게는 셸을 주지 않는다. 모든 호출은 `botGate`를 거친다.
 - 실행 중 메시지 추가(live input)는 하지 않는다. 메시지는 다음 turn까지 큐에 쌓인다.
 - 비용은 토큰 수에 설정 단가(`bots.openaiInputPerMTok`, `openaiOutputPerMTok`)를 곱해 추정한다.
+- skill은 Claude bot과 같은 등록을 쓴다. OpenAI SDK에는 skill 로더가 없어 `read_skill` 도구가 이름과 설명을 보이고 부르면 SKILL.md를 돌려준다. Claude Code plugin 형식은 OpenAI bot에 쓰지 않고, MCP server 등록을 두 SDK가 같이 쓴다(OpenAI는 `MCPServerStdio`).
 
 ## 이유
 

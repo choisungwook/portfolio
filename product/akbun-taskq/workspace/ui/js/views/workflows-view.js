@@ -4,19 +4,16 @@
 // - the run history like Argo: every run with the bot that executed it, its status, and whether the workflow was
 //   deleted since; a run opens as its graph colored by step status, with outputs, evidence and approval buttons.
 import { api, mutate, notify, qs } from '../core/api.js'
-import { area, clear, el } from '../core/dom.js'
+import { area, el, fill } from '../core/dom.js'
 import { emit, on } from '../core/bus.js'
 import { show } from '../core/nav.js'
 import { t } from '../core/i18n.js'
 import { fmtDateTime } from '../core/time.js'
 import { botAvatar } from './avatar.js'
+import { createCanvas, KIND_LABEL } from './workflow-canvas.js'
 
-const KINDS = {
-  do: ['wf.kind.do', 'Do'], check: ['wf.kind.check', 'Check (needs evidence)'],
-  handoff: ['wf.kind.handoff', 'Hand off to a bot'], approval: ['wf.kind.approval', 'User approval'],
-}
+const KINDS = KIND_LABEL
 const POLL_MS = 5000
-const SVG = 'http://www.w3.org/2000/svg'
 
 let root
 let screen = 'list'      // list | edit | runs | run
@@ -77,7 +74,7 @@ function statusChip(status) {
 
 async function renderList() {
   const workflows = await api.get('/workflows')
-  clear(root).append(
+  fill(root, 
     header(t('nav.workflows', 'Workflows'), el('button', { type: 'button', class: 'primary', text: `+ ${t('wf.new', 'New workflow')}`, onclick: () => edit(null) })),
     workflows.length === 0
       ? el('p', { class: 'meta', text: t('wf.empty', 'No workflows yet. A workflow is a list of steps a bot runs in order; assign it to a task and give the task to a bot.') })
@@ -120,149 +117,115 @@ async function remove(w) {
 function edit(w) {
   editing = w
     ? { id: w.id, name: w.name, description: w.description, steps: structuredClone(w.definition.steps) }
-    : { id: null, name: '', description: '', steps: [{ id: 'step-1', name: '', kind: 'do', instructions: '', needs: [] }] }
+    : { id: null, name: '', description: '', steps: [] }
+  dirty = false
   go('edit')
 }
 
+let canvas = null
+let inspector = null
+let dirty = false
+
+// The editor: a palette of step kinds on the left, the canvas in the middle, the selected step's fields on the right.
 function renderEditor() {
+  inspector = el('aside', { class: 'wf-inspector', 'aria-label': t('wf.inspector', 'Step') })
+  const count = el('span', { class: 'meta', text: `${editing.steps.length} ${t('wf.steps', 'steps')}` })
+  canvas = createCanvas({
+    steps: editing.steps, editable: true, notify,
+    onChange: () => {
+      dirty = true
+      count.textContent = `${editing.steps.length} ${t('wf.steps', 'steps')}`
+    },
+    onSelect: (selection) => renderInspector(selection),
+  })
+  const palette = el('div', { class: 'wf-palette', 'aria-label': t('wf.add_step', 'Add step') },
+    el('p', { class: 'meta', text: t('wf.add_step', 'Add step') }),
+    ...Object.entries(KINDS).map(([kind, label]) => el('button', {
+      type: 'button', class: 'wf-palette-item', dataset: { kind }, text: t(...label),
+      onclick: () => canvas.add(newStep(kind)),
+    })),
+  )
+  const help = el('p', { class: 'meta wf-help', text: t('wf.help', 'Drag a node to move it. Drag from its right dot to another node to make that one run after it. Click a link and press Delete to remove it.') })
   const form = el('form', { class: 'wf-editor', onsubmit: save },
     el('div', { class: 'wf-meta' },
-      el('label', {}, t('wf.name', 'Name'), el('input', { name: 'name', required: true, maxlength: 80, value: editing.name, oninput: (e) => { editing.name = e.target.value } })),
-      el('label', {}, t('wf.description', 'Description'), el('input', { name: 'description', maxlength: 1000, value: editing.description, oninput: (e) => { editing.description = e.target.value } }))),
-    el('div', { class: 'wf-canvas', 'data-area': 'wf-canvas' }, graph(editing.steps, null, (id) => document.getElementById(`wf-step-${id}`)?.scrollIntoView({ behavior: 'smooth', block: 'center' }))),
-    el('ol', { class: 'wf-steps' }, ...editing.steps.map((step, i) => stepForm(step, i))),
+      el('label', {}, t('wf.name', 'Name'), el('input', { name: 'name', required: true, maxlength: 80, value: editing.name, oninput: (e) => { editing.name = e.target.value; dirty = true } })),
+      el('label', {}, t('wf.description', 'Description'), el('input', { name: 'description', maxlength: 1000, value: editing.description, oninput: (e) => { editing.description = e.target.value; dirty = true } }))),
+    el('div', { class: 'wf-studio' }, palette, canvas.element, inspector, help),
     el('div', { class: 'wf-actions' },
-      el('button', { type: 'button', text: `+ ${t('wf.add_step', 'Add step')}`, onclick: addStep }),
+      count,
       el('span', { class: 'compose-spacer' }),
-      el('button', { type: 'button', text: t('wf.cancel', 'Cancel'), onclick: () => go('list') }),
+      el('button', { type: 'button', text: t('wf.cancel', 'Cancel'), onclick: () => { if (!dirty || confirm(t('wf.discard', 'Discard the changes?'))) go('list') } }),
       el('button', { type: 'submit', class: 'primary', text: t('wf.save', 'Save') })),
   )
-  clear(root).append(header(editing.id ? editing.name || t('wf.edit', 'Edit') : t('wf.new', 'New workflow')), form)
+  fill(root, header(editing.id ? editing.name || t('wf.edit', 'Edit') : t('wf.new', 'New workflow')), form)
+  renderInspector(null)
+  if (editing.steps.length === 0) canvas.add(newStep('do'))
 }
 
-function redrawGraph() {
-  const canvas = area('wf-canvas', root)
-  if (canvas) clear(canvas).append(graph(editing.steps, null, (id) => document.getElementById(`wf-step-${id}`)?.scrollIntoView({ behavior: 'smooth', block: 'center' })))
-}
-
-function stepForm(step, index) {
-  const others = editing.steps.filter((s) => s !== step)
-  const field = (key, node) => { node.addEventListener('input', () => { step[key] = node.value; redrawGraph() }); return node }
-  const kind = el('select', { 'aria-label': t('wf.kind', 'Kind') }, ...Object.entries(KINDS).map(([k, label]) => el('option', { value: k, text: t(...label), selected: step.kind === k })))
-  kind.addEventListener('change', () => { step.kind = kind.value; renderEditor() })
-  return el('li', { class: 'wf-step', id: `wf-step-${step.id}` },
-    el('div', { class: 'wf-step-row' },
-      el('span', { class: 'wf-index', text: String(index + 1) }),
-      el('label', {}, 'id', field('id', el('input', { value: step.id, required: true, pattern: '[a-z0-9][a-z0-9\\-]{0,31}', maxlength: 32, class: 'mono' }))),
-      el('label', { class: 'grow' }, t('wf.step_name', 'Step'), field('name', el('input', { value: step.name, required: true, maxlength: 120 }))),
-      el('label', {}, t('wf.kind', 'Kind'), kind),
-      step.kind === 'handoff' ? el('label', {}, t('wf.to', 'To bot'), field('to', el('select', {},
-        el('option', { value: '', text: '—' }), ...bots.map((b) => el('option', { value: b.name, text: b.name, selected: step.to === b.name }))))) : null,
-      el('button', { type: 'button', class: 'danger-quiet', 'aria-label': t('wf.remove_step', 'Remove step'), text: '✕', onclick: () => removeStep(step) })),
-    el('label', { class: 'wide' }, t('wf.instructions', 'Instructions for the bot'),
-      field('instructions', el('textarea', { rows: 2, maxlength: 4000, text: step.instructions }))),
-    others.length === 0 ? null : el('fieldset', { class: 'wf-needs' }, el('legend', { text: t('wf.needs', 'Runs after') }),
-      ...others.map((o) => el('label', { class: 'check' }, el('input', {
-        type: 'checkbox', checked: step.needs.includes(o.id),
-        onchange: (e) => { step.needs = e.target.checked ? [...step.needs, o.id] : step.needs.filter((n) => n !== o.id); redrawGraph() },
-      }), o.name || o.id))),
-  )
-}
-
-function addStep() {
+function newStep(kind) {
   let n = editing.steps.length + 1
   while (editing.steps.some((s) => s.id === `step-${n}`)) n += 1
-  const last = editing.steps.at(-1)
-  editing.steps.push({ id: `step-${n}`, name: '', kind: 'do', instructions: '', needs: last ? [last.id] : [] })
-  renderEditor()
+  return { id: `step-${n}`, name: t(...KINDS[kind]), kind, instructions: '', needs: [] }
 }
 
-function removeStep(step) {
-  editing.steps = editing.steps.filter((s) => s !== step)
-  for (const s of editing.steps) s.needs = s.needs.filter((n) => n !== step.id)
-  renderEditor()
+function renderInspector(selection) {
+  if (!inspector) return
+  const step = selection?.type === 'node' ? editing.steps.find((s) => s.id === selection.id) : null
+  if (!step) {
+    fill(inspector, el('p', { class: 'meta', text: selection?.type === 'edge'
+      ? t('wf.edge_selected', 'Link selected. Press Delete to remove it.')
+      : t('wf.pick_node', 'Select a step to edit it.') }))
+    return
+  }
+  const changed = (key, value, redraw = true) => {
+    step[key] = value
+    dirty = true
+    if (redraw) canvas.render()
+  }
+  const kind = el('select', { name: 'kind', onchange: (e) => { changed('kind', e.target.value); renderInspector(selection) } },
+    ...Object.entries(KINDS).map(([k, label]) => el('option', { value: k, text: t(...label), selected: step.kind === k })))
+  const idInput = el('input', { value: step.id, maxlength: 32, pattern: '[a-z0-9][a-z0-9\\-]{0,31}', class: 'mono',
+    onchange: (e) => {
+      const next = e.target.value.trim()
+      if (!/^[a-z0-9][a-z0-9-]{0,31}$/.test(next) || editing.steps.some((s) => s !== step && s.id === next)) {
+        notify(t('wf.bad_id', 'The id must be unique: lowercase letters, digits and hyphens'), true)
+        e.target.value = step.id
+        return
+      }
+      for (const s of editing.steps) s.needs = s.needs.map((n) => (n === step.id ? next : n))
+      step.id = next
+      dirty = true
+      canvas.select({ type: 'node', id: next })
+    } })
+  fill(inspector,
+    el('h3', { text: step.name || step.id }),
+    el('label', {}, t('wf.step_name', 'Step'), el('input', { value: step.name, maxlength: 120, oninput: (e) => changed('name', e.target.value) })),
+    el('label', {}, 'id', idInput),
+    el('label', {}, t('wf.kind', 'Kind'), kind),
+    step.kind === 'handoff' ? el('label', {}, t('wf.to', 'To bot'), el('select', { onchange: (e) => changed('to', e.target.value) },
+      el('option', { value: '', text: '—' }), ...bots.map((b) => el('option', { value: b.name, text: b.name, selected: step.to === b.name })))) : null,
+    el('label', {}, t('wf.instructions', 'Instructions for the bot'),
+      el('textarea', { rows: 6, maxlength: 4000, text: step.instructions, oninput: (e) => changed('instructions', e.target.value, false) })),
+    el('p', { class: 'meta', text: step.needs.length ? `${t('wf.needs', 'Runs after')}: ${step.needs.join(', ')}` : t('wf.first', 'Runs first') }),
+    el('button', { type: 'button', class: 'danger-quiet', text: t('wf.remove_step', 'Remove step'), onclick: () => canvas.removeSelected() }),
+  )
 }
 
 async function save(event) {
   event.preventDefault()
   const body = { name: editing.name.trim(), description: editing.description, definition: { steps: editing.steps } }
   const saved = await mutate(() => (editing.id ? api.put(`/workflows/${editing.id}`, body) : api.post('/workflows', body)), t('wf.saved', 'Saved'))
-  if (saved) go('list')
-}
-
-// ---- graph ----
-
-// Steps laid out left to right by depth (the longest chain of needs before them), like n8n's canvas. Clicking a node
-// calls onPick with its id. `states` colors nodes by run status.
-function graph(steps, states, onPick) {
-  const byId = new Map(steps.map((s) => [s.id, s]))
-  const depth = new Map()
-  const depthOf = (id, seen = new Set()) => {
-    if (depth.has(id)) return depth.get(id)
-    if (seen.has(id) || !byId.has(id)) return 0
-    seen.add(id)
-    const d = Math.max(-1, ...byId.get(id).needs.map((n) => depthOf(n, seen))) + 1
-    depth.set(id, d)
-    return d
+  if (saved) {
+    dirty = false
+    go('list')
   }
-  for (const s of steps) depthOf(s.id)
-  const columns = []
-  for (const s of steps) {
-    const d = depth.get(s.id)
-    if (!columns[d]) columns[d] = []
-    columns[d].push(s)
-  }
-  const W = 184, H = 52, GX = 56, GY = 20
-  const pos = new Map()
-  columns.forEach((col, x) => {
-    col.forEach((s, y) => {
-      pos.set(s.id, { x: 12 + x * (W + GX), y: 12 + y * (H + GY) })
-    })
-  })
-  const width = 24 + columns.length * (W + GX) - GX
-  const height = 24 + Math.max(1, ...columns.map((c) => c.length)) * (H + GY) - GY
-  const svg = document.createElementNS(SVG, 'svg')
-  svg.setAttribute('viewBox', `0 0 ${width} ${height}`)
-  svg.setAttribute('width', String(width))
-  svg.setAttribute('height', String(height))
-  svg.setAttribute('role', 'img')
-  svg.setAttribute('aria-label', steps.map((s) => s.name || s.id).join(', '))
-  const node = (tag, attrs, text) => {
-    const n = document.createElementNS(SVG, tag)
-    for (const [k, v] of Object.entries(attrs)) n.setAttribute(k, String(v))
-    if (text !== undefined) n.textContent = text
-    return n
-  }
-  for (const s of steps) {
-    for (const need of s.needs) {
-      const a = pos.get(need), b = pos.get(s.id)
-      if (!a || !b) continue
-      const x1 = a.x + W, y1 = a.y + H / 2, x2 = b.x, y2 = b.y + H / 2
-      svg.append(node('path', { class: 'wf-edge', d: `M${x1},${y1} C${x1 + GX / 2},${y1} ${x2 - GX / 2},${y2} ${x2},${y2}` }))
-    }
-  }
-  for (const s of steps) {
-    const p = pos.get(s.id)
-    const state = states?.get(s.id)
-    const g = node('g', { class: 'wf-node', 'data-kind': s.kind, 'data-status': state ?? 'none', tabindex: 0, transform: `translate(${p.x},${p.y})` })
-    g.append(node('rect', { width: W, height: H, rx: 12 }))
-    g.append(node('text', { x: 12, y: 21, class: 'wf-node-name' }, (s.name || s.id).slice(0, 20)))
-    // A run shows each step's status; the editor shows its kind.
-    const second = state ? t(`wf.status.${state}`, state) : `${t(...KINDS[s.kind])}${s.to ? ` → ${s.to}` : ''}`
-    g.append(node('text', { x: 12, y: 39, class: 'wf-node-kind' }, second.length > 24 ? `${second.slice(0, 23)}…` : second))
-    const pick = () => onPick?.(s.id)
-    g.addEventListener('click', pick)
-    g.addEventListener('keydown', (e) => { if (e.key === 'Enter') pick() })
-    svg.append(g)
-  }
-  return svg
 }
 
 // ---- runs ----
 
 async function renderRuns() {
   const runs = await api.get(`/workflow-runs${qs({ limit: 100 })}`)
-  clear(root).append(
+  fill(root, 
     header(t('wf.runs', 'Run history')),
     runs.length === 0 ? el('p', { class: 'meta', text: t('wf.no_runs', 'No runs yet.') }) : el('table', { class: 'wf-runs' },
       el('thead', {}, el('tr', {}, ...[t('wf.col.status', 'Status'), t('wf.col.workflow', 'Workflow'), t('wf.col.bot', 'Bot'), t('wf.col.task', 'Task'), t('wf.col.started', 'Started'), t('wf.col.duration', 'Duration')].map((h) => el('th', { text: h })))),
@@ -285,7 +248,7 @@ async function renderRun() {
   const run = await api.get(`/workflow-runs/${openRun}`)
   const states = new Map(run.steps.map((s) => [s.step_id, s.status]))
   const byId = new Map(run.steps.map((s) => [s.step_id, s]))
-  clear(root).append(
+  fill(root, 
     header(`${run.workflow_name} · ${run.id.slice(0, 8)}`,
       run.status === 'running' ? el('button', { type: 'button', class: 'danger-quiet', text: t('wf.cancel_run', 'Cancel run'), onclick: async () => {
         if (await mutate(() => api.post(`/workflow-runs/${run.id}/cancel`), t('wf.cancelled', 'Cancelled'))) render()
@@ -295,7 +258,10 @@ async function renderRun() {
       el('span', { class: 'meta', text: ` · ${fmtDateTime(run.started_at)} · ${duration(run.started_at, run.ended_at)}` }),
       run.workflow_deleted ? el('span', { class: 'badge', text: t('wf.deleted_since', 'workflow deleted; this run used its copy') }) : null),
     run.summary ? el('p', { class: 'meta', text: run.summary }) : null,
-    el('div', { class: 'wf-canvas' }, graph(run.snapshot.steps, states, (id) => document.getElementById(`wf-run-step-${id}`)?.scrollIntoView({ behavior: 'smooth', block: 'center' }))),
+    createCanvas({
+      steps: structuredClone(run.snapshot.steps), editable: false, states,
+      onSelect: (selection) => { if (selection?.type === 'node') document.getElementById(`wf-run-step-${selection.id}`)?.scrollIntoView({ behavior: 'smooth', block: 'center' }) },
+    }).element,
     el('ol', { class: 'wf-steps' }, ...run.snapshot.steps.map((step) => {
       const s = byId.get(step.id)
       return el('li', { class: 'wf-step', id: `wf-run-step-${step.id}` },

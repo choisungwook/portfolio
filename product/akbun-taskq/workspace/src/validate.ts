@@ -11,6 +11,7 @@ export interface TaskInput {
   lock_key: string | null
   data: TaskData
   depends_on: string[]
+  worktree?: boolean   // for a code task in a git repository: work in a new worktree (default true)
 }
 
 export interface TaskPatch {
@@ -39,6 +40,12 @@ function asObject(body: unknown): Obj {
 function optText(value: unknown, key: string, limit = TEXT_LIMIT): string | undefined {
   if (value === undefined || value === null) return undefined
   if (typeof value !== 'string' || value.length > limit) throw new InputError(`${key} must be a string up to ${limit} characters`)
+  return value
+}
+
+function optBool(value: unknown, key: string): boolean | undefined {
+  if (value === undefined || value === null) return undefined
+  if (typeof value !== 'boolean') throw new InputError(`${key} must be true or false`)
   return value
 }
 
@@ -137,6 +144,7 @@ export function parseTaskInput(body: unknown, known: SkillLookup): Parsed<TaskIn
         lock_key: optText(o.lock_key, 'lock_key', 100) ?? null,
         data,
         depends_on: optIds(o.depends_on, 'depends_on'),
+        worktree: optBool(o.worktree, 'worktree'),
       },
     }
   } catch (error) {

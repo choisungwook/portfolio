@@ -177,7 +177,14 @@
     <section id="view-plugins" data-view-panel="plugins" aria-label="Plugins" data-area="plugins-view" hidden>
       <h2 class="view-title" data-i18n="nav.plugins">Plugins</h2>
       <p class="meta" data-i18n="plugins.hint">Skills and plugins registered here can be chosen per bot in its settings. Update pulls a git checkout and reloads every bot that uses it.</p>
-    <section class="plugins-section" aria-labelledby="bot-skills-title">
+      <div class="wf-tabs plugins-tabs" role="tablist" aria-label="Agent SDK">
+        <button type="button" role="tab" data-sdk-tab="claude" aria-selected="true">Claude</button>
+        <button type="button" role="tab" data-sdk-tab="openai" aria-selected="false">OpenAI</button>
+      </div>
+    <section class="plugins-section" data-sdk="openai" hidden>
+      <p class="meta" data-i18n="plugins.openai_hint">OpenAI bots use the same skills (they read SKILL.md with the read_skill tool when they need one) and the MCP servers below. Claude Code plugins do not load in the OpenAI Agents SDK.</p>
+    </section>
+    <section class="plugins-section" aria-labelledby="bot-skills-title" data-sdk="both">
       <h3 class="plugins-heading" id="bot-skills-title" data-i18n="settings.skills">Skills for bots</h3>
       <p class="meta">Agent skill folders (with SKILL.md) that bots can load. Each bot picks its own in its settings.</p>
       <ul class="skill-list" data-area="registry-skill"></ul>
@@ -186,7 +193,7 @@
         <button type="submit">Add</button>
       </form>
     </section>
-    <section class="plugins-section" aria-labelledby="bot-plugins-title">
+    <section class="plugins-section" aria-labelledby="bot-plugins-title" data-sdk="claude">
       <h3 class="plugins-heading" id="bot-plugins-title" data-i18n="settings.plugins">Plugins for bots</h3>
       <p class="meta">Claude Code plugin folders (with .claude-plugin/plugin.json): skills, commands, hooks and MCP servers together.</p>
       <ul class="skill-list" data-area="registry-plugin"></ul>
@@ -195,7 +202,19 @@
         <button type="submit">Add</button>
       </form>
     </section>
-      <section class="plugins-section" aria-labelledby="official-title">
+    <section class="plugins-section" aria-labelledby="bot-mcp-title" data-sdk="both">
+      <h3 class="plugins-heading" id="bot-mcp-title" data-i18n="plugins.mcp">MCP servers for bots</h3>
+      <p class="meta" data-i18n="plugins.mcp_hint">A command started over stdio for the bots that pick it, Claude and OpenAI alike. It runs as you, outside the bot gate: register only servers you trust, and keep keys in your environment, not here.</p>
+      <ul class="skill-list" data-area="registry-mcp"></ul>
+      <form class="skill-path-form mcp-form" data-area="registry-mcp-form">
+        <label>Name <input name="name" type="text" maxlength="40" pattern="[a-z0-9][a-z0-9\-]{0,39}" required autocomplete="off" spellcheck="false" placeholder="github"></label>
+        <label>Command <input name="command" type="text" maxlength="500" required autocomplete="off" spellcheck="false" placeholder="npx"></label>
+        <label>Arguments <input name="args" type="text" maxlength="2000" autocomplete="off" spellcheck="false" placeholder="-y @modelcontextprotocol/server-github"></label>
+        <label>Description <input name="description" type="text" maxlength="500" autocomplete="off"></label>
+        <button type="submit">Add</button>
+      </form>
+    </section>
+      <section class="plugins-section" aria-labelledby="official-title" data-sdk="claude">
         <div class="plugins-head">
           <h3 id="official-title" class="plugins-heading" data-i18n="plugins.official">Official marketplace</h3>
           <label class="check"><input type="checkbox" data-area="official-anthropic" checked> <span data-i18n="plugins.anthropic_only">Anthropic only</span></label>
@@ -266,6 +285,9 @@
           <div class="attach-chips" data-area="task-attachments" hidden></div>
         </div>
         <label class="wide" data-area="task-skill-field">Access skill <select name="access_skill"><option value="">none</option></select></label>
+        <label class="wide">Repository or folder <input name="repo" type="text" maxlength="500" list="repo-options" autocomplete="off" spellcheck="false" placeholder="pick a repository or type an absolute folder path" data-area="task-repo"><datalist id="repo-options" data-area="repo-options"></datalist></label>
+        <p class="meta wide" data-area="task-repo-info"></p>
+        <label class="check wide" data-area="task-worktree-field" hidden><input name="worktree" type="checkbox" checked> Work in a new git worktree (its own branch; your checkout stays as it is)</label>
         <label>Bot <select name="owner" data-area="task-owner-select"><option value="">none (the queue runs it)</option></select></label>
         <label>Workflow <select name="workflow_id" data-area="task-workflow-select"><option value="">none</option></select></label>
         <p class="meta wide" data-area="task-workflow-hint" hidden>Only a bot runs workflows: pick the bot that runs it.</p>
@@ -287,7 +309,6 @@
             <label>Depends on <input name="depends_on" type="text" maxlength="8" pattern="[0-9a-f]{8}" placeholder="task id"></label>
             <label class="check wide"><input name="auto_accept_handoffs" type="checkbox" checked> Automatically accept incoming handoffs</label>
             <label>Priority <input name="priority" type="number" min="-100" max="100" step="1" value="0"></label>
-            <label class="wide">Repository <input name="repo" type="text" maxlength="500" placeholder="absolute path, for a task that works in a repository"></label>
             <label class="wide">Output path <input name="output_path" type="text" maxlength="500" placeholder="relative path under outputs/"></label>
           </div>
         </details>
@@ -308,9 +329,10 @@
       <label data-area="bot-name-row">Name <input name="name" type="text" maxlength="32" pattern="[a-z][a-z0-9\-]*" autocomplete="off" spellcheck="false" placeholder="coder"></label>
       <label data-area="bot-preset-row">Start from <select name="preset" data-area="bot-preset"><option value="">Blank</option></select></label>
       <label>Role <input name="role" type="text" maxlength="40" autocomplete="off"></label>
-      <label>Agent SDK <select name="sdk" data-area="bot-sdk"><option value="claude">Claude Agent SDK</option><option value="openai">OpenAI Agents SDK</option></select></label>
+      <label>Agent SDK <select name="sdk" data-area="bot-sdk"><option value="claude">Claude Agent SDK</option><option value="openai">OpenAI</option><option value="kiro">Kiro (AWS)</option></select></label>
+      <label data-area="bot-provider-row" hidden>Sign in with <select name="provider"><option value="api">OpenAI API key (Agents SDK)</option><option value="bedrock">Amazon Bedrock (Agents SDK)</option><option value="chatgpt">ChatGPT plan (Codex CLI)</option></select></label>
       <label>Model <input name="model" type="text" maxlength="100" autocomplete="off" placeholder="config default"></label>
-      <p class="meta wide" data-area="bot-sdk-hint" hidden>OpenAI bots have no auto mode. Their permission mode picks their tools: plan reads files, accept edits also writes in its folder and the shared folder, bypass also runs shell commands. Set OPENAI_API_KEY where taskq runs.</p>
+      <p class="meta wide" data-area="bot-sdk-hint" hidden></p>
       <label class="wide">Description <span class="meta">Other bots hand work to this bot by this text.</span><textarea name="description" rows="2" maxlength="500" required></textarea></label>
       <label class="wide">Instructions <textarea name="instructions" rows="5" maxlength="8000"></textarea></label>
       <label class="wide">Working directory <input name="workdir" type="text" maxlength="500" autocomplete="off" spellcheck="false" placeholder="the bot's own folder"></label>
@@ -324,10 +346,11 @@
       <p class="meta">taskq's own data and config are always off limits; a call that reaches them stops the turn and pauses the bots.</p>
     </fieldset>
     <fieldset>
-      <legend>Skills and plugins</legend>
-      <p class="meta">Registered in the global settings. Saving copies the chosen ones for this bot; Reload copies them again.</p>
+      <legend>Skills, plugins and MCP servers</legend>
+      <p class="meta">Registered in the Plugins menu. Saving copies the chosen skills and plugins for this bot; Reload copies them again. Plugins load only in Claude bots.</p>
       <div class="bot-picks" data-area="bot-skills"></div>
       <div class="bot-picks" data-area="bot-plugins"></div>
+      <div class="bot-picks" data-area="bot-mcp"></div>
     </fieldset>
     <fieldset>
       <legend>Limits</legend>
@@ -384,6 +407,31 @@
       <h3 id="limits-title" data-i18n="settings.limits">Rate limits</h3>
       <p class="meta" data-i18n="settings.limits.hint">Limits for all bots together, and the defaults each bot uses unless its own settings say otherwise.</p>
       <form class="limits-form" data-area="limits-form"></form>
+    </section>
+    <section class="settings-section" aria-labelledby="usage-title">
+      <div class="plugins-head">
+        <h3 id="usage-title" data-i18n="settings.usage">Usage</h3>
+        <select data-area="usage-period" aria-label="Period">
+          <option value="today" data-i18n="usage.today">Today</option>
+          <option value="7d" selected data-i18n="usage.7d">Last 7 days</option>
+          <option value="30d" data-i18n="usage.30d">Last 30 days</option>
+          <option value="all" data-i18n="usage.all">All time</option>
+        </select>
+      </div>
+      <p class="meta" data-i18n="usage.hint">Tokens and cost of every bot session, by SDK. OpenAI cost is estimated from the prices in taskq.config.json; the ChatGPT plan has no per-turn price; Kiro reports credits when kiro-cli gives them.</p>
+      <div data-area="usage-report"></div>
+    </section>
+    <section class="settings-section" aria-labelledby="kiro-title">
+      <h3 id="kiro-title">Kiro (AWS)</h3>
+      <p class="meta" data-i18n="kiro.hint">Kiro bots use your AWS IAM Identity Center session. Enter your SSO start URL and region and sign in: kiro-cli shows a code to approve in the browser and keeps the session; taskq stores no token.</p>
+      <p data-area="kiro-status"></p>
+      <form class="mcp-form kiro-form" data-area="kiro-form">
+        <label>SSO start URL <input name="start_url" type="url" required placeholder="https://your-org.awsapps.com/start" autocomplete="off" spellcheck="false"></label>
+        <label>Region <input name="region" type="text" required placeholder="us-east-1" autocomplete="off" spellcheck="false"></label>
+        <button type="submit" data-i18n="kiro.sign_in">Sign in with AWS SSO</button>
+        <button type="button" data-area="kiro-check" data-i18n="kiro.check">Check status</button>
+      </form>
+      <div data-area="kiro-login"></div>
     </section>
     <section class="settings-section" aria-labelledby="folders-title">
       <h3 id="folders-title" data-i18n="settings.folders">Folders</h3>

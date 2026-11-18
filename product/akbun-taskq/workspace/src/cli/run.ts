@@ -7,6 +7,9 @@ import { startServer } from '../api/server.ts'
 import { createRetrospector } from '../memory/retrospect.ts'
 import { createTeamHub, type TeamHub } from '../team/hub.ts'
 import { createOpenAITeamBackend } from '../agents/openai/team.ts'
+import { createKiroTeamBackend } from '../agents/kiro/team.ts'
+import { createJobRunner } from '../jobs/runner.ts'
+import { JOB_HANDLERS } from '../jobs/handlers.ts'
 
 // Runs the loop and the API in this process until SIGINT or SIGTERM. The API token lives in memory only: a new start
 // issues a new token, and the UI gets it from the URL fragment printed below.
@@ -21,9 +24,12 @@ export async function runCommand(config: Config, db: Db): Promise<void> {
   const server = await startServer({ db, config, control: runner, bots: hub }, token)
   await runner.start()
   await hub?.start()
+  const jobs = createJobRunner(db, config, JOB_HANDLERS)
+  jobs.start()
   console.log(`taskq running at http://127.0.0.1:${config.port}/#token=${token}`)
   const shutdown = async () => {
     await hub?.stop()
+    await jobs.stop()
     await runner.stop()
     server.close()
     db.close()
@@ -40,5 +46,5 @@ function teamHub(config: Config, db: Db, agent: ReturnType<typeof agentFor>): Te
     return undefined
   }
   // OpenAI bots run on their own backend next to the Claude one; it needs OPENAI_API_KEY only when such a bot works.
-  return createTeamHub({ db, config, backend: agent.team, backends: { openai: createOpenAITeamBackend() } })
+  return createTeamHub({ db, config, backend: agent.team, backends: { openai: createOpenAITeamBackend(), kiro: createKiroTeamBackend() } })
 }

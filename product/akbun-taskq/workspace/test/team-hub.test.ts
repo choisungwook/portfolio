@@ -1,6 +1,6 @@
 import { test, describe } from 'node:test'
 import assert from 'node:assert/strict'
-import { USER, getAgent, listMessages, listTurns, postMessage, seedAgents } from '../src/db/team.ts'
+import { USER, getAgent, listMessages, listTurns, postMessage, seedAgents, setAgentSession, updateAgent } from '../src/db/team.ts'
 import { createTeamHub, isTeamPaused, resumeTeam, teamPauseReason, type TeamHub } from '../src/team/hub.ts'
 import type { TeamBackend, TurnRequest, TurnResult } from '../src/team/types.ts'
 import { teamChanged } from '../src/wake.ts'
@@ -183,6 +183,43 @@ describe('team hub', () => {
     teamChanged.notify()
     await waitFor(() => getAgent(db, 'taskq')?.session_id === 'fresh')
     assert.deepEqual(requests.map((r) => r.resume), ['gone', null])
+  })
+
+  test('[critical] a lost OpenAI or Kiro login turns off only that bot; the team keeps working', async () => {
+    const { db, config } = env
+    updateAgent(db, 'coder', { ...getAgent(db, 'coder')!, sdk: 'kiro' })
+    const kiro: TeamBackend = { sdk: 'kiro', async runTurn() { return { outcome: 'failed', auth_failed: true, error: 'login', cost_usd: 0 } } }
+    hub = createTeamHub({ db, config, backend: fakeBackend(() => ({ outcome: 'done', cost_usd: 0 })).backend, backends: { kiro }, retryAfterSec: 0 })
+    await hub.start()
+    postMessage(db, { sender: USER, recipient: 'coder', body: 'hi' })
+    teamChanged.notify()
+    await waitFor(() => getAgent(db, 'coder')?.enabled === false)
+    assert.equal(isTeamPaused(db), false)
+    const alert = db.prepare(`SELECT message FROM alerts WHERE kind = 'auth_required'`).get() as { message: string } | undefined
+    assert.match(alert?.message ?? '', /coder was turned off: its Kiro login failed/)
+    assert.equal(db.prepare('SELECT sdk FROM team_turns ORDER BY id DESC LIMIT 1').get()?.sdk, 'kiro', 'the turn keeps the runtime it started on')
+  })
+
+  test('[critical] a new SDK or provider starts a new session; the reset clears the context and the session cost', async () => {
+    const { db } = env
+    setAgentSession(db, 'coder', 'claude-session')
+    db.prepare(`UPDATE team_agents SET context_tokens = 5000, context_window = 200000, session_cost_usd = 2 WHERE name = 'coder'`).run()
+    updateAgent(db, 'coder', { ...getAgent(db, 'coder')!, role: 'renamed' })
+    assert.equal(getAgent(db, 'coder')?.session_id, 'claude-session', 'other edits keep the session')
+    updateAgent(db, 'coder', { ...getAgent(db, 'coder')!, sdk: 'openai', provider: 'api' })
+    const moved = db.prepare(`SELECT session_id, context_tokens, context_window FROM team_agents WHERE name = 'coder'`).get()
+    assert.deepEqual({ ...moved }, { session_id: null, context_tokens: null, context_window: null })
+    setAgentSession(db, 'coder', 'resp_1')
+    updateAgent(db, 'coder', { ...getAgent(db, 'coder')!, provider: 'bedrock' })
+    assert.equal(getAgent(db, 'coder')?.session_id, null, 'a Responses id is not a Bedrock session')
+    setAgentSession(db, 'coder', 'local:coder:1')
+    db.prepare(`UPDATE team_agents SET context_tokens = 900, session_cost_usd = 1 WHERE name = 'coder'`).run()
+    const res = await createApp({ db, config: env.config }, TOKEN).request('/api/bots/coder/reset', {
+      method: 'POST', headers: { 'x-taskq-token': TOKEN, 'content-type': 'application/json', host: `127.0.0.1:${env.config.port}` }, body: '{}',
+    })
+    assert.equal(res.status, 200)
+    const reset = db.prepare(`SELECT session_id, context_tokens, session_cost_usd FROM team_agents WHERE name = 'coder'`).get()
+    assert.deepEqual({ ...reset }, { session_id: null, context_tokens: null, session_cost_usd: 0 })
   })
 
   test('a login failure pauses the team until the user resumes it', async () => {

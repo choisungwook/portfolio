@@ -10,7 +10,10 @@ export const ORCHESTRATOR = 'taskq'
 
 export type BotEffort = 'low' | 'medium' | 'high' | 'xhigh' | 'max'
 export const EFFORTS: BotEffort[] = ['low', 'medium', 'high', 'xhigh', 'max']
-export type BotSdk = 'claude' | 'openai'
+export type BotSdk = 'claude' | 'openai' | 'kiro'
+// How an OpenAI bot signs in: an API key, Amazon Bedrock, or the user's ChatGPT plan through Codex.
+export type BotProvider = 'api' | 'bedrock' | 'chatgpt'
+export const PROVIDERS: BotProvider[] = ['api', 'bedrock', 'chatgpt']
 
 export type BotPermissionMode = 'auto' | 'acceptEdits' | 'default' | 'dontAsk' | 'plan' | 'bypassPermissions'
 export const PERMISSION_MODES: BotPermissionMode[] = ['auto', 'acceptEdits', 'default', 'dontAsk', 'plan', 'bypassPermissions']
@@ -29,10 +32,12 @@ export interface BotSettings {
   blocked_commands: string[]  // Bash command patterns (* matches anything) that are always refused
   workdir: string | null      // absolute working directory; null is the bot's own folder under TASKQ_HOME/team/
   skills: string[]            // names from the global skill registry
-  plugins: string[]           // names from the global plugin registry
+  plugins: string[]           // names from the global plugin registry (Claude bots)
+  mcp_servers: string[]       // names from the MCP server registry (both SDKs)
   model: string | null        // null uses the config model
   effort: BotEffort | null    // reasoning effort; null leaves it to the model
   sdk: BotSdk                 // which agent SDK runs the bot
+  provider: BotProvider | null   // OpenAI bots: how they sign in; null is api
   hourly_turns: number | null    // per-bot rate limit; null uses the global default
   turn_budget_usd: number | null // per-turn spend limit; null uses the global default
   turn_max_turns: number | null  // per-turn model turns; null uses the global default
@@ -72,7 +77,7 @@ export interface TeamTurn {
 }
 
 const BODY_LIMIT = 8000
-const JSON_FIELDS = ['allowed_domains', 'blocked_commands', 'skills', 'plugins'] as const
+const JSON_FIELDS = ['allowed_domains', 'blocked_commands', 'skills', 'plugins', 'mcp_servers'] as const
 const BOOL_FIELDS = ['may_message_user', 'enabled', 'sandbox', 'system'] as const
 
 function toAgent(row: Record<string, unknown>): TeamAgent {
@@ -86,23 +91,27 @@ function toAgent(row: Record<string, unknown>): TeamAgent {
 export function createAgent(db: Db, name: string, settings: BotSettings, system = false): void {
   db.prepare(`INSERT INTO team_agents (name, role, description, instructions, may_message_user, enabled, system,
     permission_mode, sandbox, allowed_domains, blocked_commands, workdir, skills, plugins, model, sdk, hourly_turns,
-    turn_budget_usd, turn_max_turns, effort, created_at)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`).run(
+    turn_budget_usd, turn_max_turns, effort, mcp_servers, provider, created_at)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`).run(
     name, settings.role, settings.description, settings.instructions, settings.may_message_user ? 1 : 0, settings.enabled ? 1 : 0,
     system ? 1 : 0, settings.permission_mode, settings.sandbox ? 1 : 0, JSON.stringify(settings.allowed_domains),
     JSON.stringify(settings.blocked_commands), settings.workdir, JSON.stringify(settings.skills), JSON.stringify(settings.plugins),
-    settings.model, settings.sdk, settings.hourly_turns, settings.turn_budget_usd, settings.turn_max_turns, settings.effort, nowSec())
+    settings.model, settings.sdk, settings.hourly_turns, settings.turn_budget_usd, settings.turn_max_turns, settings.effort,
+    JSON.stringify(settings.mcp_servers ?? []), settings.provider ?? null, nowSec())
 }
 
 export function updateAgent(db: Db, name: string, settings: BotSettings): boolean {
+  // A session of one runtime cannot be resumed by another: a new SDK or OpenAI provider starts a new session.
+  db.prepare(`UPDATE team_agents SET session_id = NULL, session_cost_usd = 0, context_tokens = NULL, context_window = NULL
+    WHERE name = ? AND (sdk IS NOT ? OR coalesce(provider, 'api') IS NOT coalesce(?, 'api'))`).run(name, settings.sdk, settings.provider ?? null)
   return db.prepare(`UPDATE team_agents SET role = ?, description = ?, instructions = ?, may_message_user = ?, enabled = ?,
     permission_mode = ?, sandbox = ?, allowed_domains = ?, blocked_commands = ?, workdir = ?, skills = ?, plugins = ?, model = ?,
-    sdk = ?, hourly_turns = ?, turn_budget_usd = ?, turn_max_turns = ?, effort = ?
+    sdk = ?, hourly_turns = ?, turn_budget_usd = ?, turn_max_turns = ?, effort = ?, mcp_servers = ?, provider = ?
     WHERE name = ?`).run(
     settings.role, settings.description, settings.instructions, settings.may_message_user ? 1 : 0, settings.enabled ? 1 : 0,
     settings.permission_mode, settings.sandbox ? 1 : 0, JSON.stringify(settings.allowed_domains), JSON.stringify(settings.blocked_commands),
     settings.workdir, JSON.stringify(settings.skills), JSON.stringify(settings.plugins), settings.model, settings.sdk,
-    settings.hourly_turns, settings.turn_budget_usd, settings.turn_max_turns, settings.effort, name).changes === 1
+    settings.hourly_turns, settings.turn_budget_usd, settings.turn_max_turns, settings.effort, JSON.stringify(settings.mcp_servers ?? []), settings.provider ?? null, name).changes === 1
 }
 
 // The orchestrator is refused. Its tasks go back to the user; its messages stay for the record.
@@ -136,6 +145,11 @@ export function getAgent(db: Db, name: string): TeamAgent | undefined {
 
 export function setAgentSession(db: Db, name: string, sessionId: string | null): void {
   db.prepare('UPDATE team_agents SET session_id = ? WHERE name = ?').run(sessionId, name)
+}
+
+// The user's reset: the next turn starts a new session with an empty context.
+export function resetAgentSession(db: Db, name: string): void {
+  db.prepare('UPDATE team_agents SET session_id = NULL, session_cost_usd = 0, context_tokens = NULL WHERE name = ?').run(name)
 }
 
 // Used when a turn ends: the session is replaced only if nobody reset it while the turn ran.
@@ -193,10 +207,12 @@ export function startTurn(db: Db, agent: string, limit: number): { turn: TeamTur
     const messages = db.prepare(`SELECT * FROM team_messages m WHERE recipient = ? AND ${DELIVERABLE}
       ORDER BY id LIMIT ?`).all(agent, nowSec(), limit) as unknown as TeamMessage[]
     if (messages.length === 0) return undefined
-    const session = getAgent(db, agent)?.session_id ?? null
     const now = nowSec()
-    const id = Number(db.prepare('INSERT INTO team_turns (agent, session_id, started_at) VALUES (?, ?, ?)')
-      .run(agent, session, now).lastInsertRowid)
+    const bot = getAgent(db, agent)
+    const session = bot?.session_id ?? null
+    // The runtime is recorded when the turn starts: a settings change mid-turn must not move it to another SDK in Usage.
+    const id = Number(db.prepare('INSERT INTO team_turns (agent, session_id, started_at, sdk, provider) VALUES (?, ?, ?, ?, ?)')
+      .run(agent, session, now, bot?.sdk ?? null, bot?.sdk === 'openai' ? bot.provider ?? 'api' : null).lastInsertRowid)
     const mark = db.prepare('UPDATE team_messages SET read_at = ?, turn_id = ?, attempts = attempts + 1 WHERE id = ?')
     for (const message of messages) mark.run(now, id, message.id)
     const turn: TeamTurn = {

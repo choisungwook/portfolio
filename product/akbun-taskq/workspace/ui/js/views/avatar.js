@@ -30,8 +30,10 @@ function circle(name, label, size) {
   }, label)
 }
 
-// The agent SDK a bot runs on, as a small mark at the avatar's lower right: Claude today; another SDK gets its own mark.
-const SDK_MARKS = { claude: { text: '✻', title: 'Claude Agent SDK' }, openai: { text: '◎', title: 'OpenAI Agents SDK' } }
+// The agent SDK a bot runs on, as a small mark at the avatar's lower right.
+const SDK_MARKS = {
+  claude: { text: '✻', title: 'Claude Agent SDK' }, openai: { text: '◎', title: 'OpenAI' }, kiro: { text: 'K', title: 'Kiro (AWS)' },
+}
 
 export function botAvatar(name, size = 40, sdk = null) {
   const face = circle(name, name.slice(0, 1).toUpperCase(), size)

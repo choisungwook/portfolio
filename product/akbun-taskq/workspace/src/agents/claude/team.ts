@@ -11,6 +11,7 @@ import { ToolError, type TeamTool } from '../../team/tools.ts'
 import type { Catalog, CatalogRequest, TeamBackend, TurnRequest, TurnResult } from '../../team/types.ts'
 import { buildEnv } from './auth.ts'
 import { LiveInput } from '../../team/live-input.ts'
+import { worktreesDir } from '../../workspace/worktree.ts'
 
 export type TeamQueryFn = (params: { prompt: AsyncIterable<SDKUserMessage>; options: Options }) => AsyncIterable<SDKMessage>
 
@@ -54,16 +55,32 @@ async function runTurn(config: Config, request: TurnRequest, runQuery: TeamQuery
   const live = request.live ?? new LiveInput()
   let turns = 0
   let total = 0
+  // Tokens add up over the turn's results; the context is the last model call's input (with cache) against the model's
+  // context window, which modelUsage reports.
+  const usage = { input_tokens: 0, output_tokens: 0, cache_read_tokens: 0, cache_write_tokens: 0 }
+  let context: { tokens: number; window: number | null } | undefined
+  let model: string | undefined
   try {
     for await (const message of runQuery({ prompt: userMessages(live, request.prompt), options: optionsFor(config, request, abort, state) })) {
       if (message.type === 'system' && message.subtype === 'init') sessionId = message.session_id
       else if (message.type === 'assistant' && message.error && INFERENCE_AUTH_ERRORS.has(message.error)) authFailed = true
+      else if (message.type === 'assistant') {
+        const u = message.message.usage
+        if (u) context = { tokens: (u.input_tokens ?? 0) + (u.cache_read_input_tokens ?? 0) + (u.cache_creation_input_tokens ?? 0), window: context?.window ?? null }
+        model = message.message.model ?? model
+      }
       else if (message.type === 'result') {
         turns += message.num_turns
         total = message.total_cost_usd
+        usage.input_tokens += message.usage?.input_tokens ?? 0
+        usage.output_tokens += message.usage?.output_tokens ?? 0
+        usage.cache_read_tokens += message.usage?.cache_read_input_tokens ?? 0
+        usage.cache_write_tokens += message.usage?.cache_creation_input_tokens ?? 0
+        const windows = Object.values(message.modelUsage ?? {}).map((m) => m.contextWindow).filter((w) => w > 0)
+        if (context && windows.length) context = { ...context, window: Math.max(...windows) }
         const ids = message.user_message_uuids ?? (message.user_message_uuid ? [message.user_message_uuid] : undefined)
         live.answer(ids, !ids && message.queued_turn_count === 0)
-        const base = { session_id: sessionId ?? message.session_id, turns, session_total_usd: total }
+        const base = { session_id: sessionId ?? message.session_id, turns, session_total_usd: total, usage: { ...usage }, context, model }
         const failed = message.subtype !== 'success'
         const pending = live.unanswered() > 0 || (message.queued_turn_count ?? 0) > 0
         if (state.tampered || authFailed || failed || !pending) live.close()
@@ -98,7 +115,11 @@ function optionsFor(config: Config, request: TurnRequest, abort: AbortController
     // The skill copy is taskq's own plugin with skills only; it never brings MCP servers.
     plugins: request.plugins.map((path) => (path.endsWith('skills-plugin') ? { type: 'local' as const, path, skipMcpDiscovery: true } : { type: 'local' as const, path })),
     strictMcpConfig: request.plugins.length === 0,
-    mcpServers: { [SERVER]: serverFor(request.tools) },
+    // The bots' own tools, plus the registered MCP servers this bot picked (started over stdio by Claude Code).
+    mcpServers: {
+      ...Object.fromEntries((request.mcpServers ?? []).map((s) => [s.name, { type: 'stdio' as const, command: s.command, args: s.args }])),
+      [SERVER]: serverFor(request.tools),
+    },
     permissionMode: agent.permission_mode,
     allowDangerouslySkipPermissions: agent.permission_mode === 'bypassPermissions' || undefined,
     allowedTools: request.tools.map((t) => `mcp__${SERVER}__${t.name}`),
@@ -109,13 +130,14 @@ function optionsFor(config: Config, request: TurnRequest, abort: AbortController
       enabled: true,
       failIfUnavailable: true,
       allowUnsandboxedCommands: false,
-      filesystem: { allowWrite: [request.cwd, request.sharedDir], denyRead: [dataDir, join(config.home, 'taskq.config.json')] },
+      filesystem: { allowWrite: [request.cwd, request.sharedDir, worktreesDir(config)], denyRead: [dataDir, join(config.home, 'taskq.config.json')] },
       network: { allowedDomains: agent.allowed_domains },
     } : undefined,
     effort: agent.effort ?? undefined,
     maxTurns: request.maxTurns,
     maxBudgetUsd: request.budgetUsd,
-    additionalDirectories: [request.sharedDir],
+    // The shared folder, and the task worktrees a bot works in when it starts a code task.
+    additionalDirectories: [request.sharedDir, worktreesDir(config)],
     resume: request.resume ?? undefined,
     abortController: abort,
     systemPrompt: { type: 'preset', preset: 'claude_code', append: request.system },

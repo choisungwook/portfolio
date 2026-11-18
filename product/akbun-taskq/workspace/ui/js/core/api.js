@@ -58,6 +58,17 @@ export const api = {
     return res.blob()
   },
   del: (path, body) => request('DELETE', path, body ?? {}),
+  // A plain-text answer (a diff): same token header, the body as a string, the error text on failure.
+  text: async (path) => {
+    const res = await fetch(`/api${path}`, { headers: { 'x-taskq-token': getToken() ?? '' } })
+    const text = await res.text()
+    if (!res.ok) {
+      let message = `HTTP ${res.status}`
+      try { message = JSON.parse(text).error ?? message } catch { /* not JSON */ }
+      throw new ApiError(message, res.status)
+    }
+    return text
+  },
 }
 
 // Builds ?a=1&b=2 and skips empty values.

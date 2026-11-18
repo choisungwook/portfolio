@@ -13,6 +13,8 @@ import { agentFor } from '../src/agents/index.ts'
 import { TASKS } from './demo-data.ts'
 import { seedTeam } from './demo-team.ts'
 import { seedWorkflows } from './demo-workflows.ts'
+import { seedWorkspace } from './demo-workspace.ts'
+import { seedUsage } from './demo-usage.ts'
 import { seedRuns, type SeededRun } from './demo-runs.ts'
 
 type AlertArg = Parameters<typeof raiseAlert>[1]
@@ -144,6 +146,8 @@ export async function seedDemo(db: Db, config: Config, home: string, configDir: 
   seedTeam(db, (all.find((t) => t.type === 'code') ?? all[0]).id,
     all.filter((t) => !['done', 'failed'].includes(t.status)).slice(0, 6).map((t) => t.id))
   seedWorkflows(db, (all.find((t) => t.type === 'code') ?? all[0]).id)
+  seedWorkspace(db, config, home)
+  seedUsage(db, now)
   await pauseLikeRunner(db, config)
   return controller
 }

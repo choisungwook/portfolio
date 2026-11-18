@@ -28,6 +28,9 @@ export interface BotsConfig {
   // million tokens) for the daily budget. Set them to your model's price list.
   openaiInputPerMTok: number
   openaiOutputPerMTok: number
+  bedrockRegion: string        // OpenAI bots on Amazon Bedrock: the region of the OpenAI-compatible endpoint
+  codexPath: string            // OpenAI bots on the ChatGPT plan: the Codex CLI to run
+  kiroPath: string             // Kiro bots: the kiro-cli to run
 }
 
 export interface Config {
@@ -74,7 +77,7 @@ export const DEFAULTS: Omit<Config, 'home'> = {
   bots: {
     enabled: false, maxConcurrentTurns: 2, turnMaxTurns: 30, turnBudgetUsd: 1, dailyBudgetUsd: 10,
     hourlyTurnsPerAgent: 20, maxOpenTasks: 10, maxAttempts: 3, readRoots: [],
-    openaiInputPerMTok: 1.25, openaiOutputPerMTok: 10,
+    openaiInputPerMTok: 1.25, openaiOutputPerMTok: 10, bedrockRegion: 'us-west-2', codexPath: 'codex', kiroPath: 'kiro-cli',
   },
 }
 

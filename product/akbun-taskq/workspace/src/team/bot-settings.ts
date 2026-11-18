@@ -1,6 +1,6 @@
 import { existsSync, statSync } from 'node:fs'
 import { isAbsolute } from 'node:path'
-import { EFFORTS, PERMISSION_MODES, type BotEffort, type BotPermissionMode, type BotSdk, type BotSettings } from '../db/team.ts'
+import { EFFORTS, PERMISSION_MODES, type BotEffort, type BotPermissionMode, type BotProvider, type BotSdk, type BotSettings, PROVIDERS } from '../db/team.ts'
 import { BOT_DEFAULTS } from './roster.ts'
 import { PERMISSIONS_BY_SDK } from './catalog.ts'
 
@@ -27,8 +27,14 @@ function list(value: unknown, key: string, check: (item: string) => boolean, lim
   return items
 }
 
+function providerOf(value: unknown): BotProvider | null {
+  if (value === null || value === '' || value === undefined) return null
+  if (!PROVIDERS.includes(value as BotProvider)) throw new Error(`provider must be one of ${PROVIDERS.join(', ')}`)
+  return value as BotProvider
+}
+
 function sdkOf(value: unknown): BotSdk {
-  if (value !== 'claude' && value !== 'openai') throw new Error('sdk must be claude or openai')
+  if (value !== 'claude' && value !== 'openai' && value !== 'kiro') throw new Error('sdk must be claude, openai or kiro')
   return value
 }
 
@@ -48,7 +54,7 @@ function limit(value: unknown, key: string, min: number, max: number, integer: b
   return n
 }
 
-export function parseBotSettings(body: unknown, known: { skills: Set<string>; plugins: Set<string> }, base?: BotSettings): Parsed<BotSettings> {
+export function parseBotSettings(body: unknown, known: { skills: Set<string>; plugins: Set<string>; mcp?: Set<string> }, base?: BotSettings): Parsed<BotSettings> {
   try {
     if (typeof body !== 'object' || body === null || Array.isArray(body)) throw new Error('body must be a JSON object')
     const o = body as Record<string, unknown>
@@ -78,14 +84,17 @@ export function parseBotSettings(body: unknown, known: { skills: Set<string>; pl
       workdir,
       skills: has('skills') ? list(o.skills, 'skills', (n) => known.skills.has(n)) : from.skills,
       plugins: has('plugins') ? list(o.plugins, 'plugins', (n) => known.plugins.has(n)) : from.plugins,
+      mcp_servers: has('mcp_servers') ? list(o.mcp_servers, 'mcp_servers', (n) => known.mcp?.has(n) ?? false) : from.mcp_servers ?? [],
       model: has('model') ? (text(o.model, 'model', 100) || null) : from.model,
       sdk: has('sdk') ? sdkOf(o.sdk) : from.sdk,
+      provider: has('provider') ? providerOf(o.provider) : from.provider ?? null,
       effort: has('effort') ? effortOf(o.effort) : from.effort,
       hourly_turns: has('hourly_turns') ? limit(o.hourly_turns, 'hourly_turns', 1, 1000, true) : from.hourly_turns,
       turn_budget_usd: has('turn_budget_usd') ? limit(o.turn_budget_usd, 'turn_budget_usd', 0.01, 100, false) : from.turn_budget_usd,
       turn_max_turns: has('turn_max_turns') ? limit(o.turn_max_turns, 'turn_max_turns', 1, 500, true) : from.turn_max_turns,
     }
     if (!value.description) throw new Error('description is required: other bots delegate by it')
+    if (value.sdk !== 'openai') value.provider = null
     // The OpenAI Agents SDK has no auto mode or permission modes; taskq builds an OpenAI bot's tools from plan,
     // acceptEdits or bypassPermissions. A bot switched to OpenAI without a mode given gets acceptEdits.
     if (!PERMISSIONS_BY_SDK[value.sdk].includes(value.permission_mode)) {

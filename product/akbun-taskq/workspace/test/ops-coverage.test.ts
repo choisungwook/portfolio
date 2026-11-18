@@ -70,4 +70,25 @@ describe('CLI and MCP reach every route', () => {
       await client.close()
     }
   })
+
+  test('[critical] taskq mcp --bot serves one bot\'s own tools, acting as that bot', async (t) => {
+    const env = setup()
+    t.after(env.cleanup)
+    await seedTestBots(env.db)
+    const transport = new StdioClientTransport({ command: process.execPath, args: ['bin/taskq', 'mcp', '--bot', 'coder'], env: { TASKQ_HOME: env.home, TASKQ_NO_NOTIFY: '1' }, stderr: 'pipe' })
+    const client = new Client({ name: 'taskq-test', version: '1.0.0' })
+    try {
+      await client.connect(transport)
+      const names = (await client.listTools()).tools.map((tool) => tool.name)
+      assert.ok(['send_message', 'start_task', 'workflow_step', 'memory_write'].every((n) => names.includes(n)))
+      const sent = await client.callTool({ name: 'send_message', arguments: { to: 'planner', body: 'hi from codex' } })
+      assert.notEqual(sent.isError, true)
+      const row = env.db.prepare('SELECT sender, recipient FROM team_messages ORDER BY id DESC LIMIT 1').get()
+      assert.deepEqual({ ...row }, { sender: 'coder', recipient: 'planner' })
+      const bad = await client.callTool({ name: 'send_message', arguments: { to: 'nobody', body: 'x' } })
+      assert.equal(bad.isError, true)
+    } finally {
+      await client.close()
+    }
+  })
 })

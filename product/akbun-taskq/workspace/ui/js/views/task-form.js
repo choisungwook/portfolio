@@ -37,13 +37,23 @@ export function initTaskForm() {
     dialog.showModal()
     loadSkillOptions()
     loadBotOptions()
+    loadRepoOptions()
+    showRepo()
   })
   dialog.querySelector('[data-close]').addEventListener('click', () => dialog.close())
   form.addEventListener('submit', submit)
   fitIntent = autosize(form.elements.intent, 360)
+  let repoTimer
+  form.elements.repo.addEventListener('input', () => {
+    clearTimeout(repoTimer)
+    repoTimer = setTimeout(showRepo, 300)
+  })
   files = attachments({ zone: area('task-attach-zone'), button: area('task-attach'), chips: area('task-attachments'), pasteTarget: form })
   form.addEventListener('change', (event) => {
-    if (event.target.name === 'kind') showKind()
+    if (event.target.name === 'kind' || event.target.name === 'mode') {
+      showKind()
+      showRepo()
+    }
     if (event.target.name === 'workflow_id' || event.target.name === 'owner') showWorkflowHint()
   })
   on('settings-closed', loadSkillOptions)
@@ -64,6 +74,34 @@ async function loadBotOptions() {
 
 function showWorkflowHint() {
   area('task-workflow-hint').hidden = !(form.elements.workflow_id.value && !form.elements.owner.value)
+}
+
+// Repositories to pick from; any absolute folder can be typed as well.
+async function loadRepoOptions() {
+  try {
+    const repos = await api.get('/repos')
+    area('repo-options').replaceChildren(...repos.map((r) => el('option', { value: r.path, text: r.branch ? `${r.path} (${r.branch})` : r.path })))
+  } catch {
+    // The field still takes a typed path.
+  }
+}
+
+// The worktree switch shows for a task that writes code in a git repository; reading needs no worktree.
+let repoInfo = null
+async function showRepo() {
+  const path = form.elements.repo.value.trim()
+  const info = area('task-repo-info')
+  repoInfo = null
+  if (path) {
+    try {
+      repoInfo = await api.get(`/paths/check?path=${encodeURIComponent(path)}`)
+    } catch {
+      repoInfo = null
+    }
+  }
+  const writes = form.elements.kind.value === 'task' && form.elements.mode.value === 'code'
+  info.textContent = !path ? '' : !repoInfo?.exists ? 'This folder does not exist.' : repoInfo.git ? `git repository on ${repoInfo.branch ?? '?'}` : 'plain folder (no git)'
+  area('task-worktree-field').hidden = !(writes && repoInfo?.git)
 }
 
 // The access skill list comes from the registry. A name that is no longer registered falls back to none.
@@ -101,6 +139,7 @@ function body() {
   const dependsOn = String(data.get('depends_on') ?? '').trim()
   if (dependsOn !== '') out.depends_on = [dependsOn]
   out.auto_accept_handoffs = data.has('auto_accept_handoffs')
+  if (!area('task-worktree-field').hidden) out.worktree = data.has('worktree')
   const attached = files.files()
   if (attached.length) out.attachments = attached
   return out
