@@ -1,6 +1,6 @@
 # akbun-taskq: wiki export·import, worktree, Plugins SDK 하위 메뉴, n8n식 workflow 편집기
 
-- Issue: 새로 만들 예정 (root #1483)
+- Issue: #1519 (root #1483)
 - Branch: claude/taskq-agent-expansion-cqvk13
 
 ## 실행 계획
