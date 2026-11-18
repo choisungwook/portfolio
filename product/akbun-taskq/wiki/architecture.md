@@ -526,7 +526,7 @@ The approval input is the one exemption. The exact text is stored in `approvals.
 
 ## Critical tests
 
-`npm run test:critical` runs only the tests whose name contains `[critical]`, and pull requests run only these. The full suite (`npm test`) runs everything. Each row below is one invariant and the tests that guard it. The gate rows are cases of the `decide table` and `access skill folder` tables in `test/gate.test.ts`. The aws-guard rows are cases of the `isReadOnlyAws` tables in `test/aws-guard.test.ts`.
+`npm run test:critical` runs only the tests whose name contains `[critical]`, and pull requests run only these. The full suite (`npm test`) runs everything. Both run test files in parallel (`node --test` uses one process per file, about 30 s on 4 cores against 80 s one file at a time). In CI the type check and the docs and operations coverage run in one job, and the tests in two shard jobs (`--test-shard=1/2`, `2/2`) next to it. Each row below is one invariant and the tests that guard it. The gate rows are cases of the `decide table` and `access skill folder` tables in `test/gate.test.ts`. The aws-guard rows are cases of the `isReadOnlyAws` tables in `test/aws-guard.test.ts`.
 
 | Invariant | Test |
 |---|---|
