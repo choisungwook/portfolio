@@ -1,6 +1,6 @@
 import { execFileSync, spawnSync } from 'node:child_process'
 import { existsSync, mkdirSync, statSync } from 'node:fs'
-import { basename, isAbsolute, join } from 'node:path'
+import { basename, isAbsolute, join, relative } from 'node:path'
 import type { Config } from '../config.ts'
 
 // A task that writes to a git repository works in its own worktree, the way Claude Desktop gives each session one:
@@ -60,8 +60,20 @@ export function createWorktree(config: Config, repo: string, taskId: string): Wo
   return { path, branch, base, base_branch: info.branch && info.branch !== 'HEAD' ? info.branch : 'main' }
 }
 
-export function removeWorktree(sourceRepo: string, worktree: Worktree): void {
-  git(sourceRepo, ['worktree', 'remove', '--force', worktree.path])
+// Uncommitted edits and new files in the worktree; removing it would lose them (the branch keeps commits only).
+export function hasUncommitted(worktree: Worktree): boolean {
+  return Boolean(tryGit(worktree.path, ['status', '--porcelain']))
+}
+
+export function removeWorktree(sourceRepo: string, worktree: Worktree, discardUncommitted = false): void {
+  git(sourceRepo, ['worktree', 'remove', ...(discardUncommitted ? ['--force'] : []), worktree.path])
+}
+
+// The folder inside the worktree that matches the folder the user picked (a package of a monorepo, say).
+export function worktreeFolder(worktree: Worktree, picked: string): string {
+  const top = tryGit(picked, ['rev-parse', '--show-toplevel'])
+  const sub = top ? relative(top, picked) : ''
+  return sub && !sub.startsWith('..') ? join(worktree.path, sub) : worktree.path
 }
 
 export interface ChangedFile {
@@ -72,21 +84,33 @@ export interface ChangedFile {
 }
 
 // Everything that differs from the base: commits on the branch and uncommitted edits, plus new untracked files.
+// -z keeps paths exactly as they are (no quoting of non-ASCII names, renames as two separate paths).
 export function changedFiles(worktree: Worktree): ChangedFile[] {
   if (!existsSync(worktree.path)) return []
+  const fields = (args: string[]) => (tryGit(worktree.path, args) ?? '').split('\0')
   const status = new Map<string, ChangedFile['status']>()
-  for (const line of (tryGit(worktree.path, ['diff', '--name-status', worktree.base]) ?? '').split('\n').filter(Boolean)) {
-    const [code, ...rest] = line.split('\t')
-    const file = rest.at(-1)!
-    status.set(file, code.startsWith('A') ? 'added' : code.startsWith('D') ? 'deleted' : code.startsWith('R') ? 'renamed' : 'modified')
+  const order: string[] = []
+  const names = fields(['diff', '-z', '--name-status', worktree.base])
+  for (let i = 0; i < names.length - 1;) {
+    const code = names[i]
+    const renamed = code.startsWith('R') || code.startsWith('C')
+    const file = renamed ? names[i + 2] : names[i + 1]
+    i += renamed ? 3 : 2
+    if (!file) continue
+    status.set(file, code.startsWith('A') || code.startsWith('C') ? 'added' : code.startsWith('D') ? 'deleted' : renamed ? 'renamed' : 'modified')
+    order.push(file)
   }
-  const files: ChangedFile[] = []
-  for (const line of (tryGit(worktree.path, ['diff', '--numstat', worktree.base]) ?? '').split('\n').filter(Boolean)) {
-    const [add, del, ...rest] = line.split('\t')
-    const file = rest.join('\t').replace(/^.*\{.* => (.*)\}.*$/, '$1')
-    files.push({ path: file, status: status.get(file) ?? 'modified', additions: add === '-' ? null : Number(add), deletions: del === '-' ? null : Number(del) })
+  const counts = new Map<string, { additions: number | null; deletions: number | null }>()
+  const stats = fields(['diff', '-z', '--numstat', worktree.base])
+  for (let i = 0; i < stats.length - 1;) {
+    const [add, del, path] = stats[i].split('\t')
+    // A rename leaves the path empty and gives the old and new paths as the next two fields.
+    const file = path === '' ? stats[i + 2] : path
+    i += path === '' ? 3 : 1
+    if (file) counts.set(file, { additions: add === '-' ? null : Number(add), deletions: del === '-' ? null : Number(del) })
   }
-  for (const file of (tryGit(worktree.path, ['ls-files', '--others', '--exclude-standard']) ?? '').split('\n').filter(Boolean)) {
+  const files: ChangedFile[] = order.map((file) => ({ path: file, status: status.get(file)!, ...(counts.get(file) ?? { additions: null, deletions: null }) }))
+  for (const file of fields(['ls-files', '-z', '--others', '--exclude-standard']).filter(Boolean)) {
     files.push({ path: file, status: 'untracked', additions: null, deletions: null })
   }
   return files

@@ -1,7 +1,7 @@
 import { inTransaction, type Db } from './open.ts'
 import { getWorkflow } from './workflows.ts'
 import type { Config } from '../config.ts'
-import { createWorktree, pathInfo } from '../workspace/worktree.ts'
+import { createWorktree, pathInfo, worktreeFolder } from '../workspace/worktree.ts'
 import type { Task, TaskData, TaskStatus, TaskType } from '../types.ts'
 import { newId } from '../ids.ts'
 import { nowSec } from '../time.ts'
@@ -149,7 +149,7 @@ export function createFromInput(db: Db, input: TaskInput, owner: string | null =
   let data = input.data
   if (config && data.repo && input.type === 'code' && input.worktree !== false && pathInfo(data.repo).git) {
     const worktree = createWorktree(config, data.repo, id)
-    data = { ...data, source_repo: data.repo, repo: worktree.path, worktree, base_commit: worktree.base }
+    data = { ...data, source_repo: data.repo, repo: worktreeFolder(worktree, data.repo), worktree, base_commit: worktree.base }
   }
   return inTransaction(db, () => insertTask(db, {
     id, type: input.type, status: input.status, priority: input.priority, lock_key: input.lock_key, owner, data,

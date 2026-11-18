@@ -64,8 +64,16 @@ async function load(task, aside, onChange) {
       ws.kind === 'worktree' && !ws.removed && task.status !== 'running' ? el('button', {
         type: 'button', class: 'danger-quiet', text: t('ws.remove', 'Remove worktree'),
         onclick: async () => {
-          if (!confirm(t('ws.remove_confirm', 'Remove the worktree folder? The branch stays in the repository.'))) return
-          if (await mutate(() => api.post(`/tasks/${task.id}/workspace/remove`), t('ws.removed', 'removed'))) onChange()
+          if (!confirm(t('ws.remove_confirm', 'Remove the worktree folder? The branch keeps its commits.'))) return
+          try {
+            await api.post(`/tasks/${task.id}/workspace/remove`)
+          } catch (error) {
+            if (error.status !== 409 || !/uncommitted/.test(error.message)) return notify(error.message, true)
+            if (!confirm(t('ws.discard_confirm', 'The worktree has uncommitted changes. Removing it deletes them for good. Remove anyway?'))) return
+            if (!(await mutate(() => api.post(`/tasks/${task.id}/workspace/remove`, { discard: true })))) return
+          }
+          notify(t('ws.removed', 'removed'))
+          onChange()
         },
       }) : null,
     ),

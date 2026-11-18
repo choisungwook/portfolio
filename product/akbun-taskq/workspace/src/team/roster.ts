@@ -11,6 +11,7 @@ export const BOT_DEFAULTS: Omit<BotSettings, 'role' | 'description' | 'instructi
   workdir: null,
   skills: [],
   mcp_servers: [],
+  provider: null,
   plugins: [],
   model: null,
   effort: null,

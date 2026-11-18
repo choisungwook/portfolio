@@ -39,7 +39,9 @@ export function profileFor(task: Task, config: Config): Profile {
         ...READ_TOOLS, 'Edit', 'Write', 'Bash(git diff *)', 'Bash(git status)', 'Bash(git log *)', 'Bash(npm test)', 'Bash(npm run *)',
       ]
       const profile = plain(mode, allowed, repo, [repo, ...config.sandbox.allowWrite])
-      return config.trustedRepos.includes(repo) ? { ...profile, settingSources: ['user', 'project'] } : profile
+      // A task in its own worktree is trusted when the repository the user picked is.
+      const trusted = config.trustedRepos.includes(task.data.source_repo ?? repo)
+      return trusted ? { ...profile, settingSources: ['user', 'project'] } : profile
     }
     case 'security_review': {
       const repo = requireRepo(task)

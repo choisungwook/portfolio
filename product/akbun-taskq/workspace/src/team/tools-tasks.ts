@@ -136,7 +136,12 @@ export function taskTools(scope: ScopedTools): TeamTool[] {
         const task = getTask(db, String(args.task_id))!
         // A code task in a repository has its own worktree: the bot works and commits there, never in the user's checkout.
         const where = task.data.worktree
-          ? { workspace: task.data.repo, branch: task.data.worktree.branch, note: `Work and commit in ${task.data.repo} (branch ${task.data.worktree.branch}), not in ${task.data.source_repo}. If you open a pull request, put its URL in the finish_task summary.` }
+          ? {
+            workspace: task.data.repo, branch: task.data.worktree.branch,
+            note: self().sandbox
+              ? `Work in ${task.data.repo} (branch ${task.data.worktree.branch}), not in ${task.data.source_repo}. Your sandbox cannot write the repository's .git, so leave the changes uncommitted; the user sees them in the task.`
+              : `Work and commit in ${task.data.repo} (branch ${task.data.worktree.branch}), not in ${task.data.source_repo}. If you open a pull request, put its URL in the finish_task summary.`,
+          }
           : task.data.repo ? { workspace: task.data.repo } : {}
         if (!started.workflow) return { task_id: args.task_id, status: 'running', run_id: started.runId, ...where }
         return {

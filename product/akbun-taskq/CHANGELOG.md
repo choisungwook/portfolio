@@ -9,9 +9,9 @@
 ### Added
 
 - task worktree. 새 작업에서 저장소나 폴더를 고른다(알려진 저장소 목록과 직접 입력). 저장소에서 코드를 고치는 작업은 기본으로 자기 worktree(`TASKQ_HOME/worktrees/<repo>-<task>`, 브랜치 `taskq/<task>`)에서 일하고, 내 checkout은 바뀌지 않는다. 끌 수 있고, 읽기만 하는 작업과 일반 폴더는 worktree를 만들지 않는다.
-- 작업 상세 오른쪽의 작업 공간 패널(Claude Desktop처럼): worktree 절대 경로, 브랜치, 기준 커밋, 바뀐 파일과 파일별 diff, PR 링크(실행 요약이나 bot 메시지에서 찾음) 또는 GitHub 비교 링크, VS Code로 열기(`vscode://file/<path>`), 폴더 열기, worktree 삭제(브랜치는 남김).
+- 작업 상세 오른쪽의 작업 공간 패널(Claude Desktop처럼): worktree 절대 경로, 브랜치, 기준 커밋, 바뀐 파일과 파일별 diff(한글 파일명과 이름 바꾼 파일 포함), PR 링크(실행 요약이나 bot 메시지에서 찾음) 또는 GitHub 비교 링크, VS Code로 열기(`vscode://file/<path>`), 폴더 열기, worktree 삭제(커밋은 브랜치에 남고, 커밋하지 않은 변경이 있으면 한 번 더 확인한 뒤에만 지움). 저장소의 하위 폴더를 고르면 worktree 안의 같은 하위 폴더에서 일하고, `trustedRepos` 판정은 원래 저장소로 한다.
 - wiki 내보내기: 모든 페이지를 front matter가 붙은 markdown과 `manifest.json`으로 zip(deflate level 9)에 담아 `shared/exports/`에 둔다.
-- wiki 가져오기: zip, 폴더, 파일을 bot이 쓸 수 있게 소화한다. 문서마다 페이지, 긴 문서는 `##` 절마다 페이지, 문서 사이 상대 링크는 `[[slug]]` 링크, HTML은 글로, 코드와 데이터는 코드 블록으로, 바이너리는 건너뛰고 목록에 남긴다. 마지막에 색인 페이지를 만든다. taskq가 내보낸 zip은 원래 slug로 복원한다.
+- wiki 가져오기: zip, 폴더, 파일을 bot이 쓸 수 있게 소화한다. 문서마다 페이지, 긴 문서는 `##` 절마다 페이지(절이 없으면 길이로 나눈 여러 페이지, 버리는 글 없음), 문서 사이 상대 링크는 `[[slug]]` 링크, HTML은 글로, 코드와 데이터는 코드 블록으로, 바이너리는 건너뛰고 목록에 남긴다. 마지막에 색인 페이지를 만든다. taskq가 내보낸 zip(`manifest.json`이 있는 것)만 원래 slug로 복원한다.
 - 백그라운드 job(`/api/jobs`): 내보내기와 가져오기가 진행률을 보이며 돌고, 취소하면 지금 단계 뒤에 멈추고, "마지막 단계부터 다시"로 checkpoint에서 이어 한다. taskq가 멈춘 동안 돌던 job은 다음 시작 때 이어 한다.
 - Plugins 메뉴의 Claude / OpenAI 탭. skill은 두 SDK가 같이 쓰고(OpenAI bot은 `read_skill` 도구로 SKILL.md를 읽음), plugin은 Claude bot만, MCP server는 두 SDK가 같이 쓴다.
 - bot용 MCP server 등록(`/api/bot-mcp-servers`)과 bot 설정의 MCP server 선택.

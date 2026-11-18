@@ -33,6 +33,16 @@ export interface TurnResult {
   auth_failed?: boolean     // the model provider login failed; the hub pauses the team
   session_missing?: boolean // the resumed session no longer exists; the hub starts a new one next time
   tampered?: string         // a tool call reached taskq itself (data directory, config); the hub pauses the team
+  model?: string            // the model that answered
+  usage?: TokenUsage        // tokens of this turn
+  context?: { tokens: number; window: number | null }   // the context size at the end of the turn, for the context ring
+}
+
+export interface TokenUsage {
+  input_tokens: number
+  output_tokens: number
+  cache_read_tokens?: number
+  cache_write_tokens?: number
 }
 
 export interface CatalogRequest {

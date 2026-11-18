@@ -10,7 +10,10 @@ export const ORCHESTRATOR = 'taskq'
 
 export type BotEffort = 'low' | 'medium' | 'high' | 'xhigh' | 'max'
 export const EFFORTS: BotEffort[] = ['low', 'medium', 'high', 'xhigh', 'max']
-export type BotSdk = 'claude' | 'openai'
+export type BotSdk = 'claude' | 'openai' | 'kiro'
+// How an OpenAI bot signs in: an API key, Amazon Bedrock, or the user's ChatGPT plan through Codex.
+export type BotProvider = 'api' | 'bedrock' | 'chatgpt'
+export const PROVIDERS: BotProvider[] = ['api', 'bedrock', 'chatgpt']
 
 export type BotPermissionMode = 'auto' | 'acceptEdits' | 'default' | 'dontAsk' | 'plan' | 'bypassPermissions'
 export const PERMISSION_MODES: BotPermissionMode[] = ['auto', 'acceptEdits', 'default', 'dontAsk', 'plan', 'bypassPermissions']
@@ -34,6 +37,7 @@ export interface BotSettings {
   model: string | null        // null uses the config model
   effort: BotEffort | null    // reasoning effort; null leaves it to the model
   sdk: BotSdk                 // which agent SDK runs the bot
+  provider: BotProvider | null   // OpenAI bots: how they sign in; null is api
   hourly_turns: number | null    // per-bot rate limit; null uses the global default
   turn_budget_usd: number | null // per-turn spend limit; null uses the global default
   turn_max_turns: number | null  // per-turn model turns; null uses the global default
@@ -87,24 +91,24 @@ function toAgent(row: Record<string, unknown>): TeamAgent {
 export function createAgent(db: Db, name: string, settings: BotSettings, system = false): void {
   db.prepare(`INSERT INTO team_agents (name, role, description, instructions, may_message_user, enabled, system,
     permission_mode, sandbox, allowed_domains, blocked_commands, workdir, skills, plugins, model, sdk, hourly_turns,
-    turn_budget_usd, turn_max_turns, effort, mcp_servers, created_at)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`).run(
+    turn_budget_usd, turn_max_turns, effort, mcp_servers, provider, created_at)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`).run(
     name, settings.role, settings.description, settings.instructions, settings.may_message_user ? 1 : 0, settings.enabled ? 1 : 0,
     system ? 1 : 0, settings.permission_mode, settings.sandbox ? 1 : 0, JSON.stringify(settings.allowed_domains),
     JSON.stringify(settings.blocked_commands), settings.workdir, JSON.stringify(settings.skills), JSON.stringify(settings.plugins),
     settings.model, settings.sdk, settings.hourly_turns, settings.turn_budget_usd, settings.turn_max_turns, settings.effort,
-    JSON.stringify(settings.mcp_servers ?? []), nowSec())
+    JSON.stringify(settings.mcp_servers ?? []), settings.provider ?? null, nowSec())
 }
 
 export function updateAgent(db: Db, name: string, settings: BotSettings): boolean {
   return db.prepare(`UPDATE team_agents SET role = ?, description = ?, instructions = ?, may_message_user = ?, enabled = ?,
     permission_mode = ?, sandbox = ?, allowed_domains = ?, blocked_commands = ?, workdir = ?, skills = ?, plugins = ?, model = ?,
-    sdk = ?, hourly_turns = ?, turn_budget_usd = ?, turn_max_turns = ?, effort = ?, mcp_servers = ?
+    sdk = ?, hourly_turns = ?, turn_budget_usd = ?, turn_max_turns = ?, effort = ?, mcp_servers = ?, provider = ?
     WHERE name = ?`).run(
     settings.role, settings.description, settings.instructions, settings.may_message_user ? 1 : 0, settings.enabled ? 1 : 0,
     settings.permission_mode, settings.sandbox ? 1 : 0, JSON.stringify(settings.allowed_domains), JSON.stringify(settings.blocked_commands),
     settings.workdir, JSON.stringify(settings.skills), JSON.stringify(settings.plugins), settings.model, settings.sdk,
-    settings.hourly_turns, settings.turn_budget_usd, settings.turn_max_turns, settings.effort, JSON.stringify(settings.mcp_servers ?? []), name).changes === 1
+    settings.hourly_turns, settings.turn_budget_usd, settings.turn_max_turns, settings.effort, JSON.stringify(settings.mcp_servers ?? []), settings.provider ?? null, name).changes === 1
 }
 
 // The orchestrator is refused. Its tasks go back to the user; its messages stay for the record.

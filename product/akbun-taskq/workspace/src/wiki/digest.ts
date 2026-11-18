@@ -102,8 +102,10 @@ export function parseExported(file: SourceFile): ExportedPage | undefined {
 }
 
 // Slugs for every importable file, decided before any page is written, so links between them can be rewritten.
+// `index` is the import's own index page. Pages taskq derives from a document (sections, parts) use `--`, which a file
+// slug never contains (slugPart collapses hyphens), so they cannot collide with another file's slug.
 export function planSlugs(files: SourceFile[], prefix: string): Map<string, string> {
-  const used = new Set<string>()
+  const used = new Set<string>([`${prefix}/index`])
   const out = new Map<string, string>()
   for (const file of files) {
     const base = slugPart(file.path.replace(/\.[^./]+$/, '').replaceAll('/', '-'), file.path)
@@ -128,7 +130,13 @@ export function digestFile(file: SourceFile, slugs: Map<string, string>, when: s
   const here = dirname(file.path)
   text = text.replace(/\[([^\]]+)\]\(([^)\s#]+)(#[^)]*)?\)/g, (whole, label: string, target: string) => {
     if (/^[a-z]+:/i.test(target)) return whole
-    const other = slugs.get(posix.normalize(posix.join(here, decodeURIComponent(target))))
+    let decoded = target
+    try {
+      decoded = decodeURIComponent(target)
+    } catch {
+      // A stray % (50%.md) is a literal character, not an escape.
+    }
+    const other = slugs.get(posix.normalize(posix.join(here, decoded)))
     return other ? `${label} ([[${other}]])` : whole
   })
   const title = titleOf(text, file.path)
@@ -136,23 +144,44 @@ export function digestFile(file: SourceFile, slugs: Map<string, string>, when: s
   if (text.length <= SPLIT_AT || ![TEXT, HTML].some((set) => set.has(ext))) {
     const pieces = chunks(text, PAGE_LIMIT)
     if (pieces.length === 1) return [{ slug, title, body: `${origin}\n\n${text}`, source: file.path }]
-    const parts = pieces.map((piece, i) => ({ slug: `${slug}-p${i + 1}`, title: `${title} (${i + 1}/${pieces.length})`, body: `${origin}\n\n${piece}`, source: file.path }))
+    const parts = pieces.map((piece, i) => ({ slug: `${slug}--p${i + 1}`, title: `${title} (${i + 1}/${pieces.length})`, body: `${origin}\n\n${piece}`, source: file.path }))
     return [{ slug, title, body: `${origin}\n\nThis document is split into ${parts.length} pages:\n\n${parts.map((p) => `- [[${p.slug}]]`).join('\n')}`, source: file.path }, ...parts]
   }
   const sections = splitSections(text)
   const intro = sections[0]?.heading ? '' : sections.shift()?.body ?? ''
+  // No ## headings to split at: the document is cut into parts by length instead, so nothing is dropped.
+  if (sections.length === 0) {
+    const pieces = chunks(text, PAGE_LIMIT)
+    const parts = pieces.map((piece, i) => ({ slug: `${slug}--p${i + 1}`, title: `${title} (${i + 1}/${pieces.length})`, body: `${origin}\n\n${piece}`, source: file.path }))
+    return [{ slug, title, body: `${origin}\n\nThis document is split into ${parts.length} pages:\n\n${parts.map((p) => `- [[${p.slug}]]`).join('\n')}`, source: file.path }, ...parts]
+  }
   const pages: PageDraft[] = []
+  // A long text before the first ## heading becomes its own parts, linked first.
+  const introPieces = chunks(intro, PAGE_LIMIT)
+  introPieces.slice(1).forEach((piece, i) => {
+    pages.push({ slug: `${slug}--p${i + 2}`, title: `${title} (intro ${i + 2}/${introPieces.length})`, body: `${origin} Part of [[${slug}]].\n\n${piece}`, source: file.path })
+  })
   sections.forEach((section, i) => {
     const pieces = chunks(section.body, PAGE_LIMIT)
     pieces.forEach((piece, j) => {
       pages.push({
-        slug: `${slug}-s${i + 1}${pieces.length > 1 ? `-${j + 1}` : ''}`,
+        slug: `${slug}--s${i + 1}${pieces.length > 1 ? `-${j + 1}` : ''}`,
         title: `${title}: ${section.heading || `part ${i + 1}`}${pieces.length > 1 ? ` (${j + 1}/${pieces.length})` : ''}`,
         body: `${origin} Part of [[${slug}]].\n\n${piece}`, source: file.path,
       })
     })
   })
-  const toc = pages.map((p) => `- ${p.title.slice(title.length + 2) || p.title} [[${p.slug}]]`).join('\n')
-  const head = chunks(intro, PAGE_LIMIT - toc.length - 400)[0] ?? ''
-  return [{ slug, title, body: `${origin}\n\n${head}\n\n## Sections\n\n${toc}`.slice(0, PAGE_LIMIT), source: file.path }, ...pages]
+  // The document page holds the start of the intro and the section list; a list too long for one page is cut at a whole
+  // line and points to the import's index page, which lists every page.
+  const lines = pages.map((p) => `- ${p.title.slice(title.length + 2) || p.title} [[${p.slug}]]`)
+  const head = (introPieces[0] ?? '').slice(0, 4000)
+  let toc = ''
+  for (const line of lines) {
+    if (origin.length + head.length + toc.length + line.length + 200 > PAGE_LIMIT) {
+      toc += '- … the rest are listed on the import\'s index page\n'
+      break
+    }
+    toc += `${line}\n`
+  }
+  return [{ slug, title, body: `${origin}\n\n${head}\n\n## Sections\n\n${toc}`, source: file.path }, ...pages]
 }

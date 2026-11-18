@@ -18,6 +18,7 @@ import { digestFile, parseExported, planSlugs, slugPart, type SourceFile } from 
 //   a failure or a restart. The last step writes an index page linking every imported page and tells the bots.
 
 const AUTHOR = 'import'
+const yieldToLoop = () => new Promise<void>((resolve) => setImmediate(resolve))
 const FOLDER_LIMIT = 5000
 const FILE_LIMIT = 5 * 1024 * 1024
 const SKIP_DIRS = new Set(['.git', 'node_modules', '.venv', '__pycache__', 'dist', 'build'])
@@ -33,7 +34,10 @@ export const exportWikiJob: JobHandler = async ({ db, config, step }) => {
     const text = ['---', `slug: ${JSON.stringify(page.slug)}`, `title: ${JSON.stringify(page.title)}`, `revision: ${page.revision}`,
       `updated_by: ${JSON.stringify(page.updated_by)}`, `updated_at: ${new Date(page.updated_at * 1000).toISOString()}`, '---', '', page.body, ''].join('\n')
     entries.push({ name: `wiki/${page.slug}.md`, data: Buffer.from(text, 'utf8') })
-    if (i % 50 === 0 && !step({ done: i, total: pages.length, message: `packing ${page.slug}` })) return 'cancelled'
+    if (i % 50 === 0) {
+      if (!step({ done: i, total: pages.length, message: `packing ${page.slug}` })) return 'cancelled'
+      await yieldToLoop()
+    }
   }
   const manifest = {
     format: 'taskq-wiki', version: 1, exported_at: new Date().toISOString(),
@@ -106,8 +110,9 @@ export const importWikiJob: JobHandler = async (ctx: JobContext) => {
   const source = resolveSource(config, String(job.params.source ?? ''))
   if (!source) throw new Error(`no such file or folder: ${job.params.source}`)
   const files = readSource(source)
-  const exported = files.map(parseExported)
-  const isExport = files.some((f) => f.path === 'manifest.json') && exported.some(Boolean)
+  // Only a taskq export (with its manifest) restores pages under their own slugs; front matter elsewhere is just text.
+  const isExport = files.some((f) => f.path === 'manifest.json' && /"format":\s*"taskq-wiki"/.test(f.data.toString('utf8')))
+  const exported = files.map((f) => (isExport ? parseExported(f) : undefined))
   const batch = slugPart(String(job.params.name ?? '') || basename(source).replace(/\.zip$/i, ''), source)
   const prefix = `import/${batch}`
   const slugs = planSlugs(files.filter((_, i) => !exported[i]), prefix)
@@ -129,6 +134,8 @@ export const importWikiJob: JobHandler = async (ctx: JobContext) => {
     }
     cp.next = i + 1
     if (!step({ done: cp.next, total: files.length, checkpoint: cp, message: file.path })) return 'cancelled'
+    // Lets the API, the bots and a cancel request run between files; the work itself is synchronous.
+    await yieldToLoop()
   }
   // A taskq export restores its own pages; anything else gets an index page bots can start from.
   let index: string | null = null

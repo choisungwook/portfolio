@@ -62,10 +62,37 @@ describe('task workspace', () => {
     const withPr = await (await call('GET', `/tasks/${task.id}/workspace`)).json() as { pr_url: string }
     assert.equal(withPr.pr_url, 'https://github.com/someone/app/pull/42')
 
-    const removed = await (await call('POST', `/tasks/${task.id}/workspace/remove`)).json() as { removed: boolean }
+    const refused = await call('POST', `/tasks/${task.id}/workspace/remove`)
+    assert.equal(refused.status, 409, 'uncommitted work is not thrown away without asking')
+    assert.ok(existsSync(task.data.repo))
+    const removed = await (await call('POST', `/tasks/${task.id}/workspace/remove`, { discard: true })).json() as { removed: boolean }
     assert.equal(removed.removed, true)
     assert.equal(existsSync(task.data.repo), false)
     assert.match(execFileSync('git', ['-C', repo, 'branch', '--list', `taskq/${task.id}`], { encoding: 'utf8' }), /taskq\//, 'the branch is kept')
+  })
+
+  test('[critical] non-ASCII and renamed files show with their real paths and diffs; a picked subfolder stays the working folder', async () => {
+    const repo = gitRepo(join(env.home, 'src', 'mono'))
+    const git = (cwd: string, ...args: string[]) => execFileSync('git', ['-C', cwd, '-c', 'user.email=t@example.com', '-c', 'user.name=t', ...args], { stdio: 'ignore' })
+    mkdirSync(join(repo, 'packages', 'web'), { recursive: true })
+    writeFileSync(join(repo, 'packages', 'web', 'a.ts'), 'export const a = 1\n')
+    writeFileSync(join(repo, '한글.md'), '가\n')
+    git(repo, 'add', '.')
+    git(repo, 'commit', '-q', '-m', 'more')
+    const task = await (await call('POST', '/tasks', { type: 'code', intent: 'web work', repo: join(repo, 'packages', 'web') })).json() as { id: string; data: { repo: string; worktree: { path: string } } }
+    assert.equal(task.data.repo, join(task.data.worktree.path, 'packages', 'web'))
+    const root = task.data.worktree.path
+    writeFileSync(join(root, '한글.md'), '가\n나\n')
+    writeFileSync(join(root, '새파일.md'), 'new\n')
+    git(root, 'mv', 'packages/web/a.ts', 'packages/web/b.ts')
+    const ws = await (await call('GET', `/tasks/${task.id}/workspace`)).json() as { files: { path: string; status: string }[] }
+    assert.deepEqual(ws.files.map((f) => [f.path, f.status]).sort(), [['packages/web/b.ts', 'renamed'], ['새파일.md', 'untracked'], ['한글.md', 'modified']])
+    assert.match(await (await call('GET', `/tasks/${task.id}/workspace/diff?file=${encodeURIComponent('한글.md')}`)).text(), /\+나/)
+    assert.match(await (await call('GET', `/tasks/${task.id}/workspace/diff?file=${encodeURIComponent('새파일.md')}`)).text(), /\+new/)
+    env.config.trustedRepos = [join(repo, 'packages', 'web')]
+    const { profileFor } = await import('../src/agents/claude/profiles.ts')
+    const { getTask } = await import('../src/db/tasks.ts')
+    assert.deepEqual(profileFor(getTask(env.db, task.id)!, env.config).settingSources, ['user', 'project'], 'trust follows the repository the user picked')
   })
 
   test('no worktree for a read task, a plain folder, or when the user turns it off', async () => {

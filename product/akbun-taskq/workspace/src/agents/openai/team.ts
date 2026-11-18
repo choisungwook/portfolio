@@ -55,8 +55,10 @@ function sdkRun(apiKey: string): OpenAIRunFn {
     // Registered MCP servers the bot picked: started for the turn, closed after it.
     const servers = args.mcpServers.map((s) => new MCPServerStdio({ name: s.name, command: s.command, args: s.args, cwd: args.cwd }))
     try {
-      await Promise.all(servers.map((s) => s.connect()))
-      return await runAgent(runner, args, servers)
+      // A server that does not start is left out of the turn, as Claude Code does; the others still load.
+      const started = await Promise.allSettled(servers.map((s) => s.connect()))
+      started.forEach((r, i) => { if (r.status === 'rejected') console.error(`taskq: MCP server ${args.mcpServers[i].name} did not start: ${String(r.reason)}`) })
+      return await runAgent(runner, args, servers.filter((_, i) => started[i].status === 'fulfilled'))
     } finally {
       await Promise.allSettled(servers.map((s) => s.close()))
     }

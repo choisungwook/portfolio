@@ -5,9 +5,9 @@ import type { Db } from '../db/open.ts'
 import { getTask } from '../db/tasks.ts'
 import type { Task } from '../types.ts'
 import {
-  changedFiles, commitsAhead, compareUrl, fileDiff, findPrUrl, githubRepoUrl, pathInfo, removeWorktree, vscodeUrl,
+  changedFiles, commitsAhead, compareUrl, fileDiff, findPrUrl, githubRepoUrl, hasUncommitted, pathInfo, removeWorktree, vscodeUrl,
 } from '../workspace/worktree.ts'
-import { HttpError, type ApiDeps } from './http.ts'
+import { HttpError, optionalJson, type ApiDeps } from './http.ts'
 
 // Where a task works: the repository or folder the user picked, or the task's own worktree, with its changes, the
 // pull request link and a VS Code link, as Claude Desktop shows next to a session.
@@ -88,13 +88,20 @@ export function registerWorkspaceRoutes(api: Hono, { db, config }: ApiDeps): voi
     }
   })
 
-  // Removes the worktree folder; the branch stays in the repository, so the work is not lost. The task keeps pointing at
-  // the removed folder, so a later run fails instead of writing into the user's own checkout.
-  api.post('/tasks/:id/workspace/remove', (c) => {
+  // Removes the worktree folder. The branch stays with its commits; uncommitted edits and new files would be lost, so a
+  // worktree that has them is removed only with { "discard": true }. The task keeps pointing at the removed folder, so
+  // a later run fails instead of writing into the user's own checkout.
+  api.post('/tasks/:id/workspace/remove', async (c) => {
     const task = getTask(db, c.req.param('id'))
     if (!task?.data.worktree || !task.data.source_repo) throw new HttpError(404, 'this task has no worktree')
     if (task.status === 'running') throw new HttpError(409, 'the task is running in this worktree')
-    if (existsSync(task.data.worktree.path)) removeWorktree(task.data.source_repo, task.data.worktree)
+    const discard = (await optionalJson(c)).discard === true
+    if (existsSync(task.data.worktree.path)) {
+      if (!discard && hasUncommitted(task.data.worktree)) {
+        throw new HttpError(409, 'the worktree has uncommitted changes that removing it would lose; commit them, or remove with discard')
+      }
+      removeWorktree(task.data.source_repo, task.data.worktree, discard)
+    }
     return c.json(workspaceOf(db, task))
   })
 }
