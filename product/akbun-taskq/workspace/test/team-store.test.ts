@@ -147,7 +147,7 @@ describe('team tools', () => {
     mkdirSync(inside, { recursive: true })
     mkdirSync(outside, { recursive: true })
     symlinkSync(outside, join(root, 'link'))
-    env.config.team.readRoots = [root]
+    env.config.bots.readRoots = [root]
     assert.equal(repoAllowed(env.config, inside), true)
     assert.equal(repoAllowed(env.config, join(root, 'link')), false)
     assert.throws(() => tool(env, 'coder', 'create_task')({ type: 'code', intent: 'x', repo: outside }), /trustedRepos/)
@@ -155,7 +155,7 @@ describe('team tools', () => {
   })
 
   test('the open task cap stops agents from flooding the queue', () => {
-    env.config.team.maxOpenTasks = 2
+    env.config.bots.maxOpenTasks = 2
     const create = tool(env, 'planner', 'create_task')
     const a = create({ type: 'research', intent: 'compare queue libraries' })
     create({ type: 'research', intent: 'measure sqlite write latency' })

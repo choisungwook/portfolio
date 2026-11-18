@@ -53,6 +53,12 @@ describe('wiki search', () => {
     assert.deepEqual(hybridSearch(env.db)('검색률').map((h) => h.slug), ['notes/search'])
   })
 
+  test('a two-letter Latin term counts only as a whole word', () => {
+    page('notes/prompts', 'Prompt notes', 'prompts for the lead')
+    page('notes/pr-review', 'PR review', 'how we review a PR')
+    assert.deepEqual(hybridSearch(env.db)('PR 리뷰').map((h) => h.slug), ['notes/pr-review'])
+  })
+
   test('two-character terms match through LIKE', () => {
     page('notes/budget', 'Budget', '팀 예산은 하루 10달러다.')
     assert.deepEqual(hybridSearch(env.db)('예산').map((h) => h.slug), ['notes/budget'])
@@ -97,11 +103,14 @@ describe('task ownership', () => {
     assert.equal(again.owner, 'coder')
   })
 
-  test('similarity separates the same work reworded from different work', () => {
-    const same = similarity('add a retry limit to the export job', 'export job: add a retry limit')
-    const other = similarity('add a retry limit to the export job', 'measure sqlite write latency')
-    assert.ok(same >= 0.5, `reworded ${same}`)
-    assert.ok(other < 0.2, `different ${other}`)
+  test('the duplicate check is advisory: it skips tasks in review and its known errors stay documented', () => {
+    assert.ok(similarity('add a retry limit to the export job', 'export job: add a retry limit') >= 0.5)
+    assert.ok(similarity('add a retry limit to the export job', 'measure sqlite write latency') < 0.2)
+    assert.ok(similarity('Fix login bug in auth module', 'Fix logout bug in auth module') >= 0.5, 'known false match')
+    assert.ok(similarity('add retry limit to export job', 'export job: cap the number of retries') < 0.5, 'known miss')
+    const reviewed = insertTask(env.db, { type: 'research', status: 'review', data: { intent: 'compare cache libraries' } })
+    const followup = tool(env, 'planner', 'create_task')({ type: 'research', intent: 'compare cache libraries' })
+    assert.notEqual(followup.task_id, reviewed.id)
   })
 
   test('only the owner or a coordinator hands a task on, and both owners are told', () => {
@@ -166,7 +175,7 @@ describe('discussions', () => {
     await hub.start()
     tool(env, 'lead', 'start_discussion')({ topic: 'Queue design', participants: ['coder', 'reviewer', 'planner'], rounds: 1, context: '' })
     teamChanged.notify()
-    await waitFor(() => getThread(env.db, 1)?.status === 'concluding')
+    await waitFor(() => getThread(env.db, 1)?.status !== 'open')
     const reviewerPrompt = requests.find((r) => r.agent.name === 'reviewer')!.prompt
     assert.match(reviewerPrompt, /<discussion id="1"/)
     assert.match(reviewerPrompt, /coder view: use a queue/)
@@ -180,8 +189,30 @@ describe('discussions', () => {
     const { backend } = fakeBackend(() => ({ outcome: 'done', cost_usd: 0 }))
     hub = createTeamHub({ db: env.db, config: env.config, backend, retryAfterSec: 0 })
     await hub.start()
-    await waitFor(() => getThread(env.db, 1)?.status === 'concluding')
+    await waitFor(() => getThread(env.db, 1)?.status !== 'open')
     assert.match(listMessages(env.db, { agent: 'reviewer', limit: 5 }).map((m) => m.body).join('\n'), /skipped: this agent is disabled/)
+  })
+
+  test('a moderator who ends a turn without concluding gets the thread closed, with an alert', async () => {
+    const { backend } = fakeBackend((request, call) => {
+      if (request.agent.name !== 'lead') call('discuss', { thread_id: 1, body: `${request.agent.name} view` })
+      return { outcome: 'done', cost_usd: 0 }
+    })
+    tool(env, 'lead', 'start_discussion')({ topic: 'Q', participants: ['coder', 'reviewer'], rounds: 1, context: '' })
+    hub = createTeamHub({ db: env.db, config: env.config, backend, retryAfterSec: 0 })
+    await hub.start()
+    await waitFor(() => getThread(env.db, 1)?.status === 'closed')
+    assert.match(getThread(env.db, 1)?.conclusion ?? '', /did not conclude/)
+    assert.ok(listAlerts(env.db, false).some((a) => /Discussion #1 was closed without a conclusion/.test(a.message)))
+  })
+
+  test('a failed turn keeps the floor instead of passing', async () => {
+    const { backend } = fakeBackend(() => ({ outcome: 'failed', error: 'overloaded' }))
+    tool(env, 'lead', 'start_discussion')({ topic: 'Q', participants: ['coder', 'reviewer'], rounds: 1, context: '' })
+    hub = createTeamHub({ db: env.db, config: env.config, backend, retryAfterSec: 0 })
+    await hub.start()
+    await waitFor(() => listTurns(env.db, 5).filter((t) => t.agent === 'coder' && t.ended_at !== null).length >= 1)
+    assert.equal(getThread(env.db, 1)?.posts, 0)
   })
 
   test('a body cannot close its message block in any letter case', () => {
@@ -233,7 +264,7 @@ describe('turn safety', () => {
   })
 
   test('resume restarts the loop window instead of pausing again on the next turn', async () => {
-    env.config.team.hourlyTurnsPerAgent = 1
+    env.config.bots.hourlyTurnsPerAgent = 1
     const { backend, requests } = fakeBackend(() => ({ outcome: 'done', cost_usd: 0 }))
     hub = createTeamHub({ db: env.db, config: env.config, backend, retryAfterSec: 0 })
     await hub.start()
@@ -249,12 +280,18 @@ describe('turn safety', () => {
     assert.equal(isTeamPaused(env.db), false)
   })
 
-  test('the daily budget counts tasks the team owns', () => {
-    const since = nowSec() - 10
+  test('the daily budget counts tasks the team owns, from the moment it took them', () => {
+    const since = nowSec() - 100
     const task = insertTask(env.db, { type: 'research', status: 'done', owner: 'planner', data: { intent: 'x' } })
     insertRun(env.db, { id: 'r1', task_id: task.id, session_id: null, started_at: nowSec() })
     env.db.prepare(`UPDATE runs SET stats = '{"cost_usd":2.5}' WHERE id = 'r1'`).run()
     assert.equal(spentSince(env.db, since), 2.5)
+    const userTask = insertTask(env.db, { type: 'research', status: 'ready', data: { intent: 'user survey' } })
+    insertRun(env.db, { id: 'r2', task_id: userTask.id, session_id: null, started_at: nowSec() - 50 })
+    env.db.prepare(`UPDATE runs SET stats = '{"cost_usd":4}' WHERE id = 'r2'`).run()
+    tool(env, 'planner', 'assign_task')({ task_id: userTask.id, to: 'coder' })
+    assert.equal(spentSince(env.db, since), 2.5)
+    assert.ok(listAlerts(env.db, false).some((a) => a.message.includes(`gave your task ${userTask.id} to coder`)))
   })
 
   test('a read of taskq data pauses the team as a security finding', async () => {
@@ -270,7 +307,10 @@ describe('turn safety', () => {
     tool(env, 'planner', 'send_message')({ to: 'planner', body: 'check results', deliver_at: new Date(Date.now() + 3600_000).toISOString() })
     assert.deepEqual(agentsWithMail(env.db, nowSec(), 0), [])
     assert.deepEqual(agentsWithMail(env.db, nowSec() + 3601, 0), ['planner'])
-    assert.throws(() => tool(env, 'planner', 'send_message')({ to: 'planner', body: 'now' }), /cannot message yourself now/)
+    assert.throws(() => tool(env, 'planner', 'send_message')({ to: 'planner', body: 'now' }), /at least 10 minutes ahead/)
+    const soon = new Date(Date.now() + 60_000).toISOString()
+    assert.throws(() => tool(env, 'planner', 'send_message')({ to: 'planner', body: 'loop', deliver_at: soon }), /at least 10 minutes ahead/)
+    assert.throws(() => tool(env, 'planner', 'send_message')({ to: 'coder', body: 'x', deliver_at: '2020-01-01T00:00:00Z' }), /in the past/)
   })
 
   test('a reset during a turn is not overwritten when the turn ends', async () => {

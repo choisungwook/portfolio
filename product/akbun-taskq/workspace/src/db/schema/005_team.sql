@@ -77,6 +77,8 @@ CREATE INDEX wiki_links_target ON wiki_links(target);
 
 -- One owner per task: the team agent that gets the task's result. NULL is a task the user added and nobody claimed.
 ALTER TABLE tasks ADD COLUMN owner TEXT;
+-- When the current owner took the task. The bots' budget counts only runs from then on.
+ALTER TABLE tasks ADD COLUMN owner_since INTEGER;
 CREATE INDEX tasks_owner ON tasks(owner) WHERE owner IS NOT NULL;
 
 -- A bounded discussion: participants speak in a fixed order for a fixed number of rounds, then the moderator concludes.

@@ -60,5 +60,5 @@ function validated(t: TeamTool): TeamTool {
 // The real path is compared, so a symlink inside a read root cannot point a code task at a directory outside it.
 export function repoAllowed(config: Config, repo: string): boolean {
   const real = realPath(repo)
-  return config.trustedRepos.some((trusted) => realPath(trusted) === real) || config.team.readRoots.some((root) => under(real, realPath(root)))
+  return config.trustedRepos.some((trusted) => realPath(trusted) === real) || config.bots.readRoots.some((root) => under(real, realPath(root)))
 }

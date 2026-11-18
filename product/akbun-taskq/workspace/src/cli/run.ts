@@ -33,9 +33,9 @@ export async function runCommand(config: Config, db: Db): Promise<void> {
 }
 
 function teamHub(config: Config, db: Db, agent: ReturnType<typeof agentFor>): TeamHub | undefined {
-  if (!config.team.enabled) return undefined
+  if (!config.bots.enabled) return undefined
   if (!agent.team) {
-    console.warn(`taskq: the ${agent.name} backend has no team support; team.enabled is ignored`)
+    console.warn(`taskq: the ${agent.name} backend has no bots support; bots.enabled is ignored`)
     return undefined
   }
   return createTeamHub({ db, config, backend: agent.team })

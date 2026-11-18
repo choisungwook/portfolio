@@ -94,18 +94,46 @@ export function passStalled(db: Db, speaker: string, threadIds: number[]): numbe
   return passed
 }
 
-// A speaker disabled after the discussion opened would hold the floor forever, since a disabled agent gets no turns.
-export function skipDisabledSpeakers(db: Db): number[] {
+// Closes a thread that will never get a conclusion, recording why. Used for a silent or disabled moderator and by
+// the user. Returns false when the thread is already closed.
+export function forceClose(db: Db, id: number, reason: string): boolean {
+  return db.prepare(`UPDATE team_threads SET status = 'closed', conclusion = ?, closed_at = ? WHERE id = ? AND status != 'closed'`)
+    .run(`(closed without a conclusion: ${reason})`, nowSec(), id).changes === 1
+}
+
+// A moderator whose turn received the request to conclude, and ended without concluding, will not be asked again;
+// the thread is closed so it stops holding one of the few open discussion slots.
+export function closeUnconcluded(db: Db, moderator: string, delivered: TeamMessage[]): number[] {
+  const closed: number[] = []
+  const ids = new Set(delivered.map((m) => m.id))
+  for (const threadId of new Set(delivered.map((m) => m.thread_id).filter((id): id is number => id !== null))) {
+    const thread = getThread(db, threadId)
+    if (!thread || thread.status !== 'concluding' || thread.moderator !== moderator) continue
+    const request = db.prepare('SELECT max(id) AS id FROM team_messages WHERE thread_id = ? AND recipient = ?').get(threadId, moderator)?.id
+    if (ids.has(Number(request)) && forceClose(db, threadId, `${moderator} did not conclude when asked`)) closed.push(threadId)
+  }
+  return closed
+}
+
+// A speaker disabled after the discussion opened would hold the floor forever, since a disabled agent gets no turns;
+// it is skipped. A disabled moderator can never conclude; its thread is closed once it reaches that point.
+export function skipDisabledSpeakers(db: Db): { skipped: number[]; closed: number[] } {
   const skipped: number[] = []
-  const open = db.prepare(`SELECT id FROM team_threads WHERE status = 'open'`).all().map((row) => Number(row.id))
-  for (const id of open) {
+  const closed: number[] = []
+  const enabled = (name: string) => db.prepare('SELECT 1 FROM team_agents WHERE name = ? AND enabled = 1').get(name) !== undefined
+  const live = db.prepare(`SELECT id FROM team_threads WHERE status != 'closed'`).all().map((row) => Number(row.id))
+  for (const id of live) {
     for (let guard = 0; guard < 16; guard++) {
       const thread = getThread(db, id)
       const speaker = thread ? speakerOf(thread) : null
-      if (!speaker || db.prepare('SELECT 1 FROM team_agents WHERE name = ? AND enabled = 1').get(speaker)) break
+      if (!speaker || enabled(speaker)) break
       takeTurn(db, id, speaker, '(skipped: this agent is disabled)')
       skipped.push(id)
     }
+    const thread = getThread(db, id)
+    if (thread?.status === 'concluding' && !enabled(thread.moderator) && forceClose(db, id, `moderator ${thread.moderator} is disabled`)) {
+      closed.push(id)
+    }
   }
-  return skipped
+  return { skipped, closed }
 }

@@ -3,7 +3,7 @@ import {
   USER, getAgent, listAgents, listMessages, listTurns, markRead, postMessage, seedAgents, setAgentEnabled, setAgentSession,
 } from '../db/team.ts'
 import { getPage, listPages } from '../db/wiki.ts'
-import { listThreads, speakerOf } from '../db/threads.ts'
+import { forceClose, listThreads, speakerOf } from '../db/threads.ts'
 import { hybridSearch } from '../team/search.ts'
 import { exportWiki } from '../team/wiki-files.ts'
 import { setOwner } from '../team/owner.ts'
@@ -12,7 +12,7 @@ import { isTeamPaused, pauseTeam, resumeTeam, teamPauseReason } from '../team/hu
 import { teamChanged } from '../wake.ts'
 import type { Command } from './types.ts'
 
-const USAGE = `usage: taskq team <action>
+const USAGE = `usage: taskq bots <action>
   list                         agents, roles and whether each has a session
   say [--to NAME] TEXT...      message an agent (default: lead)
   inbox [--all]                messages the team sent you; marks them read unless --all
@@ -23,6 +23,7 @@ const USAGE = `usage: taskq team <action>
   export                       rewrite the markdown mirror under TASKQ_HOME/wiki/ (for graphify and other folder tools)
   assign TASK AGENT|user       give a task to an agent, or take it back
   threads                      discussions and whose turn it is
+  close THREAD                 close a discussion without a conclusion
   pause [--reason TEXT]        resume
   enable NAME    disable NAME    reset NAME (start a new session next turn)`
 
@@ -32,7 +33,7 @@ function limitOf(value: string | undefined, fallback: number): number {
   return n
 }
 
-export const team: Command = ({ config, db }, args) => {
+export const bots: Command = ({ config, db }, args) => {
   const [action, ...rest] = args
   // The roster is seeded here too, so a message can be queued before the first taskq run.
   seedAgents(db, DEFAULT_ROSTER)
@@ -41,15 +42,15 @@ export const team: Command = ({ config, db }, args) => {
       for (const a of listAgents(db)) {
         console.log(`${a.enabled ? ' ' : 'x'} ${a.name.padEnd(14)} ${a.role.padEnd(13)} ${a.session_id ? 'session' : 'new    '}  ${a.description}`)
       }
-      if (!config.team.enabled) console.log('\nteam.enabled is false in taskq.config.json: messages wait until it is turned on.')
-      if (isTeamPaused(db)) console.log(`\nteam paused: ${teamPauseReason(db)}`)
+      if (!config.bots.enabled) console.log('\nbots.enabled is false in taskq.config.json: messages wait until it is turned on.')
+      if (isTeamPaused(db)) console.log(`\nbots paused: ${teamPauseReason(db)}`)
       return
     }
     case 'say': {
       const { values, positionals } = parseArgs({ args: rest, strict: true, allowPositionals: true, options: { to: { type: 'string' } } })
       const to = values.to ?? 'lead'
       const body = positionals.join(' ').trim()
-      if (!body) throw new Error('usage: taskq team say [--to NAME] TEXT...')
+      if (!body) throw new Error('usage: taskq bots say [--to NAME] TEXT...')
       if (!getAgent(db, to)?.enabled) throw new Error(`no enabled agent named ${to}`)
       const id = postMessage(db, { sender: USER, recipient: to, body })
       teamChanged.notify()
@@ -94,7 +95,7 @@ export const team: Command = ({ config, db }, args) => {
     }
     case 'search': {
       const query = rest.join(' ').trim()
-      if (!query) throw new Error('usage: taskq team search QUERY...')
+      if (!query) throw new Error('usage: taskq bots search QUERY...')
       for (const hit of hybridSearch(db)(query, 20)) {
         console.log(`${hit.score.toFixed(2).padStart(6)} ${hit.slug}${hit.via ? ` (via ${hit.via})` : ''}  ${hit.snippet.replaceAll('\n', ' ')}`)
       }
@@ -105,7 +106,7 @@ export const team: Command = ({ config, db }, args) => {
       return
     case 'assign': {
       const [taskId, to] = rest
-      if (!taskId || !to) throw new Error('usage: taskq team assign TASK AGENT|user')
+      if (!taskId || !to) throw new Error('usage: taskq bots assign TASK AGENT|user')
       setOwner(db, taskId, to === USER ? null : to, USER)
       console.log(`task ${taskId} is now owned by ${to}`)
       return
@@ -117,15 +118,22 @@ export const team: Command = ({ config, db }, args) => {
       }
       return
     }
+    case 'close': {
+      const id = Number(rest[0])
+      if (!Number.isInteger(id) || id < 1) throw new Error('usage: taskq bots close THREAD')
+      if (!forceClose(db, id, 'closed by the user')) throw new Error('discussion is already closed or unknown')
+      console.log(`discussion #${id} closed`)
+      return
+    }
     case 'pause': {
       const { values } = parseArgs({ args: rest, strict: true, options: { reason: { type: 'string' } } })
       pauseTeam(db, values.reason ?? 'paused by the user')
-      console.log('team paused')
+      console.log('bots paused')
       return
     }
     case 'resume':
       resumeTeam(db)
-      console.log('team resumed')
+      console.log('bots resumed')
       return
     case 'enable':
     case 'disable': {

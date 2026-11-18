@@ -207,7 +207,7 @@ export function recoverTurns(db: Db): { agent: string; turn: number; end: TurnEn
 export function spentSince(db: Db, since: number): number {
   const turns = Number(db.prepare('SELECT COALESCE(sum(cost_usd), 0) AS cost FROM team_turns WHERE started_at >= ?').get(since)?.cost ?? 0)
   const tasks = Number(db.prepare(`SELECT COALESCE(sum(json_extract(r.stats, '$.cost_usd')), 0) AS cost FROM runs r
-    JOIN tasks t ON t.id = r.task_id WHERE t.owner IS NOT NULL AND r.started_at >= ?`).get(since)?.cost ?? 0)
+    JOIN tasks t ON t.id = r.task_id WHERE t.owner IS NOT NULL AND r.started_at >= ? AND r.started_at >= t.owner_since`).get(since)?.cost ?? 0)
   return turns + tasks
 }
 

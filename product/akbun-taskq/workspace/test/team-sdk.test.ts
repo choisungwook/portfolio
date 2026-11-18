@@ -52,7 +52,7 @@ describe('claude team backend', () => {
     assert.deepEqual(options.settingSources, [])
     assert.equal(options.strictMcpConfig, true)
     assert.deepEqual(Object.keys(options.mcpServers ?? {}), ['team'])
-    assert.equal(options.maxBudgetUsd, env.config.team.turnBudgetUsd)
+    assert.equal(options.maxBudgetUsd, env.config.bots.turnBudgetUsd)
     assert.deepEqual(f.prompts, ['1 new message'])
   })
 

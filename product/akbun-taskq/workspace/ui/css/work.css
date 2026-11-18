@@ -55,34 +55,3 @@
 
 .search-list { list-style: none; padding: 0; margin: 0; display: grid; gap: 10px; }
 .search-list li { padding-top: 2px; }
-
-/* Team tab. Messages are tiles with a left bar: blue for the user's own, green for messages to the user. */
-.team-status { display: flex; align-items: center; gap: 12px; background: var(--panel); padding: 8px 16px; margin-bottom: 8px; }
-.team-status p { margin: 0; flex: 1; }
-.team-status[data-state="paused"] { box-shadow: inset 3px 0 0 var(--needs-approval); }
-.team-status[data-state="off"] { box-shadow: inset 3px 0 0 var(--border-strong); }
-.team-layout { display: grid; grid-template-columns: minmax(0, 2fr) minmax(220px, 1fr); gap: 16px; align-items: start; }
-.team-compose { display: grid; grid-template-columns: 160px minmax(0, 1fr) auto; gap: 8px; align-items: end; background: var(--panel); padding: 12px 16px; }
-.team-compose label { display: flex; flex-direction: column; gap: 4px; font-size: var(--text-small); color: var(--muted); }
-.team-compose textarea { width: 100%; min-height: 72px; resize: vertical; background: var(--panel-soft); }
-.team-message { background: var(--panel); padding: 8px 16px; margin-bottom: 4px; box-shadow: inset 3px 0 0 var(--border); }
-.team-message[data-from="user"] { box-shadow: inset 3px 0 0 var(--running); }
-.team-message[data-from="to-user"] { box-shadow: inset 3px 0 0 var(--done); }
-.team-message pre { white-space: pre-wrap; overflow-wrap: anywhere; margin: 4px 0 0; font-family: var(--font-sans); }
-.team-agents, .team-wiki { list-style: none; margin: 0 0 16px; padding: 0; display: grid; gap: 4px; }
-.team-agent { background: var(--panel); padding: 8px 12px; }
-.team-agent[data-busy="true"] { box-shadow: inset 3px 0 0 var(--running); }
-.team-agent p { margin: 2px 0 0; }
-.team-page { background: var(--panel); padding: 12px 16px; }
-.team-page pre { white-space: pre-wrap; overflow-wrap: anywhere; }
-@media (max-width: 800px) {
-  .team-layout { grid-template-columns: 1fr; }
-  .team-compose { grid-template-columns: 1fr; }
-}
-.team-owned { list-style: none; margin: 6px 0 0; padding: 0; display: grid; gap: 2px; }
-.team-threads { list-style: none; margin: 0 0 16px; padding: 0; display: grid; gap: 4px; }
-.team-thread { background: var(--panel); padding: 8px 12px; box-shadow: inset 3px 0 0 var(--review); }
-.team-thread[data-status="closed"] { box-shadow: inset 3px 0 0 var(--border); }
-.team-thread p { margin: 2px 0 0; }
-.team-wiki-search { margin-bottom: 8px; }
-.team-wiki-search input { width: 100%; background: var(--panel-soft); }

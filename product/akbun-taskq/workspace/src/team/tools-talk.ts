@@ -11,6 +11,9 @@ import { mirrorPage } from './wiki-files.ts'
 // Each open discussion costs a turn per speaker per round, so few may run at once.
 const MAX_OPEN_THREADS = 3
 const MAX_DELAY_SEC = 30 * 24 * 3600
+// A reminder to oneself must be at least this far ahead; otherwise deliver_at would let an agent wake itself in a loop.
+const MIN_SELF_DELAY_SEC = 10 * 60
+const PAST_GRACE_SEC = 60
 
 export function talkTools(scope: ScopedTools): TeamTool[] {
   const { db, config, agent, wrote } = scope
@@ -50,7 +53,9 @@ export function talkTools(scope: ScopedTools): TeamTool[] {
       handler(args) {
         const to = String(args.to)
         const deliverAt = args.deliver_at === undefined ? undefined : timeOf(String(args.deliver_at))
-        if (to === agent && deliverAt === undefined) throw new ToolError('you cannot message yourself now; write notes to the wiki, or set deliver_at for a reminder')
+        if (to === agent && (deliverAt === undefined || deliverAt < nowSec() + MIN_SELF_DELAY_SEC)) {
+          throw new ToolError('a message to yourself needs deliver_at at least 10 minutes ahead; for notes, use the wiki')
+        }
         if (to === USER) {
           if (!self().may_message_user) throw new ToolError('only the lead messages the user; send this to the lead')
         } else if (!enabled(to)) {
@@ -145,5 +150,6 @@ function timeOf(text: string): number {
   const at = Math.floor(ms / 1000)
   const now = nowSec()
   if (at > now + MAX_DELAY_SEC) throw new ToolError('deliver_at may be at most 30 days ahead')
+  if (at < now - PAST_GRACE_SEC) throw new ToolError('deliver_at is in the past; omit it to send now')
   return Math.max(at, now)
 }

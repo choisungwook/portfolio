@@ -28,6 +28,7 @@ export interface Task {
   id: string; type: TaskType; status: TaskStatus; priority: number
   lock_key: string | null; claimed_by: string | null; heartbeat_at: number | null
   owner: string | null       // team agent that owns the task and gets its result; null for the user's own task
+  owner_since?: number | null
   session_id: string | null; data: TaskData; created_at: number; updated_at: number
 }
 

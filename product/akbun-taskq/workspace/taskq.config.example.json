@@ -18,7 +18,7 @@
   "prodLockKeys": [],
   "trustedRepos": [],
   "retrospect": true,
-  "team": {
+  "bots": {
     "enabled": false,
     "maxConcurrentTurns": 2,
     "turnMaxTurns": 30,

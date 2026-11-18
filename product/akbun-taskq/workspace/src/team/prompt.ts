@@ -33,8 +33,8 @@ export function systemFor(agent: TeamAgent, roster: TeamAgent[], config: Config,
     '- A decision that belongs to the user (money, deleting, publishing, widening access, anything irreversible or a matter of taste) is not yours. Send it to the lead with the options, what each gains and loses, and which you would pick.',
     '- If the same problem fails three times, stop and report what you checked and what is left.',
   ]
-  if (config.team.personaSkill) {
-    const skill = join(config.team.personaSkill, 'SKILL.md')
+  if (config.bots.personaSkill) {
+    const skill = join(config.bots.personaSkill, 'SKILL.md')
     if (agent.may_message_user) {
       lines.push(`- When a choice must be made while the user is away and it is not one of the user's decisions above, read ${skill} and decide the way it describes for deciding on the user's behalf. Its judgement is never the user's approval.`)
       lines.push('- That skill is private. Never copy its text into the wiki, messages or task intents; write only your decision and its reason.')

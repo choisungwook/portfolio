@@ -11,8 +11,9 @@ export interface SandboxConfig {
   allowWrite: string[]
 }
 
-// The resident agent team. Off by default: every turn is a paid model call that nobody asked for directly.
-export interface TeamConfig {
+// The resident bots (the code calls them the team). Off by default: every turn is a paid model call that nobody asked
+// for directly.
+export interface BotsConfig {
   enabled: boolean
   maxConcurrentTurns: number   // agent turns running at once, separate from maxConcurrent for tasks
   turnMaxTurns: number         // model turns inside one agent turn
@@ -46,7 +47,7 @@ export interface Config {
   trustedRepos: string[]       // absolute paths; a code task in one of these may load that repository's own Claude settings
   skillsDir?: string
   retrospect: boolean
-  team: TeamConfig
+  bots: BotsConfig
 }
 
 export const DEFAULTS: Omit<Config, 'home'> = {
@@ -66,7 +67,7 @@ export const DEFAULTS: Omit<Config, 'home'> = {
   prodLockKeys: [],
   trustedRepos: [],
   retrospect: true,
-  team: {
+  bots: {
     enabled: false, maxConcurrentTurns: 2, turnMaxTurns: 30, turnBudgetUsd: 1, dailyBudgetUsd: 10,
     hourlyTurnsPerAgent: 20, maxOpenTasks: 10, maxAttempts: 3, readRoots: [],
   },
@@ -79,7 +80,7 @@ export function resolveConfig(home: string, overrides: Partial<Config> = {}): Co
   return {
     ...DEFAULTS, home, ...overrides,
     sandbox: { ...DEFAULTS.sandbox, ...overrides.sandbox },
-    team: { ...DEFAULTS.team, ...overrides.team },
+    bots: { ...DEFAULTS.bots, ...overrides.bots },
   }
 }
 
@@ -95,10 +96,10 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
   if (config.trustedRepos.some((repo) => !isAbsolute(repo))) throw new Error('trustedRepos must be absolute paths')
   if (config.caBundle !== undefined && !isAbsolute(config.caBundle)) throw new Error('caBundle must be an absolute path')
   if (config.caBundle !== undefined && !existsSync(config.caBundle)) throw new Error(`caBundle ${config.caBundle} does not exist`)
-  const team = config.team
-  if (team.readRoots.some((root) => !isAbsolute(root))) throw new Error('team.readRoots must be absolute paths')
-  if (team.personaSkill !== undefined && !(isAbsolute(team.personaSkill) && existsSync(join(team.personaSkill, 'SKILL.md')))) {
-    throw new Error('team.personaSkill must be an absolute path to a folder with SKILL.md')
+  const bots = config.bots
+  if (bots.readRoots.some((root) => !isAbsolute(root))) throw new Error('bots.readRoots must be absolute paths')
+  if (bots.personaSkill !== undefined && !(isAbsolute(bots.personaSkill) && existsSync(join(bots.personaSkill, 'SKILL.md')))) {
+    throw new Error('bots.personaSkill must be an absolute path to a folder with SKILL.md')
   }
   return config
 }

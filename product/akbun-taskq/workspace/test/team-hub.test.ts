@@ -57,8 +57,8 @@ describe('team hub', () => {
 
   test('the team pauses when the daily budget is spent', async () => {
     const { db, config } = env
-    config.team.dailyBudgetUsd = 0.1
-    config.team.turnBudgetUsd = 0.05
+    config.bots.dailyBudgetUsd = 0.1
+    config.bots.turnBudgetUsd = 0.05
     const { backend, requests } = fakeBackend(() => ({ outcome: 'done', cost_usd: 0.06 }))
     hub = createTeamHub({ db, config, backend, retryAfterSec: 0 })
     await hub.start()
@@ -74,7 +74,7 @@ describe('team hub', () => {
 
   test('two agents messaging each other in a loop pause the team', async () => {
     const { db, config } = env
-    config.team.hourlyTurnsPerAgent = 3
+    config.bots.hourlyTurnsPerAgent = 3
     const { backend } = fakeBackend((request, call) => {
       call('send_message', { to: request.agent.name === 'lead' ? 'planner' : 'lead', body: 'your turn' })
       return { outcome: 'done', cost_usd: 0 }
@@ -92,7 +92,7 @@ describe('team hub', () => {
 
   test('a message is retried after a failed turn and set aside after maxAttempts', async () => {
     const { db, config } = env
-    config.team.maxAttempts = 2
+    config.bots.maxAttempts = 2
     const { backend, requests } = fakeBackend(() => ({ outcome: 'failed', error: 'model error' }))
     hub = createTeamHub({ db, config, backend, retryAfterSec: 0 })
     await hub.start()

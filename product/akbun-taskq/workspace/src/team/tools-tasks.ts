@@ -5,6 +5,7 @@ import { createFromInput, getTask, TASK_TITLE_SQL } from '../db/tasks.ts'
 import { findAccessSkill } from '../db/access-skills.ts'
 import { parseTaskInput, TASK_TYPES } from '../validate.ts'
 import { queueChanged, teamChanged } from '../wake.ts'
+import { raiseAlert } from '../alerts/rules.ts'
 import type { TaskType } from '../types.ts'
 import { ToolError, repoAllowed, type ScopedTools, type TeamTool } from './tools.ts'
 
@@ -13,12 +14,14 @@ import { ToolError, repoAllowed, type ScopedTools, type TeamTool } from './tools
 // about the same work do not both queue it.
 
 const COORDINATORS = new Set(['lead', 'planner'])
-// Statuses that hold a slot of team.maxOpenTasks. draft and review wait for the user, not for the team.
+// Statuses that hold a slot of bots.maxOpenTasks. draft and review wait for the user, not for the team.
 const ACTIVE = `('ready', 'running', 'needs_approval', 'needs_auth')`
 const UNFINISHED = `status NOT IN ('done', 'failed')`
-// Character-trigram overlap (Jaccard) at which two intents count as the same work. Reworded duplicates measured 0.64
-// ("add a retry limit to the export job" / "export job: add a retry limit") and 0.61 for the same pair in Korean;
-// unrelated intents measured near 0. It has not been tuned on real traffic; not_duplicate_of overrides a false match.
+// Character-trigram overlap (Jaccard) at which two intents count as the same work. This is an advisory check, not a
+// guarantee: one reworded pair measured 0.64 (0.61 in Korean), but a review found both errors. "Fix login bug" and
+// "Fix logout bug" score 0.73 (false match), and "add retry limit to export job" vs "export job: cap the number of
+// retries" scores 0.22 (missed). The refusal names the open task so the agent asks its owner; not_duplicate_of
+// overrides a false match. Ownership, not this check, is what keeps two agents off one task.
 export const DUPLICATE_SIMILARITY = 0.5
 const AGENT_MAX_PRIORITY = 0
 const TASK_ID = z.string().regex(/^[0-9a-f]{8}$/)
@@ -59,11 +62,11 @@ export function taskTools(scope: ScopedTools): TeamTool[] {
         if (!getAgent(db, owner)?.enabled) throw new ToolError(`no enabled agent named ${owner}`)
         const repo = args.repo as string | undefined
         if (repo !== undefined && !repoAllowed(config, repo)) {
-          throw new ToolError('repo must be one of trustedRepos or under team.readRoots in taskq.config.json')
+          throw new ToolError('repo must be one of trustedRepos or under bots.readRoots in taskq.config.json')
         }
         const active = Number(db.prepare(`SELECT count(*) AS n FROM tasks WHERE owner IS NOT NULL AND status IN ${ACTIVE}`).get()?.n ?? 0)
-        if (active >= config.team.maxOpenTasks) {
-          throw new ToolError(`the team already has ${active} queued or running tasks (limit ${config.team.maxOpenTasks}); wait for one to end`)
+        if (active >= config.bots.maxOpenTasks) {
+          throw new ToolError(`the team already has ${active} queued or running tasks (limit ${config.bots.maxOpenTasks}); wait for one to end`)
         }
         const dup = duplicates(db, String(args.intent)).filter((d) => !((args.not_duplicate_of as string[] | undefined) ?? []).includes(d.id))
         if (dup.length > 0) {
@@ -102,11 +105,14 @@ export function taskTools(scope: ScopedTools): TeamTool[] {
         }
         const to = String(args.to)
         if (!getAgent(db, to)?.enabled) throw new ToolError(`no enabled agent named ${to}`)
-        const changed = db.prepare(`UPDATE tasks SET owner = ? WHERE id = ? AND owner IS ? AND ${UNFINISHED}`).run(to, task.id, task.owner).changes
+        const changed = db.prepare(`UPDATE tasks SET owner = ?, owner_since = unixepoch() WHERE id = ? AND owner IS ? AND ${UNFINISHED}`).run(to, task.id, task.owner).changes
         if (changed !== 1) throw new ToolError('the task changed meanwhile; read it again')
         wrote()
         const note = args.note ? `\n${String(args.note)}` : ''
         postMessage(db, { sender: agent, recipient: to, task_id: task.id, body: `Task ${task.id} is now yours: ${task.data.intent}${note}` })
+        if (task.owner === null) {
+          raiseAlert(db, { task_id: task.id, kind: 'team_message', message: `${agent} gave your task ${task.id} to ${to}; its result now goes to ${to}. Take it back in the task detail.` })
+        }
         if (task.owner && task.owner !== agent && task.owner !== to) {
           postMessage(db, { sender: agent, recipient: task.owner, task_id: task.id, body: `I moved task ${task.id} from you to ${to}.${note}` })
         }
@@ -163,7 +169,9 @@ export function similarity(a: string, b: string): number {
 }
 
 export function duplicates(db: Db, intent: string): { id: string; status: string; owner: string | null; intent: string }[] {
-  const open = db.prepare(`SELECT id, status, owner, json_extract(data, '$.intent') AS intent FROM tasks WHERE ${UNFINISHED}`)
+  // Only work still to be done: a task in review is finished work the user is reading, and follow-ups to it are new.
+  const open = db.prepare(`SELECT id, status, owner, json_extract(data, '$.intent') AS intent FROM tasks
+    WHERE status IN ('draft', 'ready', 'running', 'needs_approval', 'needs_auth')`)
     .all() as { id: string; status: string; owner: string | null; intent: string }[]
   return open.filter((task) => similarity(intent, task.intent) >= DUPLICATE_SIMILARITY)
 }

@@ -47,9 +47,20 @@
   --stale: initial;
   --high: initial;
 
+  /* Bot avatars: one fill per bot (by roster order), the user's own avatar, and the eyes drawn on top. */
+  --avatar-1: initial;
+  --avatar-2: initial;
+  --avatar-3: initial;
+  --avatar-4: initial;
+  --avatar-5: initial;
+  --avatar-6: initial;
+  --avatar-user: initial;
+  --avatar-eye: initial;
+
   /* Shape, depth, motion and type. */
   --radius: initial;
   --radius-s: initial;
+  --radius-l: initial;       /* cards, chat bubbles, the sidebar */
   --shadow-1: initial;
   --shadow-2: initial;
   --ease: initial;

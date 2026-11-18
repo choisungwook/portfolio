@@ -15,7 +15,7 @@ import { registerApprovalRoutes } from './routes-approvals.ts'
 import { registerMiscRoutes } from './routes-misc.ts'
 import { registerSse } from './sse.ts'
 import { registerSettingsRoutes } from './routes-settings.ts'
-import { registerTeamRoutes } from './routes-team.ts'
+import { registerBotsRoutes } from './routes-bots.ts'
 
 export function createApp(deps: ApiDeps, token: string): Hono {
   const app = new Hono()
@@ -39,7 +39,7 @@ export function createApp(deps: ApiDeps, token: string): Hono {
   registerApprovalRoutes(api, deps)
   registerMiscRoutes(api, deps)
   registerSettingsRoutes(api, deps)
-  registerTeamRoutes(api, deps)
+  registerBotsRoutes(api, deps)
   registerSse(api, deps)
   app.route('/api', api)
   const index = resourcePath('ui/index.html')

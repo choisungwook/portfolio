@@ -6,7 +6,7 @@ import {
   agentsWithMail, endTurn, getAgent, listAgents, nextDelivery, recoverTurns, replaceAgentSession, seedAgents, spentSince,
   startTurn, turnsSince, type TeamMessage, type TurnEnd,
 } from '../db/team.ts'
-import { passStalled, skipDisabledSpeakers } from '../db/threads.ts'
+import { closeUnconcluded, passStalled, skipDisabledSpeakers } from '../db/threads.ts'
 import { getMeta, setMeta } from '../db/meta.ts'
 import { raiseAlert } from '../alerts/rules.ts'
 import { nowSec } from '../time.ts'
@@ -46,7 +46,7 @@ export function pauseTeam(db: Db, reason: string, kind: 'team_paused' | 'securit
   if (isTeamPaused(db)) return
   setMeta(db, 'team_paused', '1')
   setMeta(db, 'team_pause_reason', reason)
-  raiseAlert(db, { task_id: null, kind, message: `Team paused: ${reason}` })
+  raiseAlert(db, { task_id: null, kind, message: `Bots paused: ${reason}` })
 }
 
 // Resuming is the user's decision to accept what tripped the guard, so the budget and loop windows restart from now.
@@ -78,7 +78,7 @@ export function createTeamHub({ db, config, backend, retryAfterSec = RETRY_AFTER
   // user should see one alert, not one per agent. Each running turn reserves its full per-turn budget, so turns
   // started together cannot overshoot the daily limit by more than what a single turn may spend.
   function guardsHold(name: string): boolean {
-    const t = config.team
+    const t = config.bots
     const since = Math.max(localMidnight(), resumedAt(db))
     const committed = spentSince(db, since) + active.size * t.turnBudgetUsd
     if (committed + t.turnBudgetUsd > t.dailyBudgetUsd) {
@@ -102,14 +102,14 @@ export function createTeamHub({ db, config, backend, retryAfterSec = RETRY_AFTER
     mkdirSync(cwd, { recursive: true })
     const wiki = wikiDir(config)
     mkdirSync(wiki, { recursive: true })
-    const readRoots = [join(config.home, 'outputs'), wiki, ...config.trustedRepos, ...config.team.readRoots]
+    const readRoots = [join(config.home, 'outputs'), wiki, ...config.trustedRepos, ...config.bots.readRoots]
     const done = backend.runTurn(config, {
       agent,
       system: systemFor(agent, listAgents(db), config, readRoots, wiki),
       prompt: promptFor(db, started.messages),
       tools: teamTools({ db, config, agent: name, search, turnId: started.turn.id }),
       cwd,
-      readRoots: config.team.personaSkill ? [...readRoots, config.team.personaSkill] : readRoots,
+      readRoots: config.bots.personaSkill ? [...readRoots, config.bots.personaSkill] : readRoots,
       resume: agent.session_id,
       signal: controller.signal,
     })
@@ -128,15 +128,21 @@ export function createTeamHub({ db, config, backend, retryAfterSec = RETRY_AFTER
     else if (result.session_id) replaceAgentSession(db, name, session, result.session_id)
     const outcome = aborted ? 'interrupted' : result.outcome
     // A turn that ended without a cost figure (abort, crash) is charged its whole budget rather than nothing.
-    const cost = result.cost_usd ?? (outcome === 'done' ? 0 : config.team.turnBudgetUsd)
+    const cost = result.cost_usd ?? (outcome === 'done' ? 0 : config.bots.turnBudgetUsd)
     const end = endTurn(db, turnId, {
       outcome, error: result.error, turns: result.turns, cost_usd: cost, session_id: result.session_id,
-    }, config.team.maxAttempts)
+    }, config.bots.maxAttempts)
     reportSetAside(name, end, result.error)
     if (result.tampered) pauseTeam(db, `${name} tried to reach taskq itself: ${result.tampered}`, 'security_finding')
     if (result.auth_failed) pauseTeam(db, `model provider login failed for ${name}`)
-    if (outcome !== 'interrupted') {
-      passStalled(db, name, messages.map((m) => m.thread_id).filter((id): id is number => id !== null))
+    // Only a turn that ran to its end counts as choosing not to speak. A failed turn (provider outage) keeps the floor,
+    // and its messages come back for the retry.
+    if (outcome === 'done') {
+      const threads = messages.map((m) => m.thread_id).filter((id): id is number => id !== null)
+      passStalled(db, name, threads)
+      for (const id of closeUnconcluded(db, name, messages)) {
+        raiseAlert(db, { task_id: null, kind: 'team_message', message: `Discussion #${id} was closed without a conclusion: its moderator ${name} ended a turn without concluding it.` })
+      }
     }
   }
 
@@ -145,18 +151,20 @@ export function createTeamHub({ db, config, backend, retryAfterSec = RETRY_AFTER
     const ids = end.setAside.map((m) => `#${m.id}`).join(', ')
     const why = end.reason === 'writes'
       ? 'the turn failed after it had already sent messages or created tasks, so it is not retried (a retry would repeat them)'
-      : `${config.team.maxAttempts} turns failed on them`
+      : `${config.bots.maxAttempts} turns failed on them`
     raiseAlert(db, {
       task_id: end.setAside[0].task_id, kind: 'team_message',
-      message: `Messages ${ids} to ${name} were set aside: ${why}. Last error: ${error ?? 'interrupted'}. Check taskq team log and resend if needed.`,
+      message: `Messages ${ids} to ${name} were set aside: ${why}. Last error: ${error ?? 'interrupted'}. Check taskq bots log and resend if needed.`,
     })
   }
 
   function tick(): void {
     if (isTeamPaused(db)) return
-    skipDisabledSpeakers(db)
+    for (const id of skipDisabledSpeakers(db).closed) {
+      raiseAlert(db, { task_id: null, kind: 'team_message', message: `Discussion #${id} was closed without a conclusion: its moderator is disabled.` })
+    }
     for (const name of agentsWithMail(db, nowSec(), retryAfterSec)) {
-      if (active.size >= config.team.maxConcurrentTurns) return
+      if (active.size >= config.bots.maxConcurrentTurns) return
       if (active.has(name)) continue
       if (!guardsHold(name)) return
       launch(name)

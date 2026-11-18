@@ -7,7 +7,7 @@ let agents = null
 
 async function loadAgents() {
   try {
-    const team = await api.get('/team')
+    const team = await api.get('/bots')
     agents = team.agents.filter((a) => a.enabled).map((a) => a.name)
   } catch {
     agents = []
@@ -31,7 +31,7 @@ export function ownerValue(task, onChange) {
   else loadAgents().then(fill)
   select.addEventListener('change', async () => {
     const owner = select.value || null
-    const ok = await mutate(() => api.post(`/team/tasks/${task.id}/owner`, { owner }), owner ? `Given to ${owner}` : 'Taken back')
+    const ok = await mutate(() => api.post(`/bots/tasks/${task.id}/owner`, { owner }), owner ? `Given to ${owner}` : 'Taken back')
     if (ok) onChange()
     else select.value = task.owner ?? ''
   })

@@ -5,11 +5,13 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>akbun-taskq</title>
 <link rel="stylesheet" href="css/theme/contract.css">
-<link rel="stylesheet" href="css/theme/carbon.css">
+<link rel="stylesheet" href="css/theme/soft.css">
 <link rel="stylesheet" href="css/base.css">
 <link rel="stylesheet" href="css/calendar.css">
 <link rel="stylesheet" href="css/work.css">
 <link rel="stylesheet" href="css/panels.css">
+<link rel="stylesheet" href="css/nav.css">
+<link rel="stylesheet" href="css/chat.css">
 <link rel="stylesheet" href="css/settings.css">
 </head>
 <body>
@@ -44,16 +46,31 @@
 </section>
 
 <div class="layout">
+  <nav class="sidebar" data-area="sidebar" aria-label="Navigation">
+    <div class="side-me">
+      <span class="avatar avatar-lg" data-area="me-avatar" aria-hidden="true"></span>
+      <strong>akbun-taskq</strong>
+    </div>
+    <ul class="side-list" data-area="side-views">
+      <li><button type="button" class="side-item" data-view="calendar"><span class="side-icon" aria-hidden="true">◷</span><span>Calendar</span></button></li>
+      <li><button type="button" class="side-item" data-view="board"><span class="side-icon" aria-hidden="true">▤</span><span>Board</span></button></li>
+      <li><button type="button" class="side-item" data-view="graph"><span class="side-icon" aria-hidden="true">⋔</span><span>Graph</span></button></li>
+      <li><button type="button" class="side-item" data-view="proposals"><span class="side-icon" aria-hidden="true">✎</span><span>Proposals</span></button></li>
+    </ul>
+    <div class="side-heading">
+      <h2 id="bots-heading">Bots</h2>
+      <div class="bots-state" data-area="bots-state"></div>
+    </div>
+    <ul class="side-list side-bots" data-area="bot-list" aria-labelledby="bots-heading"></ul>
+    <ul class="side-list" data-area="side-shared">
+      <li><button type="button" class="side-item" data-view="discussions"><span class="side-icon" aria-hidden="true">❝</span><span>Discussions</span></button></li>
+      <li><button type="button" class="side-item" data-view="wiki"><span class="side-icon" aria-hidden="true">✦</span><span>Wiki</span></button></li>
+    </ul>
+  </nav>
   <main class="main" tabindex="-1">
-    <nav class="tabs" role="tablist" aria-label="Views">
-      <button type="button" role="tab" id="tab-calendar" data-tab="calendar" aria-controls="view-calendar">Calendar</button>
-      <button type="button" role="tab" id="tab-board" data-tab="board" aria-controls="view-board">Board</button>
-      <button type="button" role="tab" id="tab-graph" data-tab="graph" aria-controls="view-graph">Graph</button>
-      <button type="button" role="tab" id="tab-proposals" data-tab="proposals" aria-controls="view-proposals">Proposals</button>
-      <button type="button" role="tab" id="tab-team" data-tab="team" aria-controls="view-team">Team</button>
-    </nav>
 
-    <section id="view-calendar" role="tabpanel" aria-labelledby="tab-calendar" data-area="calendar">
+
+    <section id="view-calendar" data-view-panel="calendar" aria-label="Calendar" data-area="calendar">
       <div class="cal-toolbar" data-area="calendar-toolbar">
         <div class="cal-nav">
           <button type="button" class="cal-today" data-area="calendar-today">Today</button>
@@ -87,43 +104,43 @@
       <p class="legend" data-area="calendar-legend"></p>
     </section>
 
-    <section id="view-board" role="tabpanel" aria-labelledby="tab-board" data-area="board" hidden>
+    <section id="view-board" data-view-panel="board" aria-label="Board" data-area="board" hidden>
       <div class="board-columns" data-area="board-columns"></div>
     </section>
 
-    <section id="view-graph" role="tabpanel" aria-labelledby="tab-graph" data-area="graph" hidden>
+    <section id="view-graph" data-view-panel="graph" aria-label="Graph" data-area="graph" hidden>
       <p class="legend">Solid arrow = blocks. Dashed arrow = discovered from. Thick outline = failed, waiting for a person, or has stale runs.</p>
       <div data-area="graph-canvas"></div>
     </section>
 
-    <section id="view-proposals" role="tabpanel" aria-labelledby="tab-proposals" data-area="proposals" hidden>
+    <section id="view-proposals" data-view-panel="proposals" aria-label="Proposals" data-area="proposals" hidden>
       <div data-area="proposal-list"></div>
     </section>
 
-    <section id="view-team" role="tabpanel" aria-labelledby="tab-team" data-area="team" hidden>
-      <div class="team-status" data-area="team-status"></div>
-      <div class="team-layout">
-        <div class="team-main">
-          <form class="team-compose" data-area="team-compose">
-            <label>To <select data-area="team-to"></select></label>
-            <label class="team-body-label">Message <textarea data-area="team-body" rows="3" maxlength="8000" required></textarea></label>
-            <button type="submit">Send</button>
-          </form>
-          <h2>Messages</h2>
-          <div data-area="team-messages"></div>
-        </div>
-        <div class="team-side">
-          <h2>Agents and their tasks</h2>
-          <ul class="team-agents" data-area="team-agents"></ul>
-          <h2>Discussions</h2>
-          <ul class="team-threads" data-area="team-threads"></ul>
-          <h2>Wiki</h2>
-          <form class="team-wiki-search" data-area="team-wiki-search" role="search">
-            <input type="search" data-area="team-wiki-query" aria-label="Search the team wiki" placeholder="Search the wiki">
-          </form>
-          <ul class="team-wiki" data-area="team-wiki"></ul>
-          <section class="team-page" data-area="team-page" hidden></section>
-        </div>
+    <section id="view-bot" class="chat" data-view-panel="bot" aria-label="Bot conversation" data-area="bot-chat" hidden>
+      <header class="chat-head" data-area="bot-head"></header>
+      <div class="chat-log" data-area="bot-log"></div>
+      <form class="chat-compose" data-area="bot-compose">
+        <label class="sr-only" for="bot-input">Message</label>
+        <textarea id="bot-input" data-area="bot-input" rows="2" maxlength="8000" required placeholder="Message"></textarea>
+        <button type="submit">Send</button>
+      </form>
+    </section>
+
+    <section id="view-discussions" data-view-panel="discussions" aria-label="Discussions" data-area="discussions" hidden>
+      <h2 class="view-title">Discussions</h2>
+      <ul class="thread-list" data-area="thread-list"></ul>
+    </section>
+
+    <section id="view-wiki" data-view-panel="wiki" aria-label="Wiki" data-area="wiki" hidden>
+      <h2 class="view-title">Wiki</h2>
+      <form class="wiki-search" data-area="wiki-search" role="search">
+        <input type="search" data-area="wiki-query" aria-label="Search the bots' wiki" placeholder="Search the wiki">
+        <button type="submit" class="quiet">Search</button>
+      </form>
+      <div class="wiki-layout">
+        <ul class="wiki-list" data-area="wiki-list"></ul>
+        <article class="wiki-page" data-area="wiki-page" hidden></article>
       </div>
     </section>
   </main>

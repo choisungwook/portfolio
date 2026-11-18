@@ -67,7 +67,10 @@ function candidates(db: Db, terms: string[]): WikiPage[] {
   return found
 }
 
+// A two-letter Latin term ("pr", "db") counts only as a whole word, so "pr" does not score on "prompts". Korean and
+// longer terms count anywhere in a word, since Korean attaches particles to the stem.
 function occurrences(text: string, term: string): number {
+  if (/^[a-z0-9]{1,2}$/.test(term)) return text.match(new RegExp(`(?<![a-z0-9])${term}(?![a-z0-9])`, 'g'))?.length ?? 0
   let count = 0
   for (let at = text.indexOf(term); at >= 0; at = text.indexOf(term, at + term.length)) count += 1
   return count
@@ -79,7 +82,7 @@ export function scoreOf(page: Pick<WikiPage, 'slug' | 'title' | 'body'>, terms: 
   let score = 0
   let covered = 0
   for (const term of terms) {
-    const inTitle = title.includes(term)
+    const inTitle = occurrences(title, term) > 0
     const inBody = occurrences(body, term)
     if (!inTitle && inBody === 0) continue
     covered += 1

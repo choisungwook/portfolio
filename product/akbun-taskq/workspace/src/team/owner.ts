@@ -9,7 +9,7 @@ export function setOwner(db: Db, taskId: string, owner: string | null, by: strin
   if (!task) throw new Error('task not found')
   if (task.status === 'done' || task.status === 'failed') throw new Error(`task is ${task.status}`)
   if (owner !== null && !getAgent(db, owner)?.enabled) throw new Error(`no enabled agent named ${owner}`)
-  db.prepare('UPDATE tasks SET owner = ? WHERE id = ?').run(owner, taskId)
+  db.prepare('UPDATE tasks SET owner = ?, owner_since = unixepoch() WHERE id = ?').run(owner, taskId)
   if (owner) postMessage(db, { sender: by, recipient: owner, task_id: taskId, body: `Task ${taskId} is now yours: ${task.data.intent}` })
   if (task.owner && task.owner !== owner) {
     postMessage(db, { sender: by, recipient: task.owner, task_id: taskId, body: `Task ${taskId} was taken from you by ${by === USER ? 'the user' : by}.` })

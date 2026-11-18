@@ -36,9 +36,9 @@ export function insertTask(db: Db, input: NewTask): Task {
   const id = newId()
   const now = nowSec()
   const data = JSON.stringify(input.data)
-  db.prepare(`INSERT INTO tasks (id, type, status, priority, lock_key, owner, data, created_at, updated_at)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`)
-    .run(id, input.type, input.status, input.priority ?? 0, input.lock_key ?? null, input.owner ?? null, data, now, now)
+  db.prepare(`INSERT INTO tasks (id, type, status, priority, lock_key, owner, owner_since, data, created_at, updated_at)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
+    .run(id, input.type, input.status, input.priority ?? 0, input.lock_key ?? null, input.owner ?? null, input.owner ? now : null, data, now, now)
   for (const dep of input.deps ?? []) {
     db.prepare('INSERT INTO deps (task_id, depends_on, kind) VALUES (?, ?, ?)').run(id, dep.depends_on, dep.kind)
   }
