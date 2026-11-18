@@ -16,7 +16,7 @@ taskq calls the SDK from three places. All three run the Claude Code executable 
 
 | SDK API | Where | How taskq uses it |
 |---|---|---|
-| `query()` | all three | Runs one session. The worker passes a string prompt; a bot turn passes a one-message `AsyncIterable<SDKUserMessage>`, because in-process MCP tools need streaming input |
+| `query()` | all three | Runs one session. The worker passes a string prompt; a bot turn passes an `AsyncIterable<SDKUserMessage>`, because in-process MCP tools need streaming input. The stream stays open during the turn: a message that arrives for a working bot is pushed into it (`src/team/live-input.ts`), the session answers it with its own `result`, and the turn ends once every message sent in has a result |
 | `createSdkMcpServer()`, `tool()` | `team.ts` | The bots' own tools (messages, tasks, discussions, wiki, memory) as an in-process MCP server named `team`. Each tool's zod shape is also checked by taskq before the handler runs |
 | `HookCallback` (`PreToolUse`) | `worker/gate.ts` via `claude/hooks.ts`, `team/bot-gate.ts` via `team.ts` | The gate runs before the permission mode, and its deny holds in every mode. Task runs: path and command policy per task type, tamper stop. Bots: tamper stop (file paths and shell text), blocked commands |
 | `CanUseTool` | `worker.ts`, `team.ts` | Task runs of type ops_change wait for the user's approval through it. Bots refuse at once, since nobody watches a bot's turn |
@@ -39,9 +39,10 @@ taskq calls the SDK from three places. All three run the Claude Code executable 
 | `settingSources` | `['user']`, plus `project` for a trusted repo | `[]`: a bot never reads the user's Claude settings | `[]` |
 | `strictMcpConfig` | `true` | `true`, `false` when the bot has plugins (their MCP servers must load) | not set |
 | `mcpServers` | `{}` | `{ team }` | not set |
-| `plugins` | not set | the bot's skill copy (one local plugin) and selected plugins | not set |
+| `plugins` | not set | the bot's skill copy (one local plugin, `skipMcpDiscovery: true` since it has skills only) and selected plugins | not set |
 | `additionalDirectories` | per task type | `TASKQ_HOME/shared`, the folder every bot shares | not set |
 | `sandbox` | on, per profile | only when the bot turns it on: writes to workdir and shared folder, reads of taskq data denied, network to `allowed_domains` | not set |
+| `effort` | not set | the bot's effort (`low` to `max`), else the model default | not set |
 | `maxTurns`, `maxBudgetUsd` | task or config limits | the bot's limits, else the defaults in Settings | `maxTurns` 3 |
 | `resume` | a resumed task run's session | the bot's session id | not set |
 | `abortController` | cancel, tamper, expired login | cancel (Stop, Esc), tamper, shutdown | not set |

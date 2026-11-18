@@ -54,6 +54,35 @@ describe('team hub', () => {
     assert.match(requests[1].system, /- taskq \(orchestrator\)/)
   })
 
+  test('[critical] a message to a working bot joins its running turn instead of waiting for the next one', async () => {
+    const { db, config } = env
+    let release: () => void = () => {}
+    const pushed: string[] = []
+    const backend: TeamBackend = {
+      supportsLiveInput: true,
+      async runTurn(_config, request) {
+        const original = request.live!.push.bind(request.live!)
+        request.live!.push = (text: string) => { pushed.push(text); return original(text) }
+        await new Promise<void>((resolve) => { release = resolve })
+        return { outcome: 'done', session_id: 'sess-taskq', cost_usd: 0.01, turns: 1 }
+      },
+    }
+    hub = createTeamHub({ db, config, backend, retryAfterSec: 0 })
+    await hub.start()
+    postMessage(db, { sender: USER, recipient: 'taskq', body: 'first' })
+    teamChanged.notify()
+    await waitFor(() => hub!.busy().includes('taskq'))
+    postMessage(db, { sender: USER, recipient: 'taskq', body: 'second while working' })
+    teamChanged.notify()
+    await waitFor(() => pushed.length === 1)
+    assert.match(pushed[0], /second while working/)
+    release()
+    await waitFor(() => hub!.busy().length === 0)
+    const turns = listTurns(db, 5)
+    assert.equal(turns.length, 1)
+    assert.equal(db.prepare('SELECT count(*) AS n FROM team_messages WHERE recipient = ? AND turn_id = ?').get('taskq', turns[0].id)?.n, 2)
+  })
+
   test('the team pauses when the daily budget is spent', async () => {
     const { db, config } = env
     config.bots.dailyBudgetUsd = 0.1

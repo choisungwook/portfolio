@@ -3,7 +3,7 @@ import { join } from 'node:path'
 import type { Config } from '../config.ts'
 import type { Db } from '../db/open.ts'
 import {
-  SYSTEM, agentsWithMail, endTurn, getAgent, postMessage, listAgents, nextDelivery, recoverTurns, replaceAgentSession, seedAgents, spentSince,
+  SYSTEM, agentsWithMail, endTurn, getAgent, joinTurn, leaveTurn, postMessage, listAgents, nextDelivery, recoverTurns, replaceAgentSession, seedAgents, spentSince,
   startTurn, turnsSince, type TeamMessage, type TurnEnd,
 } from '../db/team.ts'
 import { closeUnconcluded, passStalled, skipDisabledSpeakers } from '../db/threads.ts'
@@ -20,6 +20,7 @@ import { wikiDir } from './wiki-files.ts'
 import { pluginPaths } from './bot-plugin.ts'
 import { recoverBotTasks, releaseBotTasks } from './bot-work.ts'
 import { sharedDir } from './shared.ts'
+import { LiveInput } from './live-input.ts'
 import type { TeamBackend, TurnResult } from './types.ts'
 
 export interface HubOptions {
@@ -39,6 +40,18 @@ export interface TeamHub {
 const BATCH = 20                // messages handed to one turn; the rest wait for the next turn
 const STOP_GRACE_MS = 3000      // same grace the task runner gives its runs on shutdown
 const RETRY_AFTER_SEC = 60      // wait after a failed turn, so an outage does not use up every attempt at once
+// Messages sent into a running turn. Past this the turn is left to end, and the rest start a new turn that goes through
+// the budget and loop guards again; otherwise two bots answering each other could keep one turn open forever.
+const MAX_JOINS = 10
+
+interface ActiveTurn {
+  controller: AbortController
+  done: Promise<void>
+  turnId: number
+  live: LiveInput | undefined
+  messages: TeamMessage[]
+  joins: number
+}
 
 export function isTeamPaused(db: Db): boolean {
   return getMeta(db, 'team_paused') === '1'
@@ -75,7 +88,7 @@ function localMidnight(): number {
 // Delivers mail to resident agents. An agent with deliverable messages and no open turn gets one turn that resumes its
 // session; the turn sees every message that arrived since its last turn. At most maxConcurrentTurns run at once.
 export function createTeamHub({ db, config, backend, retryAfterSec = RETRY_AFTER_SEC }: HubOptions): TeamHub {
-  const active = new Map<string, { controller: AbortController; done: Promise<void> }>()
+  const active = new Map<string, ActiveTurn>()
   const cancelled = new Set<string>()
   const stopped = new AbortController()
   const search = hybridSearch(db)
@@ -139,6 +152,8 @@ export function createTeamHub({ db, config, backend, retryAfterSec = RETRY_AFTER
       }
       const shared = sharedDir(config)
       const t = limits(db, config)
+      const live = backend.supportsLiveInput ? new LiveInput() : undefined
+      const messages = [...started.messages]
       const done = backend.runTurn(config, {
         agent,
         system: systemFor(agent, listAgents(db), config, cwd, wiki, shared),
@@ -151,15 +166,16 @@ export function createTeamHub({ db, config, backend, retryAfterSec = RETRY_AFTER
         budgetUsd: agent.turn_budget_usd ?? t.turn_budget_usd,
         resume: agent.session_id,
         signal: controller.signal,
+        live,
       })
         .catch((error: unknown): TurnResult => ({ outcome: 'failed', error: error instanceof Error ? error.message : String(error) }))
-        .then((result) => finish(name, started.turn.id, agent.session_id, started.messages, result, controller.signal.aborted))
+        .then((result) => finish(name, started.turn.id, agent.session_id, messages, result, controller.signal.aborted))
         .catch((error: unknown) => console.error(`taskq: team turn of ${name} crashed: ${String(error)}`))
         .finally(() => {
           active.delete(name)
           teamChanged.notify()
         })
-      active.set(name, { controller, done })
+      active.set(name, { controller, done, turnId: started.turn.id, live, messages, joins: 0 })
     } catch (error) {
       // Preparing the turn failed (a folder could not be created, a prompt could not be built). Close the turn so the
       // bot is not left looking busy until the next restart.
@@ -218,8 +234,24 @@ export function createTeamHub({ db, config, backend, retryAfterSec = RETRY_AFTER
     })
   }
 
+  // Mail for a bot that is already working goes into its running turn instead of waiting for the turn to end.
+  function joinRunning(): void {
+    for (const [name, turn] of active) {
+      if (!turn.live || turn.live.isClosed() || turn.joins >= MAX_JOINS || turn.controller.signal.aborted) continue
+      const joined = joinTurn(db, turn.turnId, name, BATCH)
+      if (joined.length === 0) continue
+      if (!turn.live.push(promptFor(db, joined, sharedDir(config)))) {
+        leaveTurn(db, joined.map((m) => m.id))
+        continue
+      }
+      turn.joins += 1
+      turn.messages.push(...joined)
+    }
+  }
+
   function tick(): void {
     if (isTeamPaused(db)) return
+    joinRunning()
     for (const id of skipDisabledSpeakers(db).closed) {
       raiseAlert(db, { task_id: null, kind: 'team_message', message: `Discussion #${id} was closed without a conclusion: its moderator is disabled.` })
     }

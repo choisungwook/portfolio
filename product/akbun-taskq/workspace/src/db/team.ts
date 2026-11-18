@@ -206,6 +206,31 @@ export function startTurn(db: Db, agent: string, limit: number): { turn: TeamTur
   })
 }
 
+// Hands messages that arrived during an open turn to that same turn, as a Claude Code session takes a message typed
+// mid-turn. They are marked like the turn's first messages, so a failed turn gives them back the same way.
+export function joinTurn(db: Db, turnId: number, agent: string, limit: number): TeamMessage[] {
+  return inTransaction(db, () => {
+    if (!db.prepare('SELECT 1 FROM team_turns WHERE id = ? AND agent = ? AND ended_at IS NULL').get(turnId, agent)) return []
+    const messages = db.prepare(`SELECT * FROM team_messages m WHERE recipient = ? AND ${DELIVERABLE}
+      ORDER BY id LIMIT ?`).all(agent, nowSec(), limit) as unknown as TeamMessage[]
+    const mark = db.prepare('UPDATE team_messages SET read_at = ?, turn_id = ?, attempts = attempts + 1 WHERE id = ?')
+    for (const message of messages) mark.run(nowSec(), turnId, message.id)
+    return messages
+  })
+}
+
+// Undoes joinTurn when the turn closed before the messages could be sent in; they wait for the next turn.
+export function leaveTurn(db: Db, ids: number[]): void {
+  const undo = db.prepare('UPDATE team_messages SET read_at = NULL, turn_id = NULL, attempts = max(attempts - 1, 0) WHERE id = ?')
+  for (const id of ids) undo.run(id)
+}
+
+// Deliverable messages per bot that no turn has taken yet: the queue the sidebar and the chat show.
+export function queuedCounts(db: Db, now: number): Map<string, number> {
+  const rows = db.prepare(`SELECT recipient, count(*) AS n FROM team_messages m WHERE ${DELIVERABLE} GROUP BY recipient`).all(now)
+  return new Map(rows.map((row) => [String(row.recipient), Number(row.n)]))
+}
+
 // A tool with an effect (a message, a task, a wiki write) records itself on the turn. A turn that failed after such a
 // call is not retried: the retry would create the same task or send the same message again.
 export function noteWrite(db: Db, turnId: number): void {

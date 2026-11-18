@@ -7,6 +7,7 @@ import { createClaudeTeamBackend, call, type TeamQueryFn } from '../src/agents/c
 import { getAgent, seedAgents } from '../src/db/team.ts'
 import { ToolError, type TeamTool } from '../src/team/tools.ts'
 import type { TurnRequest } from '../src/team/types.ts'
+import { LiveInput } from '../src/team/live-input.ts'
 import { seedTestBots, setup, type TestEnv } from './helpers.ts'
 
 function fake(script: (options: Options) => unknown[] | Promise<unknown[]>) {
@@ -14,9 +15,19 @@ function fake(script: (options: Options) => unknown[] | Promise<unknown[]>) {
   const prompts: string[] = []
   const query: TeamQueryFn = ({ prompt, options }) => {
     calls.push(options)
+    // Like the SDK: the first user message runs the script; each later one (a live push) gets its own result.
     return (async function* () {
-      for await (const message of prompt as AsyncIterable<SDKUserMessage>) prompts.push(String(message.message.content))
+      const input = (prompt as AsyncIterable<SDKUserMessage>)[Symbol.asyncIterator]()
+      const first = await input.next()
+      if (first.done) return
+      prompts.push(String(first.value.message.content))
       for (const message of await script(options)) yield message as SDKMessage
+      for (;;) {
+        const next = await input.next()
+        if (next.done) return
+        prompts.push(String(next.value.message.content))
+        yield done({ num_turns: 1, total_cost_usd: 0.01 }) as SDKMessage
+      }
     })()
   }
   return { query, calls, prompts }
@@ -40,6 +51,26 @@ describe('claude team backend', () => {
     }
   })
   test.afterEach(() => env.cleanup())
+
+  test('[critical] a message pushed into a running turn is answered in the same session before the turn ends', async () => {
+    const live = new LiveInput()
+    const f = fake(() => {
+      assert.equal(live.push('2 new messages'), true)
+      return [{ type: 'system', subtype: 'init', session_id: 'sess-1' }, done()]
+    })
+    const result = await createClaudeTeamBackend(f.query).runTurn(env.config, { ...request, live })
+    assert.deepEqual(f.prompts, ['1 new message', '2 new messages'])
+    assert.equal(result.outcome, 'done')
+    assert.equal(result.turns, 4)
+    assert.equal(result.cost_usd, 0.03)
+    assert.equal(live.push('too late'), false)
+  })
+
+  test('effort reaches the session when the bot sets it', async () => {
+    const f = fake(() => [done()])
+    await createClaudeTeamBackend(f.query).runTurn(env.config, { ...request, agent: { ...request.agent, effort: 'high' } })
+    assert.equal(f.calls[0].effort, 'high')
+  })
 
   test('a turn resumes the session in auto mode, unsandboxed, with no user settings by default', async () => {
     const f = fake(() => [{ type: 'system', subtype: 'init', session_id: 'sess-1' }, done()])

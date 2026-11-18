@@ -1,15 +1,16 @@
 import { join } from 'node:path'
 import {
   createSdkMcpServer, query as sdkQuery, tool,
-  type HookCallback, type Options, type SDKMessage, type SDKUserMessage,
+  type HookCallback, type ModelInfo, type Options, type SDKMessage, type SDKUserMessage, type SlashCommand,
 } from '@anthropic-ai/claude-agent-sdk'
 import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js'
 import type { Config } from '../../config.ts'
 import { claudeExecutable } from '../../resources.ts'
 import { botGate } from '../../team/bot-gate.ts'
 import { ToolError, type TeamTool } from '../../team/tools.ts'
-import type { TeamBackend, TurnRequest, TurnResult } from '../../team/types.ts'
+import type { Catalog, CatalogRequest, TeamBackend, TurnRequest, TurnResult } from '../../team/types.ts'
 import { buildEnv } from './auth.ts'
+import { LiveInput } from '../../team/live-input.ts'
 
 export type TeamQueryFn = (params: { prompt: AsyncIterable<SDKUserMessage>; options: Options }) => AsyncIterable<SDKMessage>
 
@@ -22,6 +23,9 @@ const MISSING_SESSION = /no conversation found|session .* not found/i
 // reach: permission mode (auto by default), sandbox (off by default) and blocked commands (none by default).
 export function createClaudeTeamBackend(runQuery: TeamQueryFn = sdkQuery): TeamBackend {
   return {
+    sdk: 'claude',
+    supportsLiveInput: true,
+    catalog: (config, request) => claudeCatalog(config, request, runQuery),
     async runTurn(config, request) {
       try {
         return await runTurn(config, request, runQuery)
@@ -44,16 +48,27 @@ async function runTurn(config: Config, request: TurnRequest, runQuery: TeamQuery
   let sessionId: string | undefined
   let authFailed = false
   const state: { tampered?: string } = {}
+  // Every message sent into the session gets its own result. The turn ends when the session has answered all of them:
+  // the first prompt and whatever the hub pushed while the bot was working. Cost and turns add up over the results.
+  const live = request.live ?? new LiveInput()
+  let answered = 0
+  let turns = 0
+  let cost = 0
   try {
-    for await (const message of runQuery({ prompt: once(request.prompt), options: optionsFor(config, request, abort, state) })) {
+    for await (const message of runQuery({ prompt: userMessages(live, request.prompt), options: optionsFor(config, request, abort, state) })) {
       if (message.type === 'system' && message.subtype === 'init') sessionId = message.session_id
       else if (message.type === 'assistant' && message.error && INFERENCE_AUTH_ERRORS.has(message.error)) authFailed = true
       else if (message.type === 'result') {
-        const base = { session_id: sessionId ?? message.session_id, turns: message.num_turns, cost_usd: message.total_cost_usd }
+        answered += 1
+        turns += message.num_turns
+        cost += message.total_cost_usd
+        const base = { session_id: sessionId ?? message.session_id, turns, cost_usd: cost }
+        const failed = message.subtype !== 'success'
+        if (state.tampered || authFailed || failed || answered >= live.given) live.close()
         if (state.tampered) return { ...base, outcome: 'failed', error: state.tampered, tampered: state.tampered }
         if (authFailed) return { ...base, outcome: 'failed', error: 'model provider login failed', auth_failed: true }
-        if (message.subtype === 'success') return { ...base, outcome: 'done' }
-        return { ...base, outcome: 'failed', error: message.errors.length > 0 ? message.errors.join('; ').slice(0, 300) : message.subtype }
+        if (failed) return { ...base, outcome: 'failed', error: message.errors.length > 0 ? message.errors.join('; ').slice(0, 300) : message.subtype }
+        if (live.isClosed()) return { ...base, outcome: 'done' }
       }
     }
   } catch (error) {
@@ -61,6 +76,7 @@ async function runTurn(config: Config, request: TurnRequest, runQuery: TeamQuery
     if (state.tampered) return { outcome: 'failed', error: state.tampered, tampered: state.tampered, session_id: sessionId }
     throw error
   } finally {
+    live.close()
     request.signal.removeEventListener('abort', onAbort)
   }
   return { outcome: 'failed', error: 'session ended without a result', session_id: sessionId, auth_failed: authFailed || undefined }
@@ -94,6 +110,7 @@ function optionsFor(config: Config, request: TurnRequest, abort: AbortController
       filesystem: { allowWrite: [request.cwd, request.sharedDir], denyRead: [dataDir, join(config.home, 'taskq.config.json')] },
       network: { allowedDomains: agent.allowed_domains },
     } : undefined,
+    effort: agent.effort ?? undefined,
     maxTurns: request.maxTurns,
     maxBudgetUsd: request.budgetUsd,
     additionalDirectories: [request.sharedDir],
@@ -145,7 +162,37 @@ export async function call(t: TeamTool, args: Record<string, unknown>): Promise<
   }
 }
 
-// Custom SDK MCP tools need the streaming input form of the prompt, so the turn's text is sent as a one-message stream.
-async function* once(text: string): AsyncIterable<SDKUserMessage> {
-  yield { type: 'user', message: { role: 'user', content: text }, parent_tool_use_id: null }
+// Custom SDK MCP tools need the streaming input form of the prompt. The stream stays open while the turn runs, so the
+// hub can add messages that arrive meanwhile; it closes once the session has answered them all.
+async function* userMessages(live: LiveInput, first: string): AsyncIterable<SDKUserMessage> {
+  for await (const text of live.texts(first)) {
+    yield { type: 'user', message: { role: 'user', content: text }, parent_tool_use_id: null }
+  }
+}
+
+// The models the account can use and the slash commands the bot's plugins bring, read from a session that is started
+// and closed without a prompt: no model call, no cost. Used by the model menu and the slash command list.
+async function claudeCatalog(config: Config, request: CatalogRequest, runQuery: TeamQueryFn): Promise<Catalog> {
+  let release: () => void = () => {}
+  const idle = new Promise<void>((resolve) => { release = resolve })
+  async function* nothing(): AsyncIterable<SDKUserMessage> {
+    await idle
+  }
+  const q = runQuery({
+    prompt: nothing(),
+    options: {
+      cwd: request.cwd, env: buildEnv(config), pathToClaudeCodeExecutable: claudeExecutable(), settingSources: [],
+      plugins: request.plugins.map((path) => ({ type: 'local' as const, path, skipMcpDiscovery: true })), tools: [],
+    },
+  }) as AsyncIterable<SDKMessage> & { supportedModels?: () => Promise<ModelInfo[]>; supportedCommands?: () => Promise<SlashCommand[]> }
+  try {
+    const [models, commands] = await Promise.all([q.supportedModels?.() ?? [], q.supportedCommands?.() ?? []])
+    return {
+      models: models.map((m) => ({ id: m.value, name: m.displayName, description: m.description, efforts: m.supportsEffort ? m.supportedEffortLevels ?? [] : [] })),
+      commands: commands.map((c) => ({ name: c.name, description: c.description, hint: c.argumentHint })),
+    }
+  } finally {
+    release()
+    for await (const _ of q) { /* drain until the session exits */ }
+  }
 }
