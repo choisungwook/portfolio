@@ -86,7 +86,8 @@ cp taskq.config.example.json taskq.config.json
 
 ```bash
 node bin/taskq run
-taskq team list | say [--to NAME] TEXT | inbox | log | turns | wiki [SLUG] | pause | resume | enable NAME | disable NAME | reset NAME
+taskq team list | say [--to NAME] TEXT | inbox | log | turns | threads | wiki [SLUG] | search QUERY | export
+taskq team assign TASK AGENT|user | pause | resume | enable NAME | disable NAME | reset NAME
 ```
 
 출력된 주소를 연다. 주소 끝의 `#token=...`은 실행할 때마다 바뀌고, 이 토큰이 없으면 화면이 데이터를 받지 못한다. 서버를 다시 시작했다면 새로 출력된 주소로 다시 연다.
@@ -220,7 +221,11 @@ taskq run
 | reviewer | 코드 변경과 security review 결과를 보고 근거를 붙여 지적한다 |
 | doc-reviewer | 문서와 조사 결과에서 근거 없는 주장과 재현되지 않는 절차를 찾는다 |
 
-agent는 계속 떠 있는 프로세스가 아니다. 메시지가 올 때마다 그 agent의 세션을 이어서 한 번 일하고 멈춘다. 그래서 taskq를 다시 시작해도 대화가 이어지고, 메시지가 없으면 비용이 들지 않는다. 메시지 없이 스스로 깨어나 일하지는 않는다.
+agent는 계속 떠 있는 프로세스가 아니다. 메시지가 올 때마다 그 agent의 세션을 이어서 한 번 일하고 멈춘다. 그래서 taskq를 다시 시작해도 대화가 이어지고, 메시지가 없으면 비용이 들지 않는다. 메시지 없이 스스로 깨어나지는 않는다. 나중에 할 일은 agent가 시각을 정한 메시지(`deliver_at`)로 예약하고, 그 시각에 깨어난다.
+
+작업 하나는 agent 하나가 맡는다(owner). Board 카드의 `@coder` 같은 배지와 Team 탭의 agent별 작업 목록이 누가 무엇을 맡았는지 보여준다. 작업 상세의 Owner에서 다른 agent에게 넘기거나 되찾는다. agent가 이미 열려 있는 작업과 비슷한 작업을 만들려 하면 거절되고, 그 작업의 owner와 이야기하라는 답을 받는다.
+
+여러 agent의 의견이 필요한 질문은 토론으로 한다. 토론을 연 agent가 참가자와 라운드 수를 정하고, 참가자는 순서대로 앞사람의 말을 보고 의견을 낸다. 라운드가 끝나면 연 agent가 결론을 wiki에 남기고 필요한 작업을 맡긴다.
 
 agent는 파일을 읽기만 한다. 코드 수정, 명령 실행, 웹 조회는 태스크로 만들어 지금과 같은 샌드박스와 승인 절차를 지난다. agent가 만든 계정 조회·변경 태스크는 항상 초안으로 들어가므로, Board에서 내가 보고 Queued로 바꿔야 실행된다.
 
@@ -237,10 +242,10 @@ agent는 파일을 읽기만 한다. 코드 수정, 명령 실행, 웹 조회는
 | 키 | 기본값 | 뜻 |
 |---|---|---|
 | `enabled` | false | 팀을 켠다 |
-| `dailyBudgetUsd` | 10 | 자정 이후 agent 턴 비용 합계의 상한. 넘으면 팀이 멈춘다. 태스크 비용은 따로 `maxBudgetUsd`가 묶는다 |
+| `dailyBudgetUsd` | 10 | 자정 이후 agent 턴 비용과 agent가 맡은 태스크의 실행 비용을 합한 상한. 넘으면 팀이 멈춘다 |
 | `hourlyTurnsPerAgent` | 20 | agent 하나가 1시간에 할 수 있는 턴 수. agent끼리 메시지를 주고받는 루프를 막는다. 넘으면 팀이 멈춘다 |
 | `turnMaxTurns`, `turnBudgetUsd` | 30, 1 | agent 턴 한 번의 모델 턴 수와 비용 상한 |
-| `maxOpenTasks` | 10 | agent가 만든 태스크 중 끝나지 않은 것의 최대 개수 |
+| `maxOpenTasks` | 10 | agent가 맡은 태스크 중 대기, 실행, 승인 대기, 로그인 대기 상태인 것의 최대 개수. 초안과 리뷰 대기는 세지 않는다 |
 | `maxConcurrentTurns` | 2 | 동시에 일하는 agent 수 |
 | `maxAttempts` | 3 | 같은 메시지로 실패한 턴이 이 횟수가 되면 그 메시지를 내려놓고 알림을 띄운다 |
 | `readRoots` | [] | agent가 읽을 수 있고 code 태스크의 저장소로 쓸 수 있는 디렉터리. `trustedRepos`와 `outputs/`는 따로 넣지 않아도 읽는다 |
@@ -258,6 +263,15 @@ taskq team wiki
 lead가 나에게 보낸 메시지는 Must check에도 "Message from the team"으로 뜬다. CLI로 보낸 메시지는 실행 중인 taskq가 `pollSec`(기본 60초) 안에 가져가고, 화면에서 보낸 메시지는 바로 전달된다.
 
 팀이 공유하는 기억은 wiki다. agent는 일을 시작하기 전에 wiki를 찾고, 결정과 출처가 있는 사실, 진행 상태를 적는다. 세션을 새로 시작해도(`taskq team reset NAME`) wiki는 남는다.
+
+wiki 검색은 단어의 일부로도 찾는다. "검색률"로 "검색률이"가 들어간 페이지를 찾고, 맞은 페이지가 `[[slug]]`로 가리키는 페이지도 함께 보여준다. 같은 뜻의 다른 단어는 찾지 못한다. 페이지는 `TASKQ_HOME/wiki/` 아래 markdown 파일로도 저장되므로, graphify 같은 도구로 이 폴더의 지식 그래프를 만들 수 있다. 결과가 `wiki/graphify-out/GRAPH_REPORT.md`에 있으면 agent가 읽는다. 이 파일들은 사본이라 고쳐도 wiki에 반영되지 않는다.
+
+```bash
+taskq team search 검색률
+taskq team export
+```
+
+멈춘 팀을 Resume하면 예산과 턴 수 계산이 그 시점부터 다시 시작된다. 상한에 걸린 원인을 확인하고 켠다. 메시지를 보내거나 작업을 만든 뒤 실패한 턴은 같은 일을 반복하지 않도록 다시 돌리지 않는다. 이때 Must check에 어떤 메시지를 내려놓았는지 뜨므로, 필요하면 다시 보낸다.
 
 ## 11. 처음 쓸 때 직접 확인할 것
 

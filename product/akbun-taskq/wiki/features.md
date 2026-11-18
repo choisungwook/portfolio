@@ -26,9 +26,10 @@
 | 팀 탭 | `team` | `GET /api/team`, `GET /api/team/messages`, `GET /api/team/wiki` | 상주 agent 팀을 본다. 탭이 열려 있는 동안 5초마다 다시 읽는다. agent 메시지는 task 이벤트를 쓰지 않아 SSE로 오지 않기 때문이다. 탭이 사용자에게 온 메시지를 보여주면 읽음으로 표시한다(`POST /api/team/messages/read`) |
 | 팀 상태 | `team-status` | `POST /api/team/{pause,resume}` | 팀이 꺼짐(`team.enabled` false), 멈춤(이유 표시), 동작 중 중 하나를 보인다. 꺼져 있으면 버튼이 없고, 켜져 있으면 Pause team 또는 Resume team 하나를 보인다 |
 | 팀 메시지 보내기 | `team-compose`, `team-to`, `team-body` | `POST /api/team/messages` | 받는 agent(기본 lead)를 골라 사용자로서 메시지를 보낸다. 최대 8000자 |
-| 팀 메시지 | `team-messages` | `GET /api/team/messages?limit=100` | 최신순 메시지. 행마다 보낸 쪽, 받는 쪽, 시각, 관련 작업, 읽지 않음 표시. 사용자가 보낸 메시지는 파란 띠, 사용자에게 온 메시지는 초록 띠 |
-| 팀 agent 목록 | `team-agents` | `GET /api/team` | 이름, 역할, 설명. 턴이 진행 중이면 working과 파란 띠, 세션이 없으면 no session yet |
-| 팀 wiki | `team-wiki`, `team-page` | `GET /api/team/wiki`, `GET /api/team/wiki/page?slug=` | 페이지 목록(slug, revision, 마지막 작성 agent, 제목). slug를 누르면 아래에 본문을 보인다 |
+| 팀 메시지 | `team-messages` | `GET /api/team/messages?limit=100` | 최신순 메시지. 행마다 보낸 쪽, 받는 쪽, 시각, 관련 작업, 토론 번호, 예약 시각(scheduled), 읽지 않음 표시. 사용자가 보낸 메시지는 파란 띠, 사용자에게 온 메시지는 초록 띠 |
+| 팀 agent 목록 | `team-agents` | `GET /api/team` | 이름, 역할, 설명, 그 agent가 owner인 끝나지 않은 작업. 작업 하나는 한 agent 아래에만 나온다. 작업 제목을 누르면 작업 상세 dialog가 열린다. 턴이 진행 중이면 working과 파란 띠, 세션이 없으면 no session yet |
+| 팀 토론 | `team-threads` | `GET /api/team` | 토론마다 번호와 주제, moderator, 말하는 순서(→), 진행(posts/전체), 다음 차례 또는 결론 대기, 닫힌 토론은 결론을 보인다 |
+| 팀 wiki | `team-wiki-search`, `team-wiki-query`, `team-wiki`, `team-page` | `GET /api/team/wiki?q=`, `GET /api/team/wiki/page?slug=` | 검색어가 없으면 페이지 목록(slug, revision, 마지막 작성 agent, 제목), 있으면 agent와 같은 검색 결과(제목, 링크로 찾은 경우 linked from, 일치 부분). slug를 누르면 아래에 본문을 보인다 |
 | 확인 필요 패널 | `alerts-panel`, `alert-badges`, `alerts-list` | `GET /api/alerts`, `GET /api/queue`, `POST /api/alerts/:id/ack` | 확인되지 않은 알림을 심각도 순으로 보여준다. 작업 제목은 알림 행의 `task_title`을 쓴다. critical은 위에 붉게 고정된다 |
 | 승인 대기 목록 | `pending-approvals`, `pending-list` | `GET /api/approvals` | 확인 필요 패널 위에 열린 승인 요청을 모은다. 각 행은 명령 앞 120자와 Review 버튼만 가진다. Approve는 두지 않는다. 요청이 없으면 영역을 숨긴다 |
 | 큐 일시정지 배너 | `queue-banner`, `queue-text`, `queue-toggle` | `GET /api/queue`, `POST /api/queue/{pause,resume}` | 배너는 항상 보인다. 큐가 도는 동안은 Queue running과 Pause queue 버튼을, 멈춘 동안은 이유와 Resume queue 버튼을 보여준다. 버튼 하나가 두 역할을 바꿔 가진다 |
@@ -38,6 +39,7 @@
 | 접근 스킬 목록 | `access-skills` | `GET /api/settings`, `DELETE /api/access-skills/:name` | 등록된 스킬마다 이름, 설명, 경로(고정폭)를 보인다. SKILL.md가 없으면 `missing` 표시가 붙는다. `−`를 누르면 같은 행에 `Remove` 확인 버튼이 나오고, 두 번째 클릭에서만 삭제한다. 409 메시지는 그 행에 보인다. 등록된 스킬이 없으면 설명 문구를 보인다 |
 | 접근 스킬 추가 | `access-skill-add`, `access-skill-picker`, `access-skill-found`, `access-skill-path-form`, `access-skill-error` | `GET /api/skills/discover`, `POST /api/access-skills` | `+`를 누르면 열린다. 위에는 찾은 스킬 중 등록되지 않은 것을 `Add` 버튼과 함께 보이고, 아래에는 절대 경로를 입력하는 칸과 `Add` 버튼이 있다. 오류는 그 행이나 입력 칸 바로 아래에 보인다 |
 | 구성 값 | `settings-config` | `GET /api/settings` | `taskq.config.json`에서 읽은 값을 읽기 전용으로 보인다. 바꾸려면 파일을 고치고 다시 시작해야 한다는 한 줄이 함께 있다. 웹에서 바꾸는 경로는 없다 |
+| 작업 owner | 보드 카드의 `.badge.owner`, 작업 상세의 `task-owner` | `GET /api/tasks`, `GET /api/team`, `POST /api/team/tasks/:id/owner` | 카드에는 owner agent가 `@coder`처럼 배지로 붙는다. 상세 dialog의 Owner 행은 선택 목록이다. 다른 agent를 고르면 그 agent에게 넘기고, `user (no agent)`를 고르면 되찾는다. 끝난 작업은 글자만 보인다 |
 | 작업 상세 접근 스킬 | `task-detail`의 Access skill 행 | `GET /api/settings` | 작업이 쓰는 접근 스킬의 이름과 등록된 경로를 보인다. 등록이 없어졌으면 `(not registered)`를 붙인다 |
 
 ## 확인 필요 패널의 알림별 버튼

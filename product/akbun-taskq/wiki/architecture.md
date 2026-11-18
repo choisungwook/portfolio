@@ -67,7 +67,8 @@ workspace/
       similar.ts retrospect.ts
     team/                   # resident agent team, see "Team"
       types.ts              # TeamBackend: runTurn
-      hub.ts roster.ts tools.ts prompt.ts report.ts
+      hub.ts roster.ts prompt.ts report.ts owner.ts search.ts wiki-files.ts
+      tools.ts tools-talk.ts tools-tasks.ts tools-wiki.ts
     skills/                 # access skill registry: validation, discovery, run-time check
       inspect.ts registry.ts discover.ts frontmatter.ts
     api/
@@ -323,29 +324,58 @@ Adding a backend: put it under `src/agents/<name>/`, add the name to `AgentName`
 
 ## Team
 
-Resident role agents sit on top of the queue. The design record is [the team decision](../knowledge/decisions/2026-11-resident-agent-team.md). The team is off by default (`team.enabled`).
+Resident role agents sit on top of the queue. The design records are [the team decision](../knowledge/decisions/2026-11-resident-agent-team.md), [ownership and discussions](../knowledge/decisions/2026-11-task-ownership-and-discussions.md) and [wiki search](../knowledge/decisions/2026-11-wiki-hybrid-search.md). The team is off by default (`team.enabled`).
 
 ```text
 user --taskq team say / Team tab--> team_messages --hub--> agent turn (resumed Claude session)
-                                        ^                    |- team tools: send_message, create_task, wiki_*
+                                        ^                    |- team tools: messages, tasks, discussions, wiki
                                         |                    '- Read, Glob, Grep in its folder and read roots
-                 finishRun: result of a task with data.assignee
+                 finishRun: result of a task with an owner
 ```
 
 | Part | What it does |
 |---|---|
 | `team_agents` | Roster: name, role, description (what others delegate by), instructions, allowed task types, `may_message_user`, `session_id`. Seeded from `team/roster.ts` with `INSERT OR IGNORE`, so edits to rows survive restarts |
-| `team_messages` | Mailbox. `sender` and `recipient` are agent names, `user` or `taskq`. A turn claims every unread message of one agent (`turn_id`, `read_at`, `attempts`) |
-| `team_turns` | One row per agent turn with outcome, cost and the session id. An open row means the agent is busy |
-| `wiki_pages`, `wiki_revisions`, `wiki_fts` | Shared memory. `writePage` needs the revision the writer read; a stale write returns the current page |
-| `team/hub.ts` | Waits on `teamChanged` (or `pollSec`). For each enabled agent with mail and no open turn, up to `team.maxConcurrentTurns`, checks the daily budget and the hourly turn count, then opens a turn and calls `TeamBackend.runTurn` |
-| `team/tools.ts` | SDK-neutral tool handlers. `create_task` checks the role's task types, the repo (in `trustedRepos` or under `team.readRoots`, compared by real path) and `team.maxOpenTasks`; it stores `assignee` in the task data. ops tasks are always drafts. Only an agent with `may_message_user` can write to `user`, which also raises a `team_message` alert |
-| `team/report.ts` | Inside `finishRun`'s transaction, posts the run outcome to `data.assignee`. The automatic security review of an agent's code task is assigned to the first enabled `reviewer` |
-| `agents/claude/team.ts` | `query()` with `resume`, `tools: Read, Glob, Grep`, `settingSources: []`, `strictMcpConfig`, an in-process MCP server named `team`, and a PreToolUse hook (`decideTeamRead` in `worker/gate.ts`) that confines reads. The prompt is a one-message stream because SDK MCP tools need streaming input |
+| `team_messages` | Mailbox. `sender` and `recipient` are agent names, `user` or `taskq`. `deliver_at` holds a message back until that time. A turn claims every deliverable message of one agent (`turn_id`, `read_at`, `attempts`) |
+| `team_turns` | One row per agent turn with outcome, cost, session id and `writes` (tool calls with an effect). An open row means the agent is busy |
+| `tasks.owner` | The one agent that owns a task and gets its result. NULL is the user's own task |
+| `team_threads` | Discussions: moderator, ordered participants, rounds, `posts`, status `open`, `concluding`, `closed` |
+| `wiki_pages`, `wiki_revisions`, `wiki_fts` (trigram), `wiki_links` | Shared memory. `writePage` needs the revision the writer read; a stale write returns the current page. `[[slug]]` references are stored as links |
+| `team/hub.ts` | Waits on `teamChanged`, the next `deliver_at`, or `pollSec`. For each enabled agent with deliverable mail, no open turn and no failed turn in the last 60 s, up to `team.maxConcurrentTurns`, checks the guards, opens a turn and calls `TeamBackend.runTurn` |
+| `team/tools*.ts` | SDK-neutral tool handlers, each input checked against its zod schema before the handler runs. `tools-talk.ts`: messages and discussions. `tools-tasks.ts`: create, assign, list, read tasks. `tools-wiki.ts`: list, search, read (with links and backlinks), write (and mirror) |
+| `team/search.ts` | `WikiSearch` interface and `hybridSearch`, see below |
+| `team/wiki-files.ts` | Writes each page to `TASKQ_HOME/wiki/<slug>.md` after every write; `taskq team export` rewrites all. The files are a mirror for folder tools such as graphify; edits to them are not read back |
+| `team/report.ts` | Inside `finishRun`'s transaction, posts the run outcome to the task's owner. The automatic security review of an agent's code task goes to the first enabled reviewer, else the lead, never back to the author |
+| `agents/claude/team.ts` | `query()` with `resume`, `tools: Read, Glob, Grep`, `settingSources: []`, `strictMcpConfig`, an in-process MCP server named `team`, and a PreToolUse hook that confines reads (`decideTeamRead`) and ends the turn as tampered when a call reaches taskq's data or config (`tamperOf`). The prompt is a one-message stream because SDK MCP tools need streaming input |
 
-Turn failures: a failed turn returns its messages to the inbox; after `team.maxAttempts` attempts a message is set aside with a `team_message` alert. A turn cut by shutdown is `interrupted` and does not count. On start, open turns from a crash are closed as interrupted. A resumed session that no longer exists is dropped and the next turn starts a new one. A model login failure, the daily budget, or an agent passing `team.hourlyTurnsPerAgent` pauses the whole team (`meta.team_paused`) with one `team_paused` alert; only the user resumes it.
+### Ownership
 
-`team.personaSkill`, when set, is added to the read roots. The lead is told to read it before deciding something on the user's behalf, and the reviewers before reviewing. Its judgement is never an approval.
+`create_task` checks the role's task types, the repo (in `trustedRepos` or under `team.readRoots`, by real path), the count of agent-owned tasks in ready, running, needs_approval or needs_auth against `team.maxOpenTasks` (draft and review wait for the user and do not count), and duplicates: every unfinished task whose intent has character-trigram Jaccard similarity of 0.5 or more is named with its owner, and the call is refused unless the caller lists it in `not_duplicate_of`. Agent priority is capped at 0. A task with an ops type, `access_skill` or `target_profile` is always a draft.
+
+`assign_task` moves a task to another agent. The current owner may do it; lead and planner may do it for any unfinished task, the user's included. The update compares the old owner, so two concurrent moves cannot both win. The new and old owners get a message. The user sets the owner from the task detail dialog, `POST /api/team/tasks/:id/owner` or `taskq team assign`.
+
+### Discussions
+
+`start_discussion` opens a thread with 2 to 4 participants and 1 to 3 rounds; at most 3 threads are open at once. Only the participant whose turn it is (`participants[posts % count]`) can `discuss`; each post is delivered to the next speaker, whose prompt carries the thread so far in a `<discussion>` block. A speaker whose turn ends without posting passes. After the last post the thread is `concluding` and the moderator is asked to `conclude_discussion`, which closes it and can write the conclusion to a wiki page. Participants are told not to create tasks inside a discussion.
+
+### Search
+
+`hybridSearch` splits the query into terms of two or more characters. Terms of three or more go to the trigram FTS index, which matches any substring, so a Korean stem finds a word with a particle; shorter terms use `LIKE`. Each candidate is scored in JavaScript: 3 per term in the title or slug, 1 + log2(count) per term in the body, times (0.5 + share of terms matched). The five best hits are expanded one hop along `wiki_links` in both directions at 0.4 of the parent's score and marked `via`. Agents are told to read `TASKQ_HOME/wiki/graphify-out/GRAPH_REPORT.md` when it exists.
+
+### Guards and failures
+
+| Guard | Effect |
+|---|---|
+| Daily budget | Agent turns plus runs of agent-owned tasks since local midnight (or since the last resume, whichever is later), plus `turnBudgetUsd` reserved for each running turn. A new turn that would pass `dailyBudgetUsd` does not start; with nothing running the team pauses |
+| Hourly turns | An agent with `hourlyTurnsPerAgent` turns in the last hour (or since the last resume) pauses the team |
+| Retry | A failed turn with no effect returns its messages; after `maxAttempts` they are set aside with an alert. A turn that failed after an effect (message, task, wiki write) is not retried, because a retry would repeat it; its messages are set aside with an alert. The same holds for a turn open at a crash. A failed turn costs 60 s before the agent's next turn |
+| Unknown cost | A turn that ends without a cost figure is charged `turnBudgetUsd` |
+| Tamper | A read of taskq's data directory or config ends the turn and pauses the team with a `security_finding` alert |
+| Login | A model login failure pauses the team |
+
+Every pause raises one alert and only the user resumes. Resuming restarts the budget and loop windows from that moment. A resumed session that no longer exists is dropped and the next turn starts a new one; a reset made while a turn runs is not overwritten when it ends.
+
+`team.personaSkill`, when set, is added to the read roots. The lead is told to read it before deciding something on the user's behalf, and the reviewers before reviewing, and both are told not to copy its text anywhere. Its judgement is never an approval.
 
 ## Worker
 
@@ -499,11 +529,12 @@ Writes (any non-GET under `/api`) must send `Content-Type: application/json`, op
 | `GET /skills/discover` | `[{ name, path, description, registered }]` found one level deep under `$CLAUDE_CONFIG_DIR/skills` (or `~/.claude/skills`) and `skillsDir`. Capped at 200 |
 | `POST /access-skills` | body `{ "path": "/abs/dir" }`. 201 with the stored row; 400 with the reason; 409 when the name or path is already registered |
 | `DELETE /access-skills/:name` | 204. 404 when unknown; 409 when a task in draft, ready, running, needs_approval or needs_auth names it (up to 5 ids listed). Never touches the skill's files |
-| `GET /team` | `{ enabled, paused, pause_reason, agents, turns }`. Agents carry `busy` and no `instructions`. Seeds the roster when it is empty |
+| `GET /team` | `{ enabled, paused, pause_reason, agents, tasks, threads, turns }`. Agents carry `busy` and no `instructions`; `tasks` are unfinished agent-owned tasks with `owner` and `task_title`. Seeds the roster when it is empty |
+| `POST /team/tasks/:id/owner` | body `{ "owner": "coder" }` or `{ "owner": null }`. 409 for a done or failed task or an unknown agent |
 | `GET /team/messages?agent=&limit=` `POST /team/messages` | log, newest first; send `{ "to": "lead", "body": "…" }` as the user. 404 for an unknown or disabled agent |
 | `POST /team/messages/read` | mark every unread message to the user as read |
 | `POST /team/pause` `POST /team/resume` | pause state of the team, separate from the queue |
-| `GET /team/wiki?q=` `GET /team/wiki/page?slug=` | list or search pages; read one page |
+| `GET /team/wiki?q=` `GET /team/wiki/page?slug=` | list pages, or search them with `hybridSearch` (`{ slug, title, score, snippet, via? }`); read one page |
 
 `type` and `outcome` are checked against the enum lists in `src/api/params.ts` and anything else returns 400. A date (`from`, `to`) must name a real calendar day, so `2026-13-40` is 400. `output_path` must be a relative path inside `outputs/`, and `repo` an absolute path to an existing directory. The CLI `add` applies the same checks. `lock_key` is limited to 100 characters. Every SQL statement binds request values as parameters. `ORDER BY` and `LIMIT` text comes from fixed strings, and `limit` is an integer validated against 1 to 500.
 

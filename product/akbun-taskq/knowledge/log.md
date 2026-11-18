@@ -4,6 +4,9 @@ concept를 추가·수정·삭제할 때마다 오늘 날짜 섹션을 맨 위�
 
 ## 2026-11-18
 
+* **Creation**: [A task has one owner agent; several agents meet only in a bounded discussion](decisions/2026-11-task-ownership-and-discussions.md) 결정 기록. owner 열, 중복 작업 검사, 순서와 라운드가 정해진 토론.
+* **Creation**: [Team wiki search is trigram FTS plus link expansion, behind a WikiSearch interface](decisions/2026-11-wiki-hybrid-search.md) 결정 기록. 벡터 검색 대신 trigram과 링크 확장, graphify용 파일 미러.
+* **Update**: [Resident role agents are resumed sessions with a mailbox](decisions/2026-11-resident-agent-team.md) 결정 기록. 리뷰 반영: 쓰기 뒤 실패한 turn 재시도 안 함, 예산 범위, deliver_at, 확인 필요 항목.
 * **Creation**: [Resident role agents are resumed sessions with a mailbox, and work still runs as tasks](decisions/2026-11-resident-agent-team.md) 결정 기록. 상주 프로세스 대신 resume, 동기 호출 대신 mailbox, agent는 읽기만 하고 일은 큐 작업으로.
 
 ## 2026-11-16
