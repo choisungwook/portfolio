@@ -182,9 +182,10 @@ async function claudeCatalog(config: Config, request: CatalogRequest, runQuery: 
   // The catalog gives up after 20 s; the session is ended here too so a slow SDK does not leave a process behind.
   const abort = new AbortController()
   const timer = setTimeout(() => { release(); abort.abort() }, CATALOG_TIMEOUT_MS)
-  async function* nothing(): AsyncIterable<SDKUserMessage> {
-    await idle
-  }
+  // An input stream that sends nothing and ends when released, so the session starts and answers control requests only.
+  const nothing = (): AsyncIterable<SDKUserMessage> => ({
+    [Symbol.asyncIterator]: () => ({ next: () => idle.then(() => ({ done: true as const, value: undefined })) }),
+  })
   const q = runQuery({
     prompt: nothing(),
     options: {

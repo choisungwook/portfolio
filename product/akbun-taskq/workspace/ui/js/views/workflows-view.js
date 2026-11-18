@@ -207,10 +207,18 @@ function graph(steps, states, onPick) {
   }
   for (const s of steps) depthOf(s.id)
   const columns = []
-  for (const s of steps) (columns[depth.get(s.id)] ??= []).push(s)
+  for (const s of steps) {
+    const d = depth.get(s.id)
+    if (!columns[d]) columns[d] = []
+    columns[d].push(s)
+  }
   const W = 184, H = 52, GX = 56, GY = 20
   const pos = new Map()
-  columns.forEach((col, x) => col.forEach((s, y) => pos.set(s.id, { x: 12 + x * (W + GX), y: 12 + y * (H + GY) })))
+  columns.forEach((col, x) => {
+    col.forEach((s, y) => {
+      pos.set(s.id, { x: 12 + x * (W + GX), y: 12 + y * (H + GY) })
+    })
+  })
   const width = 24 + columns.length * (W + GX) - GX
   const height = 24 + Math.max(1, ...columns.map((c) => c.length)) * (H + GY) - GY
   const svg = document.createElementNS(SVG, 'svg')

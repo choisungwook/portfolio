@@ -28,7 +28,8 @@ export function resolveShared(config: Config, path: string): string | null {
 }
 
 function safeName(name: string): string {
-  const base = basename(name).replace(/[\u0000-\u001f\u007f/\\]/g, '').replace(/^\.+/, '').trim()
+  // Control characters, slashes and backslashes are dropped; a leading dot would hide the file.
+  const base = [...basename(name)].filter((ch) => ch.charCodeAt(0) > 0x1f && ch.charCodeAt(0) !== 0x7f && ch !== '/' && ch !== '\\').join('').replace(/^\.+/, '').trim()
   return (base || 'file').slice(0, 120)
 }
 

@@ -7,7 +7,9 @@ const order = new Map()
 // The sidebar calls this with the roster so every view numbers bots the same way.
 export function setRoster(names) {
   order.clear()
-  names.forEach((name, i) => order.set(name, i))
+  names.forEach((name, i) => {
+    order.set(name, i)
+  })
 }
 
 function colorOf(name) {

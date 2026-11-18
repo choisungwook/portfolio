@@ -8,7 +8,7 @@ import { describeRun } from '../db/workflows.ts'
 import { WORKFLOW_HOW } from './workflow-work.ts'
 import { queueChanged, teamChanged } from '../wake.ts'
 import { raiseAlert } from '../alerts/rules.ts'
-import type { TaskType } from '../types.ts'
+import type { Task, TaskType } from '../types.ts'
 import { ToolError, repoAllowed, type ScopedTools, type TeamTool } from './tools.ts'
 import { finishBotTask, startBotTask, type BotOutcome } from './bot-work.ts'
 
@@ -80,7 +80,7 @@ export function taskTools(scope: ScopedTools): TeamTool[] {
         const { owner: _owner, draft: _draft, not_duplicate_of: _nd, workflow, ...input } = args
         const parsed = parseTaskInput({ ...input, workflow_id: workflow, status: draft ? 'draft' : 'ready' }, (name) => findAccessSkill(db, name) !== undefined)
         if (!parsed.ok) throw new ToolError(parsed.error)
-        let task
+        let task: Task
         try {
           task = createFromInput(db, parsed.value, owner)
         } catch (error) {
