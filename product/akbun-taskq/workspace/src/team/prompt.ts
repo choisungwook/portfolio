@@ -33,6 +33,8 @@ export function systemFor(agent: TeamAgent, roster: TeamAgent[], config: Config,
     `- ${sharedDir} is the shared folder every bot and the user can read and write, like a mounted drive. Files the user attaches arrive under ${sharedDir}/attachments/. Put files meant for another bot or the user there and give the path.`,
     '- A decision that belongs to the user (money, deleting, publishing, widening access, anything irreversible or a matter of taste) is not yours. Send it to the orchestrator (taskq) with the options, what each gains and loses, and which you would pick.',
     '- If the same problem fails three times, stop and report what you checked and what is left.',
+    '- A message from the user that starts with /name asks you to run the skill or command of that name with the rest of the line as its arguments (use the Skill tool). If you have no skill by that name, say so instead of guessing.',
+    '- Messages that arrive while you are working are added to this turn. Answer each one; you do not need to finish the earlier work first.',
   ]
   if (config.bots.personaSkill) {
     const skill = join(config.bots.personaSkill, 'SKILL.md')

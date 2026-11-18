@@ -578,6 +578,7 @@ Writes (any non-GET under `/api`) must send `Content-Type: application/json`, op
 | `POST /bots/:name/cancel` | stop the bot's running turn: the turn ends `cancelled`, its messages count as handled, its running task becomes `cancelled`. 409 when it is not working or the bots are not running in this process |
 | `GET /bots/:name/memory` `PUT /bots/:name/memory` | the bot's memory text, at most 16,000 characters |
 | `POST /bots/:name/reload` `POST /bots/:name/reset` | body `{ "kind": "skill" | "plugin" | "all" }` re-copies and returns what loaded and what is missing; reset starts a new session next turn |
+| `GET /bots/:name/catalog` | the models (with their effort levels), permission modes and slash commands for the compose bar. Read from an idle SDK session and cached 10 minutes; `?refresh=1` reads again. `fallback: true` marks the built-in list used when the SDK cannot answer |
 | `GET /bots/presets` | role, description and instructions for planner, coder, reviewer, doc-reviewer |
 | `GET /bots` fields | Agents carry `busy`, `last_message` and `unread` (messages to the user not yet read) and no `instructions`; `tasks` are unfinished agent-owned tasks with `owner` and `task_title`. Creates the orchestrator when it is missing |
 | `POST /bots/tasks/:id/owner` | body `{ "owner": "coder" }` or `{ "owner": null }`. 409 for a done or failed task or an unknown agent |

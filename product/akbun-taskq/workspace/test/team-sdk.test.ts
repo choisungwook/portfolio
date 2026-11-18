@@ -26,7 +26,7 @@ function fake(script: (options: Options) => unknown[] | Promise<unknown[]>) {
         const next = await input.next()
         if (next.done) return
         prompts.push(String(next.value.message.content))
-        yield done({ num_turns: 1, total_cost_usd: 0.01 }) as SDKMessage
+        yield done({ num_turns: 1, total_cost_usd: 0.01 }) as unknown as SDKMessage
       }
     })()
   }

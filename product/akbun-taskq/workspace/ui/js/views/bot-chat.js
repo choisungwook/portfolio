@@ -14,6 +14,7 @@ import { botAvatar, senderAvatar } from './avatar.js'
 import { botsSnapshot, shortTime } from './bots-sidebar.js'
 import { openBotSettings } from './bot-settings.js'
 import { initChatFind, refreshFind } from './chat-find.js'
+import { initComposeMenus, showComposeMenus } from './compose-menus.js'
 
 const POLL_MS = 5000
 
@@ -34,6 +35,7 @@ export function initBotChat() {
   fit = autosize(nodes.input, 240)
   files = attachments({ zone: area('bot-chat'), button: area('bot-attach'), chips: area('bot-attachments'), pasteTarget: nodes.input })
   initChatFind(nodes.log)
+  initComposeMenus(nodes.input)
   nodes.form.addEventListener('submit', send)
   nodes.input.addEventListener('keydown', (event) => {
     // Enter sends, Shift+Enter breaks the line. IME composition (Korean) must not send.
@@ -112,6 +114,7 @@ function renderHead() {
       text: '⚙', onclick: () => openBotSettings(agent.name),
     }),
   )
+  showComposeMenus(agent)
   nodes.input.placeholder = `${t('chat.message', 'Message')} ${agent.name}`
   nodes.input.disabled = !agent.enabled
 }
@@ -120,6 +123,13 @@ function renderHead() {
 function renderWorking() {
   clearInterval(tick)
   const agent = agentNow()
+  const queued = agent?.queued ? ` · ${agent.queued} ${t('chat.queued', 'waiting')}` : ''
+  if (agent && !agent.busy && agent.queued) {
+    // Mail is waiting but every turn slot is taken (or the bots are paused): say so instead of looking idle.
+    clear(nodes.working).append(el('span', { class: 'meta', text: `${agent.queued} ${t('chat.queued_idle', 'messages waiting for a free turn slot')}` }))
+    nodes.working.hidden = false
+    return
+  }
   if (!agent?.busy || !agent.working_since) {
     nodes.working.hidden = true
     return
@@ -130,7 +140,7 @@ function renderWorking() {
     const task = agent.running_tasks?.length ? ` · task ${agent.running_tasks.join(', ')}` : ''
     clear(nodes.working).append(
       el('span', { class: 'pulse', 'aria-hidden': 'true' }),
-      el('span', { text: `${t('chat.working', 'Working')}… ${time}${task}` }),
+      el('span', { text: `${t('chat.working', 'Working')}… ${time}${task}${queued}` }),
       el('span', { class: 'meta', text: ` · ${t('chat.esc', 'esc to interrupt')}` }),
       el('button', { type: 'button', class: 'danger-quiet', text: t('chat.stop', 'Stop'), onclick: cancel }),
     )

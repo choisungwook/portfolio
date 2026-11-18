@@ -1,8 +1,9 @@
 import type { Hono } from 'hono'
 import {
   ORCHESTRATOR, USER, createAgent, deleteAgent, getAgent, listAgents, listMessages, listTurns, markRead, openTurnAgents, postMessage,
-  seedAgents, setAgentSession, updateAgent,
+  queuedCounts, seedAgents, setAgentSession, updateAgent,
 } from '../db/team.ts'
+import { createCatalog } from '../team/catalog.ts'
 import { knownNames } from '../db/bot-registry.ts'
 import { BOT_NAME, parseBotSettings } from '../team/bot-settings.ts'
 import { noteReload, reload, reloadAll } from '../team/bot-plugin.ts'
@@ -25,6 +26,8 @@ import { HttpError, idParam, optionalJson, readJson, type ApiDeps } from './http
 // The UI, CLI, API and config call the resident agents bots; the code and tables call them the team.
 export function registerBotsRoutes(api: Hono, { db, config, bots }: ApiDeps): void {
   const search = hybridSearch(db)
+  const catalog = bots?.catalog ?? createCatalog(db, config, () => undefined)
+  const queued = () => queuedCounts(db, Math.floor(Date.now() / 1000))
   // The sidebar shows each bot like a chat: the latest message it sent or received, and how many it sent the user unread.
   const lastMessage = (name: string) => db.prepare(`SELECT id, sender, recipient, substr(body, 1, 160) AS body, created_at FROM team_messages
     WHERE (sender = ? OR recipient = ?) AND deliver_at <= unixepoch() ORDER BY id DESC LIMIT 1`).get(name, name) ?? null
@@ -40,13 +43,14 @@ export function registerBotsRoutes(api: Hono, { db, config, bots }: ApiDeps): vo
   api.get('/bots', (c) => {
     seedAgents(db, ROSTER)
     const busy = new Set(openTurnAgents(db))
+    const waiting = queued()
     return c.json({
       enabled: config.bots.enabled,
       paused: isTeamPaused(db),
       pause_reason: teamPauseReason(db),
       agents: listAgents(db).map(({ instructions: _instructions, memory: _memory, ...agent }) => ({
         ...agent, busy: busy.has(agent.name), last_message: lastMessage(agent.name), unread: unreadFrom(agent.name),
-        working_since: workingSince(agent.name), running_tasks: runningTasks(agent.name),
+        working_since: workingSince(agent.name), running_tasks: runningTasks(agent.name), queued: waiting.get(agent.name) ?? 0,
       })),
       tasks: db.prepare(`SELECT t.id, t.type, t.status, t.owner, ${TASK_TITLE_SQL} FROM tasks t
         WHERE t.owner IS NOT NULL AND t.status NOT IN ('done', 'failed', 'cancelled') ORDER BY t.updated_at DESC LIMIT 200`).all(),
@@ -216,6 +220,13 @@ export function registerBotsRoutes(api: Hono, { db, config, bots }: ApiDeps): vo
     const error = setMemory(db, name, body.memory)
     if (error) throw new HttpError(error.startsWith('no bot') ? 404 : 400, error)
     return c.json({ memory: getMemory(db, name) })
+  })
+
+  // Models and slash commands for the compose bar. `refresh=1` asks the SDK again instead of using the cached answer.
+  api.get('/bots/:name/catalog', async (c) => {
+    const result = await catalog(c.req.param('name'), c.req.query('refresh') === '1')
+    if (!result) throw new HttpError(404, 'no such bot')
+    return c.json(result)
   })
 
   api.post('/bots/:name/reset', (c) => {

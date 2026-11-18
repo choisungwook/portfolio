@@ -104,3 +104,15 @@ mark.find.current { background: var(--accent); color: var(--on-accent); }
 .shared-item { display: grid; grid-template-columns: 20px minmax(0, 1fr) 90px 180px; gap: 10px; align-items: center; width: 100%; text-align: left; padding: 8px 12px; border-radius: var(--radius); background: var(--panel); color: var(--fg); }
 .shared-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 @media (max-width: 700px) { .shared-item { grid-template-columns: 20px minmax(0, 1fr); } .shared-item .meta { display: none; } }
+
+/* Compose bar tools: refresh on the left, model / effort / permission menus on the right. */
+.compose-tools { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; font-size: 0.85em; }
+.compose-tools select { min-height: 32px; border-radius: var(--radius-l, 12px); padding: 0 8px; background: var(--panel-soft); color: var(--fg); border: 1px solid var(--border); max-width: 180px; }
+.compose-tools .icon-button { width: 32px; min-height: 32px; padding: 0; border-radius: 50%; background: var(--panel-soft); color: var(--fg); }
+.compose-spacer { flex: 1; }
+.chat-compose { position: relative; }
+.slash-list { position: absolute; left: 16px; right: 16px; bottom: calc(100% - 8px); max-height: 320px; overflow: auto; margin: 0; padding: 6px; list-style: none;
+  background: var(--panel); border: 1px solid var(--border); border-radius: var(--radius-l, 12px); box-shadow: var(--shadow-2); z-index: 5; }
+.slash-list li { padding: 6px 10px; border-radius: 8px; cursor: pointer; display: flex; flex-wrap: wrap; gap: 4px 8px; align-items: baseline; }
+.slash-list li.active, .slash-list li:hover { background: var(--panel-soft); }
+.slash-desc { flex-basis: 100%; color: var(--muted); font-size: 0.85em; }

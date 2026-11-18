@@ -4,7 +4,7 @@ import type { Config } from '../config.ts'
 import type { Db } from '../db/open.ts'
 import {
   SYSTEM, agentsWithMail, endTurn, getAgent, joinTurn, leaveTurn, postMessage, listAgents, nextDelivery, recoverTurns, replaceAgentSession, seedAgents, spentSince,
-  startTurn, turnsSince, type TeamMessage, type TurnEnd,
+  startTurn, turnsSince, type BotSdk, type TeamMessage, type TurnEnd,
 } from '../db/team.ts'
 import { closeUnconcluded, passStalled, skipDisabledSpeakers } from '../db/threads.ts'
 import { getMeta, setMeta } from '../db/meta.ts'
@@ -22,11 +22,13 @@ import { recoverBotTasks, releaseBotTasks } from './bot-work.ts'
 import { sharedDir } from './shared.ts'
 import { LiveInput } from './live-input.ts'
 import type { TeamBackend, TurnResult } from './types.ts'
+import { createCatalog, type CatalogFn } from './catalog.ts'
 
 export interface HubOptions {
   db: Db
   config: Config
-  backend: TeamBackend
+  backend: TeamBackend                              // runs Claude bots
+  backends?: Partial<Record<BotSdk, TeamBackend>>   // other SDKs; a bot whose SDK has no backend fails its turn
   retryAfterSec?: number
 }
 
@@ -35,6 +37,7 @@ export interface TeamHub {
   stop(): Promise<void>
   cancel(name: string): boolean   // false when the bot has no turn running
   busy(): string[]
+  catalog: CatalogFn
 }
 
 const BATCH = 20                // messages handed to one turn; the rest wait for the next turn
@@ -87,7 +90,9 @@ function localMidnight(): number {
 
 // Delivers mail to resident agents. An agent with deliverable messages and no open turn gets one turn that resumes its
 // session; the turn sees every message that arrived since its last turn. At most maxConcurrentTurns run at once.
-export function createTeamHub({ db, config, backend, retryAfterSec = RETRY_AFTER_SEC }: HubOptions): TeamHub {
+export function createTeamHub({ db, config, backend: claude, backends = {}, retryAfterSec = RETRY_AFTER_SEC }: HubOptions): TeamHub {
+  const backendFor = (sdk: BotSdk): TeamBackend | undefined => backends[sdk] ?? (sdk === 'claude' ? claude : undefined)
+  const catalog = createCatalog(db, config, backendFor)
   const active = new Map<string, ActiveTurn>()
   const cancelled = new Set<string>()
   const stopped = new AbortController()
@@ -138,6 +143,8 @@ export function createTeamHub({ db, config, backend, retryAfterSec = RETRY_AFTER
     const agent = getAgent(db, name)
     if (!started || !agent) return
     try {
+      const backend = backendFor(agent.sdk)
+      if (!backend) throw new Error(`no ${agent.sdk} backend is configured (see wiki/sdk-usage.md)`)
       const controller = new AbortController()
       const own = agentDir(config, name)
       mkdirSync(own, { recursive: true })
@@ -291,6 +298,7 @@ export function createTeamHub({ db, config, backend, retryAfterSec = RETRY_AFTER
       void loop(seen)
     },
     cancel,
+    catalog,
     busy: () => [...active.keys()],
     async stop() {
       running = false

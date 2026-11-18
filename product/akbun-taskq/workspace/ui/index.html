@@ -134,12 +134,14 @@
       <div class="chat-working" data-area="chat-working" role="status" aria-live="polite" hidden></div>
       <form class="chat-compose" data-area="bot-compose">
         <div class="attach-chips" data-area="bot-attachments" hidden></div>
+        <ul class="slash-list" data-area="bot-slash" role="listbox" aria-label="Slash commands" hidden></ul>
         <div class="compose-row">
           <button type="button" class="attach-button" data-area="bot-attach" data-i18n-title="chat.attach" title="Attach files" aria-label="Attach files">＋</button>
           <label class="sr-only" for="bot-input">Message</label>
           <textarea id="bot-input" data-area="bot-input" rows="1" maxlength="8000" placeholder="Message"></textarea>
           <button type="submit" data-i18n="chat.send">Send</button>
         </div>
+        <div class="compose-tools" data-area="bot-tools"></div>
         <p class="drop-hint" data-i18n="chat.drop">Drop files here to attach them</p>
       </form>
     </section>
