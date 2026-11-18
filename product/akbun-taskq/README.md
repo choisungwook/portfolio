@@ -11,6 +11,7 @@ A personal agent task queue. You add tasks, several Claude sessions work through
 | Path | Content |
 |---|---|
 | [workspace/](./workspace/) | Source, tests, the static UI and the [manual](./workspace/manual.md) |
+| [CHANGELOG.md](./CHANGELOG.md) | Versioned changes and the source of GitHub release notes |
 | [wiki/](./wiki/index.md) | Architecture, development notes, feature map |
 | [knowledge/](./knowledge/index.md) | Decision records |
 

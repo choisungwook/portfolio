@@ -1,7 +1,7 @@
 import type { Db } from '../db/open.ts'
 import type { AlertKind, Severity } from '../types.ts'
 import { insertAlert } from '../db/alerts.ts'
-import { noticeFor, notifyCritical, type Notice } from './notify.ts'
+import { noticeFor, notifyDesktop, type Notice } from './notify.ts'
 import { mask } from '../mask.ts'
 
 // Default severity per kind. worker_flag takes the severity the worker reports.
@@ -16,12 +16,13 @@ export const SEVERITY: Record<AlertKind, Severity> = {
   budget_exceeded: 'normal',
   review_ready: 'normal',
   proposal_pending: 'normal',
+  handoff_received: 'normal',
 }
 
 // The notification is shown outside the database, so it gets the masked message too. notify is injectable for tests.
 export function raiseAlert(db: Db, alert: {
   task_id: string | null; run_id?: string | null; kind: AlertKind; message: string; severity?: Severity; ref?: string | null
-}, notify: (notice: Notice) => void = notifyCritical): void {
+}, notify: (notice: Notice) => void = notifyDesktop): void {
   const severity = alert.severity ?? SEVERITY[alert.kind]
   const message = mask(alert.message)
   insertAlert(db, { task_id: alert.task_id, run_id: alert.run_id ?? null, severity, kind: alert.kind, message, ref: alert.ref ?? null })

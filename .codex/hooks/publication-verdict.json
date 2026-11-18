@@ -1,0 +1,9 @@
+{
+  "type": "object",
+  "properties": {
+    "sensitive": { "type": "boolean" },
+    "business_score": { "type": "integer" }
+  },
+  "required": ["sensitive", "business_score"],
+  "additionalProperties": false
+}

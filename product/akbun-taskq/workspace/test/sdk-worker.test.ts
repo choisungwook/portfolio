@@ -30,7 +30,7 @@ function ctxOf(task: Task, approve: () => Promise<boolean> = async () => true) {
   const events: { kind: string; payload: Record<string, unknown> }[] = []
   const sessions: string[] = [], patches: Record<string, unknown>[] = [], approvals: { tool: string }[] = []
   const ctx: WorkerContext = {
-    task, runId: 'run-1', resumeSessionId: null, similar: [], signal: new AbortController().signal,
+    task, runId: 'run-1', resumeSessionId: null, similar: [], handoffs: [], signal: new AbortController().signal,
     emit: (kind, payload) => { events.push({ kind, payload }) },
     onSession: (id) => { sessions.push(id) },
     patchData: (patch) => { patches.push(patch) },

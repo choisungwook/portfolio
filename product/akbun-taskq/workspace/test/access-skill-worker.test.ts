@@ -22,7 +22,7 @@ const task: Task = {
 
 function ctxWith(access_skill_path?: string): WorkerContext {
   return {
-    task, runId: 'run-7', resumeSessionId: null, similar: [], signal: new AbortController().signal, access_skill_path,
+    task, runId: 'run-7', resumeSessionId: null, similar: [], handoffs: [], signal: new AbortController().signal, access_skill_path,
     emit: () => {}, onSession: () => {}, patchData: () => {}, requestApproval: async () => true,
   }
 }

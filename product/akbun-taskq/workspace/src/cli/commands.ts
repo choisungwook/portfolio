@@ -6,6 +6,7 @@ import { hasAccessSkill } from '../skills/registry.ts'
 import type { Task } from '../types.ts'
 import type { Command } from './types.ts'
 import { decideFromCli, escapeControls } from './approvals.ts'
+import { sendHandoffNotices } from '../alerts/handoffs.ts'
 
 export const add: Command = ({ db }, args) => {
   const { values } = parseArgs({
@@ -15,6 +16,7 @@ export const add: Command = ({ db }, args) => {
       cautions: { type: 'string' }, 'access-skill': { type: 'string' }, 'target-profile': { type: 'string' },
       'lock-key': { type: 'string' }, repo: { type: 'string' }, output: { type: 'string' },
       priority: { type: 'string' }, 'depends-on': { type: 'string', multiple: true }, draft: { type: 'boolean' },
+      'manual-handoffs': { type: 'boolean' },
     },
   })
   const parsed = parseTaskInput({
@@ -23,9 +25,11 @@ export const add: Command = ({ db }, args) => {
     repo: values.repo, output_path: values.output,
     priority: values.priority === undefined ? undefined : Number(values.priority),
     depends_on: values['depends-on'], status: values.draft ? 'draft' : 'ready',
+    auto_accept_handoffs: values['manual-handoffs'] ? false : undefined,
   }, (name) => hasAccessSkill(db, name))
   if (!parsed.ok) throw new Error(parsed.error)
   const task = createFromInput(db, parsed.value)
+  sendHandoffNotices(db)
   console.log(formatTask(task, false))
 }
 
@@ -59,6 +63,7 @@ export const resume: Command = ({ db }, args) => {
 export const done: Command = ({ db }, args) => {
   const id = requireId(args)
   if (!moveStatus(db, id, 'review', 'done')) throw new Error('task is not in review')
+  sendHandoffNotices(db)
   console.log(`${id} done`)
 }
 

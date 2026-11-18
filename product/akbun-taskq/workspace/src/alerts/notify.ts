@@ -5,7 +5,9 @@ export interface Notice { title: string; body: string }
 
 const LIMIT = 200
 // The command the user runs from the notification. approval_required and security_finding name the task; auth_required resumes it.
-const VERBS: Partial<Record<AlertKind, string>> = { approval_required: 'approve', auth_required: 'resume', security_finding: 'show' }
+const VERBS: Partial<Record<AlertKind, string>> = {
+  approval_required: 'approve', auth_required: 'resume', security_finding: 'show', handoff_received: 'show',
+}
 
 // The body ends with the action, so the message is cut to make room for it and the action stays whole.
 export function noticeFor(kind: AlertKind, taskId: string | null, message: string): Notice {
@@ -19,7 +21,7 @@ export function noticeFor(kind: AlertKind, taskId: string | null, message: strin
 }
 
 // Argv, never interpolated into the script text, so message content cannot inject AppleScript.
-export function notifyCritical(notice: Notice): void {
+export function notifyDesktop(notice: Notice): void {
   if (process.platform !== 'darwin' || process.env.TASKQ_NO_NOTIFY) return
   execFile('osascript', [
     '-e', 'on run argv',

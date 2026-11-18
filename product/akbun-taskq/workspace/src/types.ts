@@ -3,10 +3,10 @@ export type TaskStatus = 'draft' | 'ready' | 'running' | 'needs_approval' | 'nee
 export type Outcome = 'done' | 'failed' | 'needs_approval' | 'needs_auth' | 'review' | 'stale'
 export type Severity = 'critical' | 'high' | 'normal'
 export type AlertKind = 'approval_required' | 'security_finding' | 'prod_touch' | 'worker_flag'
-  | 'auth_required' | 'failed' | 'stale_repeat' | 'budget_exceeded' | 'review_ready' | 'proposal_pending'
+  | 'auth_required' | 'failed' | 'stale_repeat' | 'budget_exceeded' | 'review_ready' | 'proposal_pending' | 'handoff_received'
 export type EventKind = 'claimed' | 'tool_call' | 'tool_result' | 'permission_request' | 'approved' | 'denied'
   | 'auth_required' | 'progress' | 'error' | 'finished' | 'cancel_requested' | 'tamper_blocked'
-  | 'run_requested'
+  | 'run_requested' | 'handoff_received' | 'handoff_accepted'
 
 export interface TaskData {
   title?: string
@@ -16,6 +16,7 @@ export interface TaskData {
   target_profile?: string    // AWS profile for target-account commands
   repo?: string              // cwd for code tasks
   output_path?: string       // under outputs/
+  auto_accept_handoffs?: boolean
   review_of?: string         // security_review: id of the code task
   base_commit?: string       // code: HEAD before the run
   max_turns?: number
@@ -43,11 +44,34 @@ export interface WorkerResult {
 
 export interface SimilarTask { task_id: string; text: string }   // a finished run that shares words with the task
 
+export interface TaskHandoff {
+  id: number
+  task_id: string
+  run_id: string | null
+  output_path: string | null
+  summary: string | null
+  accepted_via: 'auto' | 'manual'
+}
+
+export interface HandoffRecord {
+  id: number
+  source_task_id: string
+  target_task_id: string
+  run_id: string | null
+  output_path: string | null
+  summary: string | null
+  created_at: number
+  accepted_at: number | null
+  accepted_via: TaskHandoff['accepted_via'] | null
+  status: 'pending' | 'accepted' | 'superseded'
+}
+
 export interface WorkerContext {
   task: Task
   runId: string
   resumeSessionId: string | null
   similar: SimilarTask[]                                          // up to 3, from memory/similar.ts
+  handoffs: TaskHandoff[]
   access_skill_path?: string                                      // registered folder of task.data.access_skill
   signal: AbortSignal
   emit(kind: EventKind, payload: Record<string, unknown>): void   // masked and stored by the runner

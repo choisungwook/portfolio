@@ -106,6 +106,10 @@ export function parseTaskInput(body: unknown, known: SkillLookup): Parsed<TaskIn
     data.target_profile = optText(o.target_profile, 'target_profile', 100)
     data.repo = optText(o.repo, 'repo', 500)
     data.output_path = optText(o.output_path, 'output_path', 500)
+    if (o.auto_accept_handoffs !== undefined && typeof o.auto_accept_handoffs !== 'boolean') {
+      throw new InputError('auto_accept_handoffs must be a boolean')
+    }
+    data.auto_accept_handoffs = o.auto_accept_handoffs
     data.max_turns = optInt(o.max_turns, 'max_turns', 1, 1000)
     data.max_budget_usd = optNumber(o.max_budget_usd, 'max_budget_usd', 100)
     checkPaths(data)

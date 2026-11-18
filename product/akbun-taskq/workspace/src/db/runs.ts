@@ -6,9 +6,9 @@ import { TASK_TITLE_SQL } from './tasks.ts'
 
 export interface RunFilter { from?: number; to?: number; type?: string; lock_key?: string; outcome?: string }
 
-export function insertRun(db: Db, run: { id: string; task_id: string; session_id: string | null; started_at: number }): void {
-  db.prepare('INSERT INTO runs (id, task_id, session_id, started_at) VALUES (?, ?, ?, ?)')
-    .run(run.id, run.task_id, run.session_id, run.started_at)
+export function insertRun(db: Db, run: { id: string; task_id: string; session_id: string | null; started_at: number; output_path?: string }): void {
+  db.prepare('INSERT INTO runs (id, task_id, session_id, started_at, output_path) VALUES (?, ?, ?, ?, ?)')
+    .run(run.id, run.task_id, run.session_id, run.started_at, run.output_path ?? null)
 }
 
 export function setRunSession(db: Db, runId: string, sessionId: string): void {

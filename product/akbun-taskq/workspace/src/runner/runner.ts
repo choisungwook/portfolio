@@ -1,11 +1,13 @@
-import type { Db } from '../db/open.ts'
+import { inTransaction, type Db } from '../db/open.ts'
 import type { Config } from '../config.ts'
-import type { Task, Worker } from '../types.ts'
+import type { Task, TaskHandoff, Worker } from '../types.ts'
 import { insertEvent } from '../db/events.ts'
 import { insertRun } from '../db/runs.ts'
+import { listTaskHandoffs } from '../db/handoffs.ts'
 import { claimTask, getTask, isBlocked, nextEligible } from '../db/tasks.ts'
 import { isCancelRequested, isQueuePaused, pauseBy, pauseQueue, resumeQueue } from '../db/meta.ts'
 import { raiseAlert } from '../alerts/rules.ts'
+import { sendHandoffNotices } from '../alerts/handoffs.ts'
 import { newId } from '../ids.ts'
 import { nowSec } from '../time.ts'
 import { recoverStale } from './recover.ts'
@@ -69,12 +71,22 @@ export function createRunner({
     if (pauseBy(db) === 'preflight') resumeQueue(db)
   }
 
-  function launch(task: Task): void {
+  function claimAndLaunch(taskId: string): boolean {
+    const claimed = inTransaction(db, () => {
+      if (!claimTask(db, taskId, runnerId)) return undefined
+      return { task: getTask(db, taskId)!, handoffs: listTaskHandoffs(db, taskId) }
+    })
+    if (!claimed) return false
+    launch(claimed.task, claimed.handoffs)
+    return true
+  }
+
+  function launch(task: Task, handoffs: TaskHandoff[]): void {
     const runId = newId()
     const controller = new AbortController()
-    insertRun(db, { id: runId, task_id: task.id, session_id: task.session_id, started_at: nowSec() })
+    insertRun(db, { id: runId, task_id: task.id, session_id: task.session_id, started_at: nowSec(), output_path: task.data.output_path })
     insertEvent(db, { task_id: task.id, run_id: runId, kind: 'claimed', payload: { runner: runnerId, resume: task.session_id } })
-    const done = executeRun({ db, config, worker, runnerId, retrospect }, task, runId, controller.signal)
+    const done = executeRun({ db, config, worker, runnerId, retrospect, handoffs }, task, runId, controller.signal)
       .catch((error: unknown) => console.error(`taskq: run ${runId} crashed: ${String(error)}`))
       .finally(() => {
         active.delete(task.id)
@@ -84,6 +96,7 @@ export function createRunner({
   }
 
   async function tick(): Promise<void> {
+    sendHandoffNotices(db)
     // A cancel marker aborts the live run; executeRun then closes it as cancelled.
     for (const [id, run] of active) if (isCancelRequested(db, id)) run.controller.abort()
     recoverStale(db, config, false, new Set(active.keys()))
@@ -100,17 +113,14 @@ export function createRunner({
         continue
       }
       if (!(await authOk())) return
-      if (claimTask(db, id, runnerId)) {
-        requested.delete(id)
-        launch(getTask(db, id)!)
-      }
+      if (claimAndLaunch(id)) requested.delete(id)
     }
     while (active.size < config.maxConcurrent) {
       if (isQueuePaused(db)) return
       const candidate = nextEligible(db)
       if (!candidate) return
       if (!(await authOk())) return
-      if (claimTask(db, candidate.id, runnerId)) launch(getTask(db, candidate.id)!)
+      claimAndLaunch(candidate.id)
     }
   }
 
