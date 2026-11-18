@@ -19,6 +19,7 @@ import { initSharedViews } from './views/shared-views.js'
 import { initNav } from './core/nav.js'
 import { initSearchView } from './views/search-view.js'
 import { initSharedFolder } from './views/shared-folder.js'
+import { initPluginsView } from './views/plugins-view.js'
 import { initGlobalSettings, loadGlobalSettings } from './views/global-settings.js'
 import { initTokenNotice } from './views/token-notice.js'
 
@@ -41,6 +42,7 @@ initBotChat()
 initSharedViews()
 initSearchView()
 initSharedFolder()
+initPluginsView()
 initNav()
 if (hasToken) {
   loadGlobalSettings()

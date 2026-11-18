@@ -77,7 +77,8 @@ function optionsFor(config: Config, request: TurnRequest, abort: AbortController
     // The user's own Claude settings are not loaded: a bot is what its settings say, nothing more. Skills and plugins
     // come from the bot's snapshot (src/team/bot-plugin.ts). Plugin MCP servers load only when the bot has plugins.
     settingSources: [],
-    plugins: request.plugins.map((path) => ({ type: 'local' as const, path })),
+    // The skill copy is taskq's own plugin with skills only; it never brings MCP servers.
+    plugins: request.plugins.map((path) => (path.endsWith('skills-plugin') ? { type: 'local' as const, path, skipMcpDiscovery: true } : { type: 'local' as const, path })),
     strictMcpConfig: request.plugins.length === 0,
     mcpServers: { [SERVER]: serverFor(request.tools) },
     permissionMode: agent.permission_mode,

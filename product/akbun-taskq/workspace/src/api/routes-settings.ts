@@ -12,6 +12,7 @@ import { LIMIT_RANGES, limits, setLimits } from '../db/settings.ts'
 import { sharedDir } from '../team/shared.ts'
 import { claudeProjectsDir } from '../open-folder.ts'
 import { noteReload, reload } from '../team/bot-plugin.ts'
+import { officialCatalog } from '../team/plugin-catalog.ts'
 
 // Runtime config is read-only. The desktop notification preference is stored separately in SQLite.
 export function registerSettingsRoutes(api: Hono, { db, config }: ApiDeps): void {
@@ -64,6 +65,15 @@ export function registerSettingsRoutes(api: Hono, { db, config }: ApiDeps): void
     }
     setAppearance(db, { font_family: family, font_size: size as number, language, theme })
     return c.json(appearance(db))
+  })
+
+  // The official marketplace, to browse. Nothing is installed from it.
+  api.get('/plugins/catalog', async (c) => {
+    try {
+      return c.json(await officialCatalog())
+    } catch (error) {
+      throw new HttpError(502, `the official plugin list could not be loaded: ${error instanceof Error ? error.message : String(error)}`)
+    }
   })
 
   // The global skill and plugin registry the bots pick from.

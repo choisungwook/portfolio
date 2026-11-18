@@ -144,7 +144,7 @@ describe('files, search, memory, limits and settings', () => {
     const result = await (await call('POST', '/bot-skills/notes/update')).json() as { method: string; reloaded: string[] }
     assert.equal(result.method, 'git')
     assert.deepEqual(result.reloaded, ['coder'])
-    const copy = join(env.home, 'team', 'coder', '.taskq', 'skills-plugin', 'skills', 'notes', 'SKILL.md')
+    const copy = join(env.home, 'bot-plugins', 'coder', 'skills-plugin', 'skills', 'notes', 'SKILL.md')
     assert.match(readFileSync(copy, 'utf8'), /v2/)
     assert.ok(existsSync(copy))
   })

@@ -38,7 +38,6 @@ export function initGlobalSettings() {
   nodes = {
     family: area('font-family'), size: area('font-size'), sizeValue: area('font-size-value'), autorun: area('queue-autorun'),
     language: area('ui-language'), theme: area('ui-theme'), limits: area('limits-form'), folders: area('folder-list'),
-    skill: area('registry-skill'), plugin: area('registry-plugin'),
   }
   clear(nodes.family).append(...Object.entries(FONTS).map(([value, [text]]) => el('option', { value, text })))
   const saveAppearance = () => {
@@ -64,16 +63,6 @@ export function initGlobalSettings() {
   nodes.size.addEventListener('change', saveAppearance)
   nodes.autorun.addEventListener('change', () => mutate(() => api.post('/settings/queue-autorun', { enabled: nodes.autorun.checked }),
     nodes.autorun.checked ? 'Unowned tasks run automatically' : 'Unowned tasks wait for the run button'))
-  for (const kind of ['skill', 'plugin']) {
-    area(`registry-${kind}-form`).addEventListener('submit', async (event) => {
-      event.preventDefault()
-      const input = event.currentTarget.elements.path
-      if (await mutate(() => api.post(`/bot-${kind}s`, { path: input.value.trim() }), `${kind === 'skill' ? 'Skill' : 'Plugin'} added`)) {
-        input.value = ''
-        loadGlobalSettings()
-      }
-    })
-  }
   area('settings-button').addEventListener('click', loadGlobalSettings)
 }
 
@@ -81,8 +70,6 @@ export async function loadGlobalSettings() {
   const seen = edits
   try {
     const settings = await api.get('/settings')
-    renderRegistry('skill', settings.bot_skills)
-    renderRegistry('plugin', settings.bot_plugins)
     nodes.autorun.checked = settings.queue_autorun
     if (seen !== edits) return
     renderLimits(settings.limits, settings.limit_ranges)
@@ -96,31 +83,6 @@ export async function loadGlobalSettings() {
   } catch {
     // Without a token nothing loads; the token notice already says so.
   }
-}
-
-function renderRegistry(kind, entries) {
-  const list = nodes[kind]
-  if (entries.length === 0) {
-    clear(list).append(el('li', { class: 'meta', text: `No ${kind}s registered.` }))
-    return
-  }
-  clear(list).append(...entries.map((entry) => el('li', { class: 'skill-row' },
-    el('div', {},
-      el('strong', { text: entry.name }), entry.ok ? null : el('span', { class: 'badge', text: 'missing' }),
-      entry.description ? el('p', { class: 'meta', text: entry.description }) : null,
-      el('code', { class: 'skill-path', text: entry.path })),
-    el('button', {
-      type: 'button', text: t('settings.update', 'Update'), title: 'git pull when it is a git checkout, then reload every bot that uses it',
-      onclick: async () => {
-        const result = await mutate(() => api.post(`/bot-${kind}s/${entry.name}/update`))
-        if (result) notify(`${entry.name}: ${result.output.split('\n').pop()}${result.reloaded.length ? ` · reloaded ${result.reloaded.join(', ')}` : ''}`)
-        loadGlobalSettings()
-      },
-    }),
-    el('button', {
-      type: 'button', 'aria-label': `Remove ${entry.name}`, text: '−',
-      onclick: () => mutate(() => api.del(`/bot-${kind}s/${entry.name}`), `${entry.name} removed from every bot`).then(loadGlobalSettings),
-    }))))
 }
 
 function renderLimits(values, ranges) {

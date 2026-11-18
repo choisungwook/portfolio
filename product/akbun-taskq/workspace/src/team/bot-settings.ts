@@ -1,6 +1,6 @@
 import { existsSync, statSync } from 'node:fs'
 import { isAbsolute } from 'node:path'
-import { PERMISSION_MODES, type BotPermissionMode, type BotSettings } from '../db/team.ts'
+import { EFFORTS, PERMISSION_MODES, type BotEffort, type BotPermissionMode, type BotSdk, type BotSettings } from '../db/team.ts'
 import { BOT_DEFAULTS } from './roster.ts'
 
 // Shared by the API and the CLI: turns a request body into BotSettings, or explains what is wrong.
@@ -24,6 +24,17 @@ function list(value: unknown, key: string, check: (item: string) => boolean, lim
   const bad = items.find((item) => !check(item))
   if (bad !== undefined) throw new Error(`${key} has an invalid entry: ${bad}`)
   return items
+}
+
+function sdkOf(value: unknown): BotSdk {
+  if (value !== 'claude' && value !== 'openai') throw new Error('sdk must be claude or openai')
+  return value
+}
+
+function effortOf(value: unknown): BotEffort | null {
+  if (value === null || value === '' || value === undefined) return null
+  if (!EFFORTS.includes(value as BotEffort)) throw new Error(`effort must be one of ${EFFORTS.join(', ')}, or empty`)
+  return value as BotEffort
 }
 
 // An optional number limit: null or '' means "use the global default".
@@ -67,7 +78,8 @@ export function parseBotSettings(body: unknown, known: { skills: Set<string>; pl
       skills: has('skills') ? list(o.skills, 'skills', (n) => known.skills.has(n)) : from.skills,
       plugins: has('plugins') ? list(o.plugins, 'plugins', (n) => known.plugins.has(n)) : from.plugins,
       model: has('model') ? (text(o.model, 'model', 100) || null) : from.model,
-      sdk: 'claude',
+      sdk: has('sdk') ? sdkOf(o.sdk) : from.sdk,
+      effort: has('effort') ? effortOf(o.effort) : from.effort,
       hourly_turns: has('hourly_turns') ? limit(o.hourly_turns, 'hourly_turns', 1, 1000, true) : from.hourly_turns,
       turn_budget_usd: has('turn_budget_usd') ? limit(o.turn_budget_usd, 'turn_budget_usd', 0.01, 100, false) : from.turn_budget_usd,
       turn_max_turns: has('turn_max_turns') ? limit(o.turn_max_turns, 'turn_max_turns', 1, 500, true) : from.turn_max_turns,

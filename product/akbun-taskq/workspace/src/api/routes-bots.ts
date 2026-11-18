@@ -163,7 +163,10 @@ export function registerBotsRoutes(api: Hono, { db, config, bots }: ApiDeps): vo
     if (!parsed.ok) throw new HttpError(400, parsed.error)
     if (current.system && !parsed.value.enabled) throw new HttpError(409, `${ORCHESTRATOR} cannot be disabled; pause the bots instead`)
     updateAgent(db, name, parsed.value)
-    if (current.enabled && !parsed.value.enabled) releaseBotTasks(db, name, 'the bot was disabled', 'ready')
+    if (current.enabled && !parsed.value.enabled) {
+      bots?.cancel(name)
+      releaseBotTasks(db, name, 'the bot was disabled', 'ready')
+    }
     noteReload(db, name, reloadAll(db, config, name))
     teamChanged.notify()
     return c.json(getAgent(db, name))
@@ -173,6 +176,7 @@ export function registerBotsRoutes(api: Hono, { db, config, bots }: ApiDeps): vo
     const name = c.req.param('name')
     if (getAgent(db, name)?.system) throw new HttpError(409, `${ORCHESTRATOR} cannot be deleted`)
     if (!getAgent(db, name)) throw new HttpError(404, 'no such bot')
+    bots?.cancel(name)
     releaseBotTasks(db, name, 'the bot was deleted', 'draft')
     deleteAgent(db, name)
     teamChanged.notify()

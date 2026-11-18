@@ -77,15 +77,17 @@ export function releaseBotTasks(db: Db, bot: string, why: string, to: 'ready' | 
   return ids
 }
 
-// After a restart no bot is mid-turn. A task an enabled bot had started goes back to ready and the bot is told; one held
-// by a bot that is gone or disabled becomes an unowned draft for the user.
+// After a restart no bot is mid-turn. A task a bot had started goes back to ready (an enabled bot is told); one held by
+// a bot that is gone becomes an unowned draft for the user.
 export function recoverBotTasks(db: Db): number {
   const rows = db.prepare(`SELECT DISTINCT claimed_by FROM tasks WHERE status = 'running' AND claimed_by LIKE 'bot:%'`).all()
   let count = 0
   for (const row of rows) {
     const bot = String(row.claimed_by).slice(4)
-    const enabled = db.prepare('SELECT 1 FROM team_agents WHERE name = ? AND enabled = 1').get(bot) !== undefined
-    const ids = releaseBotTasks(db, bot, 'taskq stopped while the bot was working', enabled ? 'ready' : 'draft')
+    const agent = db.prepare('SELECT enabled FROM team_agents WHERE name = ?').get(bot)
+    const enabled = agent?.enabled === 1
+    // A disabled bot keeps its task, ready, as the disable path does; a deleted bot's task becomes the user's draft.
+    const ids = releaseBotTasks(db, bot, 'taskq stopped while the bot was working', agent ? 'ready' : 'draft')
     count += ids.length
     for (const id of enabled ? ids : []) {
       postMessage(db, { sender: SYSTEM, recipient: bot, task_id: id, body: `taskq restarted while you were working on task ${id}. It is ready again; start_task to continue.` })

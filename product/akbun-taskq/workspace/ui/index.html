@@ -48,8 +48,7 @@
 <div class="layout">
   <nav class="sidebar" data-area="sidebar" aria-label="Navigation">
     <div class="side-me">
-      <span data-area="me-avatar" aria-hidden="true"></span>
-      <strong>akbun-taskq</strong>
+      <strong class="side-title">akbun-taskq</strong>
       <button type="button" class="side-search" data-view="search" data-i18n-title="nav.search" title="Search every bot conversation">⌕</button>
     </div>
     <ul class="side-list" data-area="side-views">
@@ -66,7 +65,9 @@
     <ul class="side-list side-bots" data-area="bot-list" aria-labelledby="bots-heading"></ul>
     <ul class="side-list" data-area="side-shared">
       <li><button type="button" class="side-item" data-view="discussions"><span class="side-icon" aria-hidden="true">❝</span><span data-i18n="nav.discussions">Discussions</span></button></li>
-      <li><button type="button" class="side-item" data-view="shared"><span class="side-icon" aria-hidden="true">▣</span><span data-i18n="nav.shared">Shared folder</span></button></li>
+      <li><button type="button" class="side-item" data-view="shared"><span class="side-icon" aria-hidden="true"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><path d="M3 6.5a1.5 1.5 0 0 1 1.5-1.5h4.4l2 2.2h8.6A1.5 1.5 0 0 1 21 8.7v9.8a1.5 1.5 0 0 1-1.5 1.5h-15A1.5 1.5 0 0 1 3 18.5z"/></svg></span><span data-i18n="nav.shared">Shared folder</span></button></li>
+      <li><button type="button" class="side-item" data-view="workflows"><span class="side-icon" aria-hidden="true"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><rect x="3" y="4" width="6" height="5" rx="1.2"/><rect x="15" y="4" width="6" height="5" rx="1.2"/><rect x="9" y="15" width="6" height="5" rx="1.2"/><path d="M6 9v2.5h12V9M12 11.5V15"/></svg></span><span data-i18n="nav.workflows">Workflows</span></button></li>
+      <li><button type="button" class="side-item" data-view="plugins"><span class="side-icon" aria-hidden="true"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><path d="M9 4h3.5v1.5a1.8 1.8 0 1 0 3.5 0V4H20v4.5h-1.5a1.8 1.8 0 1 0 0 3.5H20V20h-4.5v-1.5a1.8 1.8 0 1 0-3.5 0V20H4v-4.5h1.5a1.8 1.8 0 1 0 0-3.5H4V8h5z"/></svg></span><span data-i18n="nav.plugins">Plugins</span></button></li>
       <li><button type="button" class="side-item" data-view="wiki"><span class="side-icon" aria-hidden="true">✦</span><span data-i18n="nav.wiki">Wiki</span></button></li>
     </ul>
   </nav>
@@ -169,6 +170,40 @@
         <ul class="shared-list" data-area="shared-list"></ul>
       </div>
     </section>
+
+    <section id="view-plugins" data-view-panel="plugins" aria-label="Plugins" data-area="plugins-view" hidden>
+      <h2 class="view-title" data-i18n="nav.plugins">Plugins</h2>
+      <p class="meta" data-i18n="plugins.hint">Skills and plugins registered here can be chosen per bot in its settings. Update pulls a git checkout and reloads every bot that uses it.</p>
+    <section class="plugins-section" aria-labelledby="bot-skills-title">
+      <h3 class="plugins-heading" id="bot-skills-title" data-i18n="settings.skills">Skills for bots</h3>
+      <p class="meta">Agent skill folders (with SKILL.md) that bots can load. Each bot picks its own in its settings.</p>
+      <ul class="skill-list" data-area="registry-skill"></ul>
+      <form class="skill-path-form" data-area="registry-skill-form">
+        <label>Path to a skill folder <input name="path" type="text" maxlength="500" autocomplete="off" spellcheck="false" placeholder="/absolute/path/to/skill"></label>
+        <button type="submit">Add</button>
+      </form>
+    </section>
+    <section class="plugins-section" aria-labelledby="bot-plugins-title">
+      <h3 class="plugins-heading" id="bot-plugins-title" data-i18n="settings.plugins">Plugins for bots</h3>
+      <p class="meta">Claude Code plugin folders (with .claude-plugin/plugin.json): skills, commands, hooks and MCP servers together.</p>
+      <ul class="skill-list" data-area="registry-plugin"></ul>
+      <form class="skill-path-form" data-area="registry-plugin-form">
+        <label>Path to a plugin folder <input name="path" type="text" maxlength="500" autocomplete="off" spellcheck="false" placeholder="/absolute/path/to/plugin"></label>
+        <button type="submit">Add</button>
+      </form>
+    </section>
+      <section class="plugins-section" aria-labelledby="official-title">
+        <div class="plugins-head">
+          <h3 id="official-title" class="plugins-heading" data-i18n="plugins.official">Official marketplace</h3>
+          <label class="check"><input type="checkbox" data-area="official-anthropic" checked> <span data-i18n="plugins.anthropic_only">Anthropic only</span></label>
+          <input type="search" data-area="official-filter" data-i18n-placeholder="plugins.filter" placeholder="Filter" aria-label="Filter the official plugins">
+        </div>
+        <p class="meta" data-i18n="plugins.official_hint">The plugins in Anthropic's official marketplace, listed for reference. Nothing is installed: clone one and register its folder above to use it.</p>
+        <ul class="official-list" data-area="official-list"></ul>
+      </section>
+    </section>
+
+    <section id="view-workflows" data-view-panel="workflows" aria-label="Workflows" data-area="workflows-view" hidden></section>
 
     <section id="view-wiki" data-view-panel="wiki" aria-label="Wiki" data-area="wiki" hidden>
       <h2 class="view-title" data-i18n="wiki.title">Wiki</h2>
@@ -350,24 +385,6 @@
       <h3 id="queue-title" data-i18n="settings.queue">Queue</h3>
       <label class="check"><input type="checkbox" data-area="queue-autorun"> <span data-i18n="settings.autorun">Run tasks no bot owns automatically</span></label>
       <p class="meta">Off, a task without an owner runs only when you press its run button. A bot's task always waits for that bot.</p>
-    </section>
-    <section class="settings-section" aria-labelledby="bot-skills-title">
-      <h3 id="bot-skills-title" data-i18n="settings.skills">Skills for bots</h3>
-      <p class="meta">Agent skill folders (with SKILL.md) that bots can load. Each bot picks its own in its settings.</p>
-      <ul class="skill-list" data-area="registry-skill"></ul>
-      <form class="skill-path-form" data-area="registry-skill-form">
-        <label>Path to a skill folder <input name="path" type="text" maxlength="500" autocomplete="off" spellcheck="false" placeholder="/absolute/path/to/skill"></label>
-        <button type="submit">Add</button>
-      </form>
-    </section>
-    <section class="settings-section" aria-labelledby="bot-plugins-title">
-      <h3 id="bot-plugins-title" data-i18n="settings.plugins">Plugins for bots</h3>
-      <p class="meta">Claude Code plugin folders (with .claude-plugin/plugin.json): skills, commands, hooks and MCP servers together.</p>
-      <ul class="skill-list" data-area="registry-plugin"></ul>
-      <form class="skill-path-form" data-area="registry-plugin-form">
-        <label>Path to a plugin folder <input name="path" type="text" maxlength="500" autocomplete="off" spellcheck="false" placeholder="/absolute/path/to/plugin"></label>
-        <button type="submit">Add</button>
-      </form>
     </section>
     <section class="settings-section" aria-labelledby="notifications-title">
       <h3 id="notifications-title">Notifications</h3>

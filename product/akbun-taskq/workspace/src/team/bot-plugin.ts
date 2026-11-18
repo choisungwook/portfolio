@@ -5,7 +5,6 @@ import type { Db } from '../db/open.ts'
 import { entryOk, listEntries, type RegistryKind } from '../db/bot-registry.ts'
 import { getAgent, postMessage, SYSTEM } from '../db/team.ts'
 import { under } from '../worker/paths.ts'
-import { agentDir } from './prompt.ts'
 
 // What a bot loads is a snapshot: the selected skills and plugins are copied into the bot's folder when its settings
 // are saved or the user picks Reload. A turn loads the snapshot, so editing a skill folder does not change a bot in the
@@ -20,8 +19,14 @@ export interface LoadReport {
 
 const SKIP = new Set(['node_modules', '.git'])
 
+// Outside the bot's folder on purpose: the bot can write its own folder (sandbox or not), and a plugin it could edit
+// would load hooks and MCP servers that run outside its tool calls, past the gate. The gate stops any write here.
+export function snapshotsDir(config: Config): string {
+  return join(config.home, 'bot-plugins')
+}
+
 function snapshotRoot(config: Config, bot: string): string {
-  return join(agentDir(config, bot), '.taskq')
+  return join(snapshotsDir(config), bot)
 }
 
 export function skillsPluginDir(config: Config, bot: string): string {
@@ -32,11 +37,11 @@ export function pluginsDir(config: Config, bot: string): string {
   return join(snapshotRoot(config, bot), 'plugins')
 }
 
-// Clears one snapshot folder, which is about to be removed recursively. A bot can write in its own folder, so it could
-// plant a symlink there (`.taskq -> ~/.claude`). Every component from TASKQ_HOME/team down to the folder is therefore
-// checked with lstat, and the real path must still be inside TASKQ_HOME/team; a symlink anywhere refuses the reload.
+// Clears one snapshot folder, which is about to be removed recursively. Every component from TASKQ_HOME/bot-plugins
+// down to the folder is checked with lstat, and the real path must still be inside it; a symlink anywhere refuses the
+// reload, so nothing outside TASKQ_HOME is ever deleted.
 function reset(config: Config, dir: string): void {
-  const root = join(config.home, 'team')
+  const root = snapshotsDir(config)
   mkdirSync(root, { recursive: true })
   if (!under(dir, root)) throw new Error(`refusing to clear ${dir}`)
   let path = root

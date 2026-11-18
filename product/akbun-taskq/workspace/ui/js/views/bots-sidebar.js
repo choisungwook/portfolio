@@ -5,7 +5,7 @@ import { api, mutate } from '../core/api.js'
 import { area, clear, el } from '../core/dom.js'
 import { emit, on } from '../core/bus.js'
 import { currentView, show } from '../core/nav.js'
-import { botAvatar, setRoster, userAvatar } from './avatar.js'
+import { botAvatar, setRoster } from './avatar.js'
 import { openBotMenu } from './bot-menu.js'
 import { openBotSettings } from './bot-settings.js'
 import { t } from '../core/i18n.js'
@@ -19,7 +19,6 @@ let latest = null
 export function initBotsSidebar() {
   list = area('bot-list')
   state = area('bots-state')
-  area('me-avatar').append(userAvatar(56))
   area('bot-add').addEventListener('click', () => openBotSettings(null))
   on('refresh', load)
   on('bots-changed', load)

@@ -12,6 +12,7 @@ export const BOT_DEFAULTS: Omit<BotSettings, 'role' | 'description' | 'instructi
   skills: [],
   plugins: [],
   model: null,
+  effort: null,
   sdk: 'claude',
   hourly_turns: null,
   turn_budget_usd: null,

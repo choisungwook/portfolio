@@ -124,41 +124,48 @@ export function createTeamHub({ db, config, backend, retryAfterSec = RETRY_AFTER
     const started = startTurn(db, name, BATCH)
     const agent = getAgent(db, name)
     if (!started || !agent) return
-    const controller = new AbortController()
-    const own = agentDir(config, name)
-    mkdirSync(own, { recursive: true })
-    const cwd = agent.workdir ?? own
-    const wiki = wikiDir(config)
-    mkdirSync(wiki, { recursive: true })
-    let plugins: string[] = []
     try {
-      plugins = pluginPaths(db, config, name)
-    } catch (error) {
-      console.error(`taskq: could not load skills and plugins for ${name}: ${String(error)}`)
-    }
-    const shared = sharedDir(config)
-    const t = limits(db, config)
-    const done = backend.runTurn(config, {
-      agent,
-      system: systemFor(agent, listAgents(db), config, cwd, wiki, shared),
-      prompt: promptFor(db, started.messages, shared),
-      tools: teamTools({ db, config, agent: name, search, turnId: started.turn.id }),
-      cwd,
-      plugins,
-      sharedDir: shared,
-      maxTurns: agent.turn_max_turns ?? t.turn_max_turns,
-      budgetUsd: agent.turn_budget_usd ?? t.turn_budget_usd,
-      resume: agent.session_id,
-      signal: controller.signal,
-    })
-      .catch((error: unknown): TurnResult => ({ outcome: 'failed', error: error instanceof Error ? error.message : String(error) }))
-      .then((result) => finish(name, started.turn.id, agent.session_id, started.messages, result, controller.signal.aborted))
-      .catch((error: unknown) => console.error(`taskq: team turn of ${name} crashed: ${String(error)}`))
-      .finally(() => {
-        active.delete(name)
-        teamChanged.notify()
+      const controller = new AbortController()
+      const own = agentDir(config, name)
+      mkdirSync(own, { recursive: true })
+      const cwd = agent.workdir ?? own
+      const wiki = wikiDir(config)
+      mkdirSync(wiki, { recursive: true })
+      let plugins: string[] = []
+      try {
+        plugins = pluginPaths(db, config, name)
+      } catch (error) {
+        console.error(`taskq: could not load skills and plugins for ${name}: ${String(error)}`)
+      }
+      const shared = sharedDir(config)
+      const t = limits(db, config)
+      const done = backend.runTurn(config, {
+        agent,
+        system: systemFor(agent, listAgents(db), config, cwd, wiki, shared),
+        prompt: promptFor(db, started.messages, shared),
+        tools: teamTools({ db, config, agent: name, search, turnId: started.turn.id }),
+        cwd,
+        plugins,
+        sharedDir: shared,
+        maxTurns: agent.turn_max_turns ?? t.turn_max_turns,
+        budgetUsd: agent.turn_budget_usd ?? t.turn_budget_usd,
+        resume: agent.session_id,
+        signal: controller.signal,
       })
-    active.set(name, { controller, done })
+        .catch((error: unknown): TurnResult => ({ outcome: 'failed', error: error instanceof Error ? error.message : String(error) }))
+        .then((result) => finish(name, started.turn.id, agent.session_id, started.messages, result, controller.signal.aborted))
+        .catch((error: unknown) => console.error(`taskq: team turn of ${name} crashed: ${String(error)}`))
+        .finally(() => {
+          active.delete(name)
+          teamChanged.notify()
+        })
+      active.set(name, { controller, done })
+    } catch (error) {
+      // Preparing the turn failed (a folder could not be created, a prompt could not be built). Close the turn so the
+      // bot is not left looking busy until the next restart.
+      endTurn(db, started.turn.id, { outcome: 'failed', error: `could not start the turn: ${String(error)}` }, config.bots.maxAttempts)
+      console.error(`taskq: could not start a turn for ${name}: ${String(error)}`)
+    }
   }
 
   function finish(name: string, turnId: number, session: string | null, messages: TeamMessage[], result: TurnResult, aborted: boolean): void {

@@ -8,6 +8,10 @@ export const SYSTEM = 'queue'
 // The orchestrator bot. It exists from the first start, is listed first and cannot be deleted.
 export const ORCHESTRATOR = 'taskq'
 
+export type BotEffort = 'low' | 'medium' | 'high' | 'xhigh' | 'max'
+export const EFFORTS: BotEffort[] = ['low', 'medium', 'high', 'xhigh', 'max']
+export type BotSdk = 'claude' | 'openai'
+
 export type BotPermissionMode = 'auto' | 'acceptEdits' | 'default' | 'dontAsk' | 'plan' | 'bypassPermissions'
 export const PERMISSION_MODES: BotPermissionMode[] = ['auto', 'acceptEdits', 'default', 'dontAsk', 'plan', 'bypassPermissions']
 
@@ -27,7 +31,8 @@ export interface BotSettings {
   skills: string[]            // names from the global skill registry
   plugins: string[]           // names from the global plugin registry
   model: string | null        // null uses the config model
-  sdk: 'claude'               // which agent SDK runs the bot; only Claude exists today
+  effort: BotEffort | null    // reasoning effort; null leaves it to the model
+  sdk: BotSdk                 // which agent SDK runs the bot
   hourly_turns: number | null    // per-bot rate limit; null uses the global default
   turn_budget_usd: number | null // per-turn spend limit; null uses the global default
   turn_max_turns: number | null  // per-turn model turns; null uses the global default
@@ -81,23 +86,23 @@ function toAgent(row: Record<string, unknown>): TeamAgent {
 export function createAgent(db: Db, name: string, settings: BotSettings, system = false): void {
   db.prepare(`INSERT INTO team_agents (name, role, description, instructions, may_message_user, enabled, system,
     permission_mode, sandbox, allowed_domains, blocked_commands, workdir, skills, plugins, model, sdk, hourly_turns,
-    turn_budget_usd, turn_max_turns, created_at)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`).run(
+    turn_budget_usd, turn_max_turns, effort, created_at)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`).run(
     name, settings.role, settings.description, settings.instructions, settings.may_message_user ? 1 : 0, settings.enabled ? 1 : 0,
     system ? 1 : 0, settings.permission_mode, settings.sandbox ? 1 : 0, JSON.stringify(settings.allowed_domains),
     JSON.stringify(settings.blocked_commands), settings.workdir, JSON.stringify(settings.skills), JSON.stringify(settings.plugins),
-    settings.model, settings.sdk, settings.hourly_turns, settings.turn_budget_usd, settings.turn_max_turns, nowSec())
+    settings.model, settings.sdk, settings.hourly_turns, settings.turn_budget_usd, settings.turn_max_turns, settings.effort, nowSec())
 }
 
 export function updateAgent(db: Db, name: string, settings: BotSettings): boolean {
   return db.prepare(`UPDATE team_agents SET role = ?, description = ?, instructions = ?, may_message_user = ?, enabled = ?,
     permission_mode = ?, sandbox = ?, allowed_domains = ?, blocked_commands = ?, workdir = ?, skills = ?, plugins = ?, model = ?,
-    sdk = ?, hourly_turns = ?, turn_budget_usd = ?, turn_max_turns = ?
+    sdk = ?, hourly_turns = ?, turn_budget_usd = ?, turn_max_turns = ?, effort = ?
     WHERE name = ?`).run(
     settings.role, settings.description, settings.instructions, settings.may_message_user ? 1 : 0, settings.enabled ? 1 : 0,
     settings.permission_mode, settings.sandbox ? 1 : 0, JSON.stringify(settings.allowed_domains), JSON.stringify(settings.blocked_commands),
     settings.workdir, JSON.stringify(settings.skills), JSON.stringify(settings.plugins), settings.model, settings.sdk,
-    settings.hourly_turns, settings.turn_budget_usd, settings.turn_max_turns, name).changes === 1
+    settings.hourly_turns, settings.turn_budget_usd, settings.turn_max_turns, settings.effort, name).changes === 1
 }
 
 // The orchestrator is refused. Its tasks go back to the user; its messages stay for the record.
@@ -105,7 +110,8 @@ export function deleteAgent(db: Db, name: string): boolean {
   return inTransaction(db, () => {
     const row = db.prepare('SELECT system FROM team_agents WHERE name = ?').get(name)
     if (!row || row.system === 1) return false
-    db.prepare(`UPDATE tasks SET owner = NULL, owner_since = NULL WHERE owner = ? AND status NOT IN ('done', 'failed', 'cancelled', 'running')`).run(name)
+    db.prepare(`UPDATE tasks SET owner = NULL, owner_since = NULL, status = CASE WHEN status = 'ready' THEN 'draft' ELSE status END
+      WHERE owner = ? AND status NOT IN ('done', 'failed', 'cancelled', 'running')`).run(name)
     db.prepare(`UPDATE team_messages SET failed_at = ? WHERE recipient = ? AND read_at IS NULL AND failed_at IS NULL`).run(nowSec(), name)
     db.prepare('DELETE FROM team_agents WHERE name = ?').run(name)
     return true
