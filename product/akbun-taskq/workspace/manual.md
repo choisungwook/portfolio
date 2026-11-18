@@ -324,6 +324,10 @@ bot과 대화할 때 쓰는 기능은 아래와 같다.
 | bot끼리 파일 나누기 | 공용 폴더(`TASKQ_HOME/shared`). 모든 bot이 같은 경로로 읽고 쓰고, 왼쪽 메뉴의 공용 폴더에서 보고 올리고 받는다 |
 | bot이 기억할 것 고치기 | bot 오른쪽 버튼 메뉴의 메모리. bot이 매 turn 읽는 자기 메모다 |
 | skill·plugin 새 버전 받기 | Plugins 메뉴에서 업데이트. git 저장소면 받아 오고 쓰는 bot을 모두 다시 불러온다 |
+| 저장소에서 안전하게 일 시키기 | 새 작업에서 저장소를 고르고 "새 git worktree에서 작업"을 켠 채 둔다(기본). 작업은 `TASKQ_HOME/worktrees/`의 자기 폴더와 `taskq/<작업 id>` 브랜치에서 일하고 내 checkout은 그대로다. 작업 상세 오른쪽에서 바뀐 파일과 diff, PR 링크를 보고 VS Code로 연다 |
+| 문서를 bot이 쓰게 넣기 | Wiki에서 가져오기로 zip, 파일, 폴더를 넣는다. 문서가 절 단위 페이지와 링크로 바뀌고 색인 페이지가 생긴다. 멈추면 "마지막 단계부터 다시" |
+| wiki 백업 | Wiki에서 zip으로 내보내기. 공용 폴더의 `exports/`에 생기고, 다른 taskq에서 가져오기로 그대로 복원된다 |
+| bot에게 MCP server 주기 | Plugins 메뉴에서 MCP server를 등록하고 bot 설정에서 고른다. Claude와 OpenAI bot 모두 쓴다 |
 | 일하는 bot에게 더 말하기 | 그냥 보낸다. Claude bot은 진행 중인 turn에서 바로 받아 처리하고, OpenAI bot과 자리가 없는 bot은 메시지를 쌓아 두었다가 다음 turn에 처리한다. 쌓인 수가 대화 아래에 보인다 |
 | 모델, effort, 권한 바꾸기 | 입력창 아래 메뉴. 다음 turn부터 적용된다. ↻는 skill·plugin을 다시 읽고 모델과 명령 목록을 새로 불러온다 |
 | skill을 slash command로 쓰기 | 입력창에 `/`를 치고 고른다. `/이름 인자`로 보내면 bot이 그 skill로 처리한다 |

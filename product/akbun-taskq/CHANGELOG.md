@@ -2,6 +2,50 @@
 
 <!-- markdownlint-configure-file {"MD024": {"siblings_only": true}} -->
 
+## 0.10.0
+
+이 버전은 bot과 task가 실제 저장소와 문서를 다루는 방식을 넓힌다. 처음 읽는 agent는 `wiki/architecture.md`의 Task worktrees, Wiki export and import, Plugins for each SDK 절을 먼저 읽는다. 결정의 이유는 `knowledge/decisions/`의 2026-11-task-worktrees, 2026-11-wiki-transfer-jobs에 있다.
+
+### Added
+
+- task worktree. 새 작업에서 저장소나 폴더를 고른다(알려진 저장소 목록과 직접 입력). 저장소에서 코드를 고치는 작업은 기본으로 자기 worktree(`TASKQ_HOME/worktrees/<repo>-<task>`, 브랜치 `taskq/<task>`)에서 일하고, 내 checkout은 바뀌지 않는다. 끌 수 있고, 읽기만 하는 작업과 일반 폴더는 worktree를 만들지 않는다.
+- 작업 상세 오른쪽의 작업 공간 패널(Claude Desktop처럼): worktree 절대 경로, 브랜치, 기준 커밋, 바뀐 파일과 파일별 diff, PR 링크(실행 요약이나 bot 메시지에서 찾음) 또는 GitHub 비교 링크, VS Code로 열기(`vscode://file/<path>`), 폴더 열기, worktree 삭제(브랜치는 남김).
+- wiki 내보내기: 모든 페이지를 front matter가 붙은 markdown과 `manifest.json`으로 zip(deflate level 9)에 담아 `shared/exports/`에 둔다.
+- wiki 가져오기: zip, 폴더, 파일을 bot이 쓸 수 있게 소화한다. 문서마다 페이지, 긴 문서는 `##` 절마다 페이지, 문서 사이 상대 링크는 `[[slug]]` 링크, HTML은 글로, 코드와 데이터는 코드 블록으로, 바이너리는 건너뛰고 목록에 남긴다. 마지막에 색인 페이지를 만든다. taskq가 내보낸 zip은 원래 slug로 복원한다.
+- 백그라운드 job(`/api/jobs`): 내보내기와 가져오기가 진행률을 보이며 돌고, 취소하면 지금 단계 뒤에 멈추고, "마지막 단계부터 다시"로 checkpoint에서 이어 한다. taskq가 멈춘 동안 돌던 job은 다음 시작 때 이어 한다.
+- Plugins 메뉴의 Claude / OpenAI 탭. skill은 두 SDK가 같이 쓰고(OpenAI bot은 `read_skill` 도구로 SKILL.md를 읽음), plugin은 Claude bot만, MCP server는 두 SDK가 같이 쓴다.
+- bot용 MCP server 등록(`/api/bot-mcp-servers`)과 bot 설정의 MCP server 선택.
+- n8n처럼 편집하는 workflow 편집기: 단계 팔레트, 끌어서 옮기는 노드, 오른쪽 점에서 다른 노드로 끌어 연결, 연결 선택 후 Delete로 삭제, 확대·이동·화면 맞춤·자동 정렬, 오른쪽 단계 속성 패널. 노드 위치는 workflow에 저장된다. 순환이 생기는 연결은 거부한다.
+- `taskq api`와 MCP 도구에 task 작업 공간, 저장소 목록, wiki 내보내기·가져오기, job, MCP server 등록 operation 추가. `taskq add --no-worktree`.
+
+### Changed
+
+- 왼쪽 bot 목록은 bot이 많으면 목록 안에서 스크롤되고 아래 메뉴는 그대로 보인다.
+- 라이트 테마에서 체크박스가 어둡게 보이던 문제(`color-scheme`)와 새 작업 종류 버튼의 대비를 고쳤다.
+
+### Security
+
+- MCP server는 내 권한으로 bot 게이트 밖에서 돈다(plugin의 MCP server와 같음). 믿는 서버만 등록하고 키는 환경 변수에 둔다고 화면에 적었다.
+- worktree를 지워도 task는 지워진 폴더를 가리키므로, 다시 실행하면 내 checkout에 쓰지 않고 실패한다. diff API는 바뀐 파일 목록에 있는 파일만 보여 준다.
+- 가져오기는 zip 항목 5,000개, 풀린 크기 200 MB, 폴더 파일 5,000개·파일당 5 MB까지이고 symlink와 숨김 폴더를 따라가지 않는다. zip 안의 `..` 경로는 버린다.
+
+### SDK
+
+`@anthropic-ai/claude-agent-sdk`:
+
+- `mcpServers`: `team` 서버 옆에 bot이 고른 MCP server를 `{ type: 'stdio', command, args }`로 넣는다.
+- `additionalDirectories`와 샌드박스 `allowWrite`에 `TASKQ_HOME/worktrees`를 더해 bot이 task worktree에서 일하게 한다.
+
+`@openai/agents-core`:
+
+- `MCPServerStdio`와 `Agent({ mcpServers })`: bot이 고른 MCP server를 turn마다 bot 작업 디렉터리에서 시작하고 turn 뒤에 닫는다.
+- `tool()`: `read_skill` 도구. bot의 skill 이름과 설명을 도구 설명에 두고, 부르면 SKILL.md와 옆 파일 목록을 돌려준다(Claude Code의 skill처럼 필요할 때 읽음).
+
+### Not verified with a real model
+
+- bot이 `start_task`가 알려 준 worktree 경로에서 실제로 일하고 커밋하는지, OpenAI bot이 MCP server 도구와 `read_skill`을 쓰는지. 테스트는 가짜 SDK로 돈다.
+- MCP server 시작은 실제 서버로 돌려 보지 않았다. 테스트는 세션 옵션과 turn 요청에 들어가는지만 본다.
+
 ## 0.9.0
 
 이 버전은 task 큐 위에 역할을 가진 상주 bot을 더한다. 처음 읽는 agent는 `wiki/architecture.md`의 Bots 절과 `wiki/sdk-usage.md`를 먼저 읽는다. 결정의 이유는 `knowledge/decisions/`의 2026-11-bots-execute-tasks, 2026-11-resident-agent-team, 2026-11-task-ownership-and-discussions, 2026-11-wiki-hybrid-search, 2026-11-soft-theme-sidebar, 2026-11-bot-workspace, 2026-11-workflows-run-by-bots, 2026-11-openai-bot-backend, 2026-11-operations-for-cli-and-mcp에 있다.
