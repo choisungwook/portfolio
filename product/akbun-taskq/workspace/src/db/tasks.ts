@@ -1,5 +1,7 @@
 import { inTransaction, type Db } from './open.ts'
 import { getWorkflow } from './workflows.ts'
+import type { Config } from '../config.ts'
+import { createWorktree, pathInfo } from '../workspace/worktree.ts'
 import type { Task, TaskData, TaskStatus, TaskType } from '../types.ts'
 import { newId } from '../ids.ts'
 import { nowSec } from '../time.ts'
@@ -8,6 +10,7 @@ import type { TaskInput } from '../validate.ts'
 export interface DepInput { depends_on: string; kind: 'blocks' | 'discovered_from' }
 
 export interface NewTask {
+  id?: string
   type: TaskType
   status: TaskStatus
   priority?: number
@@ -34,7 +37,7 @@ const BLOCKED_SQL = `EXISTS (SELECT 1 FROM deps d JOIN tasks p ON p.id = d.depen
 export const TASK_TITLE_SQL = `COALESCE(NULLIF(json_extract(t.data, '$.title'), ''), substr(json_extract(t.data, '$.intent'), 1, 60)) AS task_title`
 
 export function insertTask(db: Db, input: NewTask): Task {
-  const id = newId()
+  const id = input.id ?? newId()
   const now = nowSec()
   const data = JSON.stringify(input.data)
   db.prepare(`INSERT INTO tasks (id, type, status, priority, lock_key, owner, owner_since, data, created_at, updated_at)
@@ -135,13 +138,21 @@ export function staleCandidates(db: Db, cutoff: number, all: boolean): Task[] {
 }
 
 // Creates a task from validated input. Dependencies are blocks-type and must name existing tasks.
-export function createFromInput(db: Db, input: TaskInput, owner: string | null = null): Task {
+// With `config`, a code task in a git repository gets its own worktree (unless input.worktree is false); see
+// src/workspace/worktree.ts. The worktree is made before the row, so a git failure creates no task.
+export function createFromInput(db: Db, input: TaskInput, owner: string | null = null, config?: Config): Task {
   for (const id of input.depends_on) {
     if (!getTask(db, id)) throw new Error(`unknown dependency: ${id}`)
   }
   if (input.data.workflow_id) input = { ...input, data: { ...input.data, workflow_id: workflowIdOf(db, input.data.workflow_id) } }
+  const id = newId()
+  let data = input.data
+  if (config && data.repo && input.type === 'code' && input.worktree !== false && pathInfo(data.repo).git) {
+    const worktree = createWorktree(config, data.repo, id)
+    data = { ...data, source_repo: data.repo, repo: worktree.path, worktree, base_commit: worktree.base }
+  }
   return inTransaction(db, () => insertTask(db, {
-    type: input.type, status: input.status, priority: input.priority, lock_key: input.lock_key, owner, data: input.data,
+    id, type: input.type, status: input.status, priority: input.priority, lock_key: input.lock_key, owner, data,
     deps: input.depends_on.map((depends_on) => ({ depends_on, kind: 'blocks' as const })),
   }))
 }

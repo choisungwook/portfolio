@@ -1,3 +1,4 @@
+import { existsSync } from 'node:fs'
 import type { Hono } from 'hono'
 import { createReadStream, statSync } from 'node:fs'
 import { basename } from 'node:path'
@@ -6,6 +7,7 @@ import { HttpError, readJson, type ApiDeps } from './http.ts'
 import { listShared, resolveShared, saveAttachment, sharedDir, UPLOAD_LIMIT } from '../team/shared.ts'
 import { agentDir } from '../team/prompt.ts'
 import { getAgent } from '../db/team.ts'
+import { getTask } from '../db/tasks.ts'
 import { claudeProjectsDir, existing, openWithSystem, sessionFolder, type Opener } from '../open-folder.ts'
 
 // Uploads arrive as JSON with base64 data, so the API keeps its one rule for writes (application/json only).
@@ -46,7 +48,7 @@ export function registerFileRoutes(api: Hono, { config, db }: ApiDeps, open: Ope
   // Opens one of taskq's own folders on this machine: the shared folder, TASKQ_HOME, the Claude session transcripts,
   // or one bot's session folder. Returns the path either way, so the UI can show and copy it.
   api.post('/open-folder', async (c) => {
-    const body = await readJson(c) as { target?: unknown; bot?: unknown } | null
+    const body = await readJson(c) as { target?: unknown; bot?: unknown; task_id?: unknown } | null
     let path: string | null
     switch (body?.target) {
       case 'shared': path = sharedDir(config); break
@@ -58,7 +60,13 @@ export function registerFileRoutes(api: Hono, { config, db }: ApiDeps, open: Ope
         path = existing(sessionFolder(bot.workdir ?? agentDir(config, bot.name)))
         break
       }
-      default: throw new HttpError(400, 'target must be shared, home, sessions or bot')
+      case 'task': {
+        const task = typeof body.task_id === 'string' ? getTask(db, body.task_id) : undefined
+        if (!task) throw new HttpError(404, 'no such task')
+        path = task.data.repo && existsSync(task.data.repo) ? task.data.repo : null
+        break
+      }
+      default: throw new HttpError(400, 'target must be shared, home, sessions, bot or task')
     }
     if (!path) throw new HttpError(404, 'that folder does not exist yet; it appears after the first session')
     open(path)

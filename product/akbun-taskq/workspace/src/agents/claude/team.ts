@@ -11,6 +11,7 @@ import { ToolError, type TeamTool } from '../../team/tools.ts'
 import type { Catalog, CatalogRequest, TeamBackend, TurnRequest, TurnResult } from '../../team/types.ts'
 import { buildEnv } from './auth.ts'
 import { LiveInput } from '../../team/live-input.ts'
+import { worktreesDir } from '../../workspace/worktree.ts'
 
 export type TeamQueryFn = (params: { prompt: AsyncIterable<SDKUserMessage>; options: Options }) => AsyncIterable<SDKMessage>
 
@@ -109,13 +110,14 @@ function optionsFor(config: Config, request: TurnRequest, abort: AbortController
       enabled: true,
       failIfUnavailable: true,
       allowUnsandboxedCommands: false,
-      filesystem: { allowWrite: [request.cwd, request.sharedDir], denyRead: [dataDir, join(config.home, 'taskq.config.json')] },
+      filesystem: { allowWrite: [request.cwd, request.sharedDir, worktreesDir(config)], denyRead: [dataDir, join(config.home, 'taskq.config.json')] },
       network: { allowedDomains: agent.allowed_domains },
     } : undefined,
     effort: agent.effort ?? undefined,
     maxTurns: request.maxTurns,
     maxBudgetUsd: request.budgetUsd,
-    additionalDirectories: [request.sharedDir],
+    // The shared folder, and the task worktrees a bot works in when it starts a code task.
+    additionalDirectories: [request.sharedDir, worktreesDir(config)],
     resume: request.resume ?? undefined,
     abortController: abort,
     systemPrompt: { type: 'preset', preset: 'claude_code', append: request.system },

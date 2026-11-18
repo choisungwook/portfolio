@@ -16,7 +16,7 @@ export function registerTaskRoutes(api: Hono, { db, config, control = noRunContr
   api.post('/tasks', async (c) => {
     const input = requireOk(parseTaskInput(await readJson(c), (name) => hasAccessSkill(db, name)))
     try {
-      return c.json(createFromInput(db, input), 201)
+      return c.json(createFromInput(db, input, null, config), 201)
     } catch (error) {
       throw new HttpError(400, error instanceof Error ? error.message : String(error))
     }

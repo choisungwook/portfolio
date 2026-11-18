@@ -9,6 +9,7 @@ import { runNowButton } from '../core/run-now.js'
 import { approvalPanel } from './approval-panel.js'
 import { ownerValue } from './owner-picker.js'
 import { workflowValue } from './task-workflow.js'
+import { workspacePanel } from './task-workspace.js'
 import { download } from './bot-chat.js'
 import { operatorControls } from './operator-controls.js'
 
@@ -49,7 +50,11 @@ async function fill(id) {
     ])
     if (id !== currentId) return
     const titles = new Map(graph.tasks.map((t) => [t.id, t.title]))
-    clear(body).append(...sections(task, events, graph, titles, settings).filter(Boolean))
+    const refill = () => { if (dialog.open && currentId === task.id) fill(task.id) }
+    const aside = workspacePanel(task, refill)
+    clear(body).append(el('div', { class: aside ? 'task-detail-grid' : '' },
+      el('div', { class: 'task-main' }, ...sections(task, events, graph, titles, settings).filter(Boolean)), aside))
+    dialog.classList.toggle('wide', Boolean(aside))
     if (focusApproval) {
       focusApproval = false
       scrollToApproval()

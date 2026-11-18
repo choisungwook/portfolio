@@ -63,7 +63,7 @@ dialog h2 { margin-top: 0; }
 .task-form .segmented label { display: block; cursor: pointer; }
 .task-form .segmented input { position: absolute; opacity: 0; pointer-events: none; }
 .task-form .segmented span { display: block; padding: 7px 16px; font-size: 14px; color: var(--fg); }
-.task-form .segmented input:checked + span { background: var(--secondary); color: var(--on-accent); }
+.task-form .segmented input:checked + span { background: var(--accent); color: var(--on-accent); }
 .task-form .segmented input:focus-visible + span { outline: 2px solid var(--focus); outline-offset: -2px; }
 .task-form .meta { margin: 6px 0 0; }
 .task-form .more > summary { cursor: pointer; font-size: 12px; color: var(--muted); padding: 4px 0; }
@@ -95,3 +95,30 @@ dialog h2 { margin-top: 0; }
 }
 .pending-approvals { margin-bottom: 10px; }
 .pending-approvals h3 { margin: 0 0 6px; }
+
+/* Task detail with a workspace: the task on the left, its worktree or folder on the right (Claude Desktop style). */
+dialog.wide { width: min(1180px, calc(100vw - 32px)); }
+.task-detail-grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(280px, 400px); gap: 20px; align-items: start; }
+.task-main { min-width: 0; }
+.task-aside { position: sticky; top: 0; background: var(--panel-soft); border-radius: var(--radius); padding: 12px 14px; min-width: 0; }
+.task-aside h3 { margin-top: 0; }
+.task-aside code { overflow-wrap: anywhere; font-family: var(--font-mono); font-size: 0.85em; }
+.ws-facts { grid-template-columns: auto minmax(0, 1fr); }
+.ws-actions { display: flex; flex-wrap: wrap; gap: 6px; margin: 10px 0; }
+.ws-actions a.button { display: inline-flex; align-items: center; min-height: 32px; padding: 0 12px; border-radius: var(--radius); text-decoration: none; color: var(--link); background: var(--panel); }
+.ws-actions a.button.primary { background: var(--accent); color: var(--on-accent); }
+.ws-files { list-style: none; margin: 0; padding: 0; display: grid; gap: 2px; }
+.ws-file { display: flex; gap: 8px; align-items: center; width: 100%; color: var(--fg); padding: 4px 6px; min-height: 28px; text-align: left; }
+.ws-path { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-family: var(--font-mono); font-size: 0.85em; }
+.ws-mark { width: 18px; text-align: center; font-weight: 700; font-size: 0.8em; color: var(--muted); }
+.ws-mark[data-status="added"], .ws-mark[data-status="untracked"] { color: var(--done); }
+.ws-mark[data-status="deleted"] { color: var(--failed); }
+.ws-count, .ws-diff { font-family: var(--font-mono); font-size: 0.8em; }
+.ws-count .add, .ws-diff .add { color: var(--done); }
+.ws-count .del, .ws-diff .del { color: var(--failed); }
+.ws-diff .hunk { color: var(--link); }
+.ws-diff { max-height: 360px; overflow: auto; background: var(--panel); border-radius: var(--radius); padding: 8px; white-space: pre; margin-top: 8px; }
+@media (max-width: 900px) {
+  .task-detail-grid { grid-template-columns: 1fr; }
+  .task-aside { position: static; }
+}

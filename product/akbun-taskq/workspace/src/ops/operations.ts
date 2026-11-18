@@ -17,7 +17,7 @@ const op = (name: string, method: Method, path: string, description: string): Op
 export const OPERATIONS: Operation[] = [
   // tasks
   op('tasks_list', 'GET', '/tasks', 'List tasks. Fields: status.'),
-  op('task_create', 'POST', '/tasks', 'Create a task. Fields: type (research|code|ops_read|ops_change), intent, title, status (draft|ready), priority, lock_key, repo, output_path, access_skill, target_profile, depends_on [ids], attachments [shared paths], workflow_id.'),
+  op('task_create', 'POST', '/tasks', 'Create a task. Fields: type (research|code|ops_read|ops_change), intent, title, status (draft|ready), priority, lock_key, repo (a git repository or a folder), worktree (false keeps a code task in the repository itself; default: its own worktree), output_path, access_skill, target_profile, depends_on [ids], attachments [shared paths], workflow_id.'),
   op('task_get', 'GET', '/tasks/:id', 'One task with its runs, events, owner and workflow.'),
   op('task_update', 'PATCH', '/tasks/:id', 'Change a task. Fields: status (ready), priority, intent, title, cautions, workflow_id (null removes it).'),
   op('task_approve', 'POST', '/tasks/:id/approve', 'Approve the pending request of a task.'),
@@ -28,6 +28,11 @@ export const OPERATIONS: Operation[] = [
   op('task_run', 'POST', '/tasks/:id/run', 'Run a task now, once, outside the queue order (needs the running taskq).'),
   op('task_retry', 'POST', '/tasks/:id/retry', 'Put a failed or cancelled task back to ready.'),
   op('task_handoff_mode', 'POST', '/tasks/:id/handoff-mode', 'Set whether the task accepts incoming handoffs on its own. Fields: auto_accept (boolean).'),
+  op('task_workspace', 'GET', '/tasks/:id/workspace', 'Where the task works: repository, folder or its own worktree (path, branch, changed files, commits ahead), the pull request or compare link and a VS Code link.'),
+  op('task_workspace_diff', 'GET', '/tasks/:id/workspace/diff', 'The diff of one changed file of the task\'s worktree against its base. Fields: file.'),
+  op('task_workspace_remove', 'POST', '/tasks/:id/workspace/remove', 'Remove the task\'s worktree folder; its branch stays in the repository.'),
+  op('repos_list', 'GET', '/repos', 'Repositories to pick for a task: trustedRepos, git repositories under bots.readRoots, and ones recent tasks used.'),
+  op('path_check', 'GET', '/paths/check', 'Whether a path exists and is a git repository (with its branch and origin). Fields: path.'),
   op('task_set_owner', 'POST', '/bots/tasks/:id/owner', 'Give a task to a bot, or back to the user. Fields: owner (bot name or null).'),
   // runs, events, queue
   op('runs_list', 'GET', '/runs', 'Past runs. Fields: from, to (unix seconds), task_id, outcome.'),
@@ -85,7 +90,7 @@ export const OPERATIONS: Operation[] = [
   op('file_upload', 'POST', '/files', 'Put a file in the shared folder under attachments/. Fields: name, data (base64). The CLI takes file=<path> instead.'),
   op('shared_list', 'GET', '/shared', 'List the shared folder. Fields: dir.'),
   op('shared_read', 'GET', '/shared/file', 'Read a file of the shared folder. Fields: path.'),
-  op('open_folder', 'POST', '/open-folder', 'Open a folder in the desktop file manager. Fields: target (shared|home|sessions|bot), bot.'),
+  op('open_folder', 'POST', '/open-folder', 'Open a folder in the desktop file manager. Fields: target (shared|home|sessions|bot|task), bot, task_id.'),
   // settings and plugins
   op('settings_get', 'GET', '/settings', 'Settings: appearance, limits, folders, registered skills and plugins.'),
   op('settings_limits', 'POST', '/settings/limits', 'Change usage limits. Fields: daily_budget_usd, turns_per_hour_total, max_concurrent_turns, bot_turns_per_hour, turn_budget_usd, turn_max_turns.'),

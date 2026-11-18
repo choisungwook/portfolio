@@ -24,6 +24,8 @@ export interface TaskData {
   max_turns?: number
   max_budget_usd?: number
   workflow_id?: string       // the workflow the owner bot runs for this task; '' or absent: none
+  source_repo?: string       // the repository the user picked, when `repo` is the task's own worktree
+  worktree?: { path: string; branch: string; base: string; base_branch: string }
 }
 
 export interface Task {

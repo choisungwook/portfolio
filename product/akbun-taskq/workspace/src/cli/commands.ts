@@ -8,7 +8,7 @@ import type { Command } from './types.ts'
 import { decideFromCli, escapeControls } from './approvals.ts'
 import { sendHandoffNotices } from '../alerts/handoffs.ts'
 
-export const add: Command = ({ db }, args) => {
+export const add: Command = ({ config, db }, args) => {
   const { values } = parseArgs({
     args, strict: true, allowPositionals: false,
     options: {
@@ -16,7 +16,7 @@ export const add: Command = ({ db }, args) => {
       cautions: { type: 'string' }, 'access-skill': { type: 'string' }, 'target-profile': { type: 'string' },
       'lock-key': { type: 'string' }, repo: { type: 'string' }, output: { type: 'string' },
       priority: { type: 'string' }, 'depends-on': { type: 'string', multiple: true }, draft: { type: 'boolean' },
-      'manual-handoffs': { type: 'boolean' },
+      'manual-handoffs': { type: 'boolean' }, 'no-worktree': { type: 'boolean' },
     },
   })
   const parsed = parseTaskInput({
@@ -26,9 +26,10 @@ export const add: Command = ({ db }, args) => {
     priority: values.priority === undefined ? undefined : Number(values.priority),
     depends_on: values['depends-on'], status: values.draft ? 'draft' : 'ready',
     auto_accept_handoffs: values['manual-handoffs'] ? false : undefined,
+    worktree: values['no-worktree'] ? false : undefined,
   }, (name) => hasAccessSkill(db, name))
   if (!parsed.ok) throw new Error(parsed.error)
-  const task = createFromInput(db, parsed.value)
+  const task = createFromInput(db, parsed.value, null, config)
   sendHandoffNotices(db)
   console.log(formatTask(task, false))
 }

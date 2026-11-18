@@ -266,6 +266,9 @@
           <div class="attach-chips" data-area="task-attachments" hidden></div>
         </div>
         <label class="wide" data-area="task-skill-field">Access skill <select name="access_skill"><option value="">none</option></select></label>
+        <label class="wide">Repository or folder <input name="repo" type="text" maxlength="500" list="repo-options" autocomplete="off" spellcheck="false" placeholder="pick a repository or type an absolute folder path" data-area="task-repo"><datalist id="repo-options" data-area="repo-options"></datalist></label>
+        <p class="meta wide" data-area="task-repo-info"></p>
+        <label class="check wide" data-area="task-worktree-field" hidden><input name="worktree" type="checkbox" checked> Work in a new git worktree (its own branch; your checkout stays as it is)</label>
         <label>Bot <select name="owner" data-area="task-owner-select"><option value="">none (the queue runs it)</option></select></label>
         <label>Workflow <select name="workflow_id" data-area="task-workflow-select"><option value="">none</option></select></label>
         <p class="meta wide" data-area="task-workflow-hint" hidden>Only a bot runs workflows: pick the bot that runs it.</p>
@@ -287,7 +290,6 @@
             <label>Depends on <input name="depends_on" type="text" maxlength="8" pattern="[0-9a-f]{8}" placeholder="task id"></label>
             <label class="check wide"><input name="auto_accept_handoffs" type="checkbox" checked> Automatically accept incoming handoffs</label>
             <label>Priority <input name="priority" type="number" min="-100" max="100" step="1" value="0"></label>
-            <label class="wide">Repository <input name="repo" type="text" maxlength="500" placeholder="absolute path, for a task that works in a repository"></label>
             <label class="wide">Output path <input name="output_path" type="text" maxlength="500" placeholder="relative path under outputs/"></label>
           </div>
         </details>

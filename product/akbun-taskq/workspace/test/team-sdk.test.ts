@@ -102,7 +102,7 @@ describe('claude team backend', () => {
     assert.equal(options.strictMcpConfig, true)
     assert.deepEqual(Object.keys(options.mcpServers ?? {}), ['team'])
     assert.equal(options.maxBudgetUsd, 1)
-    assert.deepEqual(options.additionalDirectories, [join(env.home, 'shared')])
+    assert.deepEqual(options.additionalDirectories, [join(env.home, 'shared'), join(env.home, 'worktrees')])
     assert.deepEqual(f.prompts, ['1 new message'])
   })
 

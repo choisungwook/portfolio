@@ -42,7 +42,7 @@ taskq calls the SDK from three places. All three run the Claude Code executable 
 | `strictMcpConfig` | `true` | `true`, `false` when the bot has plugins (their MCP servers must load) | not set |
 | `mcpServers` | `{}` | `{ team }` | not set |
 | `plugins` | not set | the bot's skill copy (one local plugin, `skipMcpDiscovery: true` since it has skills only) and selected plugins | not set |
-| `additionalDirectories` | per task type | `TASKQ_HOME/shared`, the folder every bot shares | not set |
+| `additionalDirectories` | per task type | `TASKQ_HOME/shared`, the folder every bot shares, and `TASKQ_HOME/worktrees`, where code tasks have their worktrees | not set |
 | `sandbox` | on, per profile | only when the bot turns it on: writes to workdir and shared folder, reads of taskq data denied, network to `allowed_domains` | not set |
 | `effort` | not set | the bot's effort (`low` to `max`), else the model default | not set |
 | `maxTurns`, `maxBudgetUsd` | task or config limits | the bot's limits, else the defaults in Settings | `maxTurns` 3 |
