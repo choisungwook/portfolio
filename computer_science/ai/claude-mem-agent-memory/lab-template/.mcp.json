@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "minimem": {
+      "command": "uv",
+      "args": ["run", "--quiet", "--project", "__MINIMEM__", "minimem-mcp"]
+    }
+  }
+}
