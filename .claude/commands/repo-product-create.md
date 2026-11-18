@@ -75,4 +75,4 @@ Reach it from the app menu or the tray context menu as "Check for Updates…".
 ## Rules
 
 - Follow .claude/rule-details/product.md, markdown.md, and the stack rules: tauri.md by default, electron.md when the reasons above apply.
-- Do not commit, push, or create Issues/PRs unless the user explicitly asks; /repo-pr-create handles that.
+- Commit, push, or create an Issue or PR only when the user requests it. Use `/repo-pr-create` for pull requests and `/repo-issue-create` for standalone issues.

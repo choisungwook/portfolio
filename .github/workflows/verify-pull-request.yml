@@ -176,10 +176,6 @@ jobs:
               fail=1
             fi
           done
-          if ! printf '%s\n' "$body" | grep -qE '^Issue #[0-9]+'; then
-            echo "::error::PR body 끝에 'Issue #<번호>' 링크가 없음"
-            fail=1
-          fi
           # 사람이 읽는 절은 작업 목적 하나이고 2줄 이내다. 템플릿 주석은 내용으로 세지 않는다.
           if ! printf '%s\n' "$body" | awk '/<!--/{c=1} c{if(/-->/)c=0; next} /^# 작업 목적$/{on=1; next} /^# /{on=0} on && NF{n++} END{exit !(n>=1 && n<=2)}'; then
             echo "::error::작업 목적 절은 1~2줄이어야 함. 목적 한 줄, 필요하면 사람 확인 한 줄"

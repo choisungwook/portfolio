@@ -1,9 +1,9 @@
 ---
-description: 기록용 Issue와 PR을 만든다. root issue의 하위로 걸고 템플릿을 따른다
+description: 현재 branch의 작업 맥락과 검증을 PR로 남긴다
 allowed-tools: Bash, Read, Glob, Grep
 ---
 
-현재 branch의 작업을 Issue와 PR로 만든다.
+현재 branch의 작업을 PR로 만든다. 작업 목적, 목표, 완료 조건, 의사결정은 PR 본문에 기록한다.
 
 ## 순서
 
@@ -13,12 +13,9 @@ allowed-tools: Bash, Read, Glob, Grep
 4. 작업 상태 파일 `.claude/work/<branch>.md`가 있으면 정리한다. 건너뛴 단계의 이유 중 다음 작업에도 유효한 것을 `knowledge/decisions/`로 옮긴 뒤 파일을 지운다. 이 삭제가 마지막 commit에 들어가야 master에 남지 않는다.
 5. commit할 변경이 남아 있으면 commit한다. commit message에 claude session 링크(claude.ai/code 링크, Co-Authored-By 아래 붙는 세션 URL)가 있으면 제거한다.
 6. push한다.
-7. 이번 작업의 root issue를 정한다. `product/<이름>`을 건드렸으면 그 product, `.claude`나 `.github`면 저장소 규칙과 도구, 나머지는 핸즈온이다. `gh issue list --label root --state open`으로 찾고 없으면 만든다.
-8. 기록용 Issue를 만든다. [.github/ISSUE_TEMPLATE/work-record.md](../../.github/ISSUE_TEMPLATE/work-record.md)를 따라 작업 목적, Goal, 완료 조건, ADR을 채운다. 변경에 목표가 다른 기능이 여럿이면 기능마다 Issue를 하나씩 만든다. 목표가 하나면 Issue도 하나다.
-9. 8의 Issue를 모두 7의 root issue 하위로 건다. sub-issue 등록 형식은 [.claude/rule-details/github-tools.md](../rule-details/github-tools.md)에 있다.
-10. PR을 만든다. [.github/pull_request_template.md](../../.github/pull_request_template.md)를 읽고 그 섹션과 형식을 그대로 따른다. Issue가 여럿이어도 PR은 하나다. 본문 끝에 Issue #<number> 형식으로 8의 Issue를 모두 링크한다. target branch는 master다.
-11. GitHub에서 PR body를 다시 읽어 실제 줄바꿈과 Issue 링크를 검증한다. 깨졌으면 같은 body 파일로 수정하고 다시 검증한다.
-12. Issue와 PR에 작업 유형 label(feat, docs, fix 등)과 기술 label을 함께 붙인다.
+7. [.github/pull_request_template.md](../../.github/pull_request_template.md)의 형식으로 PR을 만든다. target branch는 master다.
+8. GitHub에서 PR body를 다시 읽어 줄바꿈과 템플릿 형식을 검증한다.
+9. PR에 작업 유형 label(feat, docs, fix 등)과 기술 label을 함께 붙인다.
 
 ## 환경
 
@@ -47,13 +44,13 @@ shell이 없는 MCP 환경에서는 5, 6단계(commit과 push)를 할 수 없으
 ## 작성 규칙
 
 - commit message는 영어로 쓴다.
-- Issue와 PR body의 형식은 두 템플릿의 주석을, 문체와 나머지 규칙은 [.claude/rule-details/github-tools.md](../rule-details/github-tools.md)의 "Issue와 PR 작성 규칙"과 "Issue와 PR 문체"를 따른다.
+- PR body의 형식은 PR 템플릿의 주석을, 문체와 나머지 규칙은 [.claude/rule-details/github-tools.md](../rule-details/github-tools.md)의 "Issue와 PR 작성 규칙"과 "Issue와 PR 문체"를 따른다.
 
 ## body 전달과 검증
 
 - 여러 줄 body는 UTF-8 Markdown 파일로 만든다.
-- CLI 환경은 `gh issue create --body-file <파일>`과 `gh pr create --body-file <파일>`을 사용한다.
+- CLI 환경은 `gh pr create --body-file <파일>`을 사용한다.
 - 여러 줄 body를 `--body` 인자나 이스케이프한 `\n` 문자열로 전달하지 않는다.
 - PR 생성 직후 `gh pr view "$PR" --json body -q .body`로 저장된 body를 다시 읽는다.
-- 재조회한 body에 문자 그대로의 `\n`이 있거나 템플릿 헤더와 Issue 링크가 없으면 `gh pr edit "$PR" --body-file <파일>`로 고친다.
+- 재조회한 body에 문자 그대로의 `\n`이 있거나 필수 템플릿 절이 없으면 `gh pr edit "$PR" --body-file <파일>`로 고친다.
 - 수정 뒤에도 검증에 실패하면 리뷰 요청 전에 멈춘다.

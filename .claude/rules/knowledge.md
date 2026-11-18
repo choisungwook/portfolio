@@ -29,7 +29,7 @@ PR을 만들기 직전에 이번 작업에서 남길 지식이 있는지 검토�
 
 | 디렉터리 | 대상 | type |
 | --- | --- | --- |
-| `knowledge/decisions/` | 작업 중 내린 의사결정과 이유. Issue의 ADR 중 앞으로의 작업에도 영향을 주는 것. product의 아키텍처 결정도 여기에 둔다 | `Decision` |
+| `knowledge/decisions/` | 이후 작업에도 영향을 주는 의사결정과 이유. product의 아키텍처 결정도 여기에 둔다 | `Decision` |
 | `knowledge/playbooks/` | 두 번 이상 반복된 작업 절차 | `Playbook` |
 | `knowledge/topics/` | 여러 핸즈온을 관통하는 도메인 통찰 | `Topic` |
 | `knowledge/references/` | 외부 자료의 저장소 내 사본 | `Reference` |
