@@ -17,7 +17,8 @@
 - [x] 10. wiki 검색: trigram + 링크 확장 + 파일 미러(graphify)
 - [x] 11. task owner 열, 중복 검사, assign_task, UI 배지
 - [x] 12. 토론(team_threads)
-- [ ] 13. persona 2차 리뷰 반영
+- [x] 13. persona 2차 리뷰 반영
+- [x] 14. Team → Bots, 왼쪽 사이드바와 bot별 채팅, soft 테마
 
 ## 다음 세션이 알아야 할 것
 

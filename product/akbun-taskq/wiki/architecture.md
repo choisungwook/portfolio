@@ -14,7 +14,7 @@ browser UI --HTTP + SSE--> taskq process (127.0.0.1)
                             |- worker/   policy every backend enforces: gate, aws guard, prompt, result schema
                             |- memory/   similar-task lookup, retrospect, proposals
                             |- alerts/   must-check rules, desktop notifications
-                            |- team/     resident role agents: hub loop, mailbox, tools, wiki (off unless team.enabled)
+                            |- team/     resident role agents: hub loop, mailbox, tools, wiki (off unless bots.enabled)
                             '- db/       node:sqlite, WAL, numbered migrations
 CLI (taskq add/list/...) ---- opens the same SQLite file directly
 ```
@@ -303,12 +303,13 @@ After a `code` task finishes `done`, the runner creates a `security_review` task
 
 ## UI theme
 
-The UI follows IBM Carbon (Apache-2.0) through a token interface, the same way agents sit behind `AgentBackend`.
+The UI reads its colors, shapes and type through a token interface, the same way agents sit behind `AgentBackend`. The decision is [the soft theme and sidebar](../knowledge/decisions/2026-11-soft-theme-sidebar.md).
 
-- `ui/css/theme/contract.css` names every token component CSS may read (surfaces, text, interaction, notification washes, status colors, shape, motion, type). Each is `initial` there.
-- `ui/css/theme/carbon.css` implements all of them with Carbon g10 (light) and g100 (dark) values from `@carbon/themes`. `LICENSE-carbon.txt` sits beside it.
-- `test/ui-tokens.test.ts` fails when a component reads a token outside the contract or a theme leaves one out. Another theme is a new file in `ui/css/theme/` added to that test's list and loaded in `index.html` instead of `carbon.css`.
-- Carbon rules applied in component CSS: square corners, layers instead of shadows, 2px inset focus ring, ghost buttons by default with one primary per view, line tabs, content switcher, tags, inline notifications that never dismiss on a timer, danger buttons that need a second click, and status indicators that pair a symbol and a word with color.
+- `ui/css/theme/contract.css` names every token component CSS may read (surfaces, text, interaction, notification washes, status colors, bot avatar colors, shape, motion, type). Each is `initial` there.
+- `ui/css/theme/soft.css` is the theme `index.html` loads: dark first with a light variant, 16 px corners on cards and bubbles, 10 px on controls, bold type, one color per bot. `ui/css/theme/carbon.css` is the earlier IBM Carbon theme (Apache-2.0, `LICENSE-carbon.txt` beside it), kept as a second implementation; swapping the `<link>` in `index.html` switches back.
+- `test/ui-tokens.test.ts` fails when a component reads a token outside the contract or a theme leaves one out. Both theme files are in its list.
+- Layout: a left sidebar (`css/nav.css`) holds the views, the bots list and the shared views; `<main>` shows one view; the Must check panel is on the right (under the sidebar below 1280 px, on top below 800 px). The bot conversation, discussions and wiki views are in `css/chat.css`. `ui/js/core/nav.js` switches views and emits `tab` (view name) and `bot` (bot name).
+- Component patterns kept from Carbon: inline notifications that never dismiss on a timer, danger buttons that need a second click, status indicators that pair a symbol and a word with color, one primary button per view.
 
 ## Agent backends
 
@@ -322,12 +323,12 @@ The UI follows IBM Carbon (Apache-2.0) through a token interface, the same way a
 
 Adding a backend: put it under `src/agents/<name>/`, add the name to `AgentName` in `types.ts`, to `BACKENDS` in `index.ts` and to `AGENTS` in `config.ts`. `test/agents.test.ts` checks that every registered backend has the three methods. The policy, the prompt and the result schema in `src/worker/` are shared; what a backend writes itself is the mapping from its SDK's tool-call hook and permission model to `decide`, which is what `claude/hooks.ts` and `claude/profiles.ts` do for Claude.
 
-## Team
+## Bots
 
-Resident role agents sit on top of the queue. The design records are [the team decision](../knowledge/decisions/2026-11-resident-agent-team.md), [ownership and discussions](../knowledge/decisions/2026-11-task-ownership-and-discussions.md) and [wiki search](../knowledge/decisions/2026-11-wiki-hybrid-search.md). The team is off by default (`team.enabled`).
+Resident role agents sit on top of the queue. The UI, CLI (`taskq bots`), API (`/api/bots`) and config key (`bots`) call them bots; the code (`src/team/`), tables (`team_*`) and wake signal (`teamChanged`) call them the team. The design records are [the team decision](../knowledge/decisions/2026-11-resident-agent-team.md), [ownership and discussions](../knowledge/decisions/2026-11-task-ownership-and-discussions.md) and [wiki search](../knowledge/decisions/2026-11-wiki-hybrid-search.md). They are off by default (`bots.enabled`).
 
 ```text
-user --taskq team say / Team tab--> team_messages --hub--> agent turn (resumed Claude session)
+user --taskq bots say / bot chat--> team_messages --hub--> agent turn (resumed Claude session)
                                         ^                    |- team tools: messages, tasks, discussions, wiki
                                         |                    '- Read, Glob, Grep in its folder and read roots
                  finishRun: result of a task with an owner
@@ -350,32 +351,32 @@ user --taskq team say / Team tab--> team_messages --hub--> agent turn (resumed C
 
 ### Ownership
 
-`create_task` checks the role's task types, the repo (in `trustedRepos` or under `team.readRoots`, by real path), the count of agent-owned tasks in ready, running, needs_approval or needs_auth against `team.maxOpenTasks` (draft and review wait for the user and do not count), and duplicates: every unfinished task whose intent has character-trigram Jaccard similarity of 0.5 or more is named with its owner, and the call is refused unless the caller lists it in `not_duplicate_of`. Agent priority is capped at 0. A task with an ops type, `access_skill` or `target_profile` is always a draft.
+`create_task` checks the role's task types, the repo (in `trustedRepos` or under `bots.readRoots`, by real path), the count of agent-owned tasks in ready, running, needs_approval or needs_auth against `bots.maxOpenTasks` (draft and review wait for the user and do not count), and duplicates: every task in draft, ready, running, needs_approval or needs_auth whose intent has character-trigram Jaccard similarity of 0.5 or more is named with its owner, and the call is refused unless the caller lists it in `not_duplicate_of`. The check is advisory: rewording can slip past it and similar wording for different work can trip it (examples in `tools-tasks.ts`). Ownership is what keeps two agents off one task. Agent priority is capped at 0. A task with an ops type, `access_skill` or `target_profile` is always a draft.
 
-`assign_task` moves a task to another agent. The current owner may do it; lead and planner may do it for any unfinished task, the user's included. The update compares the old owner, so two concurrent moves cannot both win. The new and old owners get a message. The user sets the owner from the task detail dialog, `POST /api/team/tasks/:id/owner` or `taskq team assign`.
+`assign_task` moves a task to another agent. The current owner may do it; lead and planner may do it for any unfinished task, the user's included. The update compares the old owner, so two concurrent moves cannot both win. The new and old owners get a message; when the old owner was the user, the user gets an alert. `tasks.owner_since` records when the current owner took the task. The user sets the owner from the task detail dialog, `POST /api/bots/tasks/:id/owner` or `taskq bots assign`.
 
 ### Discussions
 
-`start_discussion` opens a thread with 2 to 4 participants and 1 to 3 rounds; at most 3 threads are open at once. Only the participant whose turn it is (`participants[posts % count]`) can `discuss`; each post is delivered to the next speaker, whose prompt carries the thread so far in a `<discussion>` block. A speaker whose turn ends without posting passes. After the last post the thread is `concluding` and the moderator is asked to `conclude_discussion`, which closes it and can write the conclusion to a wiki page. Participants are told not to create tasks inside a discussion.
+`start_discussion` opens a thread with 2 to 4 participants and 1 to 3 rounds; at most 3 threads are open at once. Only the participant whose turn it is (`participants[posts % count]`) can `discuss`; each post is delivered to the next speaker, whose prompt carries the thread so far in a `<discussion>` block. A speaker whose turn ends without posting passes. After the last post the thread is `concluding` and the moderator is asked to `conclude_discussion`, which closes it and can write the conclusion to a wiki page. Participants are told not to create tasks inside a discussion. Only a turn that ended normally counts as a pass; a failed turn keeps the floor. A moderator who ends the turn that asked it to conclude without concluding, or who is disabled, gets the thread closed without a conclusion and the user gets an alert; the user can also close a thread (`POST /api/bots/threads/:id/close`, `taskq bots close`).
 
 ### Search
 
-`hybridSearch` splits the query into terms of two or more characters. Terms of three or more go to the trigram FTS index, which matches any substring, so a Korean stem finds a word with a particle; shorter terms use `LIKE`. Each candidate is scored in JavaScript: 3 per term in the title or slug, 1 + log2(count) per term in the body, times (0.5 + share of terms matched). The five best hits are expanded one hop along `wiki_links` in both directions at 0.4 of the parent's score and marked `via`. Agents are told to read `TASKQ_HOME/wiki/graphify-out/GRAPH_REPORT.md` when it exists.
+`hybridSearch` splits the query into terms of two or more characters. Terms of three or more go to the trigram FTS index, which matches any substring, so a Korean stem finds a word with a particle; shorter terms use `LIKE`. A two-letter Latin term ("pr") scores only as a whole word. Each candidate is scored in JavaScript: 3 per term in the title or slug, 1 + log2(count) per term in the body, times (0.5 + share of terms matched). The five best hits are expanded one hop along `wiki_links` in both directions at 0.4 of the parent's score and marked `via`. Agents are told to read `TASKQ_HOME/wiki/graphify-out/GRAPH_REPORT.md` when it exists.
 
 ### Guards and failures
 
 | Guard | Effect |
 |---|---|
-| Daily budget | Agent turns plus runs of agent-owned tasks since local midnight (or since the last resume, whichever is later), plus `turnBudgetUsd` reserved for each running turn. A new turn that would pass `dailyBudgetUsd` does not start; with nothing running the team pauses |
+| Daily budget | Agent turns plus runs of agent-owned tasks started after the agent took them, since local midnight (or since the last resume, whichever is later), plus `turnBudgetUsd` reserved for each running turn. A new turn that would pass `dailyBudgetUsd` does not start; with nothing running the team pauses |
 | Hourly turns | An agent with `hourlyTurnsPerAgent` turns in the last hour (or since the last resume) pauses the team |
 | Retry | A failed turn with no effect returns its messages; after `maxAttempts` they are set aside with an alert. A turn that failed after an effect (message, task, wiki write) is not retried, because a retry would repeat it; its messages are set aside with an alert. The same holds for a turn open at a crash. A failed turn costs 60 s before the agent's next turn |
 | Unknown cost | A turn that ends without a cost figure is charged `turnBudgetUsd` |
 | Tamper | A read of taskq's data directory or config ends the turn and pauses the team with a `security_finding` alert |
 | Login | A model login failure pauses the team |
 
-Every pause raises one alert and only the user resumes. Resuming restarts the budget and loop windows from that moment. A resumed session that no longer exists is dropped and the next turn starts a new one; a reset made while a turn runs is not overwritten when it ends.
+Every pause raises one alert and only the user resumes. Pausing the bots stops agent turns only; tasks they already queued keep running unless the queue is paused too. A message to oneself needs `deliver_at` at least 10 minutes ahead, and a `deliver_at` in the past is refused, so an agent cannot wake itself in a loop. Resuming restarts the budget and loop windows from that moment. A resumed session that no longer exists is dropped and the next turn starts a new one; a reset made while a turn runs is not overwritten when it ends.
 
-`team.personaSkill`, when set, is added to the read roots. The lead is told to read it before deciding something on the user's behalf, and the reviewers before reviewing, and both are told not to copy its text anywhere. Its judgement is never an approval.
+`bots.personaSkill`, when set, is added to the read roots. The lead is told to read it before deciding something on the user's behalf, and the reviewers before reviewing, and both are told not to copy its text anywhere. Its judgement is never an approval.
 
 ## Worker
 
@@ -529,12 +530,13 @@ Writes (any non-GET under `/api`) must send `Content-Type: application/json`, op
 | `GET /skills/discover` | `[{ name, path, description, registered }]` found one level deep under `$CLAUDE_CONFIG_DIR/skills` (or `~/.claude/skills`) and `skillsDir`. Capped at 200 |
 | `POST /access-skills` | body `{ "path": "/abs/dir" }`. 201 with the stored row; 400 with the reason; 409 when the name or path is already registered |
 | `DELETE /access-skills/:name` | 204. 404 when unknown; 409 when a task in draft, ready, running, needs_approval or needs_auth names it (up to 5 ids listed). Never touches the skill's files |
-| `GET /team` | `{ enabled, paused, pause_reason, agents, tasks, threads, turns }`. Agents carry `busy` and no `instructions`; `tasks` are unfinished agent-owned tasks with `owner` and `task_title`. Seeds the roster when it is empty |
-| `POST /team/tasks/:id/owner` | body `{ "owner": "coder" }` or `{ "owner": null }`. 409 for a done or failed task or an unknown agent |
-| `GET /team/messages?agent=&limit=` `POST /team/messages` | log, newest first; send `{ "to": "lead", "body": "…" }` as the user. 404 for an unknown or disabled agent |
-| `POST /team/messages/read` | mark every unread message to the user as read |
-| `POST /team/pause` `POST /team/resume` | pause state of the team, separate from the queue |
-| `GET /team/wiki?q=` `GET /team/wiki/page?slug=` | list pages, or search them with `hybridSearch` (`{ slug, title, score, snippet, via? }`); read one page |
+| `GET /bots` | `{ enabled, paused, pause_reason, agents, tasks, threads, turns }`. Agents carry `busy`, `last_message` and `unread` (messages to the user not yet read) and no `instructions`; `tasks` are unfinished agent-owned tasks with `owner` and `task_title`. Seeds the roster when it is empty |
+| `POST /bots/tasks/:id/owner` | body `{ "owner": "coder" }` or `{ "owner": null }`. 409 for a done or failed task or an unknown agent |
+| `GET /bots/messages?agent=&limit=` `POST /bots/messages` | log, newest first; send `{ "to": "lead", "body": "…" }` as the user. 404 for an unknown or disabled agent |
+| `POST /bots/messages/read` | mark unread messages to the user as read; body `{ "agent": "lead" }` limits it to one bot |
+| `POST /bots/threads/:id/close` | close a discussion without a conclusion. 409 when already closed |
+| `POST /bots/pause` `POST /bots/resume` | pause state of the bots, separate from the queue |
+| `GET /bots/wiki?q=` `GET /bots/wiki/page?slug=` | list pages, or search them with `hybridSearch` (`{ slug, title, score, snippet, via? }`); read one page |
 
 `type` and `outcome` are checked against the enum lists in `src/api/params.ts` and anything else returns 400. A date (`from`, `to`) must name a real calendar day, so `2026-13-40` is 400. `output_path` must be a relative path inside `outputs/`, and `repo` an absolute path to an existing directory. The CLI `add` applies the same checks. `lock_key` is limited to 100 characters. Every SQL statement binds request values as parameters. `ORDER BY` and `LIMIT` text comes from fixed strings, and `limit` is an integer validated against 1 to 500.
 
