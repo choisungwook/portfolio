@@ -11,8 +11,8 @@
 .operator label { display: inline-flex; gap: 4px; align-items: center; font-size: 12px; color: var(--muted); }
 /* Danger tertiary (Carbon): outlined until armed, then filled. Destructive actions always take a second click. */
 button.danger { color: var(--danger); box-shadow: inset 0 0 0 1px var(--danger); }
-button.danger:hover:not(:disabled) { background: var(--danger-fill); color: var(--on-accent); }
-button.danger[data-armed="true"] { background: var(--danger-fill); color: var(--on-accent); }
+button.danger:hover:not(:disabled) { background: var(--danger-fill); color: var(--on-danger); }
+button.danger[data-armed="true"] { background: var(--danger-fill); color: var(--on-danger); }
 
 .alerts { list-style: none; padding: 0; margin: 0; display: grid; gap: 8px; }
 .alert {
@@ -91,7 +91,7 @@ dialog h2 { margin-top: 0; }
 .approval-read { display: flex; align-items: center; gap: 6px; margin-top: 8px; font-size: 12px; color: var(--muted); }
 .approval-read input { min-height: 0; width: 14px; height: 14px; padding: 0; accent-color: var(--accent); }
 .hidden-char {
-  padding: 0 2px; font-weight: 600; color: var(--on-accent); background: var(--danger-fill);
+  padding: 0 2px; font-weight: 600; color: var(--on-danger); background: var(--danger-fill);
 }
 .pending-approvals { margin-bottom: 10px; }
 .pending-approvals h3 { margin: 0 0 6px; }

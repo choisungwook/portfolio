@@ -66,7 +66,7 @@
 .primary-button:hover:not(:disabled) { background: var(--accent-hover); }
 .primary-button svg { display: block; flex: none; }
 /* Secondary button (Carbon). */
-button[type="submit"].quiet { background: var(--secondary); color: var(--on-accent); }
+button[type="submit"].quiet { background: var(--secondary); color: var(--on-secondary); }
 button[type="submit"].quiet:hover:not(:disabled) { background: var(--secondary-hover); }
 
 /* Bot settings dialog. */

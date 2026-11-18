@@ -27,6 +27,8 @@
   --on-accent: #ffffff;
   --focus: #0f62fe;
   --secondary: #393939;     /* button-secondary */
+  --on-secondary: #ffffff;
+  --on-danger: #ffffff;
   --secondary-hover: #474747;
   --danger: #da1e28;        /* support-error, button-danger */
   --danger-hover: #b81921;
@@ -90,6 +92,8 @@
     --on-accent: #ffffff;
     --focus: #ffffff;
     --secondary: #6f6f6f;
+    --on-secondary: #ffffff;
+    --on-danger: #ffffff;
     --secondary-hover: #606060;
     --danger: #fa4d56;
     --danger-hover: #da1e28;

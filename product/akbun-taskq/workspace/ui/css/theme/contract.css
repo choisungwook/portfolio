@@ -27,6 +27,8 @@
   --focus: initial;
   --secondary: initial;
   --secondary-hover: initial;
+  --on-secondary: initial;  /* text on a --secondary fill */
+  --on-danger: initial;     /* text on a --danger-fill */
   --danger: initial;
   --danger-hover: initial;
   --danger-fill: initial;

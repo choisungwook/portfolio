@@ -80,7 +80,7 @@ h3 { font-size: 14px; margin: 16px 0 8px; }
 /* Content switcher (Carbon): joined buttons, the selected one filled. */
 .segmented, .btn-group { display: inline-flex; box-shadow: inset 0 0 0 1px var(--border-strong); }
 .btn-group > button { min-height: 32px; padding: 0 16px; color: var(--muted); }
-.btn-group > button[aria-pressed="true"] { background: var(--secondary); color: var(--on-accent); }
+.btn-group > button[aria-pressed="true"] { background: var(--secondary); color: var(--on-secondary); }
 
 button, input, select, textarea {
   font: inherit; color: inherit; border: 0; outline: none;
