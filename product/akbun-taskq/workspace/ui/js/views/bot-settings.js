@@ -37,6 +37,7 @@ function init() {
     form.elements.description.value = preset.description
     form.elements.instructions.value = preset.instructions
   })
+  area('bot-session-folder').addEventListener('click', () => mutate(() => api.post('/open-folder', { target: 'bot', bot: editing })))
   const remove = area('bot-delete')
   remove.addEventListener('click', async () => {
     if (remove.dataset.confirm !== 'true') {
@@ -77,7 +78,8 @@ export async function openBotSettings(name) {
     ])
     presets = loadedPresets
     const value = bot ?? { role: 'custom', description: '', instructions: '', model: null, workdir: null, permission_mode: 'auto',
-      sandbox: false, allowed_domains: [], blocked_commands: [], skills: [], plugins: [], enabled: true, may_message_user: false }
+      sandbox: false, allowed_domains: [], blocked_commands: [], skills: [], plugins: [], enabled: true, may_message_user: false,
+      hourly_turns: null, turn_budget_usd: null, turn_max_turns: null }
     area('bot-settings-title').textContent = name ? `${name} settings` : 'New bot'
     area('bot-name-row').hidden = Boolean(name)
     area('bot-preset-row').hidden = Boolean(name)
@@ -96,6 +98,10 @@ export async function openBotSettings(name) {
     f.enabled.checked = value.enabled
     f.enabled.disabled = Boolean(bot?.system)
     f.may_message_user.checked = value.may_message_user
+    f.hourly_turns.value = value.hourly_turns ?? ''
+    f.turn_budget_usd.value = value.turn_budget_usd ?? ''
+    f.turn_max_turns.value = value.turn_max_turns ?? ''
+    area('bot-session-folder').hidden = !name
     remove.hidden = !name || Boolean(bot?.system)
     picks('bot-skills', 'skill', settings.bot_skills, value.skills)
     picks('bot-plugins', 'plugin', settings.bot_plugins, value.plugins)
@@ -115,6 +121,9 @@ async function save(event) {
     workdir: f.workdir.value, permission_mode: f.permission_mode.value, sandbox: f.sandbox.checked,
     allowed_domains: lines(f.allowed_domains.value), blocked_commands: lines(f.blocked_commands.value),
     skills: checked('skill'), plugins: checked('plugin'), enabled: f.enabled.checked, may_message_user: f.may_message_user.checked,
+    hourly_turns: f.hourly_turns.value === '' ? null : Number(f.hourly_turns.value),
+    turn_budget_usd: f.turn_budget_usd.value === '' ? null : Number(f.turn_budget_usd.value),
+    turn_max_turns: f.turn_max_turns.value === '' ? null : Number(f.turn_max_turns.value),
   }
   const error = area('bot-form-error')
   try {

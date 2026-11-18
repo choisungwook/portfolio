@@ -4,7 +4,7 @@
    Rules carried here: 16px corners on cards and bubbles, 10px on controls, no borders where a layer change separates,
    soft shadows only for things that float (toasts, dialogs), the system font with Korean faces first. */
 :root {
-  color-scheme: dark light;
+  color-scheme: dark;
   --bg: #121212;
   --panel: #1c1c1e;
   --panel-soft: #2a2a2d;
@@ -66,8 +66,57 @@
   --text-small: 13px;
 }
 
+/* Light: chosen in Settings (data-theme="light"), or by the system when Settings says System. */
+:root[data-theme="light"] {
+    color-scheme: light;
+    --bg: #f6f5f2;
+    --panel: #ffffff;
+    --panel-soft: #f0efeb;
+    --stage: #e9e7e2;
+    --field: #f0efeb;
+    --chip: #ecebe6;
+    --control: #e6e4df;
+    --hover: rgba(0, 0, 0, 0.05);
+
+    --fg: #17171a;
+    --muted: #63636a;
+    --border: #e4e2dd;
+    --border-strong: #a3a29d;
+
+    --accent: #e8922a;
+    --accent-hover: #d5811c;
+    --link: #b8650c;
+    --accent-soft: #fde9cc;
+    --on-accent: #1a1206;
+    --focus: #b8650c;
+    --secondary: #2f2f33;
+    --secondary-hover: #45454b;
+    --danger: #c9302c;
+    --danger-hover: #a8241f;
+    --danger-fill: #d23b37;
+
+    --error-soft: #fdeceb;
+    --warning-soft: #fcf3dc;
+    --success-soft: #e3f6ea;
+    --info-soft: #e8f0fd;
+
+    --done: #1d8a50;
+    --failed: #c9302c;
+    --needs-approval: #b75b00;
+    --needs-auth: #8a6a00;
+    --review: #2c5cc5;
+    --running: #2463d6;
+    --stale: #6b6b70;
+    --high: #b75b00;
+
+    --avatar-user: #e4e2dd;
+    --avatar-eye: #17171a;
+
+    --shadow-2: 0 8px 24px rgba(0, 0, 0, 0.12);
+}
+
 @media (prefers-color-scheme: light) {
-  :root {
+  :root:not([data-theme="dark"]) {
     --bg: #f6f5f2;
     --panel: #ffffff;
     --panel-soft: #f0efeb;

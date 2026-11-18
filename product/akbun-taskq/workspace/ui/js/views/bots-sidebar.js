@@ -8,6 +8,7 @@ import { currentView, show } from '../core/nav.js'
 import { botAvatar, setRoster, userAvatar } from './avatar.js'
 import { openBotMenu } from './bot-menu.js'
 import { openBotSettings } from './bot-settings.js'
+import { t } from '../core/i18n.js'
 
 const POLL_MS = 5000
 
@@ -24,6 +25,11 @@ export function initBotsSidebar() {
   on('bots-changed', load)
   load()
   setInterval(load, POLL_MS)
+  setInterval(() => {
+    for (const node of list.querySelectorAll('.side-bot-working')) {
+      node.querySelector('.working-text').textContent = workingText(Number(node.dataset.since) || 0)
+    }
+  }, 1000)
 }
 
 export function botsSnapshot() {
@@ -42,12 +48,13 @@ async function load() {
 }
 
 function render(team) {
-  const label = !team.enabled ? 'Off' : team.paused ? 'Paused' : 'Running'
+  const label = !team.enabled ? t('bots.off', 'Off') : team.paused ? t('bots.paused', 'Paused') : t('bots.running', 'Running')
+  const mode = !team.enabled ? 'off' : team.paused ? 'paused' : 'running'
   const toggle = !team.enabled ? null : team.paused
-    ? el('button', { type: 'button', class: 'quiet', text: 'Resume', onclick: () => mutate(() => api.post('/bots/resume'), 'Bots resumed').then(load) })
-    : el('button', { type: 'button', class: 'quiet', text: 'Pause', onclick: () => mutate(() => api.post('/bots/pause'), 'Bots paused').then(load) })
+    ? el('button', { type: 'button', class: 'quiet', text: t('bots.resume', 'Resume'), onclick: () => mutate(() => api.post('/bots/resume'), 'Bots resumed').then(load) })
+    : el('button', { type: 'button', class: 'quiet', text: t('bots.pause', 'Pause'), onclick: () => mutate(() => api.post('/bots/pause'), 'Bots paused').then(load) })
   clear(state).append(el('span', {
-    class: 'bots-state-label', dataset: { state: label.toLowerCase() },
+    class: 'bots-state-label', dataset: { state: mode },
     title: !team.enabled ? 'Set bots.enabled to true in taskq.config.json and restart' : team.pause_reason ?? '',
     text: label,
   }), ...(toggle ? [toggle] : []))
@@ -71,12 +78,14 @@ function render(team) {
         }
       },
     },
-    botAvatar(a.name, 44),
+    el('span', { class: 'side-avatar', dataset: { busy: String(a.busy) } }, botAvatar(a.name, 44, a.sdk)),
     el('span', { class: 'side-bot-text' },
       el('span', { class: 'side-bot-top' },
         el('strong', { text: a.name }),
         el('time', { class: 'meta', text: a.last_message ? shortTime(a.last_message.created_at) : '' })),
-      el('span', { class: 'side-bot-preview', text: preview(a) })),
+      a.busy
+        ? el('span', { class: 'side-bot-working', dataset: { since: String(a.working_since ?? '') } }, el('span', { class: 'pulse', 'aria-hidden': 'true' }), el('span', { class: 'working-text', text: workingText(a.working_since) }))
+        : el('span', { class: 'side-bot-preview', text: preview(a) })),
     a.unread > 0 ? el('span', { class: 'unread-dot', 'aria-label': `${a.unread} unread` }) : null),
     el('button', {
       type: 'button', class: 'side-bot-gear', 'aria-label': `${a.name} settings`, title: 'Settings', text: '⚙',
@@ -84,9 +93,14 @@ function render(team) {
     }))))
 }
 
+// The elapsed time of a working bot, redrawn every second by the ticker in initBotsSidebar.
+function workingText(since) {
+  const seconds = since ? Math.max(0, Math.floor(Date.now() / 1000) - since) : 0
+  return `${t('chat.working', 'Working')} ${seconds < 60 ? `${seconds}s` : `${Math.floor(seconds / 60)}m ${seconds % 60}s`}`
+}
+
 function preview(agent) {
-  if (!agent.enabled) return 'Disabled'
-  if (agent.busy) return 'Working…'
+  if (!agent.enabled) return t('bots.disabled', 'Disabled')
   const m = agent.last_message
   if (!m) return agent.role
   const who = m.sender === agent.name ? (m.recipient === 'user' ? '' : `→ ${m.recipient}: `) : `${m.sender}: `

@@ -50,6 +50,13 @@ export const api = {
   post: (path, body) => request('POST', path, body ?? {}),
   patch: (path, body) => request('PATCH', path, body ?? {}),
   put: (path, body) => request('PUT', path, body ?? {}),
+  // A file download: same token header, body returned as a Blob.
+  blob: async (path) => {
+    const token = getToken()
+    const res = await fetch(`/api${path}`, { headers: { 'x-taskq-token': token ?? '' } })
+    if (!res.ok) throw new ApiError(`HTTP ${res.status}`, res.status)
+    return res.blob()
+  },
   del: (path, body) => request('DELETE', path, body ?? {}),
 }
 

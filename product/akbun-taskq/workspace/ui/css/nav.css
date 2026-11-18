@@ -66,3 +66,22 @@
   .side-list:not(.side-bots) { display: flex; overflow-x: auto; gap: 4px; }
   .side-list:not(.side-bots) .side-item { white-space: nowrap; }
 }
+.side-me { position: relative; }
+.side-search { position: absolute; top: 0; right: 4px; width: 36px; min-height: 36px; padding: 0; border-radius: 50%; font-size: 1.4em; color: var(--fg); background: var(--panel-soft); }
+.side-search[aria-current="page"] { background: var(--accent); color: var(--on-accent); }
+.avatar-wrap { position: relative; display: inline-flex; flex: none; }
+.sdk-badge {
+  position: absolute; right: -3px; bottom: -3px; display: inline-flex; align-items: center; justify-content: center;
+  border-radius: 50%; background: var(--panel); color: var(--accent); box-shadow: 0 0 0 2px var(--panel); font-weight: 700; line-height: 1;
+}
+.sdk-badge[data-sdk="openai"] { color: var(--fg); }
+.side-avatar { position: relative; display: inline-flex; border-radius: 50%; flex: none; }
+/* A working bot gets a turning ring around its avatar and an accent-colored "Working 12s" line. */
+.side-avatar[data-busy="true"]::before {
+  content: ""; position: absolute; inset: -4px; border-radius: 50%;
+  border: 2px solid transparent; border-top-color: var(--accent); border-right-color: var(--accent); animation: spin 0.9s linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+.side-bot-working { display: flex; align-items: center; gap: 6px; color: var(--accent); font-weight: 600; font-size: 0.93em; }
+.side-bot[data-busy="true"] { background: var(--accent-soft); }
+.side-bot[data-busy="true"] .avatar { animation: none; }

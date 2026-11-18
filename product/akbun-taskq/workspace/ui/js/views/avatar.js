@@ -28,8 +28,16 @@ function circle(name, label, size) {
   }, label)
 }
 
-export function botAvatar(name, size = 40) {
-  return circle(name, name.slice(0, 1).toUpperCase(), size)
+// The agent SDK a bot runs on, as a small mark at the avatar's lower right: Claude today; another SDK gets its own mark.
+const SDK_MARKS = { claude: { text: '✻', title: 'Claude Agent SDK' }, openai: { text: '◎', title: 'OpenAI Agents SDK' } }
+
+export function botAvatar(name, size = 40, sdk = null) {
+  const face = circle(name, name.slice(0, 1).toUpperCase(), size)
+  const mark = sdk ? SDK_MARKS[sdk] : null
+  if (!mark) return face
+  return el('span', { class: 'avatar-wrap', title: mark.title },
+    face,
+    el('span', { class: 'sdk-badge', dataset: { sdk }, 'aria-label': mark.title, style: { width: `${Math.round(size * 0.42)}px`, height: `${Math.round(size * 0.42)}px`, fontSize: `${Math.round(size * 0.28)}px` } }, mark.text))
 }
 
 export function userAvatar(size = 40) {

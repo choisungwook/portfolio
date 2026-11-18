@@ -8,6 +8,7 @@ import { statusIndicator } from '../core/status.js'
 import { runNowButton } from '../core/run-now.js'
 import { approvalPanel } from './approval-panel.js'
 import { ownerValue } from './owner-picker.js'
+import { download } from './bot-chat.js'
 import { operatorControls } from './operator-controls.js'
 
 let dialog
@@ -87,6 +88,9 @@ function sections(task, events, graph, titles, settings) {
     task.pending_approval ? approvalPanel(task, task.pending_approval) : null,
     el('h3', { text: 'Intent' }),
     el('p', { class: 'pre', text: data.intent }),
+    ...(data.attachments?.length ? [el('h3', { text: 'Attachments' }), el('div', { class: 'msg-files' }, ...data.attachments.map((path) => el('button', {
+      type: 'button', class: 'file-chip', text: path.split('/').pop(), title: path, onclick: () => download(path),
+    })))] : []),
     el('h3', { text: 'Cautions' }),
     el('p', { class: 'pre', text: data.cautions ?? 'None.' }),
     el('h3', { text: 'Runs' }),

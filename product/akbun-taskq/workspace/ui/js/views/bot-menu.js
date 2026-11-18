@@ -5,6 +5,8 @@ import { area, clear, el } from '../core/dom.js'
 import { emit } from '../core/bus.js'
 import { show } from '../core/nav.js'
 import { openBotSettings } from './bot-settings.js'
+import { openMemory } from './memory-dialog.js'
+import { t } from '../core/i18n.js'
 
 let menu
 
@@ -50,18 +52,23 @@ async function reload(bot, kind, label) {
 export function openBotMenu(bot, x, y) {
   menu ??= area('bot-menu')
   const items = [
-    item('Open conversation', () => show('bot', bot.name)),
-    item('Settings…', () => openBotSettings(bot.name)),
+    item(t('menu.open', 'Open conversation'), () => show('bot', bot.name)),
+    item(t('menu.settings', 'Settings…'), () => openBotSettings(bot.name)),
+    item(t('menu.memory', 'Memory…'), () => openMemory(bot.name)),
     el('li', { role: 'separator' }, el('hr')),
-    item('Reload skills', () => reload(bot, 'skill', 'Skills')),
-    item('Reload plugins', () => reload(bot, 'plugin', 'Plugins')),
-    item('Start a new session', () => mutate(() => api.post(`/bots/${bot.name}/reset`), `${bot.name} starts a new session on its next turn`)),
+    item(t('menu.reload_skills', 'Reload skills'), () => reload(bot, 'skill', 'Skills')),
+    item(t('menu.reload_plugins', 'Reload plugins'), () => reload(bot, 'plugin', 'Plugins')),
+    item(t('menu.new_session', 'Start a new session'), () => mutate(() => api.post(`/bots/${bot.name}/reset`), `${bot.name} starts a new session on its next turn`)),
+    item(t('menu.session_folder', 'Open session folder'), () => mutate(() => api.post('/open-folder', { target: 'bot', bot: bot.name }))),
   ]
+  if (bot.busy) {
+    items.unshift(item(t('menu.cancel', 'Cancel the running work'), () => mutate(() => api.post(`/bots/${bot.name}/cancel`), `${bot.name}: ${t('chat.cancelled', 'cancelled')}`).then(() => emit('bots-changed')), { class: 'danger' }))
+  }
   if (!bot.system) {
-    items.push(item(bot.enabled ? 'Disable' : 'Enable', () => mutate(() => api.put(`/bots/${bot.name}`, { enabled: !bot.enabled }),
+    items.push(item(bot.enabled ? t('menu.disable', 'Disable') : t('menu.enable', 'Enable'), () => mutate(() => api.put(`/bots/${bot.name}`, { enabled: !bot.enabled }),
       `${bot.name} ${bot.enabled ? 'disabled' : 'enabled'}`).then(() => emit('bots-changed'))))
     items.push(el('li', { role: 'separator' }, el('hr')))
-    const remove = el('button', { type: 'button', role: 'menuitem', class: 'danger', text: 'Delete…' })
+    const remove = el('button', { type: 'button', role: 'menuitem', class: 'danger', text: t('menu.delete', 'Delete…') })
     remove.addEventListener('click', async () => {
       if (remove.dataset.confirm !== 'true') {
         remove.dataset.confirm = 'true'

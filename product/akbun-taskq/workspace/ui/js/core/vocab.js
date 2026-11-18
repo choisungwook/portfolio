@@ -1,3 +1,4 @@
+import { currentLanguage, KO_WORDS } from './i18n.js'
 // Shared names for statuses, outcomes, types and alert kinds, plus helpers that read JSON text fields.
 export const BOARD_COLUMNS = ['ready', 'running', 'needs_approval', 'needs_auth', 'review', 'done']
 export const COLLAPSED_COLUMNS = ['draft', 'failed', 'cancelled']
@@ -27,7 +28,7 @@ const WORDS = {
   blocks: 'Blocks', discovered_from: 'Found while working on', memory: 'Memory note', skill: 'Skill note',
   pending: 'Waiting', applied: 'Applied', rejected: 'Rejected',
 }
-export const label = (value) => WORDS[value] ?? String(value ?? '').replaceAll('_', ' ')
+export const label = (value) => (currentLanguage() === 'ko' ? KO_WORDS[value] : undefined) ?? WORDS[value] ?? String(value ?? '').replaceAll('_', ' ')
 
 // Run fields like stats and task_data come back as JSON text. Accepts text or already-parsed values.
 export function parseField(value, fallback) {

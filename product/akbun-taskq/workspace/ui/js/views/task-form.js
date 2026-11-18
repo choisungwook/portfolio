@@ -4,12 +4,16 @@
 // More options, and the default mode asks for approval before every change.
 import { api, mutate } from '../core/api.js'
 import { area, el } from '../core/dom.js'
+import { autosize } from '../core/autosize.js'
+import { attachments } from '../core/attach.js'
 import { emit, on } from '../core/bus.js'
 
 const TEXT_FIELDS = ['title', 'intent', 'cautions', 'lock_key', 'access_skill', 'target_profile', 'repo', 'output_path']
 
 let dialog
 let form
+let files
+let fitIntent
 let error
 let skillSelect
 
@@ -25,6 +29,8 @@ export function initTaskForm() {
   skillSelect = form.elements.access_skill
   area('new-task-button').addEventListener('click', () => {
     form.reset()
+    files?.clear()
+    setTimeout(() => fitIntent?.(), 0)
     area('task-more').open = false
     showKind()
     error.textContent = ''
@@ -33,6 +39,8 @@ export function initTaskForm() {
   })
   dialog.querySelector('[data-close]').addEventListener('click', () => dialog.close())
   form.addEventListener('submit', submit)
+  fitIntent = autosize(form.elements.intent, 360)
+  files = attachments({ zone: area('task-attach-zone'), button: area('task-attach'), chips: area('task-attachments'), pasteTarget: form })
   form.addEventListener('change', (event) => {
     if (event.target.name === 'kind') showKind()
   })
@@ -74,6 +82,8 @@ function body() {
   const dependsOn = String(data.get('depends_on') ?? '').trim()
   if (dependsOn !== '') out.depends_on = [dependsOn]
   out.auto_accept_handoffs = data.has('auto_accept_handoffs')
+  const attached = files.files()
+  if (attached.length) out.attachments = attached
   return out
 }
 
@@ -86,6 +96,7 @@ async function submit(event) {
     error.textContent = 'The task was not added. See the message at the top.'
     return
   }
+  files.clear()
   dialog.close()
   emit('open-task', created.id)
 }

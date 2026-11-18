@@ -1,7 +1,15 @@
 // The global part of the Settings dialog: appearance (font and size, applied to the whole app), whether the queue runs
 // unowned tasks on its own, and the skill and plugin registry the bots pick from.
-import { api, mutate } from '../core/api.js'
+import { api, mutate, notify } from '../core/api.js'
 import { area, clear, el } from '../core/dom.js'
+import { applyLanguage, t } from '../core/i18n.js'
+
+const LIMIT_FIELDS = [
+  ['daily_budget_usd', 'Daily budget (USD)'], ['turns_per_hour_total', 'Turns per hour, all bots'],
+  ['max_concurrent_turns', 'Bots working at once'], ['bot_turns_per_hour', 'Turns per hour per bot (default)'],
+  ['turn_budget_usd', 'Budget per turn (default, USD)'], ['turn_max_turns', 'Model turns per turn (default)'],
+]
+const FOLDERS = [['shared', 'settings.folder.shared', 'Shared folder'], ['sessions', 'settings.folder.sessions', 'Session transcripts'], ['home', 'settings.folder.home', 'taskq data folder']]
 
 // Font choices. A face that is not installed falls back to the system font.
 const FONTS = {
@@ -16,7 +24,10 @@ const FONTS = {
 let nodes
 let edits = 0   // bumped by every change, so a load that started earlier does not undo it
 
-export function applyAppearance({ font_family, font_size }) {
+export function applyAppearance({ font_family, font_size, language, theme }) {
+  if (theme === 'dark' || theme === 'light') document.documentElement.dataset.theme = theme
+  else delete document.documentElement.dataset.theme
+  if (language) applyLanguage(language)
   const root = document.documentElement.style
   root.setProperty('--font-sans', (FONTS[font_family] ?? FONTS.system)[1])
   root.setProperty('--text-body', `${font_size}px/${Math.round(font_size * 1.46)}px`)
@@ -26,17 +37,25 @@ export function applyAppearance({ font_family, font_size }) {
 export function initGlobalSettings() {
   nodes = {
     family: area('font-family'), size: area('font-size'), sizeValue: area('font-size-value'), autorun: area('queue-autorun'),
+    language: area('ui-language'), theme: area('ui-theme'), limits: area('limits-form'), folders: area('folder-list'),
     skill: area('registry-skill'), plugin: area('registry-plugin'),
   }
   clear(nodes.family).append(...Object.entries(FONTS).map(([value, [text]]) => el('option', { value, text })))
   const saveAppearance = () => {
     edits += 1
-    const value = { font_family: nodes.family.value, font_size: Number(nodes.size.value) }
+    const value = { font_family: nodes.family.value, font_size: Number(nodes.size.value), language: nodes.language.value, theme: nodes.theme.value }
     nodes.sizeValue.textContent = `${value.font_size}px`
     applyAppearance(value)
     mutate(() => api.post('/settings/appearance', value))
   }
   nodes.family.addEventListener('change', saveAppearance)
+  nodes.language.addEventListener('change', saveAppearance)
+  nodes.theme.addEventListener('change', saveAppearance)
+  nodes.limits.addEventListener('submit', async (event) => {
+    event.preventDefault()
+    const patch = Object.fromEntries(LIMIT_FIELDS.map(([key]) => [key, Number(nodes.limits.elements[key].value)]))
+    await mutate(() => api.post('/settings/limits', patch), t('settings.save', 'Saved'))
+  })
   nodes.size.addEventListener('input', () => {
     edits += 1
     nodes.sizeValue.textContent = `${nodes.size.value}px`
@@ -66,7 +85,11 @@ export async function loadGlobalSettings() {
     renderRegistry('plugin', settings.bot_plugins)
     nodes.autorun.checked = settings.queue_autorun
     if (seen !== edits) return
+    renderLimits(settings.limits, settings.limit_ranges)
+    renderFolders(settings.paths)
     nodes.family.value = settings.appearance.font_family
+    nodes.language.value = settings.appearance.language
+    nodes.theme.value = settings.appearance.theme
     nodes.size.value = String(settings.appearance.font_size)
     nodes.sizeValue.textContent = `${settings.appearance.font_size}px`
     applyAppearance(settings.appearance)
@@ -87,7 +110,29 @@ function renderRegistry(kind, entries) {
       entry.description ? el('p', { class: 'meta', text: entry.description }) : null,
       el('code', { class: 'skill-path', text: entry.path })),
     el('button', {
+      type: 'button', text: t('settings.update', 'Update'), title: 'git pull when it is a git checkout, then reload every bot that uses it',
+      onclick: async () => {
+        const result = await mutate(() => api.post(`/bot-${kind}s/${entry.name}/update`))
+        if (result) notify(`${entry.name}: ${result.output.split('\n').pop()}${result.reloaded.length ? ` · reloaded ${result.reloaded.join(', ')}` : ''}`)
+        loadGlobalSettings()
+      },
+    }),
+    el('button', {
       type: 'button', 'aria-label': `Remove ${entry.name}`, text: '−',
       onclick: () => mutate(() => api.del(`/bot-${kind}s/${entry.name}`), `${entry.name} removed from every bot`).then(loadGlobalSettings),
     }))))
+}
+
+function renderLimits(values, ranges) {
+  clear(nodes.limits).append(
+    ...LIMIT_FIELDS.map(([key, english]) => el('label', {},
+      t(`limit.${key}`, english),
+      el('input', { type: 'number', name: key, value: String(values[key]), min: String(ranges[key].min), max: String(ranges[key].max), step: ranges[key].integer ? '1' : '0.01', required: true }))),
+    el('button', { type: 'submit', text: t('settings.save', 'Save') }))
+}
+
+function renderFolders(paths) {
+  clear(nodes.folders).append(...FOLDERS.map(([target, key, english]) => el('li', { class: 'folder-row' },
+    el('div', {}, el('strong', { text: t(key, english) }), el('code', { class: 'skill-path', text: paths[target] })),
+    el('button', { type: 'button', text: t('settings.open', 'Open'), onclick: () => mutate(() => api.post('/open-folder', { target })) }))))
 }
