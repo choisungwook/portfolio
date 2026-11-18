@@ -33,6 +33,8 @@ const KO = {
   'wiki.export_started': '내보내기를 시작했습니다', 'wiki.import_started': '가져오기를 시작했습니다',
   'job.queued': '대기', 'job.running': '진행 중', 'job.cancelled': '취소됨', 'job.done': '완료', 'job.failed': '실패',
   'job.cancel': '취소', 'job.resume': '마지막 단계부터 다시', 'job.download': '내려받기', 'job.pages': '페이지', 'job.skipped': '건너뜀',
+  'plugins.mcp': 'bot용 MCP server', 'plugins.mcp_hint': '고른 bot에게 stdio로 시작되는 명령입니다. Claude와 OpenAI bot 모두 씁니다. bot 게이트 밖에서 내 권한으로 돌므로 믿는 서버만 등록하고, 키는 여기 말고 환경 변수에 두세요.',
+  'plugins.openai_hint': 'OpenAI bot은 같은 skill을 씁니다(필요할 때 read_skill 도구로 SKILL.md를 읽음). 아래 MCP server도 씁니다. Claude Code plugin은 OpenAI Agents SDK에서 동작하지 않습니다.',
   'perm.auto': '자동', 'perm.acceptEdits': '편집 허용', 'perm.default': '묻기(거부)', 'perm.dontAsk': '허용된 도구만', 'perm.plan': '계획(읽기 전용)', 'perm.bypass': '권한 무시',
   'header.new_task': '새 작업', 'header.settings': '설정', 'header.search': '검색', 'header.search_runs': '지난 실행 검색',
   'settings.title': '설정', 'settings.appearance': '화면', 'settings.language': '언어', 'settings.theme': '테마',

@@ -2,6 +2,7 @@ import type { Config } from '../config.ts'
 import type { TeamAgent } from '../db/team.ts'
 import type { TeamTool } from './tools.ts'
 import type { LiveInput } from './live-input.ts'
+import type { McpServerEntry } from '../db/mcp-registry.ts'
 
 // One turn of a resident agent: resume its session, hand it the new messages, let it call tools until it stops.
 // The hub sees only this interface, so tests run the whole team with a fake backend and no model call.
@@ -17,6 +18,8 @@ export interface TurnRequest {
   budgetUsd: number
   resume: string | null     // the session to continue; null starts a new one
   live?: LiveInput          // messages that arrive while the turn runs; only for a backend with supportsLiveInput
+  mcpServers?: McpServerEntry[]  // the registered MCP servers the bot picked, started over stdio
+  skills?: { name: string; description: string; path: string }[]  // the bot's skills, for a backend without plugins (OpenAI)
   signal: AbortSignal
 }
 

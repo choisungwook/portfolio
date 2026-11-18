@@ -99,7 +99,11 @@ function optionsFor(config: Config, request: TurnRequest, abort: AbortController
     // The skill copy is taskq's own plugin with skills only; it never brings MCP servers.
     plugins: request.plugins.map((path) => (path.endsWith('skills-plugin') ? { type: 'local' as const, path, skipMcpDiscovery: true } : { type: 'local' as const, path })),
     strictMcpConfig: request.plugins.length === 0,
-    mcpServers: { [SERVER]: serverFor(request.tools) },
+    // The bots' own tools, plus the registered MCP servers this bot picked (started over stdio by Claude Code).
+    mcpServers: {
+      ...Object.fromEntries((request.mcpServers ?? []).map((s) => [s.name, { type: 'stdio' as const, command: s.command, args: s.args }])),
+      [SERVER]: serverFor(request.tools),
+    },
     permissionMode: agent.permission_mode,
     allowDangerouslySkipPermissions: agent.permission_mode === 'bypassPermissions' || undefined,
     allowedTools: request.tools.map((t) => `mcp__${SERVER}__${t.name}`),

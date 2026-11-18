@@ -1,4 +1,6 @@
-import { Agent, MaxTurnsExceededError, Runner, tool } from '@openai/agents-core'
+import { Agent, MCPServerStdio, MaxTurnsExceededError, Runner, tool } from '@openai/agents-core'
+import { readdirSync, readFileSync } from 'node:fs'
+import { join } from 'node:path'
 import { OpenAIProvider } from '@openai/agents-openai'
 import { z } from 'zod'
 import type { Config } from '../../config.ts'
@@ -24,6 +26,8 @@ export interface NeutralTool {
 }
 
 export interface OpenAIRunArgs {
+  mcpServers: { name: string; command: string; args: string[] }[]
+  cwd: string
   model: string
   instructions: string
   tools: NeutralTool[]
@@ -48,20 +52,48 @@ export const DEFAULT_OPENAI_MODEL = 'gpt-5'
 function sdkRun(apiKey: string): OpenAIRunFn {
   const runner = new Runner({ modelProvider: new OpenAIProvider({ apiKey }), tracingDisabled: true })
   return async (args) => {
-    const agent = new Agent({
-      name: 'taskq-bot',
-      instructions: args.instructions,
-      model: args.model,
-      ...(args.effort ? { modelSettings: { reasoning: { effort: args.effort as 'low' | 'medium' | 'high' } } } : {}),
-      tools: args.tools.map((t) => tool({
-        name: t.name, description: t.description, strict: false,
-        parameters: t.parameters as never,
-        execute: (input: unknown) => t.run((input ?? {}) as Record<string, unknown>),
-      })),
-    })
-    const result = await runner.run(agent, args.input, { maxTurns: args.maxTurns, signal: args.signal, previousResponseId: args.previousResponseId })
-    const usage = result.runContext.usage
-    return { lastResponseId: result.lastResponseId, inputTokens: usage.inputTokens, outputTokens: usage.outputTokens, requests: usage.requests }
+    // Registered MCP servers the bot picked: started for the turn, closed after it.
+    const servers = args.mcpServers.map((s) => new MCPServerStdio({ name: s.name, command: s.command, args: s.args, cwd: args.cwd }))
+    try {
+      await Promise.all(servers.map((s) => s.connect()))
+      return await runAgent(runner, args, servers)
+    } finally {
+      await Promise.allSettled(servers.map((s) => s.close()))
+    }
+  }
+}
+
+async function runAgent(runner: Runner, args: OpenAIRunArgs, servers: MCPServerStdio[]): Promise<OpenAIRunResult> {
+  const agent = new Agent({
+    mcpServers: servers,
+    name: 'taskq-bot',
+    instructions: args.instructions,
+    model: args.model,
+    ...(args.effort ? { modelSettings: { reasoning: { effort: args.effort as 'low' | 'medium' | 'high' } } } : {}),
+    tools: args.tools.map((t) => tool({
+      name: t.name, description: t.description, strict: false,
+      parameters: t.parameters as never,
+      execute: (input: unknown) => t.run((input ?? {}) as Record<string, unknown>),
+    })),
+  })
+  const result = await runner.run(agent, args.input, { maxTurns: args.maxTurns, signal: args.signal, previousResponseId: args.previousResponseId })
+  const usage = result.runContext.usage
+  return { lastResponseId: result.lastResponseId, inputTokens: usage.inputTokens, outputTokens: usage.outputTokens, requests: usage.requests }
+}
+
+// The bot's skills, the way Claude Code offers them: names and descriptions up front, the SKILL.md text on demand.
+function skillTool(skills: NonNullable<TurnRequest['skills']>): NeutralTool | undefined {
+  if (skills.length === 0) return undefined
+  return {
+    name: 'read_skill',
+    description: `Read one of your skills before using it: its SKILL.md and the files next to it. Skills: ${skills.map((s) => `${s.name} (${s.description.slice(0, 120)})`).join('; ')}`,
+    parameters: { type: 'object', properties: { name: { type: 'string', enum: skills.map((s) => s.name) } }, required: ['name'], additionalProperties: false },
+    async run(input) {
+      const skill = skills.find((s) => s.name === input.name)
+      if (!skill) return 'error: no such skill'
+      const files = readdirSync(skill.path).filter((f) => f !== 'SKILL.md')
+      return `${readFileSync(join(skill.path, 'SKILL.md'), 'utf8')}\n\nFiles in ${skill.path}: ${files.join(', ') || 'none'} (read them with read_file).`
+    },
   }
 }
 
@@ -115,8 +147,10 @@ export function createOpenAITeamBackend(runFn?: OpenAIRunFn, fetcher: typeof fet
       const onAbort = () => abort.abort()
       request.signal.addEventListener('abort', onAbort, { once: true })
       let tampered: string | undefined
+      const skill = skillTool(request.skills ?? [])
       const tools = [
         ...request.tools.map(teamTool),
+        ...(skill ? [skill] : []),
         ...localTools(config, request.agent, request.cwd, request.sharedDir).map((t) => local(t, (reason) => {
           tampered = reason
           abort.abort()
@@ -125,6 +159,8 @@ export function createOpenAITeamBackend(runFn?: OpenAIRunFn, fetcher: typeof fet
       const cost = (r: OpenAIRunResult) => (r.inputTokens * config.bots.openaiInputPerMTok + r.outputTokens * config.bots.openaiOutputPerMTok) / 1_000_000
       try {
         const result = await run({
+          mcpServers: request.mcpServers ?? [],
+          cwd: request.cwd,
           model: request.agent.model ?? DEFAULT_OPENAI_MODEL,
           instructions: request.system,
           tools,

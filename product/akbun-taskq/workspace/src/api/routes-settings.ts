@@ -1,4 +1,5 @@
 import type { Hono } from 'hono'
+import { addMcpServer, listMcpServers, removeMcpServer } from '../db/mcp-registry.ts'
 import { join, resolve } from 'node:path'
 import { discoverSkills, skillRoots } from '../skills/discover.ts'
 import { SkillError } from '../skills/inspect.ts'
@@ -30,7 +31,27 @@ export function registerSettingsRoutes(api: Hono, { db, config }: ApiDeps): void
     font_families: FONT_FAMILIES,
     bot_skills: listEntries(db, 'skill'),
     bot_plugins: listEntries(db, 'plugin'),
+    bot_mcp_servers: listMcpServers(db),
   }))
+
+  // MCP servers for bots of both SDKs: { name, command, args: [...], description }.
+  api.post('/bot-mcp-servers', async (c) => {
+    const body = await readJson(c) as Record<string, unknown> | null
+    try {
+      return c.json(addMcpServer(db, {
+        name: String(body?.name ?? ''), command: String(body?.command ?? ''),
+        args: Array.isArray(body?.args) ? body.args as string[] : typeof body?.args === 'string' ? (body.args as string).split(/\s+/).filter(Boolean) : [],
+        description: typeof body?.description === 'string' ? body.description : '',
+      }), 201)
+    } catch (error) {
+      throw new HttpError(400, error instanceof Error ? error.message : String(error))
+    }
+  })
+
+  api.delete('/bot-mcp-servers/:name', (c) => {
+    if (!removeMcpServer(db, c.req.param('name'))) throw new HttpError(404, `no MCP server named ${c.req.param('name')}`)
+    return c.body(null, 204)
+  })
 
   api.post('/settings/queue-autorun', async (c) => {
     const body = await readJson(c) as { enabled?: unknown } | null

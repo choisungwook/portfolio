@@ -48,7 +48,7 @@ function limit(value: unknown, key: string, min: number, max: number, integer: b
   return n
 }
 
-export function parseBotSettings(body: unknown, known: { skills: Set<string>; plugins: Set<string> }, base?: BotSettings): Parsed<BotSettings> {
+export function parseBotSettings(body: unknown, known: { skills: Set<string>; plugins: Set<string>; mcp?: Set<string> }, base?: BotSettings): Parsed<BotSettings> {
   try {
     if (typeof body !== 'object' || body === null || Array.isArray(body)) throw new Error('body must be a JSON object')
     const o = body as Record<string, unknown>
@@ -78,6 +78,7 @@ export function parseBotSettings(body: unknown, known: { skills: Set<string>; pl
       workdir,
       skills: has('skills') ? list(o.skills, 'skills', (n) => known.skills.has(n)) : from.skills,
       plugins: has('plugins') ? list(o.plugins, 'plugins', (n) => known.plugins.has(n)) : from.plugins,
+      mcp_servers: has('mcp_servers') ? list(o.mcp_servers, 'mcp_servers', (n) => known.mcp?.has(n) ?? false) : from.mcp_servers ?? [],
       model: has('model') ? (text(o.model, 'model', 100) || null) : from.model,
       sdk: has('sdk') ? sdkOf(o.sdk) : from.sdk,
       effort: has('effort') ? effortOf(o.effort) : from.effort,

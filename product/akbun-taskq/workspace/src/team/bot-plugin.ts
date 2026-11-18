@@ -3,7 +3,7 @@ import { basename, join, relative, sep } from 'node:path'
 import type { Config } from '../config.ts'
 import type { Db } from '../db/open.ts'
 import { entryOk, listEntries, type RegistryKind } from '../db/bot-registry.ts'
-import { getAgent, postMessage, SYSTEM } from '../db/team.ts'
+import { getAgent, postMessage, SYSTEM, type TeamAgent } from '../db/team.ts'
 import { under } from '../worker/paths.ts'
 
 // What a bot loads is a snapshot: the selected skills and plugins are copied into the bot's folder when its settings
@@ -115,4 +115,15 @@ export function noteReload(db: Db, bot: string, reports: LoadReport[]): string {
   const id = postMessage(db, { sender: SYSTEM, recipient: bot, body: text })
   db.prepare('UPDATE team_messages SET read_at = created_at WHERE id = ?').run(id)
   return text
+}
+
+// The bot's skills as folders of its own copy, for a backend that has no plugin loader (OpenAI): the bot reads
+// SKILL.md with read_skill when it needs one.
+export function skillsFor(db: Db, config: Config, agent: TeamAgent): { name: string; description: string; path: string }[] {
+  if (agent.skills.length === 0) return []
+  if (!existsSync(skillsPluginDir(config, agent.name))) reloadAll(db, config, agent.name)
+  const described = new Map(listEntries(db, 'skill').map((e) => [e.name, e.description ?? '']))
+  return agent.skills
+    .map((name) => ({ name, description: described.get(name) ?? '', path: join(skillsPluginDir(config, agent.name), 'skills', name) }))
+    .filter((s) => existsSync(join(s.path, 'SKILL.md')))
 }

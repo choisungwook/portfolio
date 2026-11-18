@@ -19,6 +19,17 @@ export function initPluginsView() {
       }
     })
   }
+  area('registry-mcp-form').addEventListener('submit', async (event) => {
+    event.preventDefault()
+    const form = event.currentTarget
+    const f = form.elements
+    const body = { name: f.name.value.trim(), command: f.command.value.trim(), args: f.args.value.trim().split(/\s+/).filter(Boolean), description: f.description.value.trim() }
+    if (await mutate(() => api.post('/bot-mcp-servers', body), 'MCP server added')) {
+      form.reset()
+      load()
+    }
+  })
+  for (const tab of document.querySelectorAll('[data-sdk-tab]')) tab.addEventListener('click', () => showSdk(tab.dataset.sdkTab))
   area('official-anthropic').addEventListener('change', renderCatalog)
   area('official-filter').addEventListener('input', renderCatalog)
   on('tab', (name) => {
@@ -29,9 +40,11 @@ export function initPluginsView() {
 async function load() {
   try {
     const [settings, bots] = await Promise.all([api.get('/settings'), api.get('/bots')])
-    const users = (kind, name) => bots.agents.filter((a) => (kind === 'skill' ? a.skills : a.plugins).includes(name)).map((a) => a.name)
+    const listOf = { skill: 'skills', plugin: 'plugins', mcp: 'mcp_servers' }
+    const users = (kind, name) => bots.agents.filter((a) => (a[listOf[kind]] ?? []).includes(name)).map((a) => `${a.name}${a.sdk === 'openai' ? ' ◎' : ''}`)
     renderRegistry('skill', settings.bot_skills, users)
     renderRegistry('plugin', settings.bot_plugins, users)
+    renderMcp(settings.bot_mcp_servers ?? [], users)
   } catch (error) {
     notify(error.message, true)
   }
@@ -97,4 +110,33 @@ function renderCatalog() {
         el('strong', { text: p.name }), p.anthropic ? el('span', { class: 'badge owner', text: 'Anthropic' }) : null,
         el('p', { class: 'meta', text: p.description })),
       el('code', { class: 'skill-path', text: p.source }))))
+}
+
+// Claude shows skills, plugins, MCP servers and the official marketplace; OpenAI shows what its bots can use.
+function showSdk(sdk) {
+  for (const tab of document.querySelectorAll('[data-sdk-tab]')) tab.setAttribute('aria-selected', String(tab.dataset.sdkTab === sdk))
+  for (const section of document.querySelectorAll('[data-view-panel="plugins"] [data-sdk]')) {
+    section.hidden = !(section.dataset.sdk === 'both' || section.dataset.sdk === sdk)
+  }
+}
+
+function renderMcp(entries, users) {
+  const list = area('registry-mcp')
+  if (entries.length === 0) {
+    clear(list).append(el('li', { class: 'meta', text: 'No MCP servers registered.' }))
+    return
+  }
+  clear(list).append(...entries.map((entry) => {
+    const usedBy = users('mcp', entry.name)
+    return el('li', { class: 'skill-row' },
+      el('div', {},
+        el('strong', { text: entry.name }),
+        el('p', { class: 'meta mono', text: [entry.command, ...entry.args].join(' ') }),
+        entry.description ? el('p', { class: 'meta', text: entry.description }) : null,
+        el('p', { class: 'meta', text: usedBy.length ? `${t('plugins.used_by', 'Used by')} ${usedBy.join(', ')}` : t('plugins.unused', 'No bot uses it') })),
+      el('button', { type: 'button', class: 'danger-quiet', text: t('plugins.remove', 'Remove'), onclick: async () => {
+        if (!confirm(`${entry.name}: ${usedBy.length ? usedBy.join(', ') : ''}`)) return
+        if (await mutate(() => api.del(`/bot-mcp-servers/${entry.name}`), 'Removed')) load()
+      } }))
+  }))
 }

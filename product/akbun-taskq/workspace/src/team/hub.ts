@@ -17,7 +17,8 @@ import { agentDir, promptFor, systemFor } from './prompt.ts'
 import { hybridSearch } from './search.ts'
 import { teamTools } from './tools.ts'
 import { wikiDir } from './wiki-files.ts'
-import { pluginPaths } from './bot-plugin.ts'
+import { pluginPaths, skillsFor } from './bot-plugin.ts'
+import { mcpServersFor } from '../db/mcp-registry.ts'
 import { recoverBotTasks, releaseBotTasks } from './bot-work.ts'
 import { sharedDir } from './shared.ts'
 import { LiveInput } from './live-input.ts'
@@ -175,6 +176,8 @@ export function createTeamHub({ db, config, backend: claude, backends = {}, retr
         tools: teamTools({ db, config, agent: name, search, turnId: started.turn.id }),
         cwd,
         plugins,
+        mcpServers: mcpServersFor(db, agent.mcp_servers ?? []),
+        skills: skillsFor(db, config, agent),
         sharedDir: shared,
         maxTurns: agent.turn_max_turns ?? t.turn_max_turns,
         budgetUsd: agent.turn_budget_usd ?? t.turn_budget_usd,

@@ -29,7 +29,8 @@ export interface BotSettings {
   blocked_commands: string[]  // Bash command patterns (* matches anything) that are always refused
   workdir: string | null      // absolute working directory; null is the bot's own folder under TASKQ_HOME/team/
   skills: string[]            // names from the global skill registry
-  plugins: string[]           // names from the global plugin registry
+  plugins: string[]           // names from the global plugin registry (Claude bots)
+  mcp_servers: string[]       // names from the MCP server registry (both SDKs)
   model: string | null        // null uses the config model
   effort: BotEffort | null    // reasoning effort; null leaves it to the model
   sdk: BotSdk                 // which agent SDK runs the bot
@@ -72,7 +73,7 @@ export interface TeamTurn {
 }
 
 const BODY_LIMIT = 8000
-const JSON_FIELDS = ['allowed_domains', 'blocked_commands', 'skills', 'plugins'] as const
+const JSON_FIELDS = ['allowed_domains', 'blocked_commands', 'skills', 'plugins', 'mcp_servers'] as const
 const BOOL_FIELDS = ['may_message_user', 'enabled', 'sandbox', 'system'] as const
 
 function toAgent(row: Record<string, unknown>): TeamAgent {
@@ -86,23 +87,24 @@ function toAgent(row: Record<string, unknown>): TeamAgent {
 export function createAgent(db: Db, name: string, settings: BotSettings, system = false): void {
   db.prepare(`INSERT INTO team_agents (name, role, description, instructions, may_message_user, enabled, system,
     permission_mode, sandbox, allowed_domains, blocked_commands, workdir, skills, plugins, model, sdk, hourly_turns,
-    turn_budget_usd, turn_max_turns, effort, created_at)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`).run(
+    turn_budget_usd, turn_max_turns, effort, mcp_servers, created_at)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`).run(
     name, settings.role, settings.description, settings.instructions, settings.may_message_user ? 1 : 0, settings.enabled ? 1 : 0,
     system ? 1 : 0, settings.permission_mode, settings.sandbox ? 1 : 0, JSON.stringify(settings.allowed_domains),
     JSON.stringify(settings.blocked_commands), settings.workdir, JSON.stringify(settings.skills), JSON.stringify(settings.plugins),
-    settings.model, settings.sdk, settings.hourly_turns, settings.turn_budget_usd, settings.turn_max_turns, settings.effort, nowSec())
+    settings.model, settings.sdk, settings.hourly_turns, settings.turn_budget_usd, settings.turn_max_turns, settings.effort,
+    JSON.stringify(settings.mcp_servers ?? []), nowSec())
 }
 
 export function updateAgent(db: Db, name: string, settings: BotSettings): boolean {
   return db.prepare(`UPDATE team_agents SET role = ?, description = ?, instructions = ?, may_message_user = ?, enabled = ?,
     permission_mode = ?, sandbox = ?, allowed_domains = ?, blocked_commands = ?, workdir = ?, skills = ?, plugins = ?, model = ?,
-    sdk = ?, hourly_turns = ?, turn_budget_usd = ?, turn_max_turns = ?, effort = ?
+    sdk = ?, hourly_turns = ?, turn_budget_usd = ?, turn_max_turns = ?, effort = ?, mcp_servers = ?
     WHERE name = ?`).run(
     settings.role, settings.description, settings.instructions, settings.may_message_user ? 1 : 0, settings.enabled ? 1 : 0,
     settings.permission_mode, settings.sandbox ? 1 : 0, JSON.stringify(settings.allowed_domains), JSON.stringify(settings.blocked_commands),
     settings.workdir, JSON.stringify(settings.skills), JSON.stringify(settings.plugins), settings.model, settings.sdk,
-    settings.hourly_turns, settings.turn_budget_usd, settings.turn_max_turns, settings.effort, name).changes === 1
+    settings.hourly_turns, settings.turn_budget_usd, settings.turn_max_turns, settings.effort, JSON.stringify(settings.mcp_servers ?? []), name).changes === 1
 }
 
 // The orchestrator is refused. Its tasks go back to the user; its messages stay for the record.

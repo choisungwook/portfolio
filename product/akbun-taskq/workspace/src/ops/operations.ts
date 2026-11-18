@@ -110,6 +110,8 @@ export const OPERATIONS: Operation[] = [
   op('bot_plugin_add', 'POST', '/bot-plugins', 'Register a plugin folder for bots. Fields: path.'),
   op('bot_plugin_update', 'POST', '/bot-plugins/:name/update', 'Update a registered plugin (git pull) and reload the bots that use it.'),
   op('bot_plugin_remove', 'DELETE', '/bot-plugins/:name', 'Unregister a plugin; bots stop loading it.'),
+  op('bot_mcp_add', 'POST', '/bot-mcp-servers', 'Register an MCP server for bots of both SDKs, started over stdio. Fields: name, command, args [strings], description.'),
+  op('bot_mcp_remove', 'DELETE', '/bot-mcp-servers/:name', 'Unregister an MCP server; bots stop loading it.'),
   op('access_skills_discover', 'GET', '/skills/discover', 'Skill folders found on this machine that can be registered as access skills.'),
   op('access_skill_add', 'POST', '/access-skills', 'Register an access skill (logs in to a target account). Fields: path.'),
   op('access_skill_remove', 'DELETE', '/access-skills/:name', 'Unregister an access skill.'),

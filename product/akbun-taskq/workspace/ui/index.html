@@ -177,7 +177,14 @@
     <section id="view-plugins" data-view-panel="plugins" aria-label="Plugins" data-area="plugins-view" hidden>
       <h2 class="view-title" data-i18n="nav.plugins">Plugins</h2>
       <p class="meta" data-i18n="plugins.hint">Skills and plugins registered here can be chosen per bot in its settings. Update pulls a git checkout and reloads every bot that uses it.</p>
-    <section class="plugins-section" aria-labelledby="bot-skills-title">
+      <div class="wf-tabs plugins-tabs" role="tablist" aria-label="Agent SDK">
+        <button type="button" role="tab" data-sdk-tab="claude" aria-selected="true">Claude</button>
+        <button type="button" role="tab" data-sdk-tab="openai" aria-selected="false">OpenAI</button>
+      </div>
+    <section class="plugins-section" data-sdk="openai" hidden>
+      <p class="meta" data-i18n="plugins.openai_hint">OpenAI bots use the same skills (they read SKILL.md with the read_skill tool when they need one) and the MCP servers below. Claude Code plugins do not load in the OpenAI Agents SDK.</p>
+    </section>
+    <section class="plugins-section" aria-labelledby="bot-skills-title" data-sdk="both">
       <h3 class="plugins-heading" id="bot-skills-title" data-i18n="settings.skills">Skills for bots</h3>
       <p class="meta">Agent skill folders (with SKILL.md) that bots can load. Each bot picks its own in its settings.</p>
       <ul class="skill-list" data-area="registry-skill"></ul>
@@ -186,7 +193,7 @@
         <button type="submit">Add</button>
       </form>
     </section>
-    <section class="plugins-section" aria-labelledby="bot-plugins-title">
+    <section class="plugins-section" aria-labelledby="bot-plugins-title" data-sdk="claude">
       <h3 class="plugins-heading" id="bot-plugins-title" data-i18n="settings.plugins">Plugins for bots</h3>
       <p class="meta">Claude Code plugin folders (with .claude-plugin/plugin.json): skills, commands, hooks and MCP servers together.</p>
       <ul class="skill-list" data-area="registry-plugin"></ul>
@@ -195,7 +202,19 @@
         <button type="submit">Add</button>
       </form>
     </section>
-      <section class="plugins-section" aria-labelledby="official-title">
+    <section class="plugins-section" aria-labelledby="bot-mcp-title" data-sdk="both">
+      <h3 class="plugins-heading" id="bot-mcp-title" data-i18n="plugins.mcp">MCP servers for bots</h3>
+      <p class="meta" data-i18n="plugins.mcp_hint">A command started over stdio for the bots that pick it, Claude and OpenAI alike. It runs as you, outside the bot gate: register only servers you trust, and keep keys in your environment, not here.</p>
+      <ul class="skill-list" data-area="registry-mcp"></ul>
+      <form class="skill-path-form mcp-form" data-area="registry-mcp-form">
+        <label>Name <input name="name" type="text" maxlength="40" pattern="[a-z0-9][a-z0-9\-]{0,39}" required autocomplete="off" spellcheck="false" placeholder="github"></label>
+        <label>Command <input name="command" type="text" maxlength="500" required autocomplete="off" spellcheck="false" placeholder="npx"></label>
+        <label>Arguments <input name="args" type="text" maxlength="2000" autocomplete="off" spellcheck="false" placeholder="-y @modelcontextprotocol/server-github"></label>
+        <label>Description <input name="description" type="text" maxlength="500" autocomplete="off"></label>
+        <button type="submit">Add</button>
+      </form>
+    </section>
+      <section class="plugins-section" aria-labelledby="official-title" data-sdk="claude">
         <div class="plugins-head">
           <h3 id="official-title" class="plugins-heading" data-i18n="plugins.official">Official marketplace</h3>
           <label class="check"><input type="checkbox" data-area="official-anthropic" checked> <span data-i18n="plugins.anthropic_only">Anthropic only</span></label>
@@ -326,10 +345,11 @@
       <p class="meta">taskq's own data and config are always off limits; a call that reaches them stops the turn and pauses the bots.</p>
     </fieldset>
     <fieldset>
-      <legend>Skills and plugins</legend>
-      <p class="meta">Registered in the global settings. Saving copies the chosen ones for this bot; Reload copies them again.</p>
+      <legend>Skills, plugins and MCP servers</legend>
+      <p class="meta">Registered in the Plugins menu. Saving copies the chosen skills and plugins for this bot; Reload copies them again. Plugins load only in Claude bots.</p>
       <div class="bot-picks" data-area="bot-skills"></div>
       <div class="bot-picks" data-area="bot-plugins"></div>
+      <div class="bot-picks" data-area="bot-mcp"></div>
     </fieldset>
     <fieldset>
       <legend>Limits</legend>

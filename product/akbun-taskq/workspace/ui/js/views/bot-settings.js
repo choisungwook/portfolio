@@ -56,12 +56,13 @@ function init() {
 function picks(target, kind, entries, chosen) {
   const box = area(target)
   if (entries.length === 0) {
-    clear(box).append(el('p', { class: 'meta', text: `No ${kind}s registered. Add them in Settings.` }))
+    clear(box).append(el('p', { class: 'meta', text: `No ${kind === 'mcp' ? 'MCP server' : kind}s registered. Add them in the Plugins menu.` }))
     return
   }
-  clear(box).append(el('p', { class: 'pick-title', text: kind === 'skill' ? 'Skills' : 'Plugins' }), ...entries.map((entry) => el('label', { class: 'check' },
+  const title = { skill: 'Skills', plugin: 'Plugins (Claude only)', mcp: 'MCP servers' }[kind]
+  clear(box).append(el('p', { class: 'pick-title', text: title }), ...entries.map((entry) => el('label', { class: 'check' },
     el('input', { type: 'checkbox', name: kind, value: entry.name, checked: chosen.includes(entry.name) || null }),
-    ` ${entry.name}`, entry.ok ? null : el('span', { class: 'meta', text: ' (missing)' }))))
+    ` ${entry.name}`, entry.ok === false ? el('span', { class: 'meta', text: ' (missing)' }) : null)))
 }
 
 // name null creates a bot.
@@ -106,6 +107,7 @@ export async function openBotSettings(name) {
     remove.hidden = !name || Boolean(bot?.system)
     picks('bot-skills', 'skill', settings.bot_skills, value.skills)
     picks('bot-plugins', 'plugin', settings.bot_plugins, value.plugins)
+    picks('bot-mcp', 'mcp', settings.bot_mcp_servers ?? [], value.mcp_servers ?? [])
     dialog.showModal()
     ;(name ? f.description : f.name).focus()
   } catch (error) {
@@ -121,7 +123,7 @@ async function save(event) {
     role: f.role.value, model: f.model.value, description: f.description.value, instructions: f.instructions.value,
     workdir: f.workdir.value, permission_mode: f.permission_mode.value, sandbox: f.sandbox.checked, sdk: f.sdk.value,
     allowed_domains: lines(f.allowed_domains.value), blocked_commands: lines(f.blocked_commands.value),
-    skills: checked('skill'), plugins: checked('plugin'), enabled: f.enabled.checked, may_message_user: f.may_message_user.checked,
+    skills: checked('skill'), plugins: checked('plugin'), mcp_servers: checked('mcp'), enabled: f.enabled.checked, may_message_user: f.may_message_user.checked,
     hourly_turns: f.hourly_turns.value === '' ? null : Number(f.hourly_turns.value),
     turn_budget_usd: f.turn_budget_usd.value === '' ? null : Number(f.turn_budget_usd.value),
     turn_max_turns: f.turn_max_turns.value === '' ? null : Number(f.turn_max_turns.value),

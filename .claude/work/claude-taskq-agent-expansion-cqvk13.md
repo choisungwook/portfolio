@@ -9,7 +9,7 @@
 - [x] 2. bot 목록 스크롤
 - [x] 3. task 저장소·폴더 선택, 쓰기 작업 worktree, 작업 공간 패널(diff, PR, VS Code)
 - [x] 4. wiki export(zip level 9)와 소화하는 import를 이어 하기 가능한 백그라운드 job으로
-- [ ] 5. Plugins 메뉴를 Claude / OpenAI 하위 메뉴로
+- [x] 5. Plugins 메뉴를 Claude / OpenAI 하위 메뉴로
 - [ ] 6. n8n처럼 끌어서 편집하는 workflow 편집기
 - [ ] 7. 버전 0.10.0, CHANGELOG, 문서, 리뷰, PR, squash merge
 

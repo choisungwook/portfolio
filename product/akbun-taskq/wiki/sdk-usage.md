@@ -40,7 +40,7 @@ taskq calls the SDK from three places. All three run the Claude Code executable 
 | `hooks` | `PreToolUse`, `PostToolUse`, `PostToolUseFailure` | `PreToolUse` | not set |
 | `settingSources` | `['user']`, plus `project` for a trusted repo | `[]`: a bot never reads the user's Claude settings | `[]` |
 | `strictMcpConfig` | `true` | `true`, `false` when the bot has plugins (their MCP servers must load) | not set |
-| `mcpServers` | `{}` | `{ team }` | not set |
+| `mcpServers` | `{}` | `{ team }` plus the registered MCP servers the bot picked, as `{ type: 'stdio', command, args }` | not set |
 | `plugins` | not set | the bot's skill copy (one local plugin, `skipMcpDiscovery: true` since it has skills only) and selected plugins | not set |
 | `additionalDirectories` | per task type | `TASKQ_HOME/shared`, the folder every bot shares, and `TASKQ_HOME/worktrees`, where code tasks have their worktrees | not set |
 | `sandbox` | on, per profile | only when the bot turns it on: writes to workdir and shared folder, reads of taskq data denied, network to `allowed_domains` | not set |
@@ -69,6 +69,7 @@ OpenAI bots (`sdk: openai`) run on `src/agents/openai/team.ts`. The hub, mailbox
 | `Agent({ name, instructions, model, modelSettings, tools })` | `instructions` is the same system text a Claude bot gets; `model` is the bot's model or `gpt-5`; `modelSettings.reasoning.effort` is the bot's effort |
 | `tool({ name, description, parameters, strict: false, execute })` | The 20 team tools (zod shape turned into JSON schema with `z.toJSONSchema`) and the file and shell tools of `local-tools.ts`. A `ToolError` is returned to the model as text; a gate stop aborts the run |
 | `previousResponseId`, `result.lastResponseId` | The conversation lives on OpenAI's side (Responses API). The last response id is the bot's session id; a `previous_response_not_found` error drops it so the next turn starts fresh |
+| `MCPServerStdio` (`Agent({ mcpServers })`) | The registered MCP servers the bot picked, started in the bot's working directory for the turn and closed after it |
 | `maxTurns`, `signal` | The bot's turn limit, and cancel (Stop, Esc, disable, delete, shutdown) |
 | `result.runContext.usage` | `inputTokens`, `outputTokens`, `requests`: the turn count and the cost estimate from `bots.openaiInputPerMTok` and `bots.openaiOutputPerMTok` |
 | `MaxTurnsExceededError`, an error with `status` 401 | A failed turn with a reason; 401 pauses the bots like a Claude login failure |
