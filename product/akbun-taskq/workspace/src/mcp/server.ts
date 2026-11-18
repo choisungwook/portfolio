@@ -6,6 +6,11 @@ import type { Config } from '../config.ts'
 import { handoffMode, listHandoffs } from '../db/handoffs.ts'
 import { OPERATIONS, pathParams } from '../ops/operations.ts'
 import { localApi } from '../ops/local-api.ts'
+import { z } from 'zod'
+import { basename } from 'node:path'
+import { getAgent } from '../db/team.ts'
+import { hybridSearch } from '../team/search.ts'
+import { teamTools, ToolError } from '../team/tools.ts'
 
 // Every API operation as a tool named taskq_<operation>: tasks, bots, workflows, files, settings and plugins.
 // The path parameters are declared; the rest of an operation's fields are listed in its description and passed on.
@@ -81,4 +86,42 @@ export async function serveMcp(db: Db, config: Config, version: string): Promise
   } finally {
     process.stdin.off('end', onEnd)
   }
+}
+
+// One bot's own tools (messages, tasks, wiki, memory, workflows) as an MCP server, for an agent runtime that runs in its
+// own process and takes tools over MCP: Codex (ChatGPT plan) and Kiro. The tools act as that bot, with the same checks
+// as in a Claude or OpenAI Agents SDK turn; TASKQ_TURN_ID ties their writes to the running turn so a failed turn that
+// already wrote is not retried.
+export async function serveBotMcp(db: Db, config: Config, bot: string, version: string): Promise<void> {
+  if (!getAgent(db, bot)) throw new Error(`no bot named ${bot}`)
+  const turnId = Number(process.env.TASKQ_TURN_ID) || undefined
+  const tools = teamTools({ db, config, agent: bot, search: hybridSearch(db), turnId })
+  const server = new Server({ name: `taskq-${bot}`, version }, { capabilities: { tools: {} } })
+  server.setRequestHandler(ListToolsRequestSchema, () => ({
+    tools: tools.map((t) => {
+      const { $schema: _schema, ...inputSchema } = z.toJSONSchema(z.object(t.input).strict()) as Record<string, unknown>
+      return { name: t.name, description: t.description, inputSchema: inputSchema as Tool['inputSchema'], annotations: { readOnlyHint: t.readOnly } }
+    }),
+  }))
+  server.setRequestHandler(CallToolRequestSchema, ({ params }) => {
+    const found = tools.find((t) => t.name === params.name)
+    if (!found) return error('unknown tool')
+    try {
+      return result(found.handler(params.arguments ?? {}))
+    } catch (failure) {
+      if (failure instanceof ToolError) return error(failure.message)
+      throw failure
+    }
+  })
+  const closed = new Promise<void>((resolve) => { server.onclose = resolve })
+  await server.connect(new StdioServerTransport())
+  process.stdin.once('end', () => { void server.close() })
+  await closed
+}
+
+// How another process starts this taskq: the release binary is one executable; in development node runs the CLI entry.
+export function selfCommand(): { command: string; args: string[] } {
+  const runtime = basename(process.execPath).replace(/\.exe$/, '')
+  if ((runtime === 'node' || runtime === 'bun') && process.argv[1]) return { command: process.execPath, args: [process.argv[1]] }
+  return { command: process.execPath, args: [] }
 }

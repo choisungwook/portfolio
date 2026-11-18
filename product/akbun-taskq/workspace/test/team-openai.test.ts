@@ -3,6 +3,7 @@ import assert from 'node:assert/strict'
 import { mkdirSync, readFileSync, symlinkSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { createOpenAITeamBackend, type OpenAIRunArgs, type OpenAIRunFn } from '../src/agents/openai/team.ts'
+import type { CodexSpawn } from '../src/agents/openai/codex.ts'
 import { getAgent, listTurns, postMessage, USER, updateAgent } from '../src/db/team.ts'
 import { parseBotSettings } from '../src/team/bot-settings.ts'
 import { createTeamHub, type TeamHub } from '../src/team/hub.ts'
@@ -51,7 +52,11 @@ describe('openai team backend', () => {
   test('[critical] a turn continues the conversation by response id and charges the estimated cost', async () => {
     const f = fake()
     const result = await createOpenAITeamBackend(f.run).runTurn(env.config, request)
-    assert.deepEqual(result, { outcome: 'done', session_id: 'resp-1', turns: 4, cost_usd: 1.25 + 1 })
+    assert.equal(result.outcome, 'done')
+    assert.equal(result.session_id, 'resp-1')
+    assert.equal(result.turns, 4)
+    assert.equal(result.cost_usd, 1.25 + 1)
+    assert.deepEqual(result.usage, { input_tokens: 1_000_000, output_tokens: 100_000 })
     const args = f.calls[0]
     assert.equal(args.previousResponseId, 'resp-0')
     assert.equal(args.model, 'gpt-5')
@@ -100,6 +105,52 @@ describe('openai team backend', () => {
     const result = await createOpenAITeamBackend(reach.run).runTurn(env.config, request)
     assert.equal(result.outcome, 'failed')
     assert.match(result.tampered ?? '', /data directory/)
+  })
+
+  test('[critical] a Bedrock bot keeps its conversation itself and starts empty after a reset', async () => {
+    const seen: OpenAIRunArgs[] = []
+    const run: OpenAIRunFn = async (args) => {
+      seen.push(args)
+      return { inputTokens: 10, outputTokens: 5, requests: 1, lastInputTokens: 900, history: [...(args.history ?? []), { role: 'user', content: args.input }, { role: 'assistant', content: 'ok' }] }
+    }
+    const bedrock = { ...request, agent: { ...request.agent, provider: 'bedrock' as const } }
+    const first = await createOpenAITeamBackend(run).runTurn(env.config, { ...bedrock, resume: null })
+    assert.equal(first.session_id, 'local:coder')
+    assert.deepEqual(first.context, { tokens: 900, window: 128_000 })
+    assert.equal(seen[0].provider, 'bedrock')
+    assert.equal(seen[0].model, 'openai.gpt-oss-120b-1:0')
+    assert.equal(seen[0].previousResponseId, undefined)
+    await createOpenAITeamBackend(run).runTurn(env.config, { ...bedrock, resume: 'local:coder', prompt: 'second' })
+    assert.equal(seen[1].history?.length, 2, 'the second turn carries the first')
+    await createOpenAITeamBackend(run).runTurn(env.config, { ...bedrock, resume: null, prompt: 'after reset' })
+    assert.deepEqual(seen[2].history, [])
+  })
+
+  test('[critical] a ChatGPT-plan bot runs codex exec with its sandbox, team tools over MCP, and resumes its thread', async () => {
+    const calls: { command: string; args: string[]; input: string }[] = []
+    const codex: CodexSpawn = async function* (command, args, input) {
+      calls.push({ command, args, input })
+      yield JSON.stringify({ type: 'thread.started', thread_id: 'th-1' })
+      yield JSON.stringify({ type: 'turn.started' })
+      yield JSON.stringify({ type: 'turn.completed', usage: { input_tokens: 5000, cached_input_tokens: 4000, output_tokens: 300 } })
+    }
+    const agent = { ...request.agent, provider: 'chatgpt' as const, permission_mode: 'acceptEdits' as const, effort: 'high' as const }
+    const result = await createOpenAITeamBackend(undefined, fetch, codex).runTurn(env.config, { ...request, agent, resume: 'th-0' })
+    assert.equal(result.outcome, 'done')
+    assert.equal(result.session_id, 'th-1')
+    assert.equal(result.cost_usd, 0, 'the plan has no per-turn price')
+    assert.deepEqual(result.usage, { input_tokens: 5000, output_tokens: 300, cache_read_tokens: 4000, cache_write_tokens: 0 })
+    const { command, args, input } = calls[0]
+    assert.equal(command, 'codex')
+    assert.equal(input, '1 new message')
+    assert.deepEqual(args.slice(0, 2), ['exec', '--experimental-json'])
+    assert.ok(args.includes('workspace-write') && args.includes('--skip-git-repo-check'))
+    assert.ok(args.join(' ').includes(`mcp_servers.taskq.args=`) && args.join(' ').includes('"--bot", "coder"'))
+    assert.ok(args.includes('approval_policy="never"') && args.includes('model_reasoning_effort="high"'))
+    assert.deepEqual(args.slice(-2), ['resume', 'th-0'])
+    const failing: CodexSpawn = async function* () { throw new Error('spawn codex ENOENT') }
+    const missing = await createOpenAITeamBackend(undefined, fetch, failing).runTurn(env.config, { ...request, agent })
+    assert.match(missing.error ?? '', /Codex CLI was not found/)
   })
 
   test('errors: no key, a rejected key, and a lost conversation', async () => {

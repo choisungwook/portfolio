@@ -82,6 +82,19 @@ describe('claude team backend', () => {
     assert.equal(live.isClosed(), true)
   })
 
+  test('[critical] a turn reports its tokens, model and the context it ends with against the model\'s window', async () => {
+    const f = fake(() => [
+      { type: 'system', subtype: 'init', session_id: 'sess-1' },
+      { type: 'assistant', message: { model: 'claude-sonnet-5-5', usage: { input_tokens: 1200, cache_read_input_tokens: 30_000, cache_creation_input_tokens: 800, output_tokens: 400 } } },
+      done({ usage: { input_tokens: 2000, output_tokens: 600, cache_read_input_tokens: 50_000, cache_creation_input_tokens: 900 },
+        modelUsage: { 'claude-sonnet-5-5': { contextWindow: 200_000 } } }),
+    ])
+    const result = await createClaudeTeamBackend(f.query).runTurn(env.config, request)
+    assert.deepEqual(result.usage, { input_tokens: 2000, output_tokens: 600, cache_read_tokens: 50_000, cache_write_tokens: 900 })
+    assert.deepEqual(result.context, { tokens: 32_000, window: 200_000 })
+    assert.equal(result.model, 'claude-sonnet-5-5')
+  })
+
   test('effort reaches the session when the bot sets it', async () => {
     const f = fake(() => [done()])
     await createClaudeTeamBackend(f.query).runTurn(env.config, { ...request, agent: { ...request.agent, effort: 'high' } })
@@ -91,7 +104,10 @@ describe('claude team backend', () => {
   test('a turn resumes the session in auto mode, unsandboxed, with no user settings by default', async () => {
     const f = fake(() => [{ type: 'system', subtype: 'init', session_id: 'sess-1' }, done()])
     const result = await createClaudeTeamBackend(f.query).runTurn(env.config, request)
-    assert.deepEqual(result, { outcome: 'done', session_id: 'sess-1', turns: 3, session_total_usd: 0.02 })
+    assert.equal(result.outcome, 'done')
+    assert.equal(result.session_id, 'sess-1')
+    assert.equal(result.turns, 3)
+    assert.equal(result.session_total_usd, 0.02)
     const options = f.calls[0]
     assert.equal(options.resume, 'sess-0')
     assert.equal(options.tools, undefined)

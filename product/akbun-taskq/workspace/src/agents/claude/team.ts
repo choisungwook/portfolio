@@ -55,16 +55,32 @@ async function runTurn(config: Config, request: TurnRequest, runQuery: TeamQuery
   const live = request.live ?? new LiveInput()
   let turns = 0
   let total = 0
+  // Tokens add up over the turn's results; the context is the last model call's input (with cache) against the model's
+  // context window, which modelUsage reports.
+  const usage = { input_tokens: 0, output_tokens: 0, cache_read_tokens: 0, cache_write_tokens: 0 }
+  let context: { tokens: number; window: number | null } | undefined
+  let model: string | undefined
   try {
     for await (const message of runQuery({ prompt: userMessages(live, request.prompt), options: optionsFor(config, request, abort, state) })) {
       if (message.type === 'system' && message.subtype === 'init') sessionId = message.session_id
       else if (message.type === 'assistant' && message.error && INFERENCE_AUTH_ERRORS.has(message.error)) authFailed = true
+      else if (message.type === 'assistant') {
+        const u = message.message.usage
+        if (u) context = { tokens: (u.input_tokens ?? 0) + (u.cache_read_input_tokens ?? 0) + (u.cache_creation_input_tokens ?? 0), window: context?.window ?? null }
+        model = message.message.model ?? model
+      }
       else if (message.type === 'result') {
         turns += message.num_turns
         total = message.total_cost_usd
+        usage.input_tokens += message.usage?.input_tokens ?? 0
+        usage.output_tokens += message.usage?.output_tokens ?? 0
+        usage.cache_read_tokens += message.usage?.cache_read_input_tokens ?? 0
+        usage.cache_write_tokens += message.usage?.cache_creation_input_tokens ?? 0
+        const windows = Object.values(message.modelUsage ?? {}).map((m) => m.contextWindow).filter((w) => w > 0)
+        if (context && windows.length) context = { ...context, window: Math.max(...windows) }
         const ids = message.user_message_uuids ?? (message.user_message_uuid ? [message.user_message_uuid] : undefined)
         live.answer(ids, !ids && message.queued_turn_count === 0)
-        const base = { session_id: sessionId ?? message.session_id, turns, session_total_usd: total }
+        const base = { session_id: sessionId ?? message.session_id, turns, session_total_usd: total, usage: { ...usage }, context, model }
         const failed = message.subtype !== 'success'
         const pending = live.unanswered() > 0 || (message.queued_turn_count ?? 0) > 0
         if (state.tampered || authFailed || failed || !pending) live.close()

@@ -24,6 +24,7 @@ import { sharedDir } from './shared.ts'
 import { LiveInput } from './live-input.ts'
 import type { TeamBackend, TurnResult } from './types.ts'
 import { createCatalog, type CatalogFn } from './catalog.ts'
+import { recordUsage } from '../db/usage.ts'
 
 export interface HubOptions {
   db: Db
@@ -211,6 +212,7 @@ export function createTeamHub({ db, config, backend: claude, backends = {}, retr
     const end = endTurn(db, turnId, {
       outcome, error: result.error, turns: result.turns, cost_usd: cost, session_id: result.session_id,
     }, config.bots.maxAttempts)
+    recordUsage(db, turnId, name, result)
     reportSetAside(name, end, result.error)
     if (result.tampered) pauseTeam(db, `${name} tried to reach taskq itself: ${result.tampered}`, 'security_finding')
     if (result.auth_failed) pauseTeam(db, `model provider login failed for ${name}`)
