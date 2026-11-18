@@ -2,6 +2,10 @@
 
 concept를 추가·수정·삭제할 때마다 오늘 날짜 섹션을 맨 위에 만들고 한 줄 남긴다. 구분은 `**Creation**`, `**Update**`, `**Deletion**`이다.
 
+## 2026-11-18
+
+* **Creation**: [Resident role agents are resumed sessions with a mailbox, and work still runs as tasks](decisions/2026-11-resident-agent-team.md) 결정 기록. 상주 프로세스 대신 resume, 동기 호출 대신 mailbox, agent는 읽기만 하고 일은 큐 작업으로.
+
 ## 2026-11-16
 
 * **Creation**: [The runner waits on an in-process wake signal with a 60 second fallback](decisions/2026-11-wake-instead-of-poll.md) 결정 기록. 폴링 2초를 60초로 바꾸고 같은 프로세스 변경은 신호로 깨움.

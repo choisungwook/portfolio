@@ -23,6 +23,12 @@
 | 인계 기록 | `task-handoffs` | `GET /api/tasks/:id`, `POST /api/handoffs/:id/accept`, `POST /api/tasks/:id/handoff-mode` | 발신·수신 작업, 산출물 경로, 도착 시각과 수락 결과를 본다. 자동 수락을 설정하거나 대기 중인 수신 인계를 직접 수락한다 |
 | 그래프 탭 | `graph`, `graph-canvas` | `GET /api/graph` | 작업을 노드, 의존을 간선으로 그린다. 의존 깊이별로 왼쪽에서 오른쪽으로 배치한다. 실패·승인·로그인 대기 상태이거나 stale run이 있고 done이 아니면 굵은 테두리를 그린다. 툴팁에 stale run 수를 보인다 |
 | 제안 탭 | `proposals`, `proposal-list` | `GET /api/proposals?status=pending`, `POST /api/proposals/:id/{apply,reject}` | 대기 중인 제안의 대상 경로와 추가될 텍스트를 보여주고 적용하거나 거절한다 |
+| 팀 탭 | `team` | `GET /api/team`, `GET /api/team/messages`, `GET /api/team/wiki` | 상주 agent 팀을 본다. 탭이 열려 있는 동안 5초마다 다시 읽는다. agent 메시지는 task 이벤트를 쓰지 않아 SSE로 오지 않기 때문이다. 탭이 사용자에게 온 메시지를 보여주면 읽음으로 표시한다(`POST /api/team/messages/read`) |
+| 팀 상태 | `team-status` | `POST /api/team/{pause,resume}` | 팀이 꺼짐(`team.enabled` false), 멈춤(이유 표시), 동작 중 중 하나를 보인다. 꺼져 있으면 버튼이 없고, 켜져 있으면 Pause team 또는 Resume team 하나를 보인다 |
+| 팀 메시지 보내기 | `team-compose`, `team-to`, `team-body` | `POST /api/team/messages` | 받는 agent(기본 lead)를 골라 사용자로서 메시지를 보낸다. 최대 8000자 |
+| 팀 메시지 | `team-messages` | `GET /api/team/messages?limit=100` | 최신순 메시지. 행마다 보낸 쪽, 받는 쪽, 시각, 관련 작업, 읽지 않음 표시. 사용자가 보낸 메시지는 파란 띠, 사용자에게 온 메시지는 초록 띠 |
+| 팀 agent 목록 | `team-agents` | `GET /api/team` | 이름, 역할, 설명. 턴이 진행 중이면 working과 파란 띠, 세션이 없으면 no session yet |
+| 팀 wiki | `team-wiki`, `team-page` | `GET /api/team/wiki`, `GET /api/team/wiki/page?slug=` | 페이지 목록(slug, revision, 마지막 작성 agent, 제목). slug를 누르면 아래에 본문을 보인다 |
 | 확인 필요 패널 | `alerts-panel`, `alert-badges`, `alerts-list` | `GET /api/alerts`, `GET /api/queue`, `POST /api/alerts/:id/ack` | 확인되지 않은 알림을 심각도 순으로 보여준다. 작업 제목은 알림 행의 `task_title`을 쓴다. critical은 위에 붉게 고정된다 |
 | 승인 대기 목록 | `pending-approvals`, `pending-list` | `GET /api/approvals` | 확인 필요 패널 위에 열린 승인 요청을 모은다. 각 행은 명령 앞 120자와 Review 버튼만 가진다. Approve는 두지 않는다. 요청이 없으면 영역을 숨긴다 |
 | 큐 일시정지 배너 | `queue-banner`, `queue-text`, `queue-toggle` | `GET /api/queue`, `POST /api/queue/{pause,resume}` | 배너는 항상 보인다. 큐가 도는 동안은 Queue running과 Pause queue 버튼을, 멈춘 동안은 이유와 Resume queue 버튼을 보여준다. 버튼 하나가 두 역할을 바꿔 가진다 |

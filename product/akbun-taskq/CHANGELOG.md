@@ -2,6 +2,17 @@
 
 <!-- markdownlint-configure-file {"MD024": {"siblings_only": true}} -->
 
+## 0.9.0
+
+### Added
+
+- 역할별 상주 agent 팀을 추가했다. lead, planner, coder, reviewer, doc-reviewer가 각자 역할과 세션을 갖고, 메시지를 받을 때마다 같은 세션을 이어서 일한다. `team.enabled`로 켜며 기본은 꺼져 있다.
+- agent끼리 비동기 메시지로 일을 넘기고, 큐 작업을 만들어 실제 코드 수정과 조사를 맡긴다. 작업이 끝나면 결과가 그 작업을 맡은 agent에게 메시지로 돌아온다.
+- 팀이 함께 쓰는 wiki를 SQLite에 두었다. 쓸 때마다 이전 revision이 남고, 두 agent가 같은 페이지를 동시에 고치면 뒤의 쓰기가 거절된다.
+- `taskq team` 명령과 Team 탭에서 lead에게 일을 맡기고, 메시지 기록과 wiki를 보고, 팀을 멈추거나 다시 켠다.
+- 일일 예산, agent별 시간당 턴 수, 열린 작업 수, 메시지 재시도 횟수에 상한을 두었다. 상한에 걸리면 팀 전체가 멈추고 경고 하나가 뜬다.
+- `team.personaSkill`에 사용자 대리 판단용 skill 폴더를 지정하면 lead와 리뷰 agent가 그 기준으로 판단하고 리뷰한다.
+
 ## 0.8.0
 
 ### Added

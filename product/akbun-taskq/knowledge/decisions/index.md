@@ -16,3 +16,4 @@
 * [Agent SDKs plug in behind one AgentBackend interface](2026-11-agent-backend-interface.md) - createWorker, preflight and ask; the gate policy stays shared and each backend maps its own hook to it.
 * [A call that reaches taskq itself stops the run for review](2026-11-tamper-stops-run.md) - Sandbox-off, data directory, taskq config and ~/.claude writes end the session; other denials only refuse the call.
 * [Release a bun-compiled binary that embeds Claude Code](2026-11-release-bun-binary.md) - One executable per platform built by bun; Node SEA and requiring an installed claude were rejected.
+* [Resident role agents are resumed sessions with a mailbox, and work still runs as tasks](2026-11-resident-agent-team.md) - Each agent is one Claude session resumed per turn; agents talk through an async mailbox, share a SQLite wiki, and only read files themselves.

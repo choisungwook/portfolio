@@ -5,6 +5,7 @@ A personal agent task queue. You add tasks, several Claude sessions work through
 - One process holds the runner, the HTTP API and the UI. It binds to 127.0.0.1 only.
 - State lives in one SQLite file. Nothing leaves the machine except the model calls the sessions make.
 - A task that changes a live account stops and waits until you approve the exact command.
+- Optional resident role agents (lead, planner, coder, reviewer, doc-reviewer) split a request, queue the tasks and share a wiki. Off by default.
 
 ## Directory
 

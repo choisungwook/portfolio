@@ -14,6 +14,7 @@ browser UI --HTTP + SSE--> taskq process (127.0.0.1)
                             |- worker/   policy every backend enforces: gate, aws guard, prompt, result schema
                             |- memory/   similar-task lookup, retrospect, proposals
                             |- alerts/   must-check rules, desktop notifications
+                            |- team/     resident role agents: hub loop, mailbox, tools, wiki (off unless team.enabled)
                             '- db/       node:sqlite, WAL, numbered migrations
 CLI (taskq add/list/...) ---- opens the same SQLite file directly
 ```
@@ -64,6 +65,9 @@ workspace/
       gate.ts paths.ts aws-guard.ts filter-args.ts prompt.ts result-schema.ts text.ts
     memory/                 # phase 2
       similar.ts retrospect.ts
+    team/                   # resident agent team, see "Team"
+      types.ts              # TeamBackend: runTurn
+      hub.ts roster.ts tools.ts prompt.ts report.ts
     skills/                 # access skill registry: validation, discovery, run-time check
       inspect.ts registry.ts discover.ts frontmatter.ts
     api/
@@ -317,6 +321,32 @@ The UI follows IBM Carbon (Apache-2.0) through a token interface, the same way a
 
 Adding a backend: put it under `src/agents/<name>/`, add the name to `AgentName` in `types.ts`, to `BACKENDS` in `index.ts` and to `AGENTS` in `config.ts`. `test/agents.test.ts` checks that every registered backend has the three methods. The policy, the prompt and the result schema in `src/worker/` are shared; what a backend writes itself is the mapping from its SDK's tool-call hook and permission model to `decide`, which is what `claude/hooks.ts` and `claude/profiles.ts` do for Claude.
 
+## Team
+
+Resident role agents sit on top of the queue. The design record is [the team decision](../knowledge/decisions/2026-11-resident-agent-team.md). The team is off by default (`team.enabled`).
+
+```text
+user --taskq team say / Team tab--> team_messages --hub--> agent turn (resumed Claude session)
+                                        ^                    |- team tools: send_message, create_task, wiki_*
+                                        |                    '- Read, Glob, Grep in its folder and read roots
+                 finishRun: result of a task with data.assignee
+```
+
+| Part | What it does |
+|---|---|
+| `team_agents` | Roster: name, role, description (what others delegate by), instructions, allowed task types, `may_message_user`, `session_id`. Seeded from `team/roster.ts` with `INSERT OR IGNORE`, so edits to rows survive restarts |
+| `team_messages` | Mailbox. `sender` and `recipient` are agent names, `user` or `taskq`. A turn claims every unread message of one agent (`turn_id`, `read_at`, `attempts`) |
+| `team_turns` | One row per agent turn with outcome, cost and the session id. An open row means the agent is busy |
+| `wiki_pages`, `wiki_revisions`, `wiki_fts` | Shared memory. `writePage` needs the revision the writer read; a stale write returns the current page |
+| `team/hub.ts` | Waits on `teamChanged` (or `pollSec`). For each enabled agent with mail and no open turn, up to `team.maxConcurrentTurns`, checks the daily budget and the hourly turn count, then opens a turn and calls `TeamBackend.runTurn` |
+| `team/tools.ts` | SDK-neutral tool handlers. `create_task` checks the role's task types, the repo (in `trustedRepos` or under `team.readRoots`, compared by real path) and `team.maxOpenTasks`; it stores `assignee` in the task data. ops tasks are always drafts. Only an agent with `may_message_user` can write to `user`, which also raises a `team_message` alert |
+| `team/report.ts` | Inside `finishRun`'s transaction, posts the run outcome to `data.assignee`. The automatic security review of an agent's code task is assigned to the first enabled `reviewer` |
+| `agents/claude/team.ts` | `query()` with `resume`, `tools: Read, Glob, Grep`, `settingSources: []`, `strictMcpConfig`, an in-process MCP server named `team`, and a PreToolUse hook (`decideTeamRead` in `worker/gate.ts`) that confines reads. The prompt is a one-message stream because SDK MCP tools need streaming input |
+
+Turn failures: a failed turn returns its messages to the inbox; after `team.maxAttempts` attempts a message is set aside with a `team_message` alert. A turn cut by shutdown is `interrupted` and does not count. On start, open turns from a crash are closed as interrupted. A resumed session that no longer exists is dropped and the next turn starts a new one. A model login failure, the daily budget, or an agent passing `team.hourlyTurnsPerAgent` pauses the whole team (`meta.team_paused`) with one `team_paused` alert; only the user resumes it.
+
+`team.personaSkill`, when set, is added to the read roots. The lead is told to read it before deciding something on the user's behalf, and the reviewers before reviewing. Its judgement is never an approval.
+
 ## Worker
 
 The rest of this section describes the `claude` backend.
@@ -469,6 +499,11 @@ Writes (any non-GET under `/api`) must send `Content-Type: application/json`, op
 | `GET /skills/discover` | `[{ name, path, description, registered }]` found one level deep under `$CLAUDE_CONFIG_DIR/skills` (or `~/.claude/skills`) and `skillsDir`. Capped at 200 |
 | `POST /access-skills` | body `{ "path": "/abs/dir" }`. 201 with the stored row; 400 with the reason; 409 when the name or path is already registered |
 | `DELETE /access-skills/:name` | 204. 404 when unknown; 409 when a task in draft, ready, running, needs_approval or needs_auth names it (up to 5 ids listed). Never touches the skill's files |
+| `GET /team` | `{ enabled, paused, pause_reason, agents, turns }`. Agents carry `busy` and no `instructions`. Seeds the roster when it is empty |
+| `GET /team/messages?agent=&limit=` `POST /team/messages` | log, newest first; send `{ "to": "lead", "body": "…" }` as the user. 404 for an unknown or disabled agent |
+| `POST /team/messages/read` | mark every unread message to the user as read |
+| `POST /team/pause` `POST /team/resume` | pause state of the team, separate from the queue |
+| `GET /team/wiki?q=` `GET /team/wiki/page?slug=` | list or search pages; read one page |
 
 `type` and `outcome` are checked against the enum lists in `src/api/params.ts` and anything else returns 400. A date (`from`, `to`) must name a real calendar day, so `2026-13-40` is 400. `output_path` must be a relative path inside `outputs/`, and `repo` an absolute path to an existing directory. The CLI `add` applies the same checks. `lock_key` is limited to 100 characters. Every SQL statement binds request values as parameters. `ORDER BY` and `LIMIT` text comes from fixed strings, and `limit` is an integer validated against 1 to 500.
 

@@ -68,6 +68,7 @@ cp taskq.config.example.json taskq.config.json
 | `trustedRepos` | [] | 저장소 자체의 Claude 설정까지 로드해도 되는 저장소의 절대 경로 |
 | `retrospect` | true | 태스크가 끝난 뒤 메모 제안을 만들지 여부 |
 | `port` | 4517 | 화면과 API의 포트 |
+| `team.enabled` | false | 상주 agent 팀을 켠다. 자세한 값은 "10. agent 팀에게 맡기기"에 있다 |
 | `caBundle` | 없음 | 회사 TLS 검사 장비의 CA를 포함한 PEM 파일의 절대 경로. 세션의 `AWS_CA_BUNDLE`(aws CLI)과 `NODE_EXTRA_CA_CERTS`(Claude Code)에 함께 들어간다 |
 
 데이터는 실행한 디렉터리 아래에 생긴다. 다른 곳에 두려면 `TASKQ_HOME`을 지정한다.
@@ -77,6 +78,7 @@ cp taskq.config.example.json taskq.config.json
 | `data/taskq.db` | 모든 태스크와 실행 기록. SQLite 파일 하나 |
 | `outputs/` | 조사 문서와 리뷰 문서 |
 | `memory/` | 적용한 메모 제안 |
+| `team/<agent>/` | agent마다 하나인 작업 폴더. 세션의 작업 디렉터리다 |
 
 ## 4. 실행하기
 
@@ -84,6 +86,7 @@ cp taskq.config.example.json taskq.config.json
 
 ```bash
 node bin/taskq run
+taskq team list | say [--to NAME] TEXT | inbox | log | turns | wiki [SLUG] | pause | resume | enable NAME | disable NAME | reset NAME
 ```
 
 출력된 주소를 연다. 주소 끝의 `#token=...`은 실행할 때마다 바뀌고, 이 토큰이 없으면 화면이 데이터를 받지 못한다. 서버를 다시 시작했다면 새로 출력된 주소로 다시 연다.
@@ -182,6 +185,7 @@ taskq handoff accept HANDOFF_ID
 | Board | 상태별 태스크 카드 |
 | Graph | 태스크 사이의 의존 관계 |
 | Proposals | 태스크가 끝난 뒤 올라온 메모 제안. 내용을 보고 Apply 또는 Reject |
+| Team | agent 팀의 메시지 기록, agent 목록, wiki. lead에게 메시지를 보내고 팀을 멈추거나 다시 켠다 |
 | Settings | 접근 skill, 데이터베이스 위치, 현재 설정값(읽기 전용) |
 
 위쪽 검색창은 지난 실행의 요약을 찾는다.
@@ -204,15 +208,67 @@ taskq run
 
 `T`는 `research`, `ops_read`, `ops_change`, `code`, `security_review` 중 하나다.
 
-## 10. 처음 쓸 때 직접 확인할 것
+## 10. agent 팀에게 맡기기
+
+태스크를 하나씩 만드는 대신 lead에게 목표를 말하면, 역할 agent들이 나눠 맡고 필요한 태스크를 큐에 넣는다. 끝나면 lead가 결과를 알려준다.
+
+| agent | 하는 일 |
+|---|---|
+| lead | 나와 대화하는 유일한 agent. 요청을 나눠 다른 agent에게 넘기고 결과를 모아 보고한다 |
+| planner | 태스크의 종류, 순서(depends_on), 우선순위, 결과를 받을 agent를 정해 큐에 넣는다 |
+| coder | code 태스크로 코드를 고치고, 결과에 테스트 명령과 출력이 있는지 확인한다 |
+| reviewer | 코드 변경과 security review 결과를 보고 근거를 붙여 지적한다 |
+| doc-reviewer | 문서와 조사 결과에서 근거 없는 주장과 재현되지 않는 절차를 찾는다 |
+
+agent는 계속 떠 있는 프로세스가 아니다. 메시지가 올 때마다 그 agent의 세션을 이어서 한 번 일하고 멈춘다. 그래서 taskq를 다시 시작해도 대화가 이어지고, 메시지가 없으면 비용이 들지 않는다. 메시지 없이 스스로 깨어나 일하지는 않는다.
+
+agent는 파일을 읽기만 한다. 코드 수정, 명령 실행, 웹 조회는 태스크로 만들어 지금과 같은 샌드박스와 승인 절차를 지난다. agent가 만든 계정 조회·변경 태스크는 항상 초안으로 들어가므로, Board에서 내가 보고 Queued로 바꿔야 실행된다.
+
+설정에 `team`을 넣고 다시 시작한다.
+
+```json
+"team": {
+  "enabled": true,
+  "dailyBudgetUsd": 10,
+  "readRoots": ["/Users/me/work"]
+}
+```
+
+| 키 | 기본값 | 뜻 |
+|---|---|---|
+| `enabled` | false | 팀을 켠다 |
+| `dailyBudgetUsd` | 10 | 자정 이후 agent 턴 비용 합계의 상한. 넘으면 팀이 멈춘다. 태스크 비용은 따로 `maxBudgetUsd`가 묶는다 |
+| `hourlyTurnsPerAgent` | 20 | agent 하나가 1시간에 할 수 있는 턴 수. agent끼리 메시지를 주고받는 루프를 막는다. 넘으면 팀이 멈춘다 |
+| `turnMaxTurns`, `turnBudgetUsd` | 30, 1 | agent 턴 한 번의 모델 턴 수와 비용 상한 |
+| `maxOpenTasks` | 10 | agent가 만든 태스크 중 끝나지 않은 것의 최대 개수 |
+| `maxConcurrentTurns` | 2 | 동시에 일하는 agent 수 |
+| `maxAttempts` | 3 | 같은 메시지로 실패한 턴이 이 횟수가 되면 그 메시지를 내려놓고 알림을 띄운다 |
+| `readRoots` | [] | agent가 읽을 수 있고 code 태스크의 저장소로 쓸 수 있는 디렉터리. `trustedRepos`와 `outputs/`는 따로 넣지 않아도 읽는다 |
+| `personaSkill` | 없음 | 나 대신 판단할 기준을 담은 skill 폴더의 절대 경로. lead는 내 결정이 아닌 선택을 할 때, reviewer와 doc-reviewer는 리뷰할 때 읽는다. 승인을 대신하지 않는다 |
+
+일을 맡기고 결과를 받는 명령은 아래와 같다. 화면에서는 Team 탭에서 같은 일을 한다.
+
+```bash
+taskq team say "README의 설치 절차를 실제로 따라 해 보고 틀린 곳을 고쳐줘. 저장소는 /Users/me/work/app"
+taskq team inbox
+taskq team log
+taskq team wiki
+```
+
+lead가 나에게 보낸 메시지는 Must check에도 "Message from the team"으로 뜬다. CLI로 보낸 메시지는 실행 중인 taskq가 `pollSec`(기본 60초) 안에 가져가고, 화면에서 보낸 메시지는 바로 전달된다.
+
+팀이 공유하는 기억은 wiki다. agent는 일을 시작하기 전에 wiki를 찾고, 결정과 출처가 있는 사실, 진행 상태를 적는다. 세션을 새로 시작해도(`taskq team reset NAME`) wiki는 남는다.
+
+## 11. 처음 쓸 때 직접 확인할 것
 
 아래는 실제 모델 세션 없이 검증했기 때문에, 내 기기에서 한 번씩 확인한다.
 
 - 조회 태스크의 AWS 명령이 샌드박스 안에서 엔드포인트에 닿는지. 안 닿으면 `sandbox.allowedDomains`에 호스트를 추가한다.
 - `auto` 권한 모드를 내 계정과 모델에서 쓸 수 있는지. 안 되면 `autoMode`를 false로 둔다.
 - 변경 태스크가 변경 명령 앞에서 승인을 묻는지. 내 Claude 설정에 allow 규칙이 있어도 묻는지 본다.
+- 팀을 켰다면 `taskq team say "hello"` 뒤 `taskq team turns`에 턴이 done으로 남는지, `taskq team inbox`에 lead의 답이 오는지. 세션 이어받기, 팀 도구 호출, 읽기 경로 제한은 가짜 SDK로만 시험했다.
 
-## 11. 자주 겪는 문제
+## 12. 자주 겪는 문제
 
 | 증상 | 원인과 해결 |
 |---|---|
@@ -221,6 +277,7 @@ taskq run
 | 태스크가 계속 "Login needed"다 | 대상 계정 로그인이 만료됐다. 터미널에서 로그인한 뒤 Resume |
 | 조회 태스크에서 명령이 거부된다 | 조회 전용 규칙에 없는 명령이다. 변경이 필요하면 Task의 기본 모드(Change an account)로 만든다 |
 | 태스크가 "Interrupted"로 남는다 | 실행 중에 프로세스가 죽었다. 다음 실행에서 이전 세션을 이어받는다 |
+| Must check에 "Team paused"가 떠 있다 | 일일 예산을 다 썼거나, agent 하나가 1시간 턴 상한을 넘었거나(메시지 루프 의심), 모델 로그인이 실패했다. `taskq team log`로 원인을 보고 `taskq team resume`이나 Team 탭의 Resume team으로 다시 켠다 |
 | 고친 화면이 안 보인다 | 브라우저를 새로 고친다 |
 | 회사 네트워크에서 `certificate verify failed`나 `self-signed certificate in certificate chain`이 뜬다 | TLS 검사 장비가 인증서를 자기 CA로 다시 서명한다. 그 CA를 넣은 PEM 파일을 `caBundle`에 적고 다시 시작한다 |
 
