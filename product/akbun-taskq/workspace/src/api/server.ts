@@ -10,6 +10,7 @@ import { resourcePath } from '../resources.ts'
 import { registerTaskRoutes } from './routes-tasks.ts'
 import { registerRunRoutes } from './routes-runs.ts'
 import { registerAlertRoutes } from './routes-alerts.ts'
+import { registerHandoffRoutes } from './routes-handoffs.ts'
 import { registerApprovalRoutes } from './routes-approvals.ts'
 import { registerMiscRoutes } from './routes-misc.ts'
 import { registerSse } from './sse.ts'
@@ -33,6 +34,7 @@ export function createApp(deps: ApiDeps, token: string): Hono {
   registerTaskRoutes(api, deps)
   registerRunRoutes(api, deps)
   registerAlertRoutes(api, deps)
+  registerHandoffRoutes(api, deps)
   registerApprovalRoutes(api, deps)
   registerMiscRoutes(api, deps)
   registerSettingsRoutes(api, deps)

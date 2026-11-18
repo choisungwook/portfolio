@@ -1,4 +1,4 @@
-import type { Db } from './open.ts'
+import { inTransaction, type Db } from './open.ts'
 import type { Task, TaskData, TaskStatus, TaskType } from '../types.ts'
 import { newId } from '../ids.ts'
 import { nowSec } from '../time.ts'
@@ -24,7 +24,9 @@ function toTask(row: TaskRow): Task {
 }
 
 const BLOCKED_SQL = `EXISTS (SELECT 1 FROM deps d JOIN tasks p ON p.id = d.depends_on
-  WHERE d.task_id = t.id AND d.kind = 'blocks' AND p.status != 'done')`
+  WHERE d.task_id = t.id AND d.kind = 'blocks' AND (p.status != 'done' OR NOT EXISTS (
+    SELECT 1 FROM current_handoffs h WHERE h.target_task_id = t.id AND h.source_task_id = p.id AND h.accepted_at IS NOT NULL
+  )))`
 
 // Title as shown in lists: the task's title, else the first 60 characters of its intent. Needs a `t` alias on tasks.
 export const TASK_TITLE_SQL = `COALESCE(NULLIF(json_extract(t.data, '$.title'), ''), substr(json_extract(t.data, '$.intent'), 1, 60)) AS task_title`
@@ -61,7 +63,7 @@ export function listDeps(db: Db): { task_id: string; depends_on: string; kind: s
   return db.prepare('SELECT task_id, depends_on, kind FROM deps').all() as { task_id: string; depends_on: string; kind: string }[]
 }
 
-// Ready tasks whose blocks-dependencies are all done and whose lock_key has no active task.
+// Ready tasks whose handoffs are accepted and whose lock_key has no active task.
 export function nextEligible(db: Db): Task | undefined {
   const row = db.prepare(`SELECT t.* FROM tasks t
     WHERE t.status = 'ready'
@@ -72,14 +74,14 @@ export function nextEligible(db: Db): Task | undefined {
   return row ? toTask(row as unknown as TaskRow) : undefined
 }
 
-// The lock_key check and the pause check are part of the UPDATE, so no runner can claim while the queue is paused
-// or claim a task that shares a lock_key with a live one.
+// Recheck eligibility in the UPDATE because another process can change it after selection.
 export function claimTask(db: Db, id: string, runnerId: string): boolean {
   const now = nowSec()
-  const result = db.prepare(`UPDATE tasks SET status = 'running', claimed_by = ?, heartbeat_at = ?, updated_at = ?
+  const result = db.prepare(`UPDATE tasks AS t SET status = 'running', claimed_by = ?, heartbeat_at = ?, updated_at = ?
     WHERE id = ? AND status = 'ready'
+      AND NOT ${BLOCKED_SQL}
       AND NOT EXISTS (SELECT 1 FROM meta WHERE key = 'queue_paused' AND value = '1')
-      AND NOT EXISTS (SELECT 1 FROM tasks o WHERE o.id != tasks.id AND o.lock_key IS NOT NULL AND o.lock_key = tasks.lock_key
+      AND NOT EXISTS (SELECT 1 FROM tasks o WHERE o.id != t.id AND o.lock_key IS NOT NULL AND o.lock_key = t.lock_key
         AND o.status IN ('running', 'needs_approval', 'needs_auth'))`).run(runnerId, now, now, id)
   return result.changes === 1
 }
@@ -106,10 +108,12 @@ export function setSession(db: Db, id: string, sessionId: string): void {
 }
 
 export function patchData(db: Db, id: string, patch: Partial<TaskData>): void {
-  const task = getTask(db, id)
-  if (!task) throw new Error(`task not found: ${id}`)
-  const data = { ...task.data, ...patch }
-  db.prepare('UPDATE tasks SET data = ?, updated_at = ? WHERE id = ?').run(JSON.stringify(data), nowSec(), id)
+  inTransaction(db, () => {
+    const task = getTask(db, id)
+    if (!task) throw new Error(`task not found: ${id}`)
+    const data = { ...task.data, ...patch }
+    db.prepare('UPDATE tasks SET data = ?, updated_at = ? WHERE id = ?').run(JSON.stringify(data), nowSec(), id)
+  })
 }
 
 export function setPriority(db: Db, id: string, priority: number): void {
@@ -128,18 +132,18 @@ export function createFromInput(db: Db, input: TaskInput): Task {
   for (const id of input.depends_on) {
     if (!getTask(db, id)) throw new Error(`unknown dependency: ${id}`)
   }
-  return insertTask(db, {
+  return inTransaction(db, () => insertTask(db, {
     type: input.type, status: input.status, priority: input.priority, lock_key: input.lock_key, data: input.data,
     deps: input.depends_on.map((depends_on) => ({ depends_on, kind: 'blocks' as const })),
-  })
+  }))
 }
 
-// Moves a task only when it is in the expected state. Returns false otherwise.
-// True when a blocks-dependency of the task is not done yet.
+// True while a blocking prerequisite or its handoff is incomplete.
 export function isBlocked(db: Db, id: string): boolean {
   return db.prepare(`SELECT ${BLOCKED_SQL} AS blocked FROM tasks t WHERE t.id = ?`).get(id)?.blocked === 1
 }
 
+// Moves a task only when it is in the expected state.
 export function moveStatus(db: Db, id: string, from: TaskStatus, to: TaskStatus): boolean {
   return db.prepare('UPDATE tasks SET status = ?, updated_at = ? WHERE id = ? AND status = ?')
     .run(to, nowSec(), id, from).changes === 1

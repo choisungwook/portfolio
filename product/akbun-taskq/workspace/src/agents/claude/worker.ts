@@ -70,7 +70,7 @@ async function runTask(config: Config, runQuery: QueryFn, head: (repo: string) =
   let final: SDKResultMessage | undefined
   let inferenceAuth = false
   try {
-    for await (const message of runQuery({ prompt: buildPrompt(task, ctx.similar, outputs, ctx.access_skill_path), options })) {
+    for await (const message of runQuery({ prompt: buildPrompt(ctx, outputs), options })) {
       if (message.type === 'system' && message.subtype === 'init') ctx.onSession(message.session_id)
       else if (message.type === 'assistant' && message.error && INFERENCE_AUTH_ERRORS.has(message.error)) inferenceAuth = true
       else if (message.type === 'result') final = message

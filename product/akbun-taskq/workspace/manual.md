@@ -137,6 +137,28 @@ node bin/taskq add --type ops_read --access-skill example-readonly --target-prof
 
 `--lock-key`가 같은 태스크는 동시에 실행되지 않는다. 계정이나 저장소 이름을 쓴다. `--depends-on <id>`를 주면 그 태스크가 끝난 뒤에 실행된다.
 
+### 검토한 산출물을 다음 태스크에 전달
+
+조사 태스크의 Output path에 `intent.md`를 지정하고, 설계 태스크의 Depends on에 조사 태스크 ID를 넣는다. 조사 결과를 읽고 Mark done을 누르면 설계 태스크가 실행 ID, 요약, `outputs/intent.md` 경로를 받아 작업한다. 설계 결과를 `spec.md`로 만든 뒤 같은 방식으로 구현 태스크를 연결한다. 설계 문서에 완료 조건과 확인할 테스트를 적으면 구현 태스크가 그 기준으로 결과를 검증할 수 있다.
+
+`outputs/`의 파일은 로컬에 저장된다. 파일의 검토 당시 버전을 보관하려면 저장소에서 별도로 커밋한다. [Anthropic AI-native SDLC 플레이북](https://claude.com/ko/resources/articles/the-ai-native-sdlc-playbook)
+
+### 인계 알림과 수락
+
+새 인계는 Must check 패널과 태스크 상세의 Handoffs에 기록된다. macOS에서는 시스템 알림도 뜬다. Handoffs에서 발신·수신 태스크, 산출물 경로, 도착 시각, 수락 방식과 시각을 확인할 수 있다.
+
+자동 수락은 기본으로 켜져 있다. 태스크에서 Automatically accept incoming handoffs를 끄면 Accept handoff를 누르기까지 실행이 대기한다. 다시 켜면 현재 대기 중인 인계를 수락한다. 선행 태스크를 재실행하면 새 산출물은 새 인계로 기록된다.
+
+CLI에서 기록을 읽고 수락 모드를 바꾸거나 인계를 수락한다.
+
+```text
+taskq handoffs [--task TASK_ID]
+taskq handoff mode TASK_ID [auto|manual]
+taskq handoff accept HANDOFF_ID
+```
+
+`taskq add`에서 처음부터 직접 수락하려면 `--manual-handoffs`를 붙인다. AI 클라이언트에는 실행 파일의 절대 경로로 `taskq mcp`를 stdio 서버로 등록하고 `TASKQ_HOME`에 같은 데이터 디렉터리를 지정한다. 도구는 `taskq_list_handoffs`와 `taskq_handoff_mode`다.
+
 ## 7. 확인하고 처리하기
 
 오른쪽 Must check 패널에 내가 봐야 할 것이 심각도 순으로 쌓인다. critical이 생기면 macOS 알림도 온다. 알림은 안내일 뿐이고 눌러도 동작하지 않는다. 처리는 화면이나 명령에서 한다.

@@ -73,6 +73,12 @@ Seed runs, events and alerts through the functions in `src/db` and `src/runner`,
 
 `node scripts/build-binary.ts` writes `dist/taskq` with bun on PATH. It generates `dist/binary-entry.ts`, which embeds every file under `ui/` and `src/db/schema/` plus the Claude Code binary of the installed SDK, registers them in `src/resources.ts`, and then imports `src/cli/main.ts`. Code that reads a file at run time goes through `resourcePath()`, not `import.meta.url`, or the binary will not find it. The Claude Code binary comes from the platform package npm installed, so build on the target OS. `release-akbun-taskq.yml` builds darwin-arm64 and linux-x64 and releases them as `akbun-taskq-v<version>` from `package.json`; bump the version with any change under `src/`, `ui/` or the package files.
 
+## Maintain the changelog
+
+Add a `## <version>` section to [CHANGELOG.md](../CHANGELOG.md) for the version in `workspace/package.json`. Use `### Added`, `### Changed`, `### Fixed` or `### Removed` and describe each feature or behavior in a bullet. Commit the entry with the corresponding code. GitHub Actions uses that section for the release notes.
+
+Codex checks the committed diff before direct `git push` and `gh pr create` shell commands. Review and trust the project hook in `/hooks`. In a linked worktree, Codex reads hook definitions from the main checkout. The taskq PR workflow also checks the entry against the PR's base.
+
 ## Adding a schema change
 
 Add `src/db/schema/NNN_name.sql` with the next number. `open.ts` runs files above the stored `user_version` inside `BEGIN IMMEDIATE`. The binary embeds the directory at build time, so nothing else needs registering. The directory is not called `migrations` because the repository's root `.gitignore` ignores that name.

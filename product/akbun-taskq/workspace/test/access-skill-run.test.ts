@@ -59,9 +59,11 @@ describe('access skill at run time', () => {
 
   test('the prompt names the skill and its folder, and omits the folder when none is given', () => {
     const task = addTask(env.db, { data: { intent: 'x', access_skill: 'example-readonly' } })
-    const withPath = buildPrompt(task, [], '/outputs', '/skills/example-readonly')
+    const context = { task, similar: [], handoffs: [] }
+    const withPath = buildPrompt({ ...context, access_skill_path: '/skills/example-readonly' }, '/outputs')
     assert.match(withPath, /use the skill named example-readonly to reach the target account\. Its files are in \/skills\/example-readonly; read \/skills\/example-readonly\/SKILL\.md/)
-    assert.doesNotMatch(buildPrompt(task, [], '/outputs'), /Its files are in/)
-    assert.doesNotMatch(buildPrompt(addTask(env.db, { data: { intent: 'y' } }), [], '/outputs'), /skill named/)
+    assert.doesNotMatch(buildPrompt(context, '/outputs'), /Its files are in/)
+    const noSkill = addTask(env.db, { data: { intent: 'y' } })
+    assert.doesNotMatch(buildPrompt({ ...context, task: noSkill }, '/outputs'), /skill named/)
   })
 })

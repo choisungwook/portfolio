@@ -95,7 +95,7 @@ export function prepareRun(db: Db, id: string): Task {
   if (!task) throw new OperatorError('task not found')
   if (!RUNNABLE.includes(task.status)) throw new OperatorError(`task is ${task.status}; it is already running`)
   if (isQueuePaused(db)) throw new OperatorError('the queue is paused; resume the queue to run tasks')
-  if (isBlocked(db, id)) throw new OperatorError('task waits for a dependency that is not done')
+  if (isBlocked(db, id)) throw new OperatorError('task waits for a dependency to finish or for a handoff to be accepted')
   inTransaction(db, () => {
     const keepSession = task.status === 'needs_auth' || task.status === 'draft' || task.status === 'ready'
     const sessionClause = keepSession ? '' : ', session_id = NULL'

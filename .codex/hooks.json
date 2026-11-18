@@ -1,0 +1,22 @@
+{
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "^Bash$",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"$(git rev-parse --show-toplevel)/.codex/hooks/taskq-changelog.mjs\"",
+            "timeout": 10
+          },
+          {
+            "type": "command",
+            "command": "bash \"$(git rev-parse --show-toplevel)/.codex/hooks/prepublish-scan.sh\"",
+            "statusMessage": "Reviewing outgoing material for sensitive information",
+            "timeout": 180
+          }
+        ]
+      }
+    ]
+  }
+}

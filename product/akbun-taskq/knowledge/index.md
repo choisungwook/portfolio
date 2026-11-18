@@ -19,6 +19,8 @@ AI agent가 작업하면서 축적하는 지식 번들이다. Google이 제안�
 
 이 workspace를 고치기 전에 이 파일을 먼저 읽는다. 이번 작업에 걸리는 concept가 있으면 그 파일까지 읽는다. 읽은 내용이 지금 아는 사실과 어긋나면 그 concept를 고치거나 지운다.
 
+기능 이력은 [CHANGELOG.md](../CHANGELOG.md)에서 확인한다. 코드를 바꿀 때는 [changelog 관리 절차](../wiki/development.md#maintain-the-changelog)에 따라 해당 버전의 항목을 갱신한다.
+
 ## 작성 규칙
 
 concept 작성 규칙은 저장소 루트의 `.claude/rules/knowledge.md`를 따른다. 변경 이력은 [log.md](log.md)에 남긴다.

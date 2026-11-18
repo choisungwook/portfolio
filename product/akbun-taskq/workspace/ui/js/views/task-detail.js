@@ -89,12 +89,52 @@ function sections(task, events, graph, titles, settings) {
     runList(task.runs ?? []),
     el('h3', { text: 'Dependencies' }),
     depList(task, graph, titles),
+    handoffSection(task, titles),
     el('h3', { text: 'Event log (latest 200, newest first)' }),
     eventList(events),
     el('h3', { text: 'Alerts' }),
     el('ul', {}, ...(task.alerts ?? []).map((a) => el('li', { class: `sev-${a.severity}` },
       el('strong', { text: `${label(a.severity)} · ${label(a.kind)}` }), ` ${a.message}`))),
   ]
+}
+
+function handoffSection(task, titles) {
+  const automatic = task.data.auto_accept_handoffs !== false
+  const rows = task.handoffs ?? []
+  return el('section', { dataset: { area: 'task-handoffs' } },
+    el('h3', { text: 'Handoffs' }),
+    el('label', { class: 'check' },
+      el('input', {
+        type: 'checkbox',
+        checked: automatic,
+        onchange: async (event) => {
+          const control = event.currentTarget
+          control.disabled = true
+          const saved = await mutate(() => api.post(`/tasks/${task.id}/handoff-mode`, { auto_accept: control.checked }), 'Handoff mode saved')
+          if (!saved) control.checked = automatic
+          control.disabled = false
+        },
+      }),
+      ' Automatically accept incoming handoffs'),
+    rows.length === 0 ? el('p', { class: 'meta', text: 'No handoffs yet.' }) : el('ul', { class: 'runs' },
+      ...rows.map((row) => {
+        const incoming = row.target_task_id === task.id
+        const partner = incoming ? row.source_task_id : row.target_task_id
+        const state = row.status === 'pending' ? 'Awaiting acceptance'
+          : row.status === 'superseded' ? 'Superseded'
+          : row.accepted_via === 'auto' ? 'Accepted automatically' : 'Accepted manually'
+        return el('li', {},
+          el('strong', { text: `#${row.id} · ${state}` }),
+          ` · ${incoming ? 'From' : 'To'} `,
+          el('button', { type: 'button', class: 'link', text: titles.get(partner) ?? partner, onclick: () => emit('open-task', partner) }),
+          el('p', { class: 'meta', text: `Received ${fmtDateTime(row.created_at)}${row.accepted_at ? ` · Accepted ${fmtDateTime(row.accepted_at)}` : ''}` }),
+          row.output_path ? el('code', { text: row.output_path }) : null,
+          row.summary ? el('p', { text: row.summary }) : null,
+          incoming && row.status === 'pending' ? el('button', {
+            type: 'button', text: 'Accept handoff',
+            onclick: () => mutate(() => api.post(`/handoffs/${row.id}/accept`, {}), 'Handoff accepted'),
+          }) : null)
+      })))
 }
 
 // The access skill's name and registered folder. A name that is no longer registered says so.

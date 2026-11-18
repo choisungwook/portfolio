@@ -156,6 +156,7 @@
             <label>Target profile <input name="target_profile" type="text" maxlength="100"></label>
             <label>Lock key <input name="lock_key" type="text" maxlength="100" placeholder="account or repository"></label>
             <label>Depends on <input name="depends_on" type="text" maxlength="8" pattern="[0-9a-f]{8}" placeholder="task id"></label>
+            <label class="check wide"><input name="auto_accept_handoffs" type="checkbox" checked> Automatically accept incoming handoffs</label>
             <label>Priority <input name="priority" type="number" min="-100" max="100" step="1" value="0"></label>
             <label class="wide">Repository <input name="repo" type="text" maxlength="500" placeholder="absolute path, for a task that works in a repository"></label>
             <label class="wide">Output path <input name="output_path" type="text" maxlength="500" placeholder="relative path under outputs/"></label>

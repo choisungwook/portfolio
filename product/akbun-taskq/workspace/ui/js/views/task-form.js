@@ -73,6 +73,7 @@ function body() {
   if (priority !== '') out.priority = Number(priority)
   const dependsOn = String(data.get('depends_on') ?? '').trim()
   if (dependsOn !== '') out.depends_on = [dependsOn]
+  out.auto_accept_handoffs = data.has('auto_accept_handoffs')
   return out
 }
 

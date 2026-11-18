@@ -8,6 +8,7 @@ import * as info from './info.ts'
 import { runCommand } from './run.ts'
 import { skills } from './skills.ts'
 import * as operator from './operator.ts'
+import { handoff, handoffs } from './handoffs.ts'
 import type { Command } from './types.ts'
 
 const COMMANDS: Record<string, Command> = {
@@ -26,15 +27,18 @@ const COMMANDS: Record<string, Command> = {
   unpause: operator.unpause,
   cancel: operator.cancel,
   retry: operator.retry,
+  handoff,
+  handoffs,
 }
 
 const USAGE = `usage: taskq <command> [options]
   add --type T --intent TEXT [--title] [--cautions] [--access-skill] [--target-profile] [--lock-key]
-      [--repo] [--output] [--priority N] [--depends-on ID]... [--draft]   (ready unless --draft)
+      [--repo] [--output] [--priority N] [--depends-on ID]... [--manual-handoffs] [--draft]   (ready unless --draft)
   list [--status S]    show ID     resume ID    done ID
   approve ID [--request REQUEST_ID --yes]    deny ID [--request REQUEST_ID --yes]
   alerts               log [--date YYYY-MM-DD]    search QUERY    run    version
   skills list | add PATH | remove NAME | discover
+  handoffs [--task TASK]    handoff accept ID    handoff mode TASK [auto|manual]    mcp
   pause [--reason TEXT]    unpause    cancel ID    retry ID [--draft] [--resume]`
 
 export async function main(argv: string[]): Promise<void> {
@@ -51,6 +55,15 @@ export async function main(argv: string[]): Promise<void> {
   const db = openDb(config.home)
   if (name === 'run') {
     await runCommand(config, db)
+    return
+  }
+  if (name === 'mcp') {
+    try {
+      const { serveMcp } = await import('../mcp/server.ts')
+      await serveMcp(db, pkg.version)
+    } finally {
+      db.close()
+    }
     return
   }
   const command = COMMANDS[name]

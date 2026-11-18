@@ -134,11 +134,21 @@ export interface WorkerResult {
 
 export interface SimilarTask { task_id: string; text: string }   // a finished run that shares words with the task
 
+export interface TaskHandoff {
+  id: number
+  task_id: string
+  run_id: string | null
+  output_path: string | null
+  summary: string | null
+  accepted_via: 'auto' | 'manual'
+}
+
 export interface WorkerContext {
   task: Task
   runId: string
   resumeSessionId: string | null
   similar: SimilarTask[]                                          // up to 3, from memory/similar.ts
+  handoffs: TaskHandoff[]
   access_skill_path?: string                                      // registered folder of task.data.access_skill
   signal: AbortSignal
   emit(kind: EventKind, payload: Record<string, unknown>): void   // masked and stored by the runner
@@ -224,10 +234,16 @@ The loop does not tick on a fixed short interval. It waits on `queueChanged` (`s
 
 1. Preflight inference auth (see Providers). On failure set the queue pause with `pause_by = preflight` and raise `auth_required`. While the queue is paused, the tick re-runs the preflight once a minute and a passing check lifts only a preflight pause.
 2. On start, recover every `running` and `needs_approval` task as stale. On each tick, recover `running` and `needs_approval` tasks whose `heartbeat_at` is older than the TTL. A NULL heartbeat is never recovered by the tick.
-3. Pick `ready` tasks by priority whose `blocks` dependencies are all `done`.
-4. Claim atomically: `UPDATE tasks SET status='running', claimed_by=?, heartbeat_at=? WHERE id=? AND status='ready'`, plus a `NOT EXISTS` clause that rejects a task whose `lock_key` a `running`, `needs_approval` or `needs_auth` task holds, and a clause that rejects every claim while `meta.queue_paused` is `1`. The lock and pause checks are inside the statement, so two runners cannot both claim tasks that share a lock key, and a pause cannot race a claim. The changed row count decides.
+3. Pick `ready` tasks by priority once every blocking prerequisite is done and its current handoff is accepted.
+4. Claim atomically. The update repeats the eligibility checks, including the lock key and queue pause. The same transaction loads the accepted handoff records for the worker.
 5. Limit concurrency to `maxConcurrent` (default 3). Tasks asked for with run now (`runner.runNow`) are claimed before the priority order.
 6. Create the `runs` row, call the worker, update `heartbeat_at` every 30 s, then finish. Before the worker is called, a task with an `access_skill` resolves it to the registered path. A missing registration or a missing `SKILL.md` finishes the run as `failed` with the summary `access skill <name> is missing at <path>`, and no session starts.
+
+### Handoffs
+
+When a blocking prerequisite reaches `done` or a dependency is added to an already completed task, SQLite records the run ID, masked summary, output path, receipt time and acceptance. The output path comes from the run's start so later task edits cannot redirect an existing handoff. The receiving task defaults to automatic acceptance. Manual mode leaves the row pending. The worker receives the accepted record ID and method and reads artifacts through the existing file policy.
+
+One prerequisite run produces at most one handoff per dependent task. A newer run supersedes the earlier record. The same transaction writes an event and a durable alert. The runner claims each desktop notification once, including while paused. CLI task creation and Mark done can also send pending notifications. The migration records completed dependencies from existing databases without replaying desktop alerts.
 
 ### Approval
 
@@ -405,6 +421,7 @@ The approval input is the one exemption. The exact text is stored in `approvals.
 | A URL password and a bearer token are redacted | `test/mask.test.ts`: URL userinfo and Basic and Bearer authorization headers |
 | A 20 kB adversarial input is masked within 200 ms | `test/mask.test.ts`: a 20 kB adversarial input is masked within 200 ms |
 | Two claimers cannot both claim one task; one wins | `test/runner.test.ts`: a task can be claimed only once |
+| A dependent task receives the artifact reference after the prerequisite is marked done | `test/handoff.test.ts` |
 | Tasks sharing a lock_key never overlap | `test/runner.test.ts`: tasks sharing a lock_key never overlap |
 | A needs_approval task with no heartbeat is not re-run by the tick | `test/recover.test.ts`: a needs_approval task with no heartbeat is not reset to ready |
 | A paused queue claims nothing; a running task continues | `test/queue-control.test.ts`: a paused queue claims nothing |
@@ -429,6 +446,9 @@ Writes (any non-GET under `/api`) must send `Content-Type: application/json`, op
 | `GET /tasks/:id` `PATCH /tasks/:id` | task with runs, deps, alerts and `pending_approval` (`{ request_id, tool, input, bytes, created_at }`, or null); edit data, priority, draft to ready. `access_skill` is checked as on create |
 | `POST /tasks/:id/approve` `deny` | body `{ "request_id": "…" }`. 400 when missing, 409 when it is not the task's open request. Returns the task |
 | `GET /approvals` | open requests across tasks: `[{ task_id, task_title, request_id, tool, input, bytes, created_at }]` |
+| `GET /handoffs?task_id=` | up to 50 handoff records, pending first, optionally filtered by sender or receiver |
+| `POST /handoffs/:id/accept` | accept a current pending handoff and record the timestamp and manual method |
+| `POST /tasks/:id/handoff-mode` | set the receiving mode with `{"auto_accept":true}` or `{"auto_accept":false}` |
 | `POST /tasks/:id/resume` `done` | state transitions |
 | `POST /tasks/:id/run` | run now, from any status but `running` and `needs_approval`. 409 while the queue is paused or a `blocks` dependency is not done. See "Run now" |
 | `GET /runs?from=&to=&type=&lock_key=&outcome=` | runs that overlap the range (started before `to`, not ended before `from`). Each row has `task_title`, `task_type`, `lock_key` and `waits`. Returns `{ runs, truncated }`, newest first, capped at 500 |

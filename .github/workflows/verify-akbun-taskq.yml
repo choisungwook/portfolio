@@ -7,6 +7,8 @@ on:
     paths:
       - 'product/akbun-taskq/**'
       - '.github/workflows/verify-akbun-taskq.yml'
+      - '.github/workflows/release-akbun-taskq.yml'
+      - '.github/scripts/taskq-changelog.mjs'
   push:
     branches:
       - master
@@ -26,6 +28,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
 
       # Node 24 runs the TypeScript sources directly and bundles node:sqlite.
       - uses: actions/setup-node@v7
@@ -33,6 +37,17 @@ jobs:
           node-version: '24'
           cache: npm
           cache-dependency-path: product/akbun-taskq/workspace/package-lock.json
+
+      - name: Check committed changelog
+        if: github.event_name == 'pull_request'
+        working-directory: .
+        env:
+          BASE: ${{ github.event.pull_request.base.sha }}
+        run: |
+          node --input-type=module -e '
+            import { checkChangelog } from "./.github/scripts/taskq-changelog.mjs"
+            checkChangelog(process.cwd(), process.env.BASE, "HEAD")
+          '
 
       - name: Install dependencies
         run: npm ci
