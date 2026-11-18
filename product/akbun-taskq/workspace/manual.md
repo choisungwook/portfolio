@@ -208,14 +208,20 @@ taskq cancel ID              taskq retry ID [--draft] [--resume]
 taskq pause [--reason TEXT]  taskq unpause
 taskq alerts                 taskq log [--date YYYY-MM-DD]
 taskq search QUERY           taskq skills list | add PATH | remove NAME | discover
+taskq bots list | say | inbox | log | ...      bot과 대화, 설정, wiki (10절)
+taskq workflows list | create FILE | run ID --bot NAME | runs | run-show RUN_ID | approve RUN_ID STEP
+taskq api [OPERATION key=value...]            화면에서 할 수 있는 모든 일. taskq api로 목록을 본다
+taskq mcp                                     같은 operation을 MCP 도구 taskq_<operation>으로 제공
 taskq run
 ```
+
+`taskq api`와 MCP 도구는 화면이 쓰는 API를 그대로 부른다. 예를 들어 `taskq api bot_update name=coder model=claude-sonnet-5-5 effort=high`는 bot 설정 화면에서 바꾸는 것과 같다. Claude Code 같은 MCP 클라이언트에 `taskq mcp`를 등록하면 그 agent가 task, bot, workflow, 공용 폴더, 설정을 모두 다룬다.
 
 `T`는 `research`, `ops_read`, `ops_change`, `code`, `security_review` 중 하나다.
 
 ## 10. bot에게 맡기기
 
-bot은 역할을 가진 상주 Claude 세션이다. 태스크는 내 작업 노트이고, bot이 자기가 맡은(owner) 태스크를 가져가 직접 처리한 뒤 결과를 남긴다. 처음에는 오케스트레이터 bot `taskq` 하나만 있다. taskq에게 목표를 말하면 태스크로 나눠 알맞은 bot에게 맡기고, 끝나면 결과를 알려준다. 다른 bot은 내가 만든다.
+bot은 역할을 가진 상주 세션이다. bot마다 Claude Agent SDK와 OpenAI Agents SDK 중 하나를 고르고, 왼쪽 목록에서 아바타 오른쪽 아래 표시(✻ Claude, ◎ OpenAI)로 구별한다. 태스크는 내 작업 노트이고, bot이 자기가 맡은(owner) 태스크를 가져가 직접 처리한 뒤 결과를 남긴다. 처음에는 오케스트레이터 bot `taskq` 하나만 있다. taskq에게 목표를 말하면 태스크로 나눠 알맞은 bot에게 맡기고, 끝나면 결과를 알려준다. 다른 bot은 내가 만든다.
 
 화면 왼쪽 메뉴의 Bots에서 bot을 누르면 그 bot과의 대화를 메신저처럼 본다. `+`로 bot을 만들고, bot의 톱니나 오른쪽 버튼 메뉴로 설정, skill·plugin 다시 불러오기, 새 세션, 끄기, 지우기를 한다. taskq는 맨 위에 고정되고 지우거나 끌 수 없다.
 
@@ -248,7 +254,11 @@ bot은 계속 떠 있는 프로세스가 아니다. 메시지가 올 때마다 �
 
 여러 bot의 의견이 필요한 질문은 토론으로 한다. 토론을 연 bot이 참가자와 라운드 수를 정하고, 참가자는 순서대로 앞사람의 말을 보고 의견을 낸다. 라운드가 끝나면 연 bot이 결론을 wiki에 남기고 필요한 작업을 맡긴다. 결론을 내지 않으면 토론은 결론 없이 닫히고 알림이 뜬다. Discussions 화면이나 `taskq bots close`로 직접 닫을 수도 있다.
 
-agent는 파일을 읽기만 한다. 코드 수정, 명령 실행, 웹 조회는 태스크로 만들어 지금과 같은 샌드박스와 승인 절차를 지난다. agent가 만든 계정 조회·변경 태스크는 항상 초안으로 들어가므로, Board에서 내가 보고 Queued로 바꿔야 실행된다.
+bot이 할 수 있는 일은 bot 설정의 권한 모드, 샌드박스, 차단 명령이 정한다. bot이 만든 계정 조회·변경 태스크는 항상 초안으로 들어가므로, Board에서 내가 보고 Queued로 바꿔야 실행된다.
+
+OpenAI bot은 bot 설정의 Agent SDK에서 고른다. taskq를 실행하는 환경에 `OPENAI_API_KEY`가 있어야 한다. OpenAI Agents SDK에는 auto 모드가 없어서 권한 모드가 bot이 받는 도구를 정한다. Plan은 파일 읽기만, Accept edits는 bot 폴더와 공용 폴더에 쓰기까지, Bypass는 셸 명령까지(샌드박스를 켜면 셸은 빠진다). 비용은 토큰 수에 설정 파일의 `bots.openaiInputPerMTok`, `bots.openaiOutputPerMTok` 단가를 곱한 추정치로 하루 예산에 들어간다.
+
+정해진 순서로 일을 시키려면 Workflows를 쓴다. 왼쪽 메뉴의 Workflows에서 단계(실행, 검증, 다른 bot에 넘김, 사용자 승인)와 순서를 그래프로 만들고, 새 작업 창에서 Bot과 Workflow를 고르거나 작업 상세의 Workflow 행에서 지정한다. 그 bot이 작업을 시작하면 단계마다 결과를 보고한다. 검증 단계는 실행한 명령과 출력을 증거로 남겨야 성공하고, 승인 단계는 내가 실행 기록 화면에서 승인해야 넘어간다. 성공은 bot의 말이 아니라 모든 단계가 끝났는지로 taskq가 판정한다. 실행 기록에는 어느 bot이 언제 실행했는지와, 지운 workflow면 "삭제됨"이 남는다. bot 없이 workflow만 지정한 작업은 큐가 실행하지 않는다.
 
 bot을 쓰려면 설정 파일에 `bots`를 넣고 다시 시작한다.
 
@@ -296,7 +306,7 @@ taskq bots export
 
 - Appearance: 글꼴과 글자 크기. 바꾸는 즉시 앱 전체에 적용된다.
 - Queue: 맡은 bot이 없는 태스크를 큐가 스스로 실행할지. 끄면 시작 버튼을 눌러야만 실행된다.
-- Skills for bots, Plugins for bots: bot이 쓸 skill 폴더와 plugin 폴더를 등록한다. 각 bot은 자기 설정에서 고른다. bot은 고른 것을 복사해 두고 쓰므로, skill 파일을 고친 뒤에는 bot의 오른쪽 버튼 메뉴에서 Reload skills를 눌러야 반영된다.
+- 왼쪽 메뉴의 Plugins: bot이 쓸 skill 폴더와 plugin 폴더를 등록하고 보고 업데이트하고 지운다. Anthropic 공식 plugin 목록도 보이지만 설치하지는 않는다. 각 bot은 자기 설정에서 고른다. bot은 고른 것을 복사해 두고 쓰므로, skill 파일을 고친 뒤에는 bot의 오른쪽 버튼 메뉴에서 Reload skills를 눌러야 반영된다.
 
 bot은 내 Claude Code 설정(~/.claude의 권한 규칙, hook, skill)을 읽지 않는다. bot 설정 화면에 보이는 것만으로 동작한다.
 
@@ -313,7 +323,10 @@ bot과 대화할 때 쓰는 기능은 아래와 같다.
 | 모든 대화에서 찾기 | 왼쪽 위 돋보기 또는 Cmd/Ctrl+K. 한글과 영어 모두 단어 일부로 찾는다 |
 | bot끼리 파일 나누기 | 공용 폴더(`TASKQ_HOME/shared`). 모든 bot이 같은 경로로 읽고 쓰고, 왼쪽 메뉴의 공용 폴더에서 보고 올리고 받는다 |
 | bot이 기억할 것 고치기 | bot 오른쪽 버튼 메뉴의 메모리. bot이 매 turn 읽는 자기 메모다 |
-| skill·plugin 새 버전 받기 | 설정의 bot용 skill·plugin에서 업데이트. git 저장소면 받아 오고 쓰는 bot을 모두 다시 불러온다 |
+| skill·plugin 새 버전 받기 | Plugins 메뉴에서 업데이트. git 저장소면 받아 오고 쓰는 bot을 모두 다시 불러온다 |
+| 일하는 bot에게 더 말하기 | 그냥 보낸다. Claude bot은 진행 중인 turn에서 바로 받아 처리하고, OpenAI bot과 자리가 없는 bot은 메시지를 쌓아 두었다가 다음 turn에 처리한다. 쌓인 수가 대화 아래에 보인다 |
+| 모델, effort, 권한 바꾸기 | 입력창 아래 메뉴. 다음 turn부터 적용된다. ↻는 skill·plugin을 다시 읽고 모델과 명령 목록을 새로 불러온다 |
+| skill을 slash command로 쓰기 | 입력창에 `/`를 치고 고른다. `/이름 인자`로 보내면 bot이 그 skill로 처리한다 |
 
 설정 화면에서는 언어(한국어 기본, English), 테마(시스템, 다크, 라이트), 사용량 제한(하루 예산, 전체와 bot별 시간당 turn, 동시에 일하는 bot, turn당 예산과 모델 턴), 폴더 열기(공용 폴더, 세션 대화 기록, 데이터 폴더)를 정한다. 모두 `TASKQ_HOME/data/taskq.db`에 저장되므로 taskq를 닫았다 열거나 새 버전으로 바꿔도 그대로 남는다. 같은 `TASKQ_HOME`을 쓰면 된다.
 

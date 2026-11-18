@@ -3,7 +3,7 @@ type: Decision
 title: Resident role agents are resumed sessions with a mailbox, and work still runs as tasks
 description: Each agent is one Claude session resumed per turn; agents talk through an async mailbox, share a SQLite wiki, and only read files themselves.
 tags: [team, agents, architecture]
-generated: { by: claude-code/claude-opus-5-5, at: 2026-11-18T17:00:00Z }
+generated: { by: claude-code/claude-opus-5-5, at: 2026-11-18T23:00:00Z }
 sources:
   - id: grok-bot
     resource: https://composio.dev/content/guide-to-frok-bot
@@ -14,6 +14,7 @@ sources:
 
 - 역할 agent(lead, planner, coder, reviewer, doc-reviewer)는 계속 떠 있는 프로세스가 아니라 agent마다 하나인 Claude 세션이다. 메시지가 오면 `resume: session_id`로 그 세션을 이어 한 턴을 돌리고 끝낸다.
 - agent 사이 호출은 비동기 mailbox(`team_messages`)다. 보낸 쪽은 답을 기다리지 않고, 답은 다음 턴에 새 메시지로 온다.
+- 일하는 Claude bot에게 온 메시지는 다음 턴을 기다리지 않고 진행 중인 턴의 입력 stream에 넣는다(한 턴에 최대 10번). Claude Code 세션이 작업 중에 입력을 받는 것과 같다. 10번이 넘거나 stream이 없는 SDK(OpenAI)면 메시지는 큐에 남아 다음 턴에 처리되고, 그 턴은 예산과 루프 guard를 다시 거친다.
 - (2026-11-18 변경) 처음에는 bot이 Read, Glob, Grep만 쓰고 실제 일을 큐 작업으로 보냈다. 지금은 bot이 자기 task를 직접 처리하고 권한은 bot마다 정한다. [bots execute tasks 결정](2026-11-bots-execute-tasks.md)을 본다.
 - 장기 기억은 SQLite의 `wiki_pages`다. 쓰기는 읽은 revision을 같이 보내야 하고(낙관적 동시성), 이전 revision은 `wiki_revisions`에 남는다.
 - 사용자에게 메시지를 보내는 bot은 기본으로 오케스트레이터 taskq 하나다. bot 설정에서 다른 bot에게도 허용할 수 있다.

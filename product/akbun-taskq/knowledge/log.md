@@ -4,6 +4,10 @@ concept를 추가·수정·삭제할 때마다 오늘 날짜 섹션을 맨 위�
 
 ## 2026-11-18
 
+* **Creation**: [Workflows are step graphs a bot executes and taskq judges](decisions/2026-11-workflows-run-by-bots.md) 결정 기록. 단계 그래프, bot 실행, taskq 판정, snapshot과 삭제 표시.
+* **Creation**: [OpenAI bots plug in behind TeamBackend](decisions/2026-11-openai-bot-backend.md) 결정 기록. Responses API 대화, 권한 모드로 도구 선택, 토큰 기반 비용 추정.
+* **Creation**: [The CLI and MCP server reach every route through one table of operations](decisions/2026-11-operations-for-cli-and-mcp.md) 결정 기록. operation 표, 프로세스 안 호출, DB marker로 취소.
+* **Update**: [Resident role agents are resumed sessions with a mailbox](decisions/2026-11-resident-agent-team.md) 결정 기록. 일하는 bot에게 온 메시지를 진행 중 turn에 넣는 것을 기록.
 * **Creation**: [Bots share one folder, keep memory and settings in SQLite](decisions/2026-11-bot-workspace.md) 결정 기록. 공용 폴더, JSON 업로드, bot 메모리, SQLite 설정, 대화 검색, 취소 처리.
 * **Creation**: [Bots work on their own tasks with per-bot permissions](decisions/2026-11-bots-execute-tasks.md) 결정 기록. bot이 task를 직접 처리, bot별 권한 모드·샌드박스·차단 명령, 시작 버튼은 일회성, taskq 오케스트레이터.
 * **Update**: [Resident role agents are resumed sessions with a mailbox](decisions/2026-11-resident-agent-team.md) 결정 기록. 읽기 전용 bot 설계가 bot별 권한 설정으로 바뀐 것을 기록.

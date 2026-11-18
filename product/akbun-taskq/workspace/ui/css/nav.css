@@ -85,7 +85,7 @@
 .side-bot-working { display: flex; align-items: center; gap: 6px; color: var(--accent); font-weight: 600; font-size: 0.93em; }
 .side-bot[data-busy="true"] { background: var(--accent-soft); }
 .side-bot[data-busy="true"] .avatar { animation: none; }
-.side-title { font-size: 1.6em; font-weight: 800; letter-spacing: -0.02em; padding: 6px 0 4px; }
+.side-me .side-title { font-size: 1.6em; font-weight: 800; letter-spacing: -0.02em; padding: 6px 0 4px; }
 .side-me { align-items: flex-start; padding: 4px 12px 14px; }
 .side-icon svg { display: block; margin: 0 auto; }
 .danger-quiet { color: var(--danger); }

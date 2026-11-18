@@ -325,7 +325,7 @@ Adding a backend: put it under `src/agents/<name>/`, add the name to `AgentName`
 
 ## Bots
 
-Bots are resident Claude sessions with a role. Tasks are the user's notes of work; a bot takes a task it owns, works on it in its own session and closes it. The run button on a task is separate: a one-off run that belongs to no bot. The UI, CLI (`taskq bots`), API (`/api/bots`) and config key (`bots`) call them bots; the code (`src/team/`), tables (`team_*`) and wake signal (`teamChanged`) call them the team. The design records are [bots execute tasks](../knowledge/decisions/2026-11-bots-execute-tasks.md), [resumed sessions and the mailbox](../knowledge/decisions/2026-11-resident-agent-team.md), [ownership and discussions](../knowledge/decisions/2026-11-task-ownership-and-discussions.md) and [wiki search](../knowledge/decisions/2026-11-wiki-hybrid-search.md). They are off by default (`bots.enabled`).
+Bots are resident agent sessions with a role, on the Claude Agent SDK or the OpenAI Agents SDK (chosen per bot). Tasks are the user's notes of work; a bot takes a task it owns, works on it in its own session and closes it. The run button on a task is separate: a one-off run that belongs to no bot. The UI, CLI (`taskq bots`), API (`/api/bots`) and config key (`bots`) call them bots; the code (`src/team/`), tables (`team_*`) and wake signal (`teamChanged`) call them the team. The design records are [bots execute tasks](../knowledge/decisions/2026-11-bots-execute-tasks.md), [resumed sessions and the mailbox](../knowledge/decisions/2026-11-resident-agent-team.md), [ownership and discussions](../knowledge/decisions/2026-11-task-ownership-and-discussions.md), [wiki search](../knowledge/decisions/2026-11-wiki-hybrid-search.md), [workflows](../knowledge/decisions/2026-11-workflows-run-by-bots.md), [OpenAI bots](../knowledge/decisions/2026-11-openai-bot-backend.md) and [operations for the CLI and MCP](../knowledge/decisions/2026-11-operations-for-cli-and-mcp.md). They are off by default (`bots.enabled`).
 
 ```text
 user --bot chat / taskq bots say--> team_messages --hub--> bot turn (resumed Claude session in its workdir)
@@ -337,7 +337,7 @@ user --bot chat / taskq bots say--> team_messages --hub--> bot turn (resumed Cla
 
 | Part | What it does |
 |---|---|
-| `team_agents` | One row per bot: role, description (what others delegate by), instructions, `may_message_user`, `enabled`, `system` (the orchestrator), `permission_mode` (default `auto`), `sandbox` (default off), `allowed_domains`, `blocked_commands` (default none), `workdir`, `skills`, `plugins`, `model`, `session_id`. Listed with `system` first |
+| `team_agents` | One row per bot: role, description (what others delegate by), instructions, `may_message_user`, `enabled`, `system` (the orchestrator), `permission_mode` (default `auto`), `sandbox` (default off), `allowed_domains`, `blocked_commands` (default none), `workdir`, `skills`, `plugins`, `model`, `effort`, `sdk` (`claude` or `openai`), per-bot limits, `memory`, `session_id` (a Claude session id, or an OpenAI response id). Listed with `system` first |
 | Orchestrator | `taskq`, created on first start from `team/roster.ts`. It may message the user, cannot be deleted or disabled, and is pinned first in the sidebar. Every other bot is created by the user, optionally from a preset (planner, coder, reviewer, doc-reviewer) |
 | `bot_skills`, `bot_plugins` | The global registry (Settings). A skill is a folder with `SKILL.md`; a plugin is a folder with `.claude-plugin/plugin.json`. Removing an entry takes it off every bot |
 | `team_messages` | Mailbox. `sender` and `recipient` are bot names, `user` or `queue` (a run's report). `deliver_at` holds a message back until that time. A turn claims every deliverable message of one bot (`turn_id`, `read_at`, `attempts`) |
@@ -353,6 +353,10 @@ user --bot chat / taskq bots say--> team_messages --hub--> bot turn (resumed Cla
 | `team/bot-plugin.ts` | Copies the bot's selected skills into one local plugin (`bot-plugins/<bot>/skills-plugin/skills/<name>`, loaded with `skipMcpDiscovery`) and its selected plugins into `bot-plugins/<bot>/plugins/<name>`. The copies live outside the bot's folder and the gate stops any write to them, because a plugin a bot could edit would run hooks and MCP servers outside its tool calls. Saving settings and Reload rebuild the copy; a turn loads the copy, so a skill edited on disk reaches the bot at the next Reload, not mid-work. `node_modules` and `.git` are not copied |
 | `team/search.ts`, `team/wiki-files.ts` | Wiki search (below) and the markdown mirror under `TASKQ_HOME/wiki/` for folder tools such as graphify |
 | `team/report.ts` | Inside `finishRun`'s transaction, posts a queue run's outcome to the task's owner. The automatic security review of a bot's code task is created owned by the first enabled reviewer, else the orchestrator, never the author, and that bot is told |
+| `team/live-input.ts` | The input stream of a running Claude turn. The hub pushes messages that arrive meanwhile into it (`joinTurn` marks them on the same turn); the turn ends when every message has its result |
+| `team/catalog.ts` | The compose bar's models, effort levels, permission modes and slash commands for one bot: the backend's `catalog()` (cached 10 minutes, `?refresh=1` asks again), else a built-in list marked `fallback` |
+| `workflows`, `workflow_runs`, `workflow_steps`, `db/workflows.ts`, `team/workflow-work.ts` | Workflows, below |
+| `agents/openai/team.ts`, `agents/openai/local-tools.ts` | OpenAI bots, below |
 | `agents/claude/team.ts` | `query()` with `resume`, `cwd` = the bot's workdir, `permissionMode` from the bot (`bypassPermissions` also sets `allowDangerouslySkipPermissions`), `sandbox` only when the bot has it on (writes limited to the workdir, reads of taskq's data and config denied, network to `allowed_domains`), `plugins` from the snapshot, `settingSources: []` so the user's own Claude settings never apply, `strictMcpConfig` unless the bot has plugins, the in-process MCP server `team`, the gate as a PreToolUse hook, and a `canUseTool` that refuses anything that would wait for an approval, since nobody watches a bot's turn |
 
 ### Bot tools
@@ -371,6 +375,32 @@ user --bot chat / taskq bots say--> team_messages --hub--> bot turn (resumed Cla
 | `run_workflow` | starts a run of a workflow that the bot itself executes, without a task |
 | `workflow_status` | the steps of a run with their state (ready, running, succeeded, failed, skipped), the run status, and whether the workflow was deleted |
 | `workflow_step` | reports one step: `running`, then `succeeded` (a `check` step needs `evidence`; an `approval` step only the user can approve), `failed` or `skipped` (with the reason). A failed step fails the run; the run succeeds when every step is done |
+
+### Messages to a working bot
+
+A message never waits for the bot to answer the sender. It lands in `team_messages`; if the bot has no open turn, the hub starts one. If a Claude bot is working, the hub's next tick takes the new messages into the running turn (`joinTurn`, at most 20 at once and 10 times per turn) and pushes them into the session's input stream, the way Claude Code takes a message typed mid-turn. Past 10 joins the messages wait for the next turn, which goes through the budget and loop guards again. An OpenAI bot has no streaming input, so its messages wait for the next turn. `GET /bots` reports `queued` per bot: deliverable messages no turn has taken; the conversation and the sidebar show it.
+
+### Compose bar and slash commands
+
+Under a bot's input: a refresh button (reload the bot's skills and plugins, then read the catalog again) and menus for model, effort and permission mode (`GET /bots/:name/catalog`, saved with `PUT /bots/:name`, applied from the next turn). Typing `/` lists the bot's commands: its registered skills and, for Claude bots, the commands the SDK reports for its plugins. The bot's system prompt says that a user message starting with `/name` asks it to run that skill.
+
+### Workflows
+
+A workflow is a named graph of steps (`kind`: `do`, `check`, `handoff` to a named bot, `approval` by the user; `needs` lists the steps that come first; no loops). The Workflows view edits it as a left-to-right graph like n8n and keeps the run history like Argo. A run copies the definition (`snapshot`), records the bot that executes it and the task if any, and has one row per step.
+
+- Start: a bot that `start_task`s a task with `data.workflow_id` starts the run (or continues the one left from an earlier turn) and gets the steps in the tool answer; `POST /workflows/:id/run` or the bot's `run_workflow` starts one directly. The queue does not run a task that has a workflow and no owner: only a bot executes workflows.
+- Progress: the bot reports steps with `workflow_step`. taskq refuses a step whose `needs` are not done, a `check` without evidence, and an `approval` the bot tries to close itself.
+- Success: decided by taskq, not the bot. One failed step fails the run (the rest are skipped); every step succeeded or skipped succeeds it. `finish_task` with done or review is refused while the task's run has not succeeded; failed ends the run as failed.
+- Approval: the user answers in the run view, `taskq workflows approve` or `POST /workflow-runs/:id/steps/:step/approve`; the bot is told.
+- Delete: soft (`deleted_at`). Runs keep their snapshot and show the workflow as deleted (`workflow_deleted`); a bot running it gets a message. A cancelled run tells its bot too.
+
+### OpenAI bots
+
+A bot with `sdk: openai` runs on `agents/openai/team.ts` with the same hub, mailbox, team tools, limits and gate. The Responses API keeps the conversation; the bot's `session_id` is the last response id and the next turn passes it as `previousResponseId`. The SDK has no permission modes and no auto mode, so the mode picks the tools taskq gives it: `plan` gets `read_file` and `list_dir`, `acceptEdits` adds `write_file` (only inside its workdir and the shared folder), `bypassPermissions` adds `shell` unless its sandbox setting is on. Every call goes through `botGate` like a Claude tool call. A turn's cost is estimated from token usage and `bots.openaiInputPerMTok` and `bots.openaiOutputPerMTok`. It needs `OPENAI_API_KEY` in taskq's environment; without it the turn fails with that message and the messages are retried, then set aside.
+
+### CLI and MCP
+
+`src/ops/operations.ts` names every API route as an operation. `taskq api <operation> key=value...` and the MCP server's `taskq_<operation>` tools call the route in their own process (`ops/local-api.ts`) against the same database, with the same validation as the UI. `taskq workflows` is a readable front for the workflow operations. What needs the running taskq reaches it through the database: a bot cancel leaves a marker (`meta.bot_cancel:<name>`) that the hub reads on its next tick, as a task cancel does. `test/ops-coverage.test.ts` fails when a route has no operation; the UI's live event stream is the one exception.
 
 ### Working, cancelling, attachments
 
