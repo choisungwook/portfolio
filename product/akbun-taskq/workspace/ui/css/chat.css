@@ -245,3 +245,18 @@ mark.find.current { background: var(--accent); color: var(--on-accent); }
 .sd-text { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .sd-note { flex: none; font-size: var(--text-small); color: var(--muted); }
 .sd-empty { margin: 16px 14px; }
+
+/* The conversation reads as one centered column (at most 820px) on a wide window: messages, the working bar and the
+   input share its edges, so lines stay short and the page has margins instead of stretching edge to edge. */
+.chat { --column: 820px; --gutter: max(24px, calc((100% - var(--column)) / 2)); }
+.chat-log { padding: 28px var(--gutter) 24px; gap: 22px; }
+.chat-working { padding-left: var(--gutter); padding-right: var(--gutter); }
+.chat-compose { padding: 8px var(--gutter) 16px; }
+.msg { max-width: 88%; gap: 10px; }
+.msg-body { gap: 6px; }
+.bubble { padding: 14px 18px; border-radius: 20px; line-height: 1.65; }
+.msg[data-side="bot"] .bubble, .msg[data-side="other"] .bubble { background: var(--panel-soft); box-shadow: inset 0 0 0 1px var(--border); border-radius: 20px 20px 20px 8px; }
+.msg[data-side="me"] .bubble { border-radius: 20px 20px 8px 20px; }
+.msg[data-side="error"] { max-width: none; }
+.msg-meta { padding: 0 6px; }
+.chat-head { padding: 18px var(--gutter); }
