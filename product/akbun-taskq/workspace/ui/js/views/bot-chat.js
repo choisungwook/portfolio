@@ -17,6 +17,7 @@ import { initChatFind, refreshFind } from './chat-find.js'
 import { initComposeMenus, showComposeMenus } from './compose-menus.js'
 import { botConnection } from './connections.js'
 import { download, showFile } from './file-viewer.js'
+import { icon } from '../core/icons.js'
 
 export { download }
 
@@ -135,8 +136,8 @@ function renderHead() {
     ),
     el('button', {
       type: 'button', class: 'chat-gear', 'aria-label': `${agent.name} ${t('bots.settings', 'settings')}`, title: t('bots.settings', 'Settings'),
-      text: '⚙', onclick: () => openBotSettings(agent.name),
-    }),
+      onclick: () => openBotSettings(agent.name),
+    }, icon('settings', 20)),
   )
   showComposeMenus(agent)
   nodes.input.placeholder = `${t('chat.message', 'Message')} ${agent.name}`

@@ -9,6 +9,7 @@ import { emit } from '../core/bus.js'
 import { el, fill } from '../core/dom.js'
 import { t } from '../core/i18n.js'
 import { parse } from '../pure/markdown.js'
+import { icon } from '../core/icons.js'
 
 const PREVIEW_LIMIT = 5 * 1024 * 1024
 // Code and scripts preview as text; the server refuses to open them with an app (src/api/routes-files.ts).
@@ -67,7 +68,7 @@ export async function showFile(box, path, { onClose } = {}) {
     NOT_OPENABLE.has(extOf(path)) ? null : el('button', { type: 'button', text: t('file.open', 'Open'), title: t('file.open_hint', 'Open with its app on this computer'), onclick: () => mutate(() => api.post('/open-file', { path })) }),
     el('button', { type: 'button', class: 'quiet', text: t('file.in_shared', 'Show in shared folder'), onclick: () => emit('open-shared', { dir, select: path }) }),
     el('button', { type: 'button', class: 'quiet', text: t('file.download', 'Download'), onclick: () => download(path) }),
-    onClose ? el('button', { type: 'button', class: 'quiet file-close', 'aria-label': t('file.close', 'Close'), text: '×', onclick: onClose } ) : null)
+    onClose ? el('button', { type: 'button', class: 'quiet file-close', 'aria-label': t('file.close', 'Close'), onclick: onClose }, icon('close', 18)) : null)
   const head = el('div', { class: 'file-head' }, el('strong', { class: 'file-name', title: path, text: name }), actions)
   const body = el('div', { class: 'file-body', dataset: { kind } }, el('p', { class: 'meta', text: '…' }))
   fill(box, head, body)

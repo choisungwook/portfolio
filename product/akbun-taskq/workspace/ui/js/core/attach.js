@@ -2,6 +2,7 @@
 // Each file is uploaded at once (POST /api/files, base64 in JSON) and shows as a chip; files() returns the stored paths.
 import { api, notify } from './api.js'
 import { clear, el } from './dom.js'
+import { icon } from './icons.js'
 
 const LIMIT = 20 * 1024 * 1024
 
@@ -24,10 +25,10 @@ export function attachments({ zone, button, chips, pasteTarget }) {
     clear(chips).append(...items.map((item) => el('span', { class: 'attach-chip', dataset: { state: item.state } },
       el('span', { text: item.name }),
       item.state === 'uploading' ? el('span', { class: 'meta', text: ' …' }) : null,
-      el('button', { type: 'button', class: 'attach-remove', 'aria-label': `Remove ${item.name}`, text: '×', onclick: () => {
+      el('button', { type: 'button', class: 'attach-remove', 'aria-label': `Remove ${item.name}`, onclick: () => {
         items = items.filter((other) => other !== item)
         render()
-      } }))))
+      } }, icon('close', 14)))))
   }
 
   async function add(files) {

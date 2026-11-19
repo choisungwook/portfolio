@@ -7,6 +7,7 @@ import { on } from '../core/bus.js'
 import { t } from '../core/i18n.js'
 import { show } from '../core/nav.js'
 import { attachments } from '../core/attach.js'
+import { icon } from '../core/icons.js'
 import { extOf, showFile } from './file-viewer.js'
 
 const STORE = 'taskq.shared.view'
@@ -84,7 +85,7 @@ function renderControls() {
   }
   area('shared-sort').value = prefs.sort
   const order = area('shared-dir')
-  order.textContent = prefs.desc ? '↓' : '↑'
+  order.replaceChildren(icon(prefs.desc ? 'arrow-down' : 'arrow-up', 16))
   order.title = prefs.desc ? t('shared.desc', 'Descending') : t('shared.asc', 'Ascending')
   order.setAttribute('aria-label', order.title)
 }
@@ -142,7 +143,7 @@ function compare(a, b) {
   return prefs.desc ? -result : result
 }
 
-function icon(entry, big = false) {
+function fileIcon(entry, big = false) {
   const ext = entry.dir ? '' : extOf(entry.path).slice(0, 4)
   return el('span', { class: `ficon${big ? ' ficon-big' : ''}`, 'aria-hidden': 'true', dataset: { kind: entry.dir ? 'folder' : 'file' } },
     ext && big ? el('span', { class: 'ficon-ext', text: ext }) : null)
@@ -165,9 +166,9 @@ function render() {
   const sorted = [...entries].sort(compare)
   if (prefs.mode === 'details') fill(list, detailsTable(sorted))
   else if (prefs.mode === 'icons') fill(list, el('div', { class: 'shared-icons' }, ...sorted.map((entry) =>
-    el('button', itemProps(entry, 'shared-tile'), icon(entry, true), el('span', { class: 'shared-name', text: entry.name })))))
+    el('button', itemProps(entry, 'shared-tile'), fileIcon(entry, true), el('span', { class: 'shared-name', text: entry.name })))))
   else fill(list, el('div', { class: 'shared-rows' }, ...sorted.map((entry) =>
-    el('button', itemProps(entry, 'shared-item'), icon(entry), el('span', { class: 'shared-name', text: entry.name })))))
+    el('button', itemProps(entry, 'shared-item'), fileIcon(entry), el('span', { class: 'shared-name', text: entry.name })))))
 }
 
 function detailsTable(sorted) {
@@ -175,7 +176,7 @@ function detailsTable(sorted) {
     el('button', {
       type: 'button', class: 'link sort-head',
       onclick: () => setPrefs(prefs.sort === key ? { desc: !prefs.desc } : { sort: key, desc: false }),
-    }, label, prefs.sort === key ? (prefs.desc ? ' ↓' : ' ↑') : ''))
+    }, label, prefs.sort === key ? icon(prefs.desc ? 'arrow-down' : 'arrow-up', 14) : null))
   return el('table', { class: 'shared-table' },
     el('thead', {}, el('tr', {},
       header('name', t('shared.sort_name', 'Name')),
@@ -183,7 +184,7 @@ function detailsTable(sorted) {
       header('size', t('shared.sort_size', 'Size'), 'col-size'),
       header('modified', t('shared.sort_modified', 'Date modified'), 'col-date'))),
     el('tbody', {}, ...sorted.map((entry) => el('tr', { 'aria-selected': entry.path === selected ? 'true' : null },
-      el('td', {}, el('button', itemProps(entry, 'shared-item'), icon(entry), el('span', { class: 'shared-name', text: entry.name }))),
+      el('td', {}, el('button', itemProps(entry, 'shared-item'), fileIcon(entry), el('span', { class: 'shared-name', text: entry.name }))),
       el('td', { class: 'meta col-kind', text: kindLabel(entry) }),
       el('td', { class: 'meta col-size', text: entry.dir ? '—' : size(entry.size) }),
       el('td', { class: 'meta col-date', text: new Date(entry.modified * 1000).toLocaleString() })))))

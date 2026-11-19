@@ -82,14 +82,14 @@
 .block {
   position: absolute; z-index: 1; display: flex; flex-direction: column; overflow: hidden; min-height: 0; margin: 0;
   text-align: left; padding: 1px 6px 1px 8px; border-radius: var(--radius-s); background: var(--tint);
-  box-shadow: inset 3px 0 0 var(--ink); font-size: 12px; line-height: 14px; color: var(--fg);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--ink) 55%, transparent); font-size: 12px; line-height: 14px; color: var(--fg);
 }
 .block > span { display: block; flex-shrink: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .block-title { font-weight: 600; }
 .block-time, .block-type { color: var(--muted); }
 .block.outcome-stale { outline: 1px dashed var(--ink); outline-offset: -1px; }
 .block:hover:not(:disabled) { background: color-mix(in srgb, var(--ink) 22%, var(--panel)); }
-.block:focus-visible { box-shadow: inset 3px 0 0 var(--ink), 0 0 0 2px var(--panel), 0 0 0 4px var(--focus); }
+.block:focus-visible { box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--ink) 55%, transparent), 0 0 0 2px var(--panel), 0 0 0 4px var(--focus); }
 
 /* Waiting time: hatched over the column so it reads without color. Above blocks, but click-through. */
 .wait {

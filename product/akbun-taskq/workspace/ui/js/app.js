@@ -1,5 +1,6 @@
 // Entry point: wires the sidebar navigation, the views and the live updates. Token first: no view may fetch before it is known.
 import { startLive } from './core/live.js'
+import { paintIcons } from './core/icons.js'
 import { requestRefresh } from './core/refresh.js'
 import { authLost, initToken } from './core/token.js'
 import { initApprovalList } from './views/approval-list.js'
@@ -27,6 +28,7 @@ import { initReviewSettings } from './views/review-settings.js'
 import { initGlobalSettings, loadGlobalSettings } from './views/global-settings.js'
 import { initTokenNotice } from './views/token-notice.js'
 
+paintIcons()
 initTokenNotice()
 const hasToken = initToken()
 if (!hasToken) authLost()
