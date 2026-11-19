@@ -77,7 +77,8 @@ cp taskq.config.example.json taskq.config.json
 | `data/taskq.db` | 모든 태스크와 실행 기록. SQLite 파일 하나 |
 | `outputs/` | 조사 문서와 리뷰 문서 |
 | `memory/` | 적용한 메모 제안 |
-| `team/<bot>/` | bot마다 하나인 작업 폴더. 세션의 작업 디렉터리다 |
+| `team/<bot>/` | bot마다 하나인 설정 폴더(메모리, 기록) |
+| `shared/bots/<bot>/` | bot마다 하나인 작업 폴더. 세션의 작업 디렉터리이고 공용 폴더 화면에서 보인다. bot 설정의 작업 디렉터리를 정하면 그쪽을 쓴다 |
 | `wiki/` | bot wiki의 markdown 사본. graphify 같은 도구가 읽는다 |
 
 ## 4. 실행하기
