@@ -63,8 +63,8 @@ function setOpen(open) {
   load()
 }
 
-// Under the bell, its right edge on the bell's, and never past either side of the window (the header wraps on a narrow
-// window, which puts the bell on the left).
+// Under the bell, its right edge on the bell's, and never past either side of the window. The bell stays at the
+// header's right edge even when the header wraps on a narrow window.
 function place() {
   const box = bell.getBoundingClientRect()
   const width = panel.offsetWidth

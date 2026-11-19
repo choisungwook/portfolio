@@ -16,14 +16,14 @@
   --hover: rgba(255, 255, 255, 0.05);
 
   --fg: #f1f1f1;
-  --muted: #9e9e9e;
+  --muted: #ababab;
   --border: rgba(255, 255, 255, 0.1);
   --border-strong: #525252;
 
   --accent: #f1f1f1;
   --accent-hover: #ffffff;
   --link: #a1caff;
-  --accent-soft: #474747;
+  --accent-soft: #3a3a3a;
   --on-accent: #111111;
   --focus: #6d9cfe;
   --secondary: #303030;
@@ -45,7 +45,7 @@
   --needs-auth: #eec448;
   --review: #d885eb;
   --running: #6d9cfe;
-  --stale: #9e9e9e;
+  --stale: #ababab;
   --high: #df843f;
 
   --avatar-1: #df843f;

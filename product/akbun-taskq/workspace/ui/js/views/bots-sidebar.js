@@ -11,6 +11,7 @@ import { openBotSettings } from './bot-settings.js'
 import { t } from '../core/i18n.js'
 import { contextRing } from './context-ring.js'
 import { connectionByBot } from './connections.js'
+import { icon } from '../core/icons.js'
 
 const POLL_MS = 5000
 
@@ -126,9 +127,9 @@ function render(team) {
         : el('span', { class: 'side-bot-preview', text: preview(a) })),
     a.unread > 0 ? el('span', { class: 'unread-dot', 'aria-label': `${a.unread} unread` }) : null),
     el('button', {
-      type: 'button', class: 'side-bot-gear', 'aria-label': `${a.name} settings`, title: 'Settings', text: '⚙',
+      type: 'button', class: 'side-bot-gear', 'aria-label': `${a.name} settings`, title: 'Settings',
       onclick: () => openBotSettings(a.name),
-    }))))
+    }, icon('settings', 18)))))
   list.scrollTop = scroll
 }
 

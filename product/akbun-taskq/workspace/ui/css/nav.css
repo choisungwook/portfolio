@@ -4,12 +4,13 @@
   display: inline-flex; align-items: center; justify-content: center; flex: none; border-radius: 50%;
   color: var(--avatar-eye); font-weight: 800; line-height: 1; letter-spacing: 0; user-select: none;
 }
+.avatar[data-who="queue"] { color: var(--panel); }
 .side-bot-row { display: flex; align-items: center; position: relative; }
 .side-bot-row .side-bot { flex: 1; min-width: 0; }
 /* Always shown, next to the bot rather than over its preview. */
 .side-bot-gear {
   flex: none; width: 36px; min-height: 36px; margin-left: 2px; padding: 0; border-radius: 50%;
-  font-size: 1.35em; color: var(--muted); background: transparent;
+  color: var(--muted); background: transparent;
 }
 .side-bot-gear:hover { color: var(--fg); background: var(--panel-soft); }
 /* Whether the bot's connection (its model sign-in) works: green connected, red failing. */
@@ -38,7 +39,7 @@
 }
 .side-item:hover:not(:disabled) { background: var(--hover); }
 .side-item[aria-current="page"] { background: var(--panel-soft); font-weight: 700; }
-.side-icon { width: 24px; text-align: center; font-size: 1.13em; color: var(--muted); }
+.side-icon { width: 24px; text-align: center; color: var(--muted); }
 .side-item[aria-current="page"] .side-icon { color: var(--accent); }
 .side-heading { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 16px 12px 6px; }
 .side-heading h2 { margin: 0; font-size: 0.87em; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); }
@@ -75,7 +76,7 @@
   .side-list:not(.side-bots) .side-item { white-space: nowrap; }
 }
 .side-me { position: relative; }
-.side-search { position: absolute; top: 0; right: 4px; width: 36px; min-height: 36px; padding: 0; border-radius: 50%; font-size: 1.4em; color: var(--fg); background: var(--panel-soft); }
+.side-search { position: absolute; top: 0; right: 4px; width: 36px; min-height: 36px; padding: 0; border-radius: 50%; color: var(--fg); background: var(--panel-soft); }
 .side-search[aria-current="page"] { background: var(--accent); color: var(--on-accent); }
 .avatar-wrap { position: relative; display: inline-flex; flex: none; }
 .sdk-badge {

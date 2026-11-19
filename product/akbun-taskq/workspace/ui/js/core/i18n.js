@@ -2,7 +2,7 @@
 // data-i18n (text), data-i18n-placeholder or data-i18n-title with a key; code calls t(key, english). A key missing here
 // shows the English text, so a new string never breaks the page.
 const KO = {
-  'nav.calendar': '캘린더', 'nav.board': '보드', 'nav.graph': '그래프', 'nav.proposals': '제안',
+  'nav.calendar': '캘린더', 'nav.board': 'task 상태보드', 'nav.graph': '그래프',
   'nav.bots': 'Bots', 'nav.wiki': '위키', 'nav.shared': '공용 폴더', 'nav.search': '검색',
   'bots.add': 'bot 추가', 'bots.paused': '멈춤', 'bots.running': '동작 중', 'bots.pause': '멈추기', 'bots.resume': '다시 켜기',
   'bots.working': '작업 중', 'bots.disabled': '꺼진 bot', 'bots.settings': '설정',

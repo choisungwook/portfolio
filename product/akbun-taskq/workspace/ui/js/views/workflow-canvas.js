@@ -6,6 +6,7 @@
 // Read-only mode (a run) draws the same graph colored by step status. Positions are saved on each step.
 import { el } from '../core/dom.js'
 import { t } from '../core/i18n.js'
+import { icon } from '../core/icons.js'
 
 const SVG = 'http://www.w3.org/2000/svg'
 const W = 196
@@ -64,9 +65,9 @@ export function createCanvas({ steps, editable, states = null, onChange = () => 
   const layer = el('div', { class: 'wfc-layer' }, edges)
   const root = el('div', { class: `wfc${editable ? ' editable' : ''}`, tabindex: 0, 'aria-label': t('wf.canvas', 'Workflow canvas') }, layer)
   const zoomBar = el('div', { class: 'wfc-zoom' },
-    el('button', { type: 'button', title: t('wf.zoom_in', 'Zoom in'), text: '+', onclick: () => zoomBy(1.2) }),
-    el('button', { type: 'button', title: t('wf.zoom_out', 'Zoom out'), text: '−', onclick: () => zoomBy(1 / 1.2) }),
-    el('button', { type: 'button', title: t('wf.fit', 'Fit'), text: '⤢', onclick: fit }),
+    el('button', { type: 'button', title: t('wf.zoom_in', 'Zoom in'), 'aria-label': t('wf.zoom_in', 'Zoom in'), onclick: () => zoomBy(1.2) }, icon('plus', 16)),
+    el('button', { type: 'button', title: t('wf.zoom_out', 'Zoom out'), 'aria-label': t('wf.zoom_out', 'Zoom out'), onclick: () => zoomBy(1 / 1.2) }, icon('minus', 16)),
+    el('button', { type: 'button', title: t('wf.fit', 'Fit'), 'aria-label': t('wf.fit', 'Fit'), onclick: fit }, icon('fit', 16)),
     editable ? el('button', { type: 'button', title: t('wf.arrange', 'Arrange'), text: t('wf.arrange', 'Arrange'), onclick: () => { layout(steps); render(); onChange() } }) : null)
   root.append(zoomBar)
 

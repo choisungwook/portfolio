@@ -68,24 +68,24 @@
   <nav class="sidebar" data-area="sidebar" aria-label="Navigation">
     <div class="side-me">
       <strong class="side-title">akbun-taskq</strong>
-      <button type="button" class="side-search" data-view="search" data-i18n-title="nav.search" title="Search every bot conversation">⌕</button>
+      <button type="button" class="side-search" data-view="search" data-i18n-title="nav.search" title="Search every bot conversation" aria-label="Search every bot conversation" data-icon="search" data-icon-size="20"></button>
     </div>
     <ul class="side-list" data-area="side-views">
-      <li><button type="button" class="side-item" data-view="calendar"><span class="side-icon" aria-hidden="true">◷</span><span data-i18n="nav.calendar">Calendar</span></button></li>
-      <li><button type="button" class="side-item" data-view="board"><span class="side-icon" aria-hidden="true">▤</span><span data-i18n="nav.board">Board</span></button></li>
-      <li><button type="button" class="side-item" data-view="graph"><span class="side-icon" aria-hidden="true">⋔</span><span data-i18n="nav.graph">Graph</span></button></li>
+      <li><button type="button" class="side-item" data-view="calendar"><span class="side-icon" aria-hidden="true" data-icon="calendar"></span><span data-i18n="nav.calendar">Calendar</span></button></li>
+      <li><button type="button" class="side-item" data-view="board"><span class="side-icon" aria-hidden="true" data-icon="board"></span><span data-i18n="nav.board">Task status board</span></button></li>
+      <li><button type="button" class="side-item" data-view="graph"><span class="side-icon" aria-hidden="true" data-icon="graph"></span><span data-i18n="nav.graph">Graph</span></button></li>
     </ul>
     <div class="side-heading">
       <h2 id="bots-heading" data-i18n="nav.bots">Bots</h2>
       <div class="bots-state" data-area="bots-state"></div>
-      <button type="button" class="add-bot" data-area="bot-add" aria-label="Add a bot" title="Add a bot" data-i18n-title="bots.add">+</button>
+      <button type="button" class="add-bot" data-area="bot-add" aria-label="Add a bot" title="Add a bot" data-i18n-title="bots.add" data-icon="plus" data-icon-size="16"></button>
     </div>
     <ul class="side-list side-bots" data-area="bot-list" aria-labelledby="bots-heading"></ul>
     <ul class="side-list" data-area="side-shared">
       <li><button type="button" class="side-item" data-view="shared"><span class="side-icon" aria-hidden="true"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><path d="M3 6.5a1.5 1.5 0 0 1 1.5-1.5h4.4l2 2.2h8.6A1.5 1.5 0 0 1 21 8.7v9.8a1.5 1.5 0 0 1-1.5 1.5h-15A1.5 1.5 0 0 1 3 18.5z"/></svg></span><span data-i18n="nav.shared">Shared folder</span></button></li>
       <li><button type="button" class="side-item" data-view="workflows"><span class="side-icon" aria-hidden="true"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><rect x="3" y="4" width="6" height="5" rx="1.2"/><rect x="15" y="4" width="6" height="5" rx="1.2"/><rect x="9" y="15" width="6" height="5" rx="1.2"/><path d="M6 9v2.5h12V9M12 11.5V15"/></svg></span><span data-i18n="nav.workflows">Workflows</span></button></li>
       <li><button type="button" class="side-item" data-view="plugins"><span class="side-icon" aria-hidden="true"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><path d="M9 4h3.5v1.5a1.8 1.8 0 1 0 3.5 0V4H20v4.5h-1.5a1.8 1.8 0 1 0 0 3.5H20V20h-4.5v-1.5a1.8 1.8 0 1 0-3.5 0V20H4v-4.5h1.5a1.8 1.8 0 1 0 0-3.5H4V8h5z"/></svg></span><span data-i18n="nav.plugins">Plugins</span></button></li>
-      <li><button type="button" class="side-item" data-view="wiki"><span class="side-icon" aria-hidden="true">✦</span><span data-i18n="nav.wiki">Wiki</span></button></li>
+      <li><button type="button" class="side-item" data-view="wiki"><span class="side-icon" aria-hidden="true" data-icon="wiki"></span><span data-i18n="nav.wiki">Wiki</span></button></li>
     </ul>
   </nav>
   <main class="main" tabindex="-1">
@@ -125,7 +125,7 @@
       <p class="legend" data-area="calendar-legend"></p>
     </section>
 
-    <section id="view-board" data-view-panel="board" aria-label="Board" data-area="board" hidden>
+    <section id="view-board" data-view-panel="board" aria-label="Task status board" data-area="board" hidden>
       <div class="board-columns" data-area="board-columns"></div>
     </section>
 
@@ -141,9 +141,9 @@
       <div class="chat-find" data-area="chat-find" hidden>
         <input type="search" data-area="chat-find-input" data-i18n-placeholder="chat.find" placeholder="Find in this conversation" aria-label="Find in this conversation">
         <span class="meta" data-area="chat-find-count"></span>
-        <button type="button" data-area="chat-find-prev" aria-label="Previous match">↑</button>
-        <button type="button" data-area="chat-find-next" aria-label="Next match">↓</button>
-        <button type="button" data-area="chat-find-close" aria-label="Close">×</button>
+        <button type="button" data-area="chat-find-prev" aria-label="Previous match" data-icon="arrow-up" data-icon-size="16"></button>
+        <button type="button" data-area="chat-find-next" aria-label="Next match" data-icon="arrow-down" data-icon-size="16"></button>
+        <button type="button" data-area="chat-find-close" aria-label="Close" data-icon="close" data-icon-size="16"></button>
       </div>
       <div class="chat-log" data-area="bot-log"></div>
       <div class="chat-working" data-area="chat-working" role="status" aria-live="polite" hidden></div>
@@ -151,7 +151,7 @@
         <div class="attach-chips" data-area="bot-attachments" hidden></div>
         <ul class="slash-list" data-area="bot-slash" role="listbox" aria-label="Slash commands" hidden></ul>
         <div class="compose-row">
-          <button type="button" class="attach-button" data-area="bot-attach" data-i18n-title="chat.attach" title="Attach files" aria-label="Attach files">＋</button>
+          <button type="button" class="attach-button" data-area="bot-attach" data-i18n-title="chat.attach" title="Attach files" aria-label="Attach files" data-icon="plus" data-icon-size="20"></button>
           <label class="sr-only" for="bot-input">Message</label>
           <textarea id="bot-input" data-area="bot-input" rows="1" maxlength="8000" placeholder="Message"></textarea>
           <button type="submit" data-i18n="chat.send">Send</button>
@@ -178,9 +178,9 @@
       <div class="shared-bar">
         <nav class="shared-crumbs" data-area="shared-crumbs" aria-label="Folder path"></nav>
         <div class="btn-group shared-views" role="group" aria-label="View" data-area="shared-views">
-          <button type="button" data-mode="list" title="List" data-i18n-title="shared.view_list" aria-label="List">☰</button>
-          <button type="button" data-mode="details" title="Details" data-i18n-title="shared.view_details" aria-label="Details">▤</button>
-          <button type="button" data-mode="icons" title="Icons" data-i18n-title="shared.view_icons" aria-label="Icons">▦</button>
+          <button type="button" data-mode="list" title="List" data-i18n-title="shared.view_list" aria-label="List" data-icon="list"></button>
+          <button type="button" data-mode="details" title="Details" data-i18n-title="shared.view_details" aria-label="Details" data-icon="details"></button>
+          <button type="button" data-mode="icons" title="Icons" data-i18n-title="shared.view_icons" aria-label="Icons" data-icon="grid"></button>
         </div>
         <label class="shared-sort"><span class="sr-only">Sort by</span>
           <select data-area="shared-sort" aria-label="Sort by">
@@ -190,7 +190,7 @@
             <option value="modified" data-i18n="shared.sort_modified">Date modified</option>
           </select>
         </label>
-        <button type="button" class="quiet" data-area="shared-dir" title="Ascending or descending" aria-label="Sort order">↑</button>
+        <button type="button" class="quiet" data-area="shared-dir" title="Ascending or descending" aria-label="Sort order" data-icon="arrow-up" data-icon-size="16"></button>
         <button type="button" data-area="shared-upload" data-i18n="shared.upload">Upload files</button>
         <button type="button" data-area="shared-open" data-i18n="shared.open">Open in file manager</button>
       </div>
@@ -296,7 +296,7 @@
         </fieldset>
         <label class="wide">Intent <textarea name="intent" rows="3" maxlength="4000" required placeholder="What should be done, and what to be careful about" data-area="task-intent"></textarea></label>
         <div class="wide task-attach" data-area="task-attach-zone">
-          <button type="button" class="attach-button" data-area="task-attach" data-i18n-title="task.attach" title="Attach files" aria-label="Attach files">＋</button>
+          <button type="button" class="attach-button" data-area="task-attach" data-i18n-title="task.attach" title="Attach files" aria-label="Attach files" data-icon="plus" data-icon-size="20"></button>
           <span class="meta" data-i18n="task.drop">Drop or paste files to attach them</span>
           <div class="attach-chips" data-area="task-attachments" hidden></div>
         </div>
@@ -525,7 +525,7 @@
     <section class="settings-section" data-settings-page="access-skills" aria-labelledby="access-skills-title" hidden>
       <div class="settings-head">
         <h3 id="access-skills-title">Access skills</h3>
-        <button type="button" class="add-button" data-area="access-skill-add" aria-label="Add access skill" aria-expanded="false" aria-controls="access-skill-picker">+</button>
+        <button type="button" class="add-button" data-area="access-skill-add" aria-label="Add access skill" aria-expanded="false" aria-controls="access-skill-picker" data-icon="plus" data-icon-size="16"></button>
       </div>
       <p class="meta">An access skill is one of your Claude Code skills that signs in to the account a task works on. taskq stores only its path.</p>
       <ul class="skill-list" data-area="access-skills"></ul>

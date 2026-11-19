@@ -14,7 +14,7 @@ export function setRoster(names) {
 
 function colorOf(name) {
   if (name === 'taskq' || name === 'user') return 'var(--avatar-user)'
-  if (name === 'queue') return 'var(--stale)'
+  if (name === 'queue') return 'var(--muted)'
   let i = order.get(name)
   if (i === undefined) {
     i = 0

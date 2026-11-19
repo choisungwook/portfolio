@@ -3,6 +3,7 @@
 import { api } from '../core/api.js'
 import { area, clear, el } from '../core/dom.js'
 import { emit } from '../core/bus.js'
+import { icon } from '../core/icons.js'
 
 const EMPTY = 'No access skills yet. An access skill is one of your Claude Code skills that signs in to the account a task works on. Add one with +; taskq stores only its path.'
 
@@ -36,13 +37,12 @@ function minusButton(row, box) {
     type: 'button',
     class: 'skill-minus',
     'aria-label': `Remove ${row.name}`,
-    text: '−',
     onclick: () => {
       const confirm = confirmRow(row, box)
       clear(box).append(confirm)
       confirm.querySelector('.skill-remove').focus()
     },
-  })
+  }, icon('minus', 16))
 }
 
 function confirmRow(row, box) {

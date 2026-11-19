@@ -3,13 +3,13 @@
   display: grid; grid-auto-flow: column; grid-auto-columns: minmax(190px, 1fr); gap: 8px; overflow-x: auto; align-items: start;
   background: var(--bg); padding: 0;
 }
-.board-col { background: var(--panel); padding: 12px 8px; min-height: 120px; }
+.board-col { background: var(--panel); padding: 12px 8px; min-height: 120px; border-radius: var(--radius-l); }
 .board-col h3 { margin: 0 0 12px 4px; font-size: 14px; }
 .board-col.collapsed summary { cursor: pointer; font-weight: 600; padding: 4px 0; }
 .cards { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
 .card {
   display: flex; flex-direction: column; gap: 2px; width: 100%; text-align: left;
-  padding: 12px 12px 12px 15px; color: var(--fg); background: var(--panel-soft); box-shadow: inset 3px 0 0 var(--bar, var(--muted));
+  padding: 12px; color: var(--fg); background: var(--panel-soft); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--bar, var(--muted)) 55%, transparent);
 }
 .card:hover:not(:disabled) { background: var(--control); }
 .board-col[data-column="ready"] .cards { --bar: var(--muted); }
@@ -25,7 +25,7 @@
 .card-item { display: grid; }
 .card-item > .run-now {
   justify-self: stretch; text-align: left; min-height: 32px; padding: 0 15px; font-size: var(--text-small);
-  background: var(--panel-soft); box-shadow: inset 3px 0 0 var(--bar, var(--muted)), inset 0 1px 0 var(--border);
+  background: var(--panel-soft); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--bar, var(--muted)) 55%, transparent), inset 0 1px 0 var(--border);
 }
 .card-item > .run-now:hover:not(:disabled) { background: var(--control); }.card .badge { align-self: flex-start; }
 
