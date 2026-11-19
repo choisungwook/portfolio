@@ -1,10 +1,13 @@
-// Must-check panel, always visible. Unacked alerts, critical first, with per-kind actions and the queue-paused banner.
+// Must-check panel: a bell in the header with the count of open alerts; clicking it opens the panel over the page (like
+// the macOS notification list) and Escape or a click outside closes it. Unacked critical and high alerts, critical
+// first, with per-kind actions and the queue banner. Normal alerts are not shown.
 // An approval alert gets Review only: the decision is taken in the task's approval panel, where the input is shown.
 import { api, mutate } from '../core/api.js'
 import { area, clear, el } from '../core/dom.js'
 import { emit, on } from '../core/bus.js'
 import { fmtDateTime } from '../core/time.js'
 import { label, SEVERITY_RANK } from '../core/vocab.js'
+import { t } from '../core/i18n.js'
 
 const KIND_ACTIONS = {
   auth_required: [['Resume', 'resume', 'Resumed']],
@@ -17,6 +20,8 @@ let banner
 let bannerText
 let toggle
 let paused = false
+let panel
+let bell
 let approvals = new Map()   // open bot approval requests by id, so their alert shows the whole call
 
 export function initAlertsPanel() {
@@ -29,17 +34,72 @@ export function initAlertsPanel() {
     ? mutate(() => api.post('/queue/resume', {}), 'Queue resumed')
     : mutate(() => api.post('/queue/pause', {}), 'Queue paused')))
   on('refresh', load)
+  panel = area('alerts-panel')
+  bell = area('alerts-button')
+  bell.addEventListener('click', () => setOpen(panel.hidden))
+  // Escape closes it, unless a dialog it opened is on top (that Escape is the dialog's) or another handler took the key.
+  document.addEventListener('keydown', (event) => {
+    if (event.key !== 'Escape' || panel.hidden || event.defaultPrevented || document.querySelector('dialog[open]')) return
+    const inside = panel.contains(document.activeElement) || document.activeElement === bell
+    setOpen(false)
+    if (inside) bell.focus()
+  })
+  window.addEventListener('resize', () => {
+    if (!panel.hidden) place()
+  })
+  // A click outside closes it; clicks on its own buttons, and on dialogs it opens, do not.
+  document.addEventListener('click', (event) => {
+    if (panel.hidden || panel.contains(event.target) || bell.contains(event.target) || event.target.closest('dialog')) return
+    setOpen(false)
+  })
+}
+
+function setOpen(open) {
+  panel.hidden = !open
+  bell.setAttribute('aria-expanded', String(open))
+  if (!open) return
+  place()
+  area('must-check-title').focus()
+  load()
+}
+
+// Under the bell, its right edge on the bell's, and never past either side of the window (the header wraps on a narrow
+// window, which puts the bell on the left).
+function place() {
+  const box = bell.getBoundingClientRect()
+  const width = panel.offsetWidth
+  const right = Math.min(Math.max(16, Math.round(window.innerWidth - box.right)), Math.max(16, window.innerWidth - width - 16))
+  panel.style.top = `${Math.round(box.bottom + 8)}px`
+  panel.style.right = `${right}px`
+}
+
+// The bell's count: open critical and high alerts, plus waiting approvals that have no open alert of their own (a task
+// approval raises one, so it is counted once). Red when one is critical. A paused queue shows "!" when nothing else does.
+function renderBell(shown, approvalsWaiting, queuePaused) {
+  const count = area('alerts-count')
+  const alerted = new Set(shown.filter((a) => a.kind === 'approval_required').map((a) => a.task_id))
+  const pending = approvalsWaiting.filter((p) => !alerted.has(p.task_id)).length
+  const total = shown.length + pending
+  count.hidden = total === 0 && !queuePaused
+  count.textContent = total === 0 ? '!' : total > 99 ? '99+' : String(total)
+  count.dataset.level = shown.some((a) => a.severity === 'critical') || pending > 0 || total === 0 ? 'critical' : 'high'
+  const text = `${t('panel.must_check', 'Must check')}${total ? ` (${total})` : ''}${queuePaused ? ` · ${t('panel.queue_paused', 'queue paused')}` : ''}`
+  bell.title = text
+  bell.setAttribute('aria-label', text)
 }
 
 async function load() {
   try {
-    const [alerts, queue, requests] = await Promise.all([api.get('/alerts'), api.get('/queue'), api.get('/bot-approvals').catch(() => [])])
+    const [alerts, queue, requests, taskApprovals] = await Promise.all([
+      api.get('/alerts'), api.get('/queue'), api.get('/bot-approvals').catch(() => []), api.get('/approvals').catch(() => []),
+    ])
     approvals = new Map(requests.map((r) => [String(r.id), r]))
     const unacked = alerts
-      .filter((a) => a.acked_at === null)
+      .filter((a) => a.acked_at === null && a.severity !== 'normal')
       .sort((a, b) => SEVERITY_RANK[a.severity] - SEVERITY_RANK[b.severity] || b.created_at - a.created_at)
     renderBadges(unacked)
     renderBanner(queue)
+    renderBell(unacked, taskApprovals, queue.paused)
     clear(list).append(...(unacked.length === 0
       ? [el('li', { class: 'empty', text: 'Nothing to check.' })]
       : unacked.map((a) => item(a))))
@@ -53,11 +113,11 @@ function renderBadges(unacked) {
   clear(badges).append(
     el('span', { class: 'badge sev-critical', text: `critical ${count('critical')}` }),
     el('span', { class: 'badge sev-high', text: `high ${count('high')}` }),
-    el('span', { class: 'badge sev-normal', text: `normal ${count('normal')}` }),
   )
 }
 
-// Always shown: the text says whether the queue runs, and the one button pauses or resumes it.
+// At the top of the panel: whether the queue runs, and the one button that pauses or resumes it. While the panel is
+// closed, a paused queue shows on the bell.
 function renderBanner(queue) {
   paused = queue.paused
   banner.dataset.state = paused ? 'paused' : 'running'

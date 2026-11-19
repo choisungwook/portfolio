@@ -87,7 +87,7 @@ const KO = {
   'nav.plugins': '플러그인', 'nav.workflows': '워크플로', 'plugins.hint': '여기 등록한 skill과 plugin을 bot 설정에서 bot마다 고릅니다. 업데이트는 git 저장소를 받아 오고 쓰는 bot을 모두 다시 불러옵니다.',
   'plugins.official': '공식 marketplace', 'plugins.anthropic_only': 'Anthropic 것만', 'plugins.filter': '거르기', 'plugins.remove': '삭제',
   'plugins.official_hint': 'Anthropic 공식 marketplace의 plugin 목록입니다. 설치하지 않습니다. 쓰려면 받아서 위에 폴더를 등록하세요.',
-  'wiki.search': '위키 검색', 'panel.must_check': '확인 필요', 'panel.pending': '승인 대기', 'discussions.title': '토론', 'wiki.title': '위키',
+  'wiki.search': '위키 검색', 'panel.must_check': '확인 필요', 'panel.queue_paused': '큐 멈춤', 'panel.pending': '승인 대기', 'discussions.title': '토론', 'wiki.title': '위키',
 }
 
 let language = 'ko'
