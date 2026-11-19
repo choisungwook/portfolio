@@ -70,13 +70,14 @@ function render(agent) {
       type: 'button', class: 'icon-button', title: t('compose.refresh', 'Reload skills and plugins, then the model and command lists'),
       'aria-label': t('compose.refresh', 'Reload skills and plugins, then the model and command lists'), onclick: refresh,
     }, icon('refresh', 16)),
-    el('span', { class: 'compose-context', title: t('ctx.title', 'How full the context is after the last turn') }, contextRing(agent, 20), el('span', { text: contextLabel(agent) })),
     catalog?.commands?.length ? el('span', { class: 'meta', text: `/ ${catalog.commands.length} ${t('compose.commands', 'commands')}` }) : null,
     el('span', { class: 'compose-spacer' }),
     source ? el('span', { class: 'meta', title: catalog.error ?? '', text: source }) : null,
     select(t('compose.model', 'Model'), agent.model ?? '', modelOptions, (v) => save({ model: v || null })),
     efforts.length || agent.effort ? select(t('compose.effort', 'Effort'), agent.effort ?? '', effortOptions, (v) => save({ effort: v || null })) : null,
     select(t('compose.permission', 'Permissions'), agent.permission_mode, modeOptions, (v) => save({ permission_mode: v })),
+    // The context ring sits last on the right, as in Claude Desktop; the number is in its tooltip.
+    el('span', { class: 'compose-context', title: `${t('ctx.title', 'How full the context is after the last turn')}: ${contextLabel(agent)}` }, contextRing(agent, 20)),
   ].filter(Boolean))
 }
 

@@ -7,7 +7,6 @@ import { initApprovalList } from './views/approval-list.js'
 import { initCalendar } from './views/calendar.js'
 import { initAlertsPanel } from './views/alerts-panel.js'
 import { initBoard } from './views/board.js'
-import { initGraph } from './views/graph.js'
 import { initRunDialog } from './views/run-dialog.js'
 import { initSearch } from './views/search.js'
 import { initSettings } from './views/settings-dialog.js'
@@ -36,7 +35,6 @@ initApprovalList()
 initCalendar()
 initAlertsPanel()
 initBoard()
-initGraph()
 initRunDialog()
 initSearch()
 initTaskDetail()

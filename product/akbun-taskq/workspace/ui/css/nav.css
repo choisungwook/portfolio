@@ -30,8 +30,8 @@
   position: sticky; top: 64px; max-height: calc(100vh - 80px); overflow: auto;
   background: var(--panel); border-radius: var(--radius-l); padding: 16px 8px;
 }
-.side-me { display: flex; flex-direction: column; align-items: center; gap: 6px; padding: 4px 0 16px; }
-.side-me strong { font-size: 1.07em; }
+/* New task and search first, like a chat app; the views follow, then the bots. */
+.side-top { margin-bottom: 8px; padding-bottom: 8px; box-shadow: inset 0 -1px 0 var(--border); }
 .side-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 2px; }
 .side-item {
   display: flex; align-items: center; gap: 12px; width: 100%; min-height: 44px; padding: 6px 12px;
@@ -71,13 +71,9 @@
 
 @media (max-width: 800px) {
   .sidebar { position: static; max-height: none; padding: 8px; }
-  .side-me { display: none; }
   .side-list:not(.side-bots) { display: flex; overflow-x: auto; gap: 4px; }
   .side-list:not(.side-bots) .side-item { white-space: nowrap; }
 }
-.side-me { position: relative; }
-.side-search { position: absolute; top: 0; right: 4px; width: 36px; min-height: 36px; padding: 0; border-radius: 50%; color: var(--fg); background: var(--panel-soft); }
-.side-search[aria-current="page"] { background: var(--accent); color: var(--on-accent); }
 .avatar-wrap { position: relative; display: inline-flex; flex: none; }
 .sdk-badge {
   position: absolute; right: -3px; bottom: -3px; display: inline-flex; align-items: center; justify-content: center;
@@ -94,8 +90,15 @@
 .side-bot-working { display: flex; align-items: center; gap: 6px; color: var(--accent); font-weight: 600; font-size: 0.93em; height: 20px; font-variant-numeric: tabular-nums; }
 .side-bot[data-busy="true"] { background: var(--accent-soft); }
 .side-bot[data-busy="true"] .avatar { animation: none; }
-.side-me .side-title { font-size: 1.6em; font-weight: 800; letter-spacing: -0.02em; padding: 6px 0 4px; }
-.side-me { align-items: flex-start; padding: 4px 12px 14px; }
 .side-icon svg { display: block; margin: 0 auto; }
 .danger-quiet { color: var(--danger); }
 .side-bot-top .conn-dot { margin-right: auto; }
+/* The orchestrator: a large dark avatar centered at the top of the sidebar; pressing it opens its conversation. */
+.side-hero { display: flex; justify-content: center; padding: 4px 0 12px; }
+.side-hero:empty { display: none; }
+.side-hero-bot { display: grid; justify-items: center; gap: 8px; padding: 8px 16px; border-radius: var(--radius-l); background: transparent; color: var(--fg); }
+.side-hero-bot:hover { background: var(--hover); }
+.side-hero-bot[aria-current="page"] { background: var(--panel-soft); }
+.side-hero-bot strong { font-size: 1.0em; font-weight: 600; }
+.side-hero .avatar { background: #111 !important; color: #fff; }
+.side-hero .unread-dot { top: 4px; left: auto; right: 4px; }

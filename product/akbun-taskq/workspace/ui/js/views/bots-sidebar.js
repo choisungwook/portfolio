@@ -96,8 +96,29 @@ function render(team) {
     text: label,
   }), ...(toggle ? [toggle] : []))
   const selected = currentView().view === 'bot' ? currentView().bot : null
-  // The orchestrator comes first from the API (system bots sort first) and is marked so CSS can set it apart.
-  clear(list).append(...team.agents.map((a) => el('li', { class: 'side-bot-row', dataset: { system: String(a.system) } },
+  // The orchestrator sits at the top of the sidebar as one large avatar with its name, like the account of a chat app;
+  // the other bots are the list.
+  const menuKeys = (a) => (event) => {
+    if (event.key === 'ContextMenu' || (event.shiftKey && event.key === 'F10')) {
+      event.preventDefault()
+      const box = event.currentTarget.getBoundingClientRect()
+      openBotMenu(a, box.left + 40, box.bottom)
+    }
+  }
+  clear(area('side-hero')).append(...team.agents.filter((a) => a.system).map((a) => el('button', {
+    type: 'button', class: 'side-hero-bot', dataset: { bot: a.name, busy: String(a.busy) },
+    'aria-current': a.name === selected ? 'page' : null, 'aria-haspopup': 'menu', title: preview(a),
+    onclick: () => show('bot', a.name),
+    oncontextmenu: (event) => {
+      event.preventDefault()
+      openBotMenu(a, event.clientX, event.clientY)
+    },
+    onkeydown: menuKeys(a),
+  },
+  el('span', { class: 'side-avatar', dataset: { busy: String(a.busy) } }, botAvatar(a.name, 88, a.sdk),
+    a.unread > 0 ? el('span', { class: 'unread-dot', 'aria-label': `${a.unread} unread` }) : null),
+  el('strong', { text: a.name }))))
+  clear(list).append(...team.agents.filter((a) => !a.system).map((a) => el('li', { class: 'side-bot-row', dataset: { system: String(a.system) } },
     el('button', {
       type: 'button', class: 'side-item side-bot', dataset: { bot: a.name, busy: String(a.busy), enabled: String(a.enabled) },
       'aria-current': a.name === selected ? 'page' : null, 'aria-haspopup': 'menu',

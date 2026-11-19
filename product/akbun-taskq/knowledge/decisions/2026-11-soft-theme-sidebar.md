@@ -3,13 +3,13 @@ type: Decision
 title: The UI uses a soft messenger theme and a left sidebar where bots read like chats
 description: Bots replace the Team tab as a chat list in a left sidebar; a new dark-first rounded theme implements the same token contract, and Carbon stays as a second theme.
 tags: [ui, design-system, bots]
-generated: { by: claude-code/claude-opus-5-5, at: 2026-11-19T14:00:00Z }
+generated: { by: claude-code/claude-opus-5-5, at: 2026-11-19T15:00:00Z }
 ---
 
 ## 결정
 
 - 사용자에게 보이는 이름은 Team이 아니라 Bots다. UI, CLI(`taskq bots`), API(`/api/bots`), 설정 키(`bots`)를 바꿨다. 코드와 테이블 이름(`src/team/`, `team_*`)은 그대로 둔다.
-- 탭 줄을 없애고 왼쪽 사이드바로 옮긴다. 화면(Calendar, Board, Graph), Bots 목록, 공유 화면(공용 폴더, Workflows, Plugins, Wiki) 순이다.
+- 탭 줄을 없애고 왼쪽 사이드바로 옮긴다. 0.15.0부터 순서는 오케스트레이터 taskq(위 가운데 큰 아바타), 새 작업과 검색, 모든 화면 메뉴(Calendar, task 상태보드, 공용 폴더, Workflows, Plugins, Wiki), Bots 목록이다. 메뉴를 위에 모은 것은 bot이 늘어도 메뉴가 화면 밖으로 밀려나지 않게 하려는 것이고, taskq를 따로 둔 것은 사용자가 가장 먼저 말을 거는 상대라서다. Graph 화면은 0.15.0에서 지웠다.
 - Proposals, Goals, Discussions 메뉴는 2026-11-19에 사용자 요청으로 뺐다. 기능(API, CLI, bot 도구)은 남기고 화면만 없앴다.
 - 기본 테마는 2026-11-19부터 [Astryx](/decisions/2026-11-astryx-design-system.md)다. soft 테마는 두 번째 구현으로 남는다.
 - Bots 목록은 채팅 목록처럼 bot마다 아바타, 이름, 최근 메시지, 시각, 읽지 않음 점을 보인다. bot을 누르면 그 bot과의 대화가 말풍선으로 열리고 거기서 메시지를 보낸다.

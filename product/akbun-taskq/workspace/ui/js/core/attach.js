@@ -18,7 +18,9 @@ function toBase64(file) {
 export function attachments({ zone, button, chips, pasteTarget }) {
   let items = []
   const picker = el('input', { type: 'file', multiple: true, hidden: true })
-  zone.append(picker)
+  // A folder attaches every file in it (webkitdirectory works in Chrome, Safari and Firefox).
+  const folderPicker = el('input', { type: 'file', multiple: true, hidden: true, webkitdirectory: true })
+  zone.append(picker, folderPicker)
 
   const render = () => {
     chips.hidden = items.length === 0
@@ -54,10 +56,12 @@ export function attachments({ zone, button, chips, pasteTarget }) {
   }
 
   button?.addEventListener('click', () => picker.click())
-  picker.addEventListener('change', () => {
-    add([...picker.files])
-    picker.value = ''
-  })
+  for (const input of [picker, folderPicker]) {
+    input.addEventListener('change', () => {
+      add([...input.files])
+      input.value = ''
+    })
+  }
   zone.addEventListener('dragover', (event) => {
     if (![...event.dataTransfer.types].includes('Files')) return
     event.preventDefault()
@@ -81,6 +85,8 @@ export function attachments({ zone, button, chips, pasteTarget }) {
 
   return {
     files: () => items.filter((item) => item.path).map((item) => item.path),
+    pick: () => picker.click(),
+    pickFolder: () => folderPicker.click(),
     busy: () => items.some((item) => item.state === 'uploading'),
     clear: () => {
       items = []

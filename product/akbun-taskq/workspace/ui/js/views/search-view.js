@@ -1,68 +1,157 @@
-// Search every bot conversation from the sidebar's search icon. One request per search (debounced while typing); the
-// server answers from the trigram index, so Korean stems and English both match. A hit opens the bot's conversation
-// at that message.
+// Search as a dialog over the page, opened from the sidebar or Cmd/Ctrl+K, like a command palette. Tabs narrow it to
+// conversations, tasks or bots. With nothing typed it lists what needs me, recent conversations and actions; typed, it
+// asks the server once per pause (conversations from the trigram index, past runs from FTS) and filters tasks and bots
+// it already has. Arrow keys move, Enter opens.
 import { api } from '../core/api.js'
 import { area, clear, el } from '../core/dom.js'
-import { emit, on } from '../core/bus.js'
+import { emit } from '../core/bus.js'
 import { show } from '../core/nav.js'
 import { t } from '../core/i18n.js'
+import { icon } from '../core/icons.js'
 import { senderAvatar } from './avatar.js'
-import { shortTime } from './bots-sidebar.js'
+import { botsSnapshot, shortTime } from './bots-sidebar.js'
 
+const TABS = [['all', 'search.all', 'All'], ['messages', 'search.messages', 'Conversations'], ['tasks', 'search.tasks', 'Tasks'], ['bots', 'nav.bots', 'Bots']]
+const NEEDS_ME = new Set(['needs_approval', 'needs_auth'])
+
+let dialog
 let input
-let list
+let body
+let tabs
+let tab = 'all'
 let timer
 let seq = 0
 
 export function initSearchView() {
+  dialog = area('search-dialog')
   input = area('msg-query')
-  list = area('msg-hits')
-  area('msg-search').addEventListener('submit', (event) => {
-    event.preventDefault()
-    run()
+  body = area('msg-hits')
+  tabs = area('search-tabs')
+  area('search-open').addEventListener('click', open)
+  area('search-close-dialog').addEventListener('click', () => dialog.close())
+  dialog.addEventListener('click', (event) => {
+    if (event.target === dialog) dialog.close()
   })
   input.addEventListener('input', () => {
     clearTimeout(timer)
-    timer = setTimeout(run, 250)
+    timer = setTimeout(run, 200)
   })
-  on('tab', (name) => {
-    if (name === 'search') setTimeout(() => input.focus(), 0)
-  })
+  dialog.addEventListener('keydown', onKey)
   document.addEventListener('keydown', (event) => {
-    // Cmd/Ctrl+K opens the search from anywhere, like a command palette.
     if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'k') {
       event.preventDefault()
-      show('search')
+      open()
     }
   })
+  renderTabs()
+}
+
+function open() {
+  if (!dialog.open) dialog.showModal()
+  input.value = ''
+  input.focus()
+  run()
+}
+
+function renderTabs() {
+  clear(tabs).append(...TABS.map(([id, key, english]) => el('button', {
+    type: 'button', role: 'tab', 'aria-selected': String(id === tab), text: t(key, english),
+    onclick: () => {
+      tab = id
+      renderTabs()
+      run()
+      input.focus()
+    },
+  })))
+}
+
+function onKey(event) {
+  const items = [...body.querySelectorAll('.sd-item')]
+  if (items.length === 0) return
+  const index = items.findIndex((item) => item.dataset.active === 'true')
+  let next = index
+  if (event.key === 'ArrowDown') next = (index + 1) % items.length
+  else if (event.key === 'ArrowUp') next = (index - 1 + items.length) % items.length
+  else if (event.key === 'Enter' && !event.isComposing && document.activeElement === input) {
+    event.preventDefault()
+    items[Math.max(0, index)].click()
+    return
+  } else return
+  event.preventDefault()
+  activate(items, next)
+}
+
+function activate(items, index) {
+  items.forEach((item, i) => { item.dataset.active = String(i === index) })
+  items[index]?.scrollIntoView({ block: 'nearest' })
+}
+
+// One row: icon or avatar, the text, and a note on the right. Choosing it closes the dialog first.
+function item(lead, text, note, onchoose) {
+  return el('button', { type: 'button', class: 'sd-item', onclick: () => {
+    dialog.close()
+    onchoose()
+  }, onmousemove: (event) => activate([...body.querySelectorAll('.sd-item')], [...body.querySelectorAll('.sd-item')].indexOf(event.currentTarget)) },
+  el('span', { class: 'sd-lead' }, lead), el('span', { class: 'sd-text' }, text), note ? el('span', { class: 'sd-note', text: note }) : null)
+}
+
+function section(title, rows) {
+  if (rows.length === 0) return null
+  return el('section', { class: 'sd-section' }, el('h3', { text: title }), ...rows)
+}
+
+const taskRow = (task) => item(icon('board', 20), task.task_title ?? task.id, task.owner ?? task.status, () => emit('open-task', task.id))
+const botRow = (agent) => item(senderAvatar(agent.name, 22), agent.name, agent.last_message ? shortTime(agent.last_message.created_at) : '', () => show('bot', agent.name))
+
+function draw(...sections) {
+  const shown = sections.filter(Boolean)
+  clear(body).append(...(shown.length ? shown : [el('p', { class: 'empty sd-empty', text: t('search.none', 'Nothing matches.') })]))
+  activate([...body.querySelectorAll('.sd-item')], 0)
 }
 
 async function run() {
   const query = input.value.trim()
   const id = ++seq
+  const team = botsSnapshot() ?? { agents: [], tasks: [] }
+  const wants = (kind) => tab === 'all' || tab === kind
   if (!query) {
-    clear(list)
+    const needs = [
+      ...team.agents.filter((a) => a.unread > 0).map((a) => item(senderAvatar(a.name, 22), a.name, `${a.unread} ${t('search.unread', 'unread')}`, () => show('bot', a.name))),
+      ...team.tasks.filter((task) => NEEDS_ME.has(task.status)).map(taskRow),
+    ]
+    const recent = [...team.agents].filter((a) => a.last_message).sort((a, b) => b.last_message.created_at - a.last_message.created_at).slice(0, 6)
+    draw(
+      tab === 'all' ? section(t('search.needs_me', 'Needs attention'), needs) : null,
+      wants('messages') || wants('bots') ? section(t('search.recent', 'Recent'), recent.map(botRow)) : null,
+      wants('tasks') ? section(t('search.open_tasks', 'Open tasks'), tab === 'tasks' ? team.tasks.slice(0, 20).map(taskRow) : []) : null,
+      tab === 'all' ? section(t('search.actions', 'Actions'), [
+        item(icon('plus', 20), t('header.new_task', 'New task'), '', () => area('new-task-button').click()),
+        item(icon('plus', 20), t('bots.add', 'Add a bot'), '', () => area('bot-add').click()),
+      ]) : null,
+    )
     return
   }
+  const lower = query.toLowerCase()
+  const bots = wants('bots') ? team.agents.filter((a) => `${a.name} ${a.description ?? ''}`.toLowerCase().includes(lower)).map(botRow) : []
+  const tasks = wants('tasks') ? team.tasks.filter((task) => (task.task_title ?? '').toLowerCase().includes(lower)).map(taskRow) : []
+  draw(section(t('nav.bots', 'Bots'), bots), section(t('search.tasks', 'Tasks'), tasks))
   try {
-    const hits = await api.get(`/bots/search?q=${encodeURIComponent(query)}`)
+    const [hits, runs] = await Promise.all([
+      wants('messages') ? api.get(`/bots/search?q=${encodeURIComponent(query)}`) : [],
+      wants('tasks') ? api.get(`/search?q=${encodeURIComponent(query)}`).catch(() => []) : [],
+    ])
     if (id !== seq) return
-    if (hits.length === 0) {
-      clear(list).append(el('li', { class: 'empty', text: t('search.none', 'No conversation matches.') }))
-      return
-    }
     const bot = (hit) => (hit.sender === 'user' || hit.sender === 'queue' ? hit.recipient : hit.sender)
-    clear(list).append(...hits.map((hit) => el('li', {},
-      el('button', { type: 'button', class: 'search-hit', onclick: () => {
+    draw(
+      section(t('nav.bots', 'Bots'), bots),
+      section(t('search.messages', 'Conversations'), hits.map((hit) => item(senderAvatar(hit.sender, 22), highlight(hit.snippet, query), `${bot(hit)} · ${shortTime(hit.created_at)}`, () => {
         show('bot', bot(hit))
         emit('focus-message', hit.id)
-      } },
-      senderAvatar(hit.sender, 32),
-      el('span', { class: 'search-hit-text' },
-        el('span', { class: 'meta', text: `${hit.sender} → ${hit.recipient} · ${shortTime(hit.created_at)}` }),
-        highlight(hit.snippet, query))))))
+      }))),
+      section(t('search.tasks', 'Tasks'), [...tasks, ...runs.slice(0, 10).map((row) => item(icon('list', 20), row.task_title ?? row.task_id, t('search.run', 'past run'), () => emit('open-run', row.run_id)))]),
+    )
   } catch (error) {
-    clear(list).append(el('li', { class: 'error', text: error.message }))
+    if (id === seq) clear(body).append(el('p', { class: 'error sd-empty', text: error.message }))
   }
 }
 

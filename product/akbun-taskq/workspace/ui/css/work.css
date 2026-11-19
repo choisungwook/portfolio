@@ -1,4 +1,4 @@
-/* Board, graph and search results. Columns and cards are Carbon tiles: separation comes from layer color, not shadow. */
+/* Board and search results. Columns and cards are Carbon tiles: separation comes from layer color, not shadow. */
 .board-columns {
   display: grid; grid-auto-flow: column; grid-auto-columns: minmax(190px, 1fr); gap: 8px; overflow-x: auto; align-items: start;
   background: var(--bg); padding: 0;
@@ -29,8 +29,6 @@
 }
 .card-item > .run-now:hover:not(:disabled) { background: var(--control); }.card .badge { align-self: flex-start; }
 
-.graph-wrap { overflow: auto; background: var(--stage); border-radius: var(--radius); padding: 8px; max-height: 70vh; }
-.graph-wrap svg { display: block; }
 .node { cursor: pointer; }
 .node:focus-visible { outline: none; }
 .node:focus-visible .node-box { stroke: var(--focus); stroke-width: 3; }
