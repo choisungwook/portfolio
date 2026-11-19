@@ -111,7 +111,7 @@ mark.find.current { background: var(--accent); color: var(--on-accent); }
 .shared-table td:first-child { padding: 0; }
 .shared-table tr[aria-selected="true"] td { background: var(--accent-soft); }
 .shared-table .col-kind { width: 90px; } .shared-table .col-size { width: 90px; } .shared-table .col-date { width: 190px; }
-.sort-head { font-weight: inherit; color: inherit; }
+.sort-head { font-weight: inherit; color: inherit; gap: 4px; }
 @media (max-width: 700px) { .shared-table .col-kind, .shared-table .col-date { display: none; } }
 /* Icons: a grid of tiles. */
 .shared-icons { display: grid; grid-template-columns: repeat(auto-fill, minmax(104px, 1fr)); gap: 8px; }

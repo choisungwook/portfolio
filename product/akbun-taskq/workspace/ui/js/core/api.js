@@ -1,6 +1,7 @@
 // Thin fetch wrapper. Every request carries the token. Mutations send application/json with a JSON body ({} when empty).
 import { requestRefresh } from './refresh.js'
 import { area, el } from './dom.js'
+import { icon } from './icons.js'
 import { authLost, getToken } from './token.js'
 
 const NO_TOKEN = 'Open the URL printed by taskq run to continue.'
@@ -90,7 +91,7 @@ export function notify(message, isError = false) {
   node.querySelector('.notice-text').textContent = message
   node.dataset.kind = isError ? 'error' : 'ok'
   node.querySelector('.notice-close')?.remove()
-  const close = el('button', { type: 'button', class: 'notice-close', 'aria-label': 'Close notification', text: '\u00D7' })
+  const close = el('button', { type: 'button', class: 'notice-close', 'aria-label': 'Close notification' }, icon('close', 16))
   close.addEventListener('click', () => {
     node.querySelector('.notice-text').textContent = ''
     delete node.dataset.kind

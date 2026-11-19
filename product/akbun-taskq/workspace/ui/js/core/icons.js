@@ -24,6 +24,8 @@ const PATHS = {
   'arrow-down': ['M12 5v14', 'M18.5 12.5L12 19l-6.5-6.5'],
   close: ['M18 6L6 18', 'M6 6l12 12'],
   plus: ['M12 5v14', 'M5 12h14'],
+  minus: ['M5 12h14'],
+  fit: ['M4 9V4h5', 'M20 9V4h-5', 'M4 15v5h5', 'M20 15v5h-5'],
 }
 
 export function icon(name, size = 18) {
