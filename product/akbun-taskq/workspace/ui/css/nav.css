@@ -80,6 +80,8 @@
   border-radius: 50%; background: var(--panel); color: var(--accent); box-shadow: 0 0 0 2px var(--panel); font-weight: 700; line-height: 1;
 }
 .sdk-badge[data-sdk="openai"] { color: var(--fg); }
+/* Claude's mark on Claude's orange, so a Claude bot reads as Claude at a glance. */
+.sdk-badge[data-sdk="claude"] { background: #d97757; color: #fff; }
 .side-avatar { position: relative; display: inline-flex; border-radius: 50%; flex: none; }
 /* A working bot gets a turning ring around its avatar and an accent-colored "Working 12s" line. */
 .side-avatar[data-busy="true"]::before {
