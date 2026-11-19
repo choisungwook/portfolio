@@ -22,6 +22,7 @@ function outside(event) {
 
 function onKey(event) {
   if (event.key === 'Escape') {
+    event.preventDefault()
     close()
     return
   }

@@ -207,11 +207,17 @@ export function createOpenAITeamBackend(runFn?: OpenAIRunFn, fetcher: typeof fet
     : process.env.AWS_BEARER_TOKEN_BEDROCK ?? '')
   // The inference profiles the signed-in AWS profile sees. A Bedrock API key alone cannot list them, so that sign-in keeps
   // the built-in list and the ids as typed. A failed listing is not a failed turn.
+  // A failure (no bedrock:ListInferenceProfiles, an expired SSO session) is remembered for 2 minutes so every turn does not
+  // sign and fail again.
+  const failedAt = new Map<string, number>()
   const profilesFor = async (config: Config) => {
     if (!config.bots.bedrockProfile) return []
+    const key = `${config.bots.bedrockProfile}@${config.bots.bedrockRegion}`
+    if (Date.now() - (failedAt.get(key) ?? 0) < 120_000) return []
     try {
       return await listProfiles(config.bots.bedrockProfile, config.bots.bedrockRegion)
     } catch {
+      failedAt.set(key, Date.now())
       return []
     }
   }

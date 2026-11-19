@@ -1,5 +1,5 @@
 import { execFileSync } from 'node:child_process'
-import { chmodSync, copyFileSync, existsSync, mkdtempSync, renameSync, rmSync, writeFileSync } from 'node:fs'
+import { chmodSync, copyFileSync, existsSync, lstatSync, mkdtempSync, renameSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
 import pkg from '../package.json' with { type: 'json' }
@@ -78,13 +78,19 @@ export async function installUpdate(fetcher: typeof fetch = fetch, target = proc
   try {
     const archive = join(work, asset.name)
     writeFileSync(archive, Buffer.from(await res.arrayBuffer()))
-    execFileSync('tar', ['-xzf', archive, '-C', work])
+    // Only the one entry, and only a regular file: a link in the archive must not put another file in taskq's place.
+    execFileSync('tar', ['-xzf', archive, '-C', work, 'taskq'])
     const built = join(work, 'taskq')
-    if (!existsSync(built)) throw new Error('the archive has no taskq executable')
+    if (!existsSync(built) || !lstatSync(built).isFile()) throw new Error('the archive has no taskq executable')
     const staged = join(dirname(target), '.taskq-update')
-    copyFileSync(built, staged)
-    chmodSync(staged, 0o755)
-    renameSync(staged, target)
+    try {
+      copyFileSync(built, staged)
+      chmodSync(staged, 0o755)
+      renameSync(staged, target)
+    } catch (error) {
+      rmSync(staged, { force: true })
+      throw error
+    }
   } finally {
     rmSync(work, { recursive: true, force: true })
   }

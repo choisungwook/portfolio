@@ -153,7 +153,7 @@ function editorKeys(event) {
   const field = event.target instanceof HTMLElement && event.target.matches('input, textarea, select')
   if (mod && (event.key.toLowerCase() === 's' || event.key === 'Enter')) {
     editorForm.requestSubmit()
-  } else if (event.key === 'Escape' && !event.defaultPrevented) {
+  } else if (event.key === 'Escape' && !event.defaultPrevented && (root.contains(document.activeElement) || document.activeElement === document.body)) {
     if (field) event.target.blur()
     else leave('list')
   } else if (event.altKey && !mod && /^Digit[1-9]$/.test(event.code) && !field) {

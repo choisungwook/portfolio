@@ -30,9 +30,10 @@ async function check() {
 }
 
 async function install(event) {
-  event.currentTarget.disabled = true
+  const button = event.currentTarget
+  button.disabled = true
   const done = await mutate(() => api.post('/update'))
   const box = area('update-status')
   if (done) clear(box).append(el('p', { text: `${t('update.installed', 'Installed')} ${done.installed}. ${t('update.restart', 'Restart taskq (stop taskq run and start it again) to use it.')}` }))
-  else event.currentTarget.disabled = false
+  else button.disabled = false
 }

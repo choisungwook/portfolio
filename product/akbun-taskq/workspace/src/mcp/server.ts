@@ -25,7 +25,7 @@ const OPERATION_TOOLS: Tool[] = OPERATIONS.map((op) => {
       ...(params.length ? { required: params } : {}),
       additionalProperties: true,
     },
-    annotations: { readOnlyHint: op.method === 'GET', destructiveHint: op.method === 'DELETE' },
+    annotations: { readOnlyHint: op.method === 'GET', destructiveHint: op.method === 'DELETE' || op.name === 'update_install' },
   }
 })
 
