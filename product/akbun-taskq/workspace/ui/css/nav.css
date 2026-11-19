@@ -54,11 +54,13 @@
 .side-bot[data-enabled="false"] { opacity: 0.5; }
 .side-bot[data-busy="true"] .avatar { animation: bob 1.2s ease-in-out infinite; }
 .side-bot-text { flex: 1; min-width: 0; display: grid; gap: 2px; }
-.side-bot-top { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; }
+/* Both lines have a fixed height, so a context ring, a status dot or the switch between preview and "working" never
+   changes the row's height and moves the rows below. */
+.side-bot-top { display: flex; align-items: center; justify-content: space-between; gap: 8px; height: 22px; }
 .side-bot-top strong { font-size: 1.07em; font-weight: 700; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .side-bot-top time { flex: none; }
 .side-bot-preview {
-  color: var(--muted); font-size: 0.93em; font-weight: 400;
+  color: var(--muted); font-size: 0.93em; font-weight: 400; height: 20px; line-height: 20px;
   overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
 .unread-dot { position: absolute; top: 10px; left: 44px; width: 12px; height: 12px; border-radius: 50%; background: var(--running); box-shadow: 0 0 0 2px var(--panel); }
@@ -88,7 +90,7 @@
   border: 2px solid transparent; border-top-color: var(--accent); border-right-color: var(--accent); animation: spin 0.9s linear infinite;
 }
 @keyframes spin { to { transform: rotate(360deg); } }
-.side-bot-working { display: flex; align-items: center; gap: 6px; color: var(--accent); font-weight: 600; font-size: 0.93em; }
+.side-bot-working { display: flex; align-items: center; gap: 6px; color: var(--accent); font-weight: 600; font-size: 0.93em; height: 20px; font-variant-numeric: tabular-nums; }
 .side-bot[data-busy="true"] { background: var(--accent-soft); }
 .side-bot[data-busy="true"] .avatar { animation: none; }
 .side-me .side-title { font-size: 1.6em; font-weight: 800; letter-spacing: -0.02em; padding: 6px 0 4px; }

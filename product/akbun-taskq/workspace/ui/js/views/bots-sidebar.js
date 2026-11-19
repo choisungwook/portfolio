@@ -17,6 +17,7 @@ const POLL_MS = 5000
 let list
 let state
 let latest = null
+let drawn = ''   // what the list shows now; an identical poll leaves the DOM alone
 let connections = {}   // bot -> { status, label, reason }, read every minute (the server caches the checks)
 
 export function initBotsSidebar() {
@@ -67,7 +68,22 @@ async function load() {
   }
 }
 
+// Rebuilding the list restarts the busy ring's spin and the pulse, and a long list loses its scroll position for a
+// frame, which made the list jump on every poll while a bot worked. So it is redrawn only when what it shows changes
+// (the elapsed time is ticked in place), and the scroll position is kept.
+function signature(team, selected) {
+  return JSON.stringify([team.paused, team.pause_reason, selected, connections, team.agents.map((a) => [
+    a.name, a.system, a.enabled, a.busy, a.working_since, a.unread, a.sdk, a.role, a.context_tokens, a.context_window,
+    a.last_message?.id, a.last_message?.created_at,
+  ])])
+}
+
 function render(team) {
+  const selectedNow = currentView().view === 'bot' ? currentView().bot : null
+  const key = signature(team, selectedNow)
+  if (key === drawn) return
+  drawn = key
+  const scroll = list.scrollTop
   const label = team.paused ? t('bots.paused', 'Paused') : t('bots.running', 'Running')
   const mode = team.paused ? 'paused' : 'running'
   const toggle = team.paused
@@ -113,6 +129,7 @@ function render(team) {
       type: 'button', class: 'side-bot-gear', 'aria-label': `${a.name} settings`, title: 'Settings', text: '⚙',
       onclick: () => openBotSettings(a.name),
     }))))
+  list.scrollTop = scroll
 }
 
 // The elapsed time of a working bot, redrawn every second by the ticker in initBotsSidebar.

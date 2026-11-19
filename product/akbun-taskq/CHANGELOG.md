@@ -24,6 +24,10 @@ bot이 사람 없이 일하는 범위를 넓히고, 사람이 결정하거나 �
 - bot의 꺼짐 모드(`bots.enabled`)를 없앴다. bot은 taskq와 함께 항상 돌고, 멈추려면 메뉴의 Pause나 `taskq bots pause`를 쓴다. 기존 설정 파일의 `bots.enabled`는 무시한다. 연결 페이지와 bot 패널의 "bot이 꺼져 있음" 안내도 뺐다.
 - 스키마 010: `team_agents`에 헌장과 `ask_first`, `bot_approvals`, `bot_routines`, `goals`, `team_messages.routine_id`.
 
+### Fixed
+
+- bot이 일할 때 왼쪽 bot 목록이 흔들리던 문제. 목록을 몇 초마다 통째로 다시 그려 바쁜 bot의 회전 고리와 점이 처음부터 다시 돌았고, context 원이 있는 행(66px)과 없는 행(64px)의 높이가 달라 원이 생기면 아래 행이 밀렸다. 이제 보이는 내용이 바뀔 때만 다시 그리고 스크롤 위치를 유지하며, 두 줄의 높이를 고정했다.
+
 ### SDK
 
 `@anthropic-ai/claude-agent-sdk`와 `@openai/agents-core`: 사용 방식 변경 없음. 먼저 묻기는 기존 `PreToolUse` hook(Claude)과 로컬 도구 게이트(OpenAI)에서 `botGate`가 판단한다. Codex와 Kiro bot의 자체 도구는 이 게이트를 지나지 않는다.
