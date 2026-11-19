@@ -1,7 +1,7 @@
 import { test, describe } from 'node:test'
 import assert from 'node:assert/strict'
 import { createApp } from '../src/api/server.ts'
-import { getAgent, listAgents, listMessages, USER } from '../src/db/team.ts'
+import { getAgent, listAgents, listMessages, postMessage, USER } from '../src/db/team.ts'
 import { botGate, type ApprovalBroker } from '../src/team/bot-gate.ts'
 import { consumeApproval, requestApproval } from '../src/db/bot-requests.ts'
 import { createRoutine, runDueRoutines, runTriggeredRoutines } from '../src/db/routines.ts'
@@ -183,5 +183,16 @@ describe('bot autonomy', () => {
     assert.ok((await call('DELETE', '/bots/coder')).ok)
     assert.equal(env.db.prepare('SELECT count(*) AS n FROM bot_routines WHERE bot = ?').get('coder')?.n, 0)
     assert.equal(env.db.prepare('SELECT status FROM bot_approvals WHERE id = ?').get(request.id)?.status, 'denied')
+  })
+
+  test('[critical] a bot the user wrote to answers the user directly; one the user never addressed cannot start a conversation', () => {
+    const coder = getAgent(env.db, 'coder')!
+    assert.equal(coder.may_message_user, false)
+    assert.throws(() => tool('coder', 'send_message').handler({ to: 'user', body: 'unprompted' }), /has not written to you/)
+    postMessage(env.db, { sender: USER, recipient: 'coder', body: 'hi' })
+    assert.ok(tool('coder', 'send_message').handler({ to: 'user', body: 'hi, what do you need?' }))
+    assert.equal(inbox('user').at(-1), 'hi, what do you need?')
+    const system = systemFor(coder, listAgents(env.db), env.config, env.home, env.home, env.home)
+    assert.match(system, /When the user writes to you .* answer them yourself with send_message to "user"/)
   })
 })

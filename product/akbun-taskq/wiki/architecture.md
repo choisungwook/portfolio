@@ -364,7 +364,7 @@ user --bot chat / taskq bots say--> team_messages --hub--> bot turn (resumed Cla
 | Tool | What it does |
 |---|---|
 | `list_agents` | the enabled bots with role, description and whether each is busy |
-| `send_message` | a message to a bot, or to the user if the bot may; `deliver_at` schedules it |
+| `send_message` | a message to a bot, or to the user: always for a bot the user has written to (it answers directly), otherwise only with `may_message_user`, which governs conversations the bot would start; `deliver_at` schedules it |
 | `start_discussion`, `discuss`, `conclude_discussion` | bounded discussions, below |
 | `create_task`, `assign_task` | record a task with an owner; hand it on |
 | `start_task`, `finish_task` | work on an owned task within one turn |
