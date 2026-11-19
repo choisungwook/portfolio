@@ -166,7 +166,7 @@ taskq handoff accept HANDOFF_ID
 
 ## 7. 확인하고 처리하기
 
-오른쪽 Must check 패널에 내가 봐야 할 것이 심각도 순으로 쌓인다. 인계와 중요 경고의 시스템 알림은 Settings → Notifications → Desktop notifications에서 끄거나 켤 수 있다. 기본값은 켜짐이며 끈 상태에도 앱 내 기록은 남는다. 다시 켜면 이후의 알림부터 표시한다. 인계와 경고 처리는 화면이나 명령에서 한다.
+헤더의 종 아이콘(Must check)에 내가 봐야 할 것의 수가 뜨고, 누르면 아이콘 아래에 심각도 순 목록이 열린다. normal 등급 알림은 보이지 않는다. 인계와 중요 경고의 시스템 알림은 Settings → Notifications → Desktop notifications에서 끄거나 켤 수 있다. 기본값은 켜짐이며 끈 상태에도 앱 내 기록은 남는다. 다시 켜면 이후의 알림부터 표시한다. 인계와 경고 처리는 화면이나 명령에서 한다.
 
 | 상황 | 화면 | 명령 |
 |---|---|---|

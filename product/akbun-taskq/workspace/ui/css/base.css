@@ -58,22 +58,32 @@ h3 { font-size: 14px; margin: 16px 0 8px; }
 .search-results .close { float: right; }
 
 .layout {
-  display: grid; grid-template-columns: 300px minmax(0, 1fr) 340px; gap: 16px; padding: 12px 16px; align-items: start;
+  display: grid; grid-template-columns: 300px minmax(0, 1fr); gap: 16px; padding: 12px 16px; align-items: start;
 }
 .main { min-width: 0; }
 .main:focus { outline: none; }
-.must-check {
-  position: sticky; top: 64px; max-height: calc(100vh - 80px); overflow: auto;
-  background: var(--panel); padding: 16px; border-radius: var(--radius-l);
+/* Must check opens over the page from the bell in the header, like the macOS notification list, instead of taking a
+   column of the layout. */
+.alerts-button {
+  position: relative; display: inline-flex; align-items: center; justify-content: center; width: 40px; min-height: 40px;
+  padding: 0; border-radius: 50%; background: transparent; color: var(--fg);
 }
-/* Below 1280px the Must check panel moves under the sidebar; below 800px everything stacks. */
+.alerts-button:hover { background: var(--hover); }
+.alerts-button[aria-expanded="true"] { background: var(--panel-soft); }
+.alerts-count {
+  position: absolute; top: 2px; right: 0; min-width: 18px; height: 18px; padding: 0 5px; border-radius: 9px;
+  font: 700 11px/18px var(--font-sans); text-align: center; color: #fff; background: var(--danger); box-shadow: 0 0 0 2px var(--panel);
+}
+.alerts-count[data-level="high"] { background: var(--accent); }
+.must-check {
+  position: fixed; top: 58px; right: 16px; z-index: 30; width: min(420px, calc(100vw - 32px)); max-height: calc(100vh - 76px);
+  overflow: auto; background: var(--panel); padding: 16px; border-radius: var(--radius-l); box-shadow: var(--shadow-2), 0 12px 40px rgba(0, 0, 0, 0.18);
+}
 @media (max-width: 1280px) {
   .layout { grid-template-columns: 280px minmax(0, 1fr); }
-  .must-check { position: static; max-height: none; grid-column: 1; grid-row: 2; }
 }
 @media (max-width: 800px) {
   .layout { grid-template-columns: 1fr; }
-  .must-check { grid-column: auto; grid-row: auto; order: -1; }
 }
 
 

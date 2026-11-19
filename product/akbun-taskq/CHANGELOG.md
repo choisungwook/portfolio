@@ -2,6 +2,17 @@
 
 <!-- markdownlint-configure-file {"MD024": {"siblings_only": true}} -->
 
+## 0.13.1
+
+### Changed
+
+- 확인 필요(Must check)를 오른쪽 열에서 헤더의 종 아이콘으로 옮겼다. 열린 critical·high 알림과 승인 대기 수가 아이콘에 뜨고(critical이나 승인 대기가 있으면 빨강), 누르면 아이콘 아래에 패널이 페이지 위로 열린다. Escape나 바깥 클릭으로 닫힌다. 오른쪽 열이 없어져 본문이 넓어졌다.
+- normal 등급 알림은 화면에 보이지 않는다(배지와 목록 모두).
+
+### SDK
+
+SDK 사용 변경 없음.
+
 ## 0.13.0
 
 Claude와 OpenAI bot이 이 컴퓨터의 AWS 프로파일(SSO 포함)로 Bedrock에 로그인하게 하고, 설정 화면에서 고르게 한다.
