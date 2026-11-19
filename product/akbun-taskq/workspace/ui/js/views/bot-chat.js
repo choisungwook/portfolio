@@ -15,6 +15,7 @@ import { botsSnapshot, shortTime } from './bots-sidebar.js'
 import { openBotSettings } from './bot-settings.js'
 import { initChatFind, refreshFind } from './chat-find.js'
 import { initComposeMenus, showComposeMenus } from './compose-menus.js'
+import { renderBotConnection } from './connections.js'
 
 const POLL_MS = 5000
 
@@ -63,6 +64,7 @@ export function initBotChat() {
     renderHead()
     renderWorking()
     load()
+    showConnection()
   })
   on('tab', (name) => {
     clearInterval(timer)
@@ -72,6 +74,8 @@ export function initBotChat() {
     if (currentView().view === 'bot') {
       renderHead()
       renderWorking()
+      // The panel follows turns as they end, at most every 30 s (the server caches the checks for a minute).
+      if (Date.now() - connectionShownAt > 30_000) showConnection()
     }
   })
   // Search results open the conversation at a message; it is scrolled to and flashed once the log is drawn.
@@ -79,6 +83,12 @@ export function initBotChat() {
     pendingMessage = id
     focusPending()
   })
+}
+
+let connectionShownAt = 0
+function showConnection() {
+  connectionShownAt = Date.now()
+  if (bot) renderBotConnection(area('bot-side'), bot)
 }
 
 function agentNow() {

@@ -114,6 +114,8 @@ export const OPERATIONS: Operation[] = [
   op('bot_mcp_remove', 'DELETE', '/bot-mcp-servers/:name', 'Unregister an MCP server; bots stop loading it.'),
   op('kiro_status', 'GET', '/kiro/status', 'Kiro sign-in: the saved AWS SSO start URL and region, a login in progress, and kiro-cli whoami.'),
   op('kiro_login', 'POST', '/kiro/login', 'Sign Kiro in with AWS IAM Identity Center (device flow). Fields: start_url, region. Answers the URL and code to approve in a browser.'),
+  op('connections', 'GET', '/connections', 'How bots reach their models: each connection (Claude provider, OpenAI API key, Bedrock, ChatGPT plan, Kiro) with its check, the bots on it and its last turn, plus whether bots are on or paused. Fields: refresh (1 reruns the checks).'),
+  op('bot_connection', 'GET', '/bots/:name/connection', 'One bot\'s connection, its last turn, waiting messages, and the first reason it would not answer. Fields: name, refresh.'),
   op('usage', 'GET', '/usage', 'Tokens and cost per SDK (and OpenAI provider), per bot session, and for one-off task runs. Fields: period (today|7d|30d|all).'),
   op('access_skills_discover', 'GET', '/skills/discover', 'Skill folders found on this machine that can be registered as access skills.'),
   op('access_skill_add', 'POST', '/access-skills', 'Register an access skill (logs in to a target account). Fields: path.'),

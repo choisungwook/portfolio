@@ -358,6 +358,7 @@ bot과 대화할 때 쓰는 기능은 아래와 같다.
 | 조회 태스크에서 명령이 거부된다 | 조회 전용 규칙에 없는 명령이다. 변경이 필요하면 Task의 기본 모드(Change an account)로 만든다 |
 | 태스크가 "Interrupted"로 남는다 | 실행 중에 프로세스가 죽었다. 다음 실행에서 이전 세션을 이어받는다 |
 | OpenAI나 Kiro bot이 꺼져 있고 Must check에 "login failed"가 있다 | 그 bot의 로그인(API 키, `codex login`, 설정의 Kiro)이 실패해 그 bot만 꺼졌다. 다시 로그인한 뒤 bot을 켠다 |
+| bot이 대답하지 않는다 | bot 대화 오른쪽의 연결 패널에 "대답하지 않는 이유"가 나온다. 흔한 원인은 `bots.enabled`가 false(기본값)이거나, Claude `provider`가 기본값 bedrock인데 AWS 프로파일이 없거나, 그 bot의 로그인(API 키, Codex, Kiro)이 실패한 경우다. 설정의 연결 페이지에서 연결마다 상태를 보고 다시 확인한다 |
 | Must check에 "Bots paused"가 떠 있다 | 일일 예산을 다 썼거나, bot 하나가 1시간 턴 상한을 넘었거나(메시지 루프 의심), Claude 모델 로그인이 실패했거나, bot이 taskq 데이터를 읽으려 했다. `taskq bots log`로 원인을 보고 `taskq bots resume`이나 메뉴 Bots 옆의 Resume으로 다시 켠다 |
 | 고친 화면이 안 보인다 | 브라우저를 새로 고친다 |
 | 회사 네트워크에서 `certificate verify failed`나 `self-signed certificate in certificate chain`이 뜬다 | TLS 검사 장비가 인증서를 자기 CA로 다시 서명한다. 그 CA를 넣은 PEM 파일을 `caBundle`에 적고 다시 시작한다 |

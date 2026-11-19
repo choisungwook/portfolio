@@ -127,3 +127,15 @@ mark.find.current { background: var(--accent); color: var(--on-accent); }
 .context-ring[data-level="none"] .context-track { stroke-dasharray: 2 3; }
 .compose-context { display: inline-flex; align-items: center; gap: 4px; color: var(--muted); }
 .side-bot .context-ring { margin-left: 4px; }
+
+/* A bot's page: the conversation, and on the right the connection it uses and why it may not answer. */
+.chat-page { display: grid; grid-template-columns: minmax(0, 1fr) 250px; gap: 12px; align-items: start; }
+.chat-side { background: var(--panel); border-radius: var(--radius-l); padding: 16px; display: grid; gap: 8px; font-size: var(--text-small); }
+.chat-side h3 { margin: 0; font-size: 1em; }
+.chat-side p { margin: 0; overflow-wrap: anywhere; }
+/* Too narrow for two columns: the panel goes above the conversation, so it stays in view. */
+@media (max-width: 1280px) {
+  .chat-page { grid-template-columns: 1fr; }
+  .chat-side { order: -1; padding: 10px 14px; gap: 4px; }
+  .chat-side .meta, .chat-side h3 { display: none; }
+}

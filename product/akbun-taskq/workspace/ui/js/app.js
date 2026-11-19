@@ -23,6 +23,7 @@ import { initPluginsView } from './views/plugins-view.js'
 import { initWorkflowsView } from './views/workflows-view.js'
 import { initWikiTransfer } from './views/wiki-transfer.js'
 import { initUsageSettings } from './views/usage-settings.js'
+import { initConnections } from './views/connections.js'
 import { initGlobalSettings, loadGlobalSettings } from './views/global-settings.js'
 import { initTokenNotice } from './views/token-notice.js'
 
@@ -49,6 +50,7 @@ initPluginsView()
 initWorkflowsView()
 initWikiTransfer()
 initUsageSettings()
+initConnections()
 initNav()
 if (hasToken) {
   loadGlobalSettings()

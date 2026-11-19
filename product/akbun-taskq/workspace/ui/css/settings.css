@@ -119,3 +119,32 @@ button[type="submit"].quiet:hover:not(:disabled) { background: var(--secondary-h
 .kiro-form label { display: grid; gap: 4px; flex: 1 1 200px; }
 [data-area="usage-report"] { overflow-x: auto; }
 dialog[data-area="settings-dialog"] { width: min(960px, calc(100vw - 32px)); }
+
+/* Settings: a menu on the left and one page on the right. */
+.settings-layout { display: grid; grid-template-columns: 190px minmax(0, 1fr); gap: 20px; min-height: min(640px, calc(100vh - 160px)); }
+.settings-nav { display: flex; flex-direction: column; gap: 2px; border-right: 1px solid var(--border); padding-right: 12px; }
+.settings-nav h2 { margin: 0 0 10px; }
+.settings-nav button { justify-content: flex-start; text-align: left; background: none; color: var(--fg); min-height: 34px; padding: 4px 10px; border-radius: var(--radius); }
+.settings-nav button:hover { background: var(--panel-soft); }
+.settings-nav button[aria-current="page"] { background: var(--secondary); color: var(--on-secondary); font-weight: 600; }
+.settings-pages { min-width: 0; }
+.settings-pages > .settings-section:first-child, .settings-pages > .settings-section { margin-top: 0; }
+@media (max-width: 700px) {
+  .settings-layout { grid-template-columns: 1fr; }
+  .settings-nav { flex-direction: row; flex-wrap: wrap; border-right: 0; padding-right: 0; border-bottom: 1px solid var(--border); padding-bottom: 8px; }
+  .settings-nav h2 { width: 100%; }
+}
+
+/* Connections: one card per way bots reach a model. */
+.conn-cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 10px; margin: 10px 0 18px; }
+.conn-card { border-radius: var(--radius); background: var(--panel-soft); padding: 12px 14px; display: grid; gap: 6px; align-content: start; }
+.conn-card p { margin: 0; overflow-wrap: anywhere; }
+.conn-card[data-used="false"] { opacity: 0.75; }
+.conn-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.conn-error { color: var(--danger); }
+.conn-banner { margin: 10px 0 0; padding: 10px 12px; border-radius: var(--radius); background: var(--warning-soft); color: var(--fg); }
+.conn-why { padding: 8px 10px; border-radius: var(--radius); background: var(--warning-soft); }
+.conn-why p { margin: 4px 0 0; }
+.conn-ok { color: var(--muted); }
+.conn-actions { display: flex; flex-wrap: wrap; gap: 6px; }
+.conn-head .wf-status { flex: none; white-space: nowrap; }

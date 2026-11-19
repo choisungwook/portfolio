@@ -1,9 +1,11 @@
 import type { Hono } from 'hono'
 import { kiroSso, loginState, setKiroSso, startLogin, whoami } from '../agents/kiro/login.ts'
 import { PERIODS, usageReport, type Period } from '../db/usage.ts'
+import { botConnection, listConnections } from '../team/connections.ts'
 import { HttpError, optionalJson, type ApiDeps } from './http.ts'
 
-// Sign-in for the SDKs that keep their own session (Kiro), and the Usage page.
+// Connections (how bots reach their models and whether that works), sign-in for the SDKs that keep their own session
+// (Kiro), and the Usage page.
 export function registerProviderRoutes(api: Hono, { db, config }: ApiDeps): void {
   api.get('/kiro/status', async (c) => c.json({ sso: kiroSso(db), login: loginState(), whoami: await whoami(config) }))
 
@@ -15,6 +17,16 @@ export function registerProviderRoutes(api: Hono, { db, config }: ApiDeps): void
     const problem = setKiroSso(db, sso)
     if (problem) throw new HttpError(400, problem)
     return c.json(await startLogin(config, sso))
+  })
+
+  // Every connection with its check, the bots on it and its last turn. Checks are cached for a minute; ?refresh=1 reruns.
+  api.get('/connections', async (c) => c.json(await listConnections(db, config, { refresh: c.req.query('refresh') === '1' })))
+
+  // One bot's connection and the first reason it would not answer (bots off, paused, bot off, connection, last turn).
+  api.get('/bots/:name/connection', async (c) => {
+    const found = await botConnection(db, config, c.req.param('name'), { refresh: c.req.query('refresh') === '1' })
+    if (!found) throw new HttpError(404, 'no such bot')
+    return c.json(found)
   })
 
   // Tokens and cost per SDK, per bot session, and for one-off task runs. ?period=today|7d|30d|all

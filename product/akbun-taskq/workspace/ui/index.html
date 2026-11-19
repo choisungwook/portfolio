@@ -122,7 +122,8 @@
       <div data-area="proposal-list"></div>
     </section>
 
-    <section id="view-bot" class="chat" data-view-panel="bot" aria-label="Bot conversation" data-area="bot-chat" hidden>
+    <section id="view-bot" class="chat-page" data-view-panel="bot" aria-label="Bot conversation" data-area="bot-chat" hidden>
+     <div class="chat">
       <header class="chat-head" data-area="bot-head"></header>
       <div class="chat-find" data-area="chat-find" hidden>
         <input type="search" data-area="chat-find-input" data-i18n-placeholder="chat.find" placeholder="Find in this conversation" aria-label="Find in this conversation">
@@ -145,6 +146,8 @@
         <div class="compose-tools" data-area="bot-tools"></div>
         <p class="drop-hint" data-i18n="chat.drop">Drop files here to attach them</p>
       </form>
+     </div>
+     <aside class="chat-side" data-area="bot-side" aria-label="Connection"></aside>
     </section>
 
     <section id="view-discussions" data-view-panel="discussions" aria-label="Discussions" data-area="discussions" hidden>
@@ -390,10 +393,23 @@
   </form>
 </dialog>
 
-<dialog data-area="settings-dialog" aria-labelledby="settings-title">
-  <div class="dialog-body">
-    <h2 id="settings-title" data-i18n="settings.title">Settings</h2>
-    <section class="settings-section" aria-labelledby="appearance-title">
+<dialog data-area="settings-dialog" class="settings-dialog" aria-labelledby="settings-title">
+  <div class="dialog-body settings-layout">
+    <nav class="settings-nav" data-area="settings-nav" aria-labelledby="settings-title">
+      <h2 id="settings-title" data-i18n="settings.title">Settings</h2>
+      <button type="button" data-page="appearance" data-i18n="settings.appearance">Appearance</button>
+      <button type="button" data-page="connections" data-i18n="settings.connections">Connections</button>
+      <button type="button" data-page="limits" data-i18n="settings.limits">Rate limits</button>
+      <button type="button" data-page="usage" data-i18n="settings.usage">Usage</button>
+      <button type="button" data-page="folders" data-i18n="settings.folders">Folders</button>
+      <button type="button" data-page="queue" data-i18n="settings.queue">Queue</button>
+      <button type="button" data-page="notifications">Notifications</button>
+      <button type="button" data-page="access-skills">Access skills</button>
+      <button type="button" data-page="database">Database</button>
+      <button type="button" data-page="configuration">Configuration</button>
+    </nav>
+    <div class="settings-pages">
+    <section class="settings-section" data-settings-page="appearance" aria-labelledby="appearance-title">
       <h3 id="appearance-title" data-i18n="settings.appearance">Appearance</h3>
       <div class="appearance-row">
         <label><span data-i18n="settings.language">Language</span> <select data-area="ui-language"><option value="ko">한국어</option><option value="en">English</option></select></label>
@@ -402,12 +418,30 @@
         <label>Size <input type="range" min="12" max="20" step="1" data-area="font-size"> <output data-area="font-size-value"></output></label>
       </div>
     </section>
-    <section class="settings-section" aria-labelledby="limits-title">
+    <section class="settings-section" data-settings-page="connections" aria-labelledby="connections-title" hidden>
+      <div class="plugins-head">
+        <h3 id="connections-title" data-i18n="settings.connections">Connections</h3>
+        <button type="button" data-area="connections-refresh" data-i18n="connections.check">Check again</button>
+      </div>
+      <p class="meta" data-i18n="connections.hint">How bots reach their models. Claude bots share the provider in taskq.config.json; an OpenAI bot uses the sign-in chosen in its settings; Kiro bots share the kiro-cli login. A bot that does not answer usually has a failing connection here.</p>
+      <div data-area="connections-report"></div>
+      <h4 id="kiro-title">Kiro (AWS) sign-in</h4>
+      <p class="meta" data-i18n="kiro.hint">Kiro bots use your AWS IAM Identity Center session. Enter your SSO start URL and region and sign in: kiro-cli shows a code to approve in the browser and keeps the session; taskq stores no token.</p>
+      <p data-area="kiro-status"></p>
+      <form class="mcp-form kiro-form" data-area="kiro-form">
+        <label>SSO start URL <input name="start_url" type="url" required placeholder="https://your-org.awsapps.com/start" autocomplete="off" spellcheck="false"></label>
+        <label>Region <input name="region" type="text" required placeholder="us-east-1" autocomplete="off" spellcheck="false"></label>
+        <button type="submit" data-i18n="kiro.sign_in">Sign in with AWS SSO</button>
+        <button type="button" data-area="kiro-check" data-i18n="kiro.check">Check status</button>
+      </form>
+      <div data-area="kiro-login"></div>
+    </section>
+    <section class="settings-section" data-settings-page="limits" aria-labelledby="limits-title" hidden>
       <h3 id="limits-title" data-i18n="settings.limits">Rate limits</h3>
       <p class="meta" data-i18n="settings.limits.hint">Limits for all bots together, and the defaults each bot uses unless its own settings say otherwise.</p>
       <form class="limits-form" data-area="limits-form"></form>
     </section>
-    <section class="settings-section" aria-labelledby="usage-title">
+    <section class="settings-section" data-settings-page="usage" aria-labelledby="usage-title" hidden>
       <div class="plugins-head">
         <h3 id="usage-title" data-i18n="settings.usage">Usage</h3>
         <select data-area="usage-period" aria-label="Period">
@@ -420,33 +454,21 @@
       <p class="meta" data-i18n="usage.hint">Tokens and cost of every bot session, by SDK. OpenAI cost is estimated from the prices in taskq.config.json; the ChatGPT plan has no per-turn price; Kiro reports credits when kiro-cli gives them.</p>
       <div data-area="usage-report"></div>
     </section>
-    <section class="settings-section" aria-labelledby="kiro-title">
-      <h3 id="kiro-title">Kiro (AWS)</h3>
-      <p class="meta" data-i18n="kiro.hint">Kiro bots use your AWS IAM Identity Center session. Enter your SSO start URL and region and sign in: kiro-cli shows a code to approve in the browser and keeps the session; taskq stores no token.</p>
-      <p data-area="kiro-status"></p>
-      <form class="mcp-form kiro-form" data-area="kiro-form">
-        <label>SSO start URL <input name="start_url" type="url" required placeholder="https://your-org.awsapps.com/start" autocomplete="off" spellcheck="false"></label>
-        <label>Region <input name="region" type="text" required placeholder="us-east-1" autocomplete="off" spellcheck="false"></label>
-        <button type="submit" data-i18n="kiro.sign_in">Sign in with AWS SSO</button>
-        <button type="button" data-area="kiro-check" data-i18n="kiro.check">Check status</button>
-      </form>
-      <div data-area="kiro-login"></div>
-    </section>
-    <section class="settings-section" aria-labelledby="folders-title">
+    <section class="settings-section" data-settings-page="folders" aria-labelledby="folders-title" hidden>
       <h3 id="folders-title" data-i18n="settings.folders">Folders</h3>
       <ul class="folder-list" data-area="folder-list"></ul>
     </section>
-    <section class="settings-section" aria-labelledby="queue-title">
+    <section class="settings-section" data-settings-page="queue" aria-labelledby="queue-title" hidden>
       <h3 id="queue-title" data-i18n="settings.queue">Queue</h3>
       <label class="check"><input type="checkbox" data-area="queue-autorun"> <span data-i18n="settings.autorun">Run tasks no bot owns automatically</span></label>
       <p class="meta">Off, a task without an owner runs only when you press its run button. A bot's task always waits for that bot.</p>
     </section>
-    <section class="settings-section" aria-labelledby="notifications-title">
+    <section class="settings-section" data-settings-page="notifications" aria-labelledby="notifications-title" hidden>
       <h3 id="notifications-title">Notifications</h3>
       <label class="check"><input type="checkbox" data-area="desktop-notifications" disabled> Desktop notifications</label>
       <p class="meta">Show system notifications for handoffs and critical alerts.</p>
     </section>
-    <section class="settings-section" aria-labelledby="access-skills-title">
+    <section class="settings-section" data-settings-page="access-skills" aria-labelledby="access-skills-title" hidden>
       <div class="settings-head">
         <h3 id="access-skills-title">Access skills</h3>
         <button type="button" class="add-button" data-area="access-skill-add" aria-label="Add access skill" aria-expanded="false" aria-controls="access-skill-picker">+</button>
@@ -463,7 +485,7 @@
         <p class="error" data-area="access-skill-error" role="alert"></p>
       </section>
     </section>
-    <section class="settings-section" aria-labelledby="db-title">
+    <section class="settings-section" data-settings-page="database" aria-labelledby="db-title" hidden>
       <h3 id="db-title">Database</h3>
       <p class="meta">The SQLite file that holds every task, run and event. Its location is fixed while taskq is running.</p>
       <div class="db-path-row">
@@ -473,11 +495,12 @@
         <button type="button" data-area="settings-db-change">Change</button>
       </div>
     </section>
-    <section class="settings-section" aria-labelledby="config-title">
+    <section class="settings-section" data-settings-page="configuration" aria-labelledby="config-title" hidden>
       <h3 id="config-title">Configuration</h3>
       <p class="meta">Read from taskq.config.json. These values change only when that file is edited and taskq is restarted.</p>
       <dl class="config-list" data-area="settings-config"></dl>
     </section>
+    </div>
   </div>
   <form method="dialog" class="dialog-foot"><button type="button" data-close>Close</button></form>
 </dialog>
