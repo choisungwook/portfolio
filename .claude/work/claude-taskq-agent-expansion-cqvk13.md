@@ -1,6 +1,6 @@
 # akbun-taskq UI/UX: impeccable 기준 평가와 수정
 
-- Issue: (PR 직전 생성)
+- Issue: #1535
 - Branch: claude/taskq-agent-expansion-cqvk13
 
 ## 실행 계획
