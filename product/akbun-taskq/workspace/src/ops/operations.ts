@@ -101,6 +101,8 @@ export const OPERATIONS: Operation[] = [
   op('shared_read', 'GET', '/shared/file', 'Read a file of the shared folder. Fields: path.'),
   op('open_folder', 'POST', '/open-folder', 'Open a folder in the desktop file manager. Fields: target (shared|home|sessions|bot|task), bot, task_id.'),
   // settings and plugins
+  op('update_check', 'GET', '/update', 'Whether a newer akbun-taskq release exists (current, latest, update_available, can_install and why not).'),
+  op('update_install', 'POST', '/update', 'Download the latest release build for this machine and replace the running binary; restart taskq to use it. Only for the single-file binary.'),
   op('settings_get', 'GET', '/settings', 'Settings: appearance, limits, folders, registered skills and plugins.'),
   op('settings_limits', 'POST', '/settings/limits', 'Change usage limits. Fields: daily_budget_usd, turns_per_hour_total, max_concurrent_turns, bot_turns_per_hour, turn_budget_usd, turn_max_turns.'),
   op('settings_appearance', 'POST', '/settings/appearance', 'Change appearance. Fields: font_family, font_size, language (ko|en), theme (system|dark|light).'),

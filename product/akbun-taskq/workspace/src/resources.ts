@@ -18,6 +18,11 @@ export function registerEmbedded(files: Map<string, string>, claude: string): vo
   embedded = { files, claude }
 }
 
+// True only in the compiled binary, whose entry registers the embedded files before main runs.
+export function isEmbedded(): boolean {
+  return embedded !== undefined
+}
+
 export function resourcePath(relative: string): string | undefined {
   return embedded ? embedded.files.get(relative) : join(WORKSPACE, relative)
 }

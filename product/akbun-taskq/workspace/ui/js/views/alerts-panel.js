@@ -41,6 +41,7 @@ export function initAlertsPanel() {
   document.addEventListener('keydown', (event) => {
     if (event.key !== 'Escape' || panel.hidden || event.defaultPrevented || document.querySelector('dialog[open]')) return
     const inside = panel.contains(document.activeElement) || document.activeElement === bell
+    event.preventDefault()
     setOpen(false)
     if (inside) bell.focus()
   })

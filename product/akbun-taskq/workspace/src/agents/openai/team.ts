@@ -3,7 +3,7 @@ import { mkdirSync, readdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { agentDir } from '../../team/prompt.ts'
 import type { BotProvider } from '../../db/team.ts'
 import { runCodexTurn, spawnCodex, type CodexSpawn } from './codex.ts'
-import { makeBedrockToken, profileFailure, type TokenMaker } from '../../aws/profiles.ts'
+import { bedrockModelId, listInferenceProfiles, makeBedrockToken, profileFailure, type InferenceProfileLister, type TokenMaker } from '../../aws/profiles.ts'
 import { join } from 'node:path'
 import { OpenAIProvider } from '@openai/agents-openai'
 import { z } from 'zod'
@@ -55,7 +55,7 @@ export interface OpenAIRunResult {
 }
 
 // Context windows for the context ring; the API does not report them.
-const WINDOWS: [RegExp, number][] = [[/^openai\.gpt-oss/, 128_000], [/^gpt-5/, 400_000], [/^gpt-4\.1/, 1_000_000], [/^o\d/, 200_000]]
+const WINDOWS: [RegExp, number][] = [[/^([a-z]+\.)?openai\.gpt-oss/, 128_000], [/^gpt-5/, 400_000], [/^gpt-4\.1/, 1_000_000], [/^o\d/, 200_000]]
 const windowOf = (model: string) => WINDOWS.find(([re]) => re.test(model))?.[1] ?? null
 
 export type OpenAIRunFn = (args: OpenAIRunArgs) => Promise<OpenAIRunResult>
@@ -198,13 +198,29 @@ function statusOf(error: unknown): number | undefined {
   return typeof status === 'number' ? status : undefined
 }
 
-export function createOpenAITeamBackend(runFn?: OpenAIRunFn, fetcher: typeof fetch = fetch, codex: CodexSpawn = spawnCodex, makeToken: TokenMaker = makeBedrockToken): TeamBackend {
+export function createOpenAITeamBackend(runFn?: OpenAIRunFn, fetcher: typeof fetch = fetch, codex: CodexSpawn = spawnCodex, makeToken: TokenMaker = makeBedrockToken, listProfiles: InferenceProfileLister = listInferenceProfiles): TeamBackend {
   const apiKey = () => process.env.OPENAI_API_KEY ?? ''
   // Bedrock signs in with an AWS profile when bots.bedrockProfile names one (a short-term token from its credentials),
   // otherwise with a Bedrock API key in AWS_BEARER_TOKEN_BEDROCK.
   const bedrockKey = async (config: Config): Promise<string> => (config.bots.bedrockProfile
     ? makeToken(config.bots.bedrockProfile, config.bots.bedrockRegion)
     : process.env.AWS_BEARER_TOKEN_BEDROCK ?? '')
+  // The inference profiles the signed-in AWS profile sees. A Bedrock API key alone cannot list them, so that sign-in keeps
+  // the built-in list and the ids as typed. A failed listing is not a failed turn.
+  // A failure (no bedrock:ListInferenceProfiles, an expired SSO session) is remembered for 2 minutes so every turn does not
+  // sign and fail again.
+  const failedAt = new Map<string, number>()
+  const profilesFor = async (config: Config) => {
+    if (!config.bots.bedrockProfile) return []
+    const key = `${config.bots.bedrockProfile}@${config.bots.bedrockRegion}`
+    if (Date.now() - (failedAt.get(key) ?? 0) < 120_000) return []
+    try {
+      return await listProfiles(config.bots.bedrockProfile, config.bots.bedrockRegion)
+    } catch {
+      failedAt.set(key, Date.now())
+      return []
+    }
+  }
   return {
     sdk: 'openai',
     supportsLiveInput: false,
@@ -223,6 +239,10 @@ export function createOpenAITeamBackend(runFn?: OpenAIRunFn, fetcher: typeof fet
         if (!runFn && !bedrockToken) return { outcome: 'failed', error: 'no Bedrock sign-in: choose an AWS profile in Settings > Connections, or set AWS_BEARER_TOKEN_BEDROCK (a Bedrock API key)' }
       }
       const run = runFn ?? sdkRun(apiKey(), bedrockToken)
+      // Newer OpenAI models on Bedrock answer only through an inference profile: openai.<model> becomes us.openai.<model>
+      // (or the region's geography, else global.) when the region lists one.
+      const typed = request.agent.model ?? (provider === 'bedrock' ? BEDROCK_DEFAULT_MODEL : DEFAULT_OPENAI_MODEL)
+      const modelId = provider === 'bedrock' ? bedrockModelId(typed, config.bots.bedrockRegion, await profilesFor(config)) : typed
       const history = provider === 'bedrock' ? loadHistory(config, request) : undefined
       const abort = new AbortController()
       const onAbort = () => abort.abort()
@@ -242,7 +262,7 @@ export function createOpenAITeamBackend(runFn?: OpenAIRunFn, fetcher: typeof fet
         const result = await run({
           mcpServers: request.mcpServers ?? [],
           cwd: request.cwd,
-          model: request.agent.model ?? (provider === 'bedrock' ? BEDROCK_DEFAULT_MODEL : DEFAULT_OPENAI_MODEL),
+          model: modelId,
           instructions: request.system,
           tools,
           input: request.prompt,
@@ -252,7 +272,7 @@ export function createOpenAITeamBackend(runFn?: OpenAIRunFn, fetcher: typeof fet
           history, provider, region: config.bots.bedrockRegion,
           signal: abort.signal,
         })
-        const model = request.agent.model ?? (provider === 'bedrock' ? BEDROCK_DEFAULT_MODEL : DEFAULT_OPENAI_MODEL)
+        const model = modelId
         if (result.history) saveHistory(config, request, result.history)
         const base = {
           session_id: provider === 'bedrock'
@@ -277,7 +297,13 @@ export function createOpenAITeamBackend(runFn?: OpenAIRunFn, fetcher: typeof fet
       }
     },
     // The model list from the API when a key is set; the commands are the bot's skills only (no plugin system here).
-    async catalog(_config: Config, _request: CatalogRequest): Promise<Catalog> {
+    async catalog(config: Config, request: CatalogRequest): Promise<Catalog> {
+      // Bedrock: the OpenAI inference profiles the AWS profile can use in the region; none (API key sign-in, or the listing
+      // failed) falls back to the built-in list.
+      if (request.agent.provider === 'bedrock') {
+        const profiles = (await profilesFor(config)).filter((p) => p.id.includes('openai.'))
+        return { models: profiles.map((p) => ({ id: p.id, name: p.name, description: p.id, efforts: ['low', 'medium', 'high'] })), commands: [] }
+      }
       if (!apiKey()) return { models: [], commands: [] }
       const res = await fetcher('https://api.openai.com/v1/models', { headers: { authorization: `Bearer ${apiKey()}` } })
       if (!res.ok) throw new Error(`OpenAI models list: HTTP ${res.status}`)
