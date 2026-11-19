@@ -1,5 +1,7 @@
-// Settings dialog: the access skill registry and the read-only configuration. Skill changes arrive on the bus and
-// reload the dialog; closing it tells the task form to refresh its access skill list.
+// Settings dialog: a menu on the left and one page on the right (appearance, connections, limits, usage, ...). This file
+// switches the pages and owns the access skill registry and the read-only configuration; other views fill their own
+// page and listen for 'settings-page'. Skill changes arrive on the bus and reload the dialog; closing it tells the task
+// form to refresh its access skill list.
 import { api, mutate } from '../core/api.js'
 import { area, clear, el } from '../core/dom.js'
 import { emit, on } from '../core/bus.js'
@@ -13,6 +15,32 @@ let configList
 let notificationToggle
 let savingNotification = false
 let loadId = 0
+let opener = null
+const PAGE_KEY = 'taskq.settings.page'
+
+function savedPage() {
+  try {
+    return localStorage.getItem(PAGE_KEY)
+  } catch {
+    return null
+  }
+}
+
+export function showSettingsPage(name) {
+  const pages = [...dialog.querySelectorAll('[data-settings-page]')]
+  const page = pages.some((section) => section.dataset.settingsPage === name) ? name : 'appearance'
+  for (const section of pages) section.hidden = section.dataset.settingsPage !== page
+  for (const button of area('settings-nav').querySelectorAll('[data-page]')) {
+    if (button.dataset.page === page) button.setAttribute('aria-current', 'page')
+    else button.removeAttribute('aria-current')
+  }
+  try {
+    localStorage.setItem(PAGE_KEY, page)
+  } catch {
+    // The page is remembered only where storage works.
+  }
+  emit('settings-page', page)
+}
 
 export function initSettings() {
   dialog = area('settings-dialog')
@@ -22,12 +50,27 @@ export function initSettings() {
   notificationToggle.addEventListener('change', saveNotification)
   gear.addEventListener('click', () => {
     dialog.showModal()
+    showSettingsPage(savedPage() ?? 'appearance')
     load()
+  })
+  area('settings-nav').addEventListener('click', (event) => {
+    const button = event.target.closest('[data-page]')
+    if (button) showSettingsPage(button.dataset.page)
+  })
+  // Opened from elsewhere (the bot connection panel): the gear's own listeners load every page, then the page shows and
+  // focus goes back to where it came from.
+  on('open-settings', (page) => {
+    if (!dialog.open) {
+      opener = document.activeElement
+      gear.click()
+    }
+    showSettingsPage(page)
   })
   dialog.querySelector('[data-close]').addEventListener('click', () => dialog.close())
   dialog.addEventListener('close', () => {
     resetPicker()
-    gear.focus()
+    ;(opener?.isConnected ? opener : gear).focus()
+    opener = null
     emit('settings-closed')
   })
   on('skills-changed', load)

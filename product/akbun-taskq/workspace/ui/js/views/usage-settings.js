@@ -1,6 +1,7 @@
 // Two sections of the global settings: Usage (tokens and cost per SDK and per bot session, Claude, OpenAI and Kiro
 // side by side) and Kiro sign-in (AWS IAM Identity Center device flow). Both load when the settings dialog opens.
 import { api, mutate, notify } from '../core/api.js'
+import { on } from '../core/bus.js'
 import { area, el, fill } from '../core/dom.js'
 import { t } from '../core/i18n.js'
 import { fmtDateTime } from '../core/time.js'
@@ -11,9 +12,9 @@ const PROVIDER_NAME = { api: 'API key', bedrock: 'Bedrock', chatgpt: 'ChatGPT pl
 let period = '7d'
 
 export function initUsageSettings() {
-  area('settings-button').addEventListener('click', () => {
-    loadUsage()
-    loadKiro()
+  on('settings-page', (page) => {
+    if (page === 'usage') loadUsage()
+    if (page === 'connections') loadKiro()
   })
   area('usage-period').addEventListener('change', (event) => {
     period = event.target.value

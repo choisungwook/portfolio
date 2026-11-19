@@ -159,6 +159,15 @@ export function registerBotsRoutes(api: Hono, { db, config, bots }: ApiDeps): vo
   })
 
   // Routes with a bot name come last, so /bots/messages, /bots/wiki and /bots/presets are not read as bot names.
+  // The bot's failed turns, newest first, so its conversation can show why a message went unanswered. ?limit= (50)
+  api.get('/bots/:name/turn-errors', (c) => {
+    const name = c.req.param('name')
+    if (!getAgent(db, name)) throw new HttpError(404, 'no such bot')
+    const limit = Math.min(200, Math.max(1, Number(c.req.query('limit') ?? 50) || 50))
+    return c.json(db.prepare(`SELECT id, outcome, error, ended_at FROM team_turns WHERE agent = ? AND outcome = 'failed' AND ended_at IS NOT NULL
+      ORDER BY id DESC LIMIT ?`).all(name, limit))
+  })
+
   api.get('/bots/:name', (c) => {
     const agent = getAgent(db, c.req.param('name'))
     if (!agent) throw new HttpError(404, 'no such bot')

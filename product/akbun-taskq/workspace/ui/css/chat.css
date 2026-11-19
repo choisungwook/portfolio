@@ -61,7 +61,7 @@
 /* Working bar, Stop, find bar, attachments. */
 .chat { display: flex; flex-direction: column; position: relative; }
 .chat > .chat-log { flex: 1; min-height: 0; }
-.chat[data-dragging="true"]::after, .shared-drop[data-dragging="true"]::after, .task-attach[data-dragging="true"]::after {
+.chat-page[data-dragging="true"] .chat::after, .shared-drop[data-dragging="true"]::after, .task-attach[data-dragging="true"]::after {
   content: ""; position: absolute; inset: 6px; border: 2px dashed var(--accent); border-radius: var(--radius-l); pointer-events: none;
 }
 .shared-drop, .task-attach { position: relative; }
@@ -87,7 +87,7 @@ mark.find.current { background: var(--accent); color: var(--on-accent); }
 .attach-chip[data-state="uploading"] { opacity: 0.6; }
 .attach-remove { min-height: 22px; width: 22px; padding: 0; border-radius: 50%; color: var(--muted); }
 .drop-hint { display: none; margin: 0; color: var(--accent); font-size: var(--text-small); }
-.chat[data-dragging="true"] .drop-hint { display: block; }
+.chat-page[data-dragging="true"] .drop-hint { display: block; }
 .msg-files { display: flex; flex-wrap: wrap; gap: 6px; }
 .file-chip { min-height: 26px; padding: 2px 10px; border-radius: 999px; background: var(--chip); color: var(--link); font-size: var(--text-small); }
 .task-attach { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding: 8px; border-radius: var(--radius); background: var(--panel-soft); }
@@ -127,3 +127,18 @@ mark.find.current { background: var(--accent); color: var(--on-accent); }
 .context-ring[data-level="none"] .context-track { stroke-dasharray: 2 3; }
 .compose-context { display: inline-flex; align-items: center; gap: 4px; color: var(--muted); }
 .side-bot .context-ring { margin-left: 4px; }
+
+/* A bot's page: the conversation, and on the right the connection it uses and why it may not answer. */
+.chat-page { display: grid; grid-template-columns: minmax(0, 1fr) 250px; gap: 12px; align-items: start; }
+.chat-side { background: var(--panel); border-radius: var(--radius-l); padding: 16px; display: grid; gap: 8px; font-size: var(--text-small); }
+.chat-side h3 { margin: 0; font-size: 1em; }
+.chat-side p { margin: 0; overflow-wrap: anywhere; }
+/* Too narrow for two columns: the panel goes above the conversation, so it stays in view. */
+@media (max-width: 1280px) {
+  .chat-page { grid-template-columns: 1fr; }
+  .chat-side { order: -1; padding: 10px 14px; gap: 4px; }
+  .chat-side .meta, .chat-side h3 { display: none; }
+}
+/* A failed turn or a refused message, shown in the conversation where it happened. */
+.msg[data-side="error"] { align-self: stretch; max-width: none; }
+.msg[data-side="error"] .bubble { background: var(--warning-soft); color: var(--fg); box-shadow: inset 3px 0 0 var(--danger); border-radius: var(--radius); }

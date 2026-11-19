@@ -15,6 +15,7 @@ import { botsSnapshot, shortTime } from './bots-sidebar.js'
 import { openBotSettings } from './bot-settings.js'
 import { initChatFind, refreshFind } from './chat-find.js'
 import { initComposeMenus, showComposeMenus } from './compose-menus.js'
+import { renderBotConnection } from './connections.js'
 
 const POLL_MS = 5000
 
@@ -60,9 +61,12 @@ export function initBotChat() {
     lastKey = null
     clear(nodes.log)
     files.clear()
+    sendError = null
+    blocker = null
     renderHead()
     renderWorking()
     load()
+    showConnection()
   })
   on('tab', (name) => {
     clearInterval(timer)
@@ -72,12 +76,31 @@ export function initBotChat() {
     if (currentView().view === 'bot') {
       renderHead()
       renderWorking()
+      // The panel follows turns as they end, at most every 30 s (the server caches the checks for a minute).
+      if (Date.now() - connectionShownAt > 30_000) showConnection()
     }
   })
   // Search results open the conversation at a message; it is scrolled to and flashed once the log is drawn.
   on('focus-message', (id) => {
     pendingMessage = id
     focusPending()
+  })
+}
+
+let connectionShownAt = 0
+let blocker = null
+function showConnection() {
+  connectionShownAt = Date.now()
+  const name = bot
+  if (!name) return
+  renderBotConnection(area('bot-side'), name, {
+    current: () => bot === name,
+    onInfo: (info) => {
+      if ((info.blocker ?? null) === blocker) return
+      blocker = info.blocker ?? null
+      lastKey = null
+      load()
+    },
   })
 }
 
@@ -156,19 +179,34 @@ async function cancel() {
   if (ok) emit('bots-changed')
 }
 
+// The conversation: the bot's messages, its failed turns (why a message went unanswered) and a message of mine the
+// server refused, in time order.
+let sendError = null
+
 async function load() {
   if (!bot) return
   const name = bot
   try {
-    const messages = (await api.get(`/bots/messages?agent=${encodeURIComponent(name)}&limit=200`)).reverse()
+    const [list, errors] = await Promise.all([
+      api.get(`/bots/messages?agent=${encodeURIComponent(name)}&limit=200`),
+      api.get(`/bots/${encodeURIComponent(name)}/turn-errors?limit=50`).catch(() => []),
+    ])
+    const messages = list.reverse()
     if (bot !== name) return
-    const key = `${messages.at(-1)?.id ?? 0}:${messages.length}`
+    const oldest = messages[0]?.created_at ?? 0
+    const failures = errors.filter((turn) => turn.ended_at >= oldest).map((turn) => ({ at: turn.ended_at, node: () => turnError(turn) }))
+    const items = [...messages.map((m) => ({ at: m.created_at, node: () => bubble(m, name) })), ...failures]
+      .sort((a, b) => a.at - b.at)
+    if (sendError && sendError.bot === name) items.push({ at: sendError.at, node: () => refused(sendError) })
+    // My last message is still unanswered and the bot cannot answer now: say why under it.
+    else if (blocker && messages.at(-1)?.sender === 'user') items.push({ at: Infinity, node: () => wontAnswer(blocker) })
+    const key = `${messages.at(-1)?.id ?? 0}:${messages.length}:${errors[0]?.id ?? 0}:${sendError?.at ?? 0}:${blocker ?? ''}`
     if (key === lastKey && nodes.log.childElementCount > 0) return
     const atBottom = nodes.log.scrollHeight - nodes.log.scrollTop - nodes.log.clientHeight < 40
     lastKey = key
-    clear(nodes.log).append(...(messages.length === 0
+    clear(nodes.log).append(...(items.length === 0
       ? [el('p', { class: 'empty chat-empty', text: t('chat.empty', 'No messages yet.') })]
-      : messages.map((m) => bubble(m, name))))
+      : items.map((item) => item.node())))
     if (atBottom || nodes.log.dataset.first !== name) nodes.log.scrollTop = nodes.log.scrollHeight
     nodes.log.dataset.first = name
     refreshFind()
@@ -199,6 +237,27 @@ function parseFiles(value) {
   } catch {
     return []
   }
+}
+
+// A failed turn: the bot did not answer the messages it was given, and this says why.
+function turnError(turn) {
+  return el('div', { class: 'msg', dataset: { side: 'error', turn: String(turn.id) }, role: 'note' },
+    el('div', { class: 'msg-body' },
+      el('div', { class: 'bubble' }, el('strong', { text: `${t('chat.turn_failed', 'The turn failed')}: ` }), turn.error ?? t('chat.no_reason', 'no reason given')),
+      el('span', { class: 'msg-meta', text: shortTime(turn.ended_at) })))
+}
+
+function wontAnswer(reason) {
+  return el('div', { class: 'msg', dataset: { side: 'error' }, role: 'status' },
+    el('div', { class: 'msg-body' }, el('div', { class: 'bubble' }, el('strong', { text: `${t('chat.wont_answer', 'Will not answer yet')}: ` }), reason)))
+}
+
+// A message of mine the server refused; the text stays in the input to send again.
+function refused(failure) {
+  return el('div', { class: 'msg', dataset: { side: 'error' }, role: 'alert' },
+    el('div', { class: 'msg-body' },
+      el('div', { class: 'bubble' }, el('strong', { text: `${t('chat.send_failed', 'Not sent')}: ` }), failure.message),
+      el('span', { class: 'msg-meta', text: `${shortTime(failure.at)} · ${failure.body.slice(0, 80)}` })))
 }
 
 function bubble(m, name) {
@@ -246,8 +305,19 @@ async function send(event) {
     notify('Wait for the attachments to finish uploading', true)
     return
   }
-  const ok = await mutate(() => api.post('/bots/messages', { to: bot, body, attachments: attached }))
+  let ok = false
+  try {
+    ok = await api.post('/bots/messages', { to: bot, body, attachments: attached })
+  } catch (error) {
+    sendError = { bot, body, message: error.message, at: Math.floor(Date.now() / 1000) }
+    lastKey = null
+    await load()
+    nodes.log.scrollTop = nodes.log.scrollHeight
+    return
+  }
   if (ok) {
+    sendError = null
+    showConnection()
     nodes.input.value = ''
     fit()
     files.clear()
