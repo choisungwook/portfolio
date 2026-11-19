@@ -104,7 +104,7 @@ export const OPERATIONS: Operation[] = [
   op('update_check', 'GET', '/update', 'Whether a newer akbun-taskq release exists (current, latest, update_available, can_install and why not).'),
   op('update_install', 'POST', '/update', 'Download the latest release build for this machine and replace the running binary; restart taskq to use it. Only for the single-file binary.'),
   op('settings_get', 'GET', '/settings', 'Settings: appearance, limits, folders, registered skills and plugins.'),
-  op('settings_limits', 'POST', '/settings/limits', 'Change usage limits. Fields: daily_budget_usd, turns_per_hour_total, max_concurrent_turns, bot_turns_per_hour, turn_budget_usd, turn_max_turns.'),
+  op('settings_limits', 'POST', '/settings/limits', 'Change usage limits. Fields: daily_budget_usd, turns_per_hour_total, max_concurrent_turns, bot_turns_per_hour, turn_budget_usd, turn_max_turns, session_max_tokens.'),
   op('settings_appearance', 'POST', '/settings/appearance', 'Change appearance. Fields: font_family, font_size, language (ko|en), theme (system|dark|light).'),
   op('settings_queue_autorun', 'POST', '/settings/queue-autorun', 'Whether the queue runs unowned ready tasks on its own. Fields: enabled.'),
   op('settings_desktop_notifications', 'POST', '/settings/desktop-notifications', 'Turn desktop notifications on or off. Fields: enabled.'),

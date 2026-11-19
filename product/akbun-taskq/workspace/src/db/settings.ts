@@ -12,6 +12,7 @@ export interface Limits {
   bot_turns_per_hour: number    // per-bot default; a bot's own setting overrides it
   turn_budget_usd: number       // per-turn default
   turn_max_turns: number        // per-turn default
+  session_max_tokens: number    // a conversation larger than this is handed over to a new session (src/team/hub.ts)
 }
 
 export const LIMIT_RANGES: Record<keyof Limits, { min: number; max: number; integer: boolean }> = {
@@ -21,6 +22,7 @@ export const LIMIT_RANGES: Record<keyof Limits, { min: number; max: number; inte
   bot_turns_per_hour: { min: 1, max: 1000, integer: true },
   turn_budget_usd: { min: 0.01, max: 100, integer: false },
   turn_max_turns: { min: 1, max: 500, integer: true },
+  session_max_tokens: { min: 50_000, max: 2_000_000, integer: true },
 }
 
 export function limits(db: Db, config: Config): Limits {
@@ -32,6 +34,7 @@ export function limits(db: Db, config: Config): Limits {
     bot_turns_per_hour: b.hourlyTurnsPerAgent,
     turn_budget_usd: b.turnBudgetUsd,
     turn_max_turns: b.turnMaxTurns,
+    session_max_tokens: 100_000,
   }
   const out = { ...defaults }
   for (const key of Object.keys(LIMIT_RANGES) as (keyof Limits)[]) {
