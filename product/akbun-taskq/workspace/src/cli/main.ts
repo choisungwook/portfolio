@@ -1,3 +1,4 @@
+import { applyConnectionSettings } from '../team/connection-settings.ts'
 import { execFileSync } from 'node:child_process'
 import { loadConfig } from '../config.ts'
 import { claudeExecutable } from '../resources.ts'
@@ -62,6 +63,8 @@ export async function main(argv: string[]): Promise<void> {
   }
   const config = loadConfig()
   const db = openDb(config.home)
+  // Sign-in saved in Settings > Connections wins over taskq.config.json, in the CLI and MCP server as in the server.
+  applyConnectionSettings(db, config)
   if (name === 'run') {
     await runCommand(config, db)
     return

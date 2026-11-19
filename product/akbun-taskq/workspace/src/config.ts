@@ -28,6 +28,7 @@ export interface BotsConfig {
   openaiInputPerMTok: number
   openaiOutputPerMTok: number
   bedrockRegion: string        // OpenAI bots on Amazon Bedrock: the region of the OpenAI-compatible endpoint
+  bedrockProfile: string       // OpenAI bots on Amazon Bedrock: an AWS profile (SSO works) whose short-term credentials sign a token; '' uses AWS_BEARER_TOKEN_BEDROCK
   codexPath: string            // OpenAI bots on the ChatGPT plan: the Codex CLI to run
   kiroPath: string             // Kiro bots: the kiro-cli to run
 }
@@ -76,7 +77,7 @@ export const DEFAULTS: Omit<Config, 'home'> = {
   bots: {
     maxConcurrentTurns: 2, turnMaxTurns: 30, turnBudgetUsd: 1, dailyBudgetUsd: 10,
     hourlyTurnsPerAgent: 20, maxOpenTasks: 10, maxAttempts: 3, readRoots: [],
-    openaiInputPerMTok: 1.25, openaiOutputPerMTok: 10, bedrockRegion: 'us-west-2', codexPath: 'codex', kiroPath: 'kiro-cli',
+    openaiInputPerMTok: 1.25, openaiOutputPerMTok: 10, bedrockRegion: 'us-west-2', bedrockProfile: '', codexPath: 'codex', kiroPath: 'kiro-cli',
   },
 }
 

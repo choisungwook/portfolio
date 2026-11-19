@@ -11,6 +11,7 @@ import { getMeta, setMeta } from '../db/meta.ts'
 import { limits } from '../db/settings.ts'
 import { raiseAlert } from '../alerts/rules.ts'
 import { consumeApproval, requestApproval } from '../db/bot-requests.ts'
+import { applyConnectionSettings } from './connection-settings.ts'
 import { runDueRoutines, runTriggeredRoutines, nextRoutineAt } from '../db/routines.ts'
 import { nowSec } from '../time.ts'
 import { teamChanged } from '../wake.ts'
@@ -312,6 +313,8 @@ export function createTeamHub({ db, config, backend: claude, backends = {}, retr
   function tick(): void {
     cancelRequested()
     if (isTeamPaused(db)) return
+    // A sign-in changed from the CLI or MCP (another process) reaches this one here; the UI applies it at once.
+    applyConnectionSettings(db, config)
     // Routines come due as messages; the turn that follows is an ordinary one, under the same guards.
     runDueRoutines(db)
     runTriggeredRoutines(db)

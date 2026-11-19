@@ -3,6 +3,7 @@ import { mkdirSync, readdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { agentDir } from '../../team/prompt.ts'
 import type { BotProvider } from '../../db/team.ts'
 import { runCodexTurn, spawnCodex, type CodexSpawn } from './codex.ts'
+import { makeBedrockToken, profileFailure, type TokenMaker } from '../../aws/profiles.ts'
 import { join } from 'node:path'
 import { OpenAIProvider } from '@openai/agents-openai'
 import { z } from 'zod'
@@ -197,9 +198,13 @@ function statusOf(error: unknown): number | undefined {
   return typeof status === 'number' ? status : undefined
 }
 
-export function createOpenAITeamBackend(runFn?: OpenAIRunFn, fetcher: typeof fetch = fetch, codex: CodexSpawn = spawnCodex): TeamBackend {
+export function createOpenAITeamBackend(runFn?: OpenAIRunFn, fetcher: typeof fetch = fetch, codex: CodexSpawn = spawnCodex, makeToken: TokenMaker = makeBedrockToken): TeamBackend {
   const apiKey = () => process.env.OPENAI_API_KEY ?? ''
-  const bedrockKey = () => process.env.AWS_BEARER_TOKEN_BEDROCK ?? ''
+  // Bedrock signs in with an AWS profile when bots.bedrockProfile names one (a short-term token from its credentials),
+  // otherwise with a Bedrock API key in AWS_BEARER_TOKEN_BEDROCK.
+  const bedrockKey = async (config: Config): Promise<string> => (config.bots.bedrockProfile
+    ? makeToken(config.bots.bedrockProfile, config.bots.bedrockRegion)
+    : process.env.AWS_BEARER_TOKEN_BEDROCK ?? '')
   return {
     sdk: 'openai',
     supportsLiveInput: false,
@@ -207,8 +212,17 @@ export function createOpenAITeamBackend(runFn?: OpenAIRunFn, fetcher: typeof fet
       const provider = request.agent.provider ?? 'api'
       if (provider === 'chatgpt') return runCodexTurn(config, request, codex)
       if (!runFn && provider === 'api' && !apiKey()) return { outcome: 'failed', error: 'OPENAI_API_KEY is not set in the environment taskq runs in' }
-      if (!runFn && provider === 'bedrock' && !bedrockKey()) return { outcome: 'failed', error: 'AWS_BEARER_TOKEN_BEDROCK (a Bedrock API key) is not set in the environment taskq runs in' }
-      const run = runFn ?? sdkRun(apiKey(), bedrockKey())
+      let bedrockToken = ''
+      if (provider === 'bedrock') {
+        try {
+          bedrockToken = await bedrockKey(config)
+        } catch {
+          // The SDK's message can carry a credential_process command line or its output, so only a fixed sentence is kept.
+          return { outcome: 'failed', cost_usd: 0, error: profileFailure(config.bots.bedrockProfile) }
+        }
+        if (!runFn && !bedrockToken) return { outcome: 'failed', error: 'no Bedrock sign-in: choose an AWS profile in Settings > Connections, or set AWS_BEARER_TOKEN_BEDROCK (a Bedrock API key)' }
+      }
+      const run = runFn ?? sdkRun(apiKey(), bedrockToken)
       const history = provider === 'bedrock' ? loadHistory(config, request) : undefined
       const abort = new AbortController()
       const onAbort = () => abort.abort()

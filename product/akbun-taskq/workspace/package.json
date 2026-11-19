@@ -1,6 +1,6 @@
 {
   "name": "akbun-taskq",
-  "version": "0.12.0",
+  "version": "0.13.0",
   "private": true,
   "type": "module",
   "description": "Personal agent task queue",
@@ -20,6 +20,8 @@
   },
   "dependencies": {
     "@anthropic-ai/claude-agent-sdk": "^0.3.327",
+    "@aws-sdk/credential-providers": "^3.1172.0",
+    "@aws/bedrock-token-generator": "^1.1.0",
     "@hono/node-server": "^1.19.0",
     "@modelcontextprotocol/sdk": "^1.32.2",
     "@openai/agents-core": "^0.22.0",
