@@ -1,5 +1,6 @@
 import type { Config } from '../config.ts'
 import type { BotSdk, TeamAgent } from '../db/team.ts'
+import type { ApprovalBroker } from './bot-gate.ts'
 import type { TeamTool } from './tools.ts'
 import type { LiveInput } from './live-input.ts'
 import type { McpServerEntry } from '../db/mcp-registry.ts'
@@ -22,6 +23,7 @@ export interface TurnRequest {
   skills?: { name: string; description: string; path: string }[]  // the bot's skills, for a backend without plugins (OpenAI)
   signal: AbortSignal
   turnId?: number           // the turn's row; a runtime in its own process hands it to `taskq mcp --bot` as TASKQ_TURN_ID
+  approvals?: ApprovalBroker  // ask-first calls become requests the user approves (src/team/bot-gate.ts)
 }
 
 export interface TurnResult {

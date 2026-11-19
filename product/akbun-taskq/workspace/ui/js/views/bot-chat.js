@@ -15,7 +15,7 @@ import { botsSnapshot, shortTime } from './bots-sidebar.js'
 import { openBotSettings } from './bot-settings.js'
 import { initChatFind, refreshFind } from './chat-find.js'
 import { initComposeMenus, showComposeMenus } from './compose-menus.js'
-import { renderBotConnection } from './connections.js'
+import { botConnection } from './connections.js'
 
 const POLL_MS = 5000
 
@@ -93,14 +93,11 @@ function showConnection() {
   connectionShownAt = Date.now()
   const name = bot
   if (!name) return
-  renderBotConnection(area('bot-side'), name, {
-    current: () => bot === name,
-    onInfo: (info) => {
-      if ((info.blocker ?? null) === blocker) return
-      blocker = info.blocker ?? null
-      lastKey = null
-      load()
-    },
+  botConnection(name).then((info) => {
+    if (bot !== name || (info?.blocker ?? null) === blocker) return
+    blocker = info?.blocker ?? null
+    lastKey = null
+    load()
   })
 }
 

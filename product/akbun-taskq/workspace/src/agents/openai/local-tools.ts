@@ -3,7 +3,7 @@ import { closeSync, constants, mkdirSync, openSync, readdirSync, readFileSync, s
 import { dirname, resolve } from 'node:path'
 import type { Config } from '../../config.ts'
 import type { TeamAgent } from '../../db/team.ts'
-import { botGate } from '../../team/bot-gate.ts'
+import { botGate, type ApprovalBroker } from '../../team/bot-gate.ts'
 import { realPath, under } from '../../worker/paths.ts'
 import { worktreesDir } from '../../workspace/worktree.ts'
 
@@ -29,9 +29,9 @@ const READ_LIMIT = 100_000
 const SHELL_TIMEOUT_MS = 120_000
 const OUTPUT_LIMIT = 20_000
 
-export function localTools(config: Config, agent: TeamAgent, cwd: string, sharedDir: string): LocalTool[] {
+export function localTools(config: Config, agent: TeamAgent, cwd: string, sharedDir: string, approvals?: ApprovalBroker): LocalTool[] {
   const gate = (tool: string, input: Record<string, unknown>): void => {
-    const verdict = botGate(config, agent, cwd, tool, input)
+    const verdict = botGate(config, agent, cwd, tool, input, approvals)
     if (verdict.action === 'stop') throw new GateStop(verdict.reason)
     if (verdict.action === 'deny') throw new Error(verdict.reason)
   }

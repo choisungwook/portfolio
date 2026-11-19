@@ -17,8 +17,8 @@ describe('bots api', () => {
   const post = (body: unknown) => ({ method: 'POST', headers: { ...headers(), 'content-type': 'application/json' }, body: JSON.stringify(body) })
 
   test('only the orchestrator exists at first, and a user message goes to it by default', async () => {
-    const team = await (await app().request('/api/bots', { headers: headers() })).json() as { enabled: boolean; agents: Record<string, unknown>[] }
-    assert.equal(team.enabled, false)
+    const team = await (await app().request('/api/bots', { headers: headers() })).json() as { enabled?: boolean; agents: Record<string, unknown>[] }
+    assert.equal(team.enabled, undefined, 'bots always run; there is no off switch')
     assert.deepEqual(team.agents.map((a) => a.name), ['taskq'])
     assert.equal('instructions' in team.agents[0], false)
     const res = await app().request('/api/bots/messages', post({ body: 'survey X' }))

@@ -148,3 +148,21 @@ dialog[data-area="settings-dialog"] { width: min(960px, calc(100vw - 32px)); }
 .conn-ok { color: var(--muted); }
 .conn-actions { display: flex; flex-wrap: wrap; gap: 6px; }
 .conn-head .wf-status { flex: none; white-space: nowrap; }
+
+/* Routines in a bot's settings. */
+.routine-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+.routine-list li { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: 4px 8px; align-items: center; }
+.routine-list li > p { grid-column: 1 / -1; margin: 0; }
+.routine-add { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; }
+.routine-add textarea { grid-column: 1 / -1; }
+.routine-add button { justify-self: start; }
+
+/* Weekly review and goals. */
+.review-prune, .review-spot, .goal-list { list-style: none; margin: 8px 0 14px; padding: 0; display: grid; gap: 8px; }
+.review-prune li { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+.review-spot li, .goal-list li { background: var(--panel-soft); border-radius: var(--radius); padding: 10px 12px; display: grid; gap: 4px; }
+.review-spot p, .goal-list p { margin: 0; overflow-wrap: anywhere; }
+.goal-form { display: grid; gap: 8px; max-width: 720px; margin: 10px 0 18px; }
+.goal-form label { display: grid; gap: 4px; color: var(--muted); font-size: var(--text-small); }
+.goal-form button { justify-self: start; }
+#view-goals { background: var(--panel); border-radius: var(--radius-l); padding: 20px; }

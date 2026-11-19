@@ -24,6 +24,8 @@ import { initWorkflowsView } from './views/workflows-view.js'
 import { initWikiTransfer } from './views/wiki-transfer.js'
 import { initUsageSettings } from './views/usage-settings.js'
 import { initConnections } from './views/connections.js'
+import { initGoalsView } from './views/goals-view.js'
+import { initReviewSettings } from './views/review-settings.js'
 import { initGlobalSettings, loadGlobalSettings } from './views/global-settings.js'
 import { initTokenNotice } from './views/token-notice.js'
 
@@ -51,6 +53,8 @@ initWorkflowsView()
 initWikiTransfer()
 initUsageSettings()
 initConnections()
+initGoalsView()
+initReviewSettings()
 initNav()
 if (hasToken) {
   loadGlobalSettings()

@@ -1,7 +1,7 @@
-// The Connections page of Settings and the connection panel on a bot's page: how each bot reaches its model, whether
-// that works, and why a bot is not answering.
+// The Connections page of Settings, plus the connection data the bot list (status dots) and a bot's conversation (why it
+// may not answer) use: how each bot reaches its model and whether that works.
 import { api } from '../core/api.js'
-import { emit, on } from '../core/bus.js'
+import { on } from '../core/bus.js'
 import { area, el, fill } from '../core/dom.js'
 import { t } from '../core/i18n.js'
 import { fmtDateTime } from '../core/time.js'
@@ -23,9 +23,8 @@ function lastLine(last, lastOk) {
       : null)
 }
 
-// A warning when no bot can answer at all: bots off in the config, or paused.
+// A warning when no bot can answer at all: the bots are paused.
 export function teamBanner(team) {
-  if (!team.enabled) return el('p', { class: 'conn-banner', role: 'alert', text: t('connections.off', 'Bots are off. Set bots.enabled to true in taskq.config.json and restart taskq; while off, no bot answers.') })
   if (team.paused) return el('p', { class: 'conn-banner', role: 'alert', text: `${t('connections.paused', 'Bots are paused')}: ${team.pause_reason ?? ''}` })
   return null
 }
@@ -54,34 +53,21 @@ async function loadConnections(refresh = false) {
   }
 }
 
-// The panel on the right of a bot's conversation. It draws only while that bot is still the one shown (current), and
-// hands each answer to onInfo, so the conversation can say the bot will not answer; Check again does the same.
-export async function renderBotConnection(box, name, { refresh = false, current = () => true, onInfo = () => {} } = {}) {
+// One bot's connection and why it may not answer, for the conversation's "will not answer yet" note.
+export async function botConnection(name) {
   try {
-    const info = await api.get(`/bots/${name}/connection${refresh ? '?refresh=1' : ''}`)
-    if (!current()) return null
-    onInfo(info)
-    const c = info.connection
-    fill(box,
-      el('h3', { text: t('connections.title', 'Connection') }),
-      el('div', { class: 'conn-head' }, el('strong', { text: c.label }), statusBadge(c.status)),
-      el('p', { class: 'meta mono', text: c.detail }),
-      c.reason ? el('p', { class: 'conn-error', text: c.reason }) : null,
-      info.blocker
-        ? el('div', { class: 'conn-why', role: 'alert' }, el('strong', { text: t('connections.why', 'Why it is not answering') }), el('p', { text: info.blocker }))
-        : el('p', { class: 'conn-ok', text: t('connections.answering', 'Can answer') }),
-      info.waiting ? el('p', { class: 'meta', text: `${t('connections.waiting', 'Waiting messages')}: ${info.waiting}` }) : null,
-      el('p', { class: 'meta' }, `${t('connections.last', 'Last turn')}: `,
-        info.last_turn ? `${info.last_turn.outcome}, ${fmtDateTime(info.last_turn.at)}` : t('connections.never', 'never')),
-      el('p', { class: 'meta', text: `${t('connections.used_by', 'Used by')}: ${c.bots.join(', ')}` }),
-      el('div', { class: 'conn-actions' },
-        el('button', { type: 'button', text: t('connections.check', 'Check again'), onclick: () => renderBotConnection(box, name, { refresh: true, current, onInfo }) }),
-        el('button', { type: 'button', class: 'quiet', text: t('connections.open', 'Connection settings'), onclick: () => emit('open-settings', 'connections') })))
-    return info
-  } catch (error) {
-    if (current()) fill(box, el('p', { class: 'error', text: error.message }))
+    return await api.get(`/bots/${encodeURIComponent(name)}/connection`)
+  } catch {
     return null
   }
+}
+
+// Each bot's connection status, for the dots in the bot list: { bot: { status, label, reason } }.
+export async function connectionByBot() {
+  const report = await api.get('/connections')
+  const out = {}
+  for (const c of report.connections) for (const bot of c.bots) out[bot] = { status: c.status, label: c.label, reason: c.reason }
+  return out
 }
 
 export function initConnections() {

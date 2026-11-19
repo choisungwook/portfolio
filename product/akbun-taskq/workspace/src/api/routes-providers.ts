@@ -26,7 +26,7 @@ export function registerProviderRoutes(api: Hono, { db, config }: ApiDeps): void
   // Every connection with its check, the bots on it and its last turn. Checks are cached for a minute; ?refresh=1 reruns.
   api.get('/connections', async (c) => c.json(await listConnections(db, config, { refresh: c.req.query('refresh') === '1' })))
 
-  // One bot's connection and the first reason it would not answer (bots off, paused, bot off, connection, last turn).
+  // One bot's connection and the first reason it would not answer (paused, bot off, connection, last turn).
   api.get('/bots/:name/connection', async (c) => {
     const found = await botConnection(db, config, c.req.param('name'), { refresh: c.req.query('refresh') === '1' })
     if (!found) throw new HttpError(404, 'no such bot')

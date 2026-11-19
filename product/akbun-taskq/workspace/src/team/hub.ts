@@ -10,6 +10,8 @@ import { closeUnconcluded, passStalled, skipDisabledSpeakers } from '../db/threa
 import { getMeta, setMeta } from '../db/meta.ts'
 import { limits } from '../db/settings.ts'
 import { raiseAlert } from '../alerts/rules.ts'
+import { consumeApproval, requestApproval } from '../db/bot-requests.ts'
+import { runDueRoutines, runTriggeredRoutines, nextRoutineAt } from '../db/routines.ts'
 import { nowSec } from '../time.ts'
 import { teamChanged } from '../wake.ts'
 import { ROSTER } from './roster.ts'
@@ -185,6 +187,10 @@ export function createTeamHub({ db, config, backend: claude, backends = {}, retr
         resume: agent.session_id,
         signal: controller.signal,
         turnId: started.turn.id,
+        approvals: {
+          consume: (tool, command) => consumeApproval(db, name, tool, command),
+          request: (tool, command, rule) => requestApproval(db, name, tool, command, rule).id,
+        },
         live,
       })
         .catch((error: unknown): TurnResult => ({ outcome: 'failed', error: error instanceof Error ? error.message : String(error) }))
@@ -306,6 +312,9 @@ export function createTeamHub({ db, config, backend: claude, backends = {}, retr
   function tick(): void {
     cancelRequested()
     if (isTeamPaused(db)) return
+    // Routines come due as messages; the turn that follows is an ordinary one, under the same guards.
+    runDueRoutines(db)
+    runTriggeredRoutines(db)
     joinRunning()
     for (const id of skipDisabledSpeakers(db).closed) {
       raiseAlert(db, { task_id: null, kind: 'team_message', message: `Discussion #${id} was closed without a conclusion: its moderator is disabled.` })
@@ -322,8 +331,8 @@ export function createTeamHub({ db, config, backend: claude, backends = {}, retr
   async function loop(seen: number): Promise<void> {
     while (running) {
       const now = nowSec()
-      const due = nextDelivery(db, now)
-      const untilDue = due === undefined ? Infinity : (due - now) * 1000
+      const due = Math.min(nextDelivery(db, now) ?? Infinity, nextRoutineAt(db) ?? Infinity)
+      const untilDue = due === Infinity ? Infinity : Math.max(0, (due - now) * 1000)
       await teamChanged.wait(Math.min(config.pollSec * 1000, untilDue + 50), stopped.signal, seen)
       if (!running) return
       seen = teamChanged.version()

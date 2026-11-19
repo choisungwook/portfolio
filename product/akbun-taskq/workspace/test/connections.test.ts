@@ -19,7 +19,7 @@ describe('connections', () => {
   let env: TestEnv
   test.beforeEach(async () => {
     clearConnectionCache()
-    env = setup({ bots: { ...setup().config.bots, enabled: true } })
+    env = setup()
     await seedTestBots(env.db)
   })
   test.afterEach(() => env.cleanup())
@@ -31,7 +31,7 @@ describe('connections', () => {
     const turn = startTurn(env.db, 'coder', 5)!
     endTurn(env.db, turn.turn.id, { outcome: 'failed', error: 'Kiro is not signed in' }, 3)
     const { team, connections } = await listConnections(env.db, env.config, { checks: passing })
-    assert.deepEqual(team, { enabled: true, paused: false, pause_reason: null })
+    assert.deepEqual(team, { paused: false, pause_reason: null })
     const by = Object.fromEntries(connections.map((c) => [c.id, c]))
     assert.deepEqual(Object.keys(by), ['claude', 'openai:api', 'openai:bedrock', 'openai:chatgpt', 'kiro'])
     assert.deepEqual(by.kiro.bots, ['coder'])
@@ -46,11 +46,6 @@ describe('connections', () => {
   })
 
   test('[critical] a silent bot says why, in the order a message meets the reasons', async () => {
-    const off = setup()
-    await seedTestBots(off.db)
-    assert.match((await botConnection(off.db, off.config, 'coder', { checks: passing }))?.blocker ?? '', /Bots are off: set bots.enabled/)
-    off.cleanup()
-
     pauseTeam(env.db, 'daily budget spent')
     assert.match((await botConnection(env.db, env.config, 'coder', { checks: passing }))?.blocker ?? '', /paused: daily budget spent/)
     env.db.prepare(`DELETE FROM meta WHERE key LIKE 'team_pause%'`).run()

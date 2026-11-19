@@ -41,7 +41,7 @@ export function talkTools(scope: ScopedTools): TeamTool[] {
     },
     {
       name: 'send_message',
-      description: 'Send a message to another agent, or to "user" if you are allowed to. Delivery is asynchronous: a reply arrives in a later turn; never wait for it. deliver_at (ISO time, up to 30 days ahead) holds the message until then; with deliver_at you may also message yourself as a reminder.',
+      description: 'Send a message to another agent, or to "user": always when the user has written to you (answer them directly), otherwise only if your settings allow it. Delivery is asynchronous: a reply arrives in a later turn; never wait for it. deliver_at (ISO time, up to 30 days ahead) holds the message until then; with deliver_at you may also message yourself as a reminder.',
       input: {
         to: z.string().max(80),
         body: z.string().min(1).max(8000),
@@ -57,7 +57,9 @@ export function talkTools(scope: ScopedTools): TeamTool[] {
           throw new ToolError('a message to yourself needs deliver_at at least 10 minutes ahead; for notes, use the wiki')
         }
         if (to === USER) {
-          if (!self().may_message_user) throw new ToolError('your settings do not let you message the user; send this to taskq, the orchestrator')
+          // A bot the user talks to answers the user. may_message_user only governs messages the user did not start.
+          const spoken = db.prepare('SELECT 1 FROM team_messages WHERE sender = ? AND recipient = ? LIMIT 1').get(USER, agent)
+          if (!self().may_message_user && !spoken) throw new ToolError('the user has not written to you, and your settings do not let you start a conversation with them; send this to taskq, the orchestrator')
         } else if (!enabled(to)) {
           throw new ToolError(`no enabled agent named ${to}; call list_agents`)
         }

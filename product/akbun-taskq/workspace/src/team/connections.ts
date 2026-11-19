@@ -136,7 +136,7 @@ async function cachedCheck(config: Config, id: ConnectionId, checks: Checks, ref
 }
 
 export function teamState(db: Db, config: Config) {
-  return { enabled: config.bots.enabled, paused: isTeamPaused(db), pause_reason: teamPauseReason(db) ?? null }
+  return { paused: isTeamPaused(db), pause_reason: teamPauseReason(db) ?? null }
 }
 
 // Every connection, with the bots on it. A connection no bot uses is listed too, so it can be set up before a bot
@@ -151,8 +151,7 @@ export async function listConnections(db: Db, config: Config, options: { refresh
   return { team: teamState(db, config), connections }
 }
 
-// One bot's connection and the likeliest reason it is not answering: bots off in the config (the hub never starts),
-// bots paused, the bot turned off, then two hints the hub does not gate on: a failing connection check and a failed
+// One bot's connection and the likeliest reason it is not answering: bots paused, the bot turned off, then two hints the hub does not gate on: a failing connection check and a failed
 // last turn (the hub retries after bots.retryAfterSec). A bot with an open turn is working, so it has no blocker.
 // Cancelled and interrupted turns are not failures.
 export async function botConnection(db: Db, config: Config, name: string, options: { refresh?: boolean; checks?: Checks } = {}) {
@@ -169,8 +168,7 @@ export async function botConnection(db: Db, config: Config, name: string, option
   const last = row ? { outcome: String(row.outcome), error: row.error === null ? null : String(row.error), at: Number(row.ended_at) } : null
   const working = Boolean(db.prepare('SELECT 1 FROM team_turns WHERE agent = ? AND ended_at IS NULL').get(name))
   const waiting = Number(db.prepare(`SELECT count(*) AS n FROM team_messages WHERE recipient = ? AND read_at IS NULL AND failed_at IS NULL`).get(name)?.n ?? 0)
-  const blocker = !team.enabled ? 'Bots are off: set bots.enabled to true in taskq.config.json and restart taskq.'
-    : team.paused ? `Bots are paused: ${team.pause_reason ?? 'no reason given'}. Resume them next to Bots in the menu.`
+  const blocker = team.paused ? `Bots are paused: ${team.pause_reason ?? 'no reason given'}. Resume them next to Bots in the menu.`
       : !agent.enabled ? 'This bot is turned off. Turn it on in its settings.'
         : working ? null
           : connection.status === 'error' ? `Its connection fails: ${connection.reason}`

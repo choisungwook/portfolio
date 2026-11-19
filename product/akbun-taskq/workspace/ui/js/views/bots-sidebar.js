@@ -10,12 +10,15 @@ import { openBotMenu } from './bot-menu.js'
 import { openBotSettings } from './bot-settings.js'
 import { t } from '../core/i18n.js'
 import { contextRing } from './context-ring.js'
+import { connectionByBot } from './connections.js'
 
 const POLL_MS = 5000
 
 let list
 let state
 let latest = null
+let drawn = ''   // what the list shows now; an identical poll leaves the DOM alone
+let connections = {}   // bot -> { status, label, reason }, read every minute (the server caches the checks)
 
 export function initBotsSidebar() {
   list = area('bot-list')
@@ -25,11 +28,29 @@ export function initBotsSidebar() {
   on('bots-changed', load)
   load()
   setInterval(load, POLL_MS)
+  loadConnections()
+  setInterval(loadConnections, 60_000)
   setInterval(() => {
     for (const node of list.querySelectorAll('.side-bot-working')) {
       node.querySelector('.working-text').textContent = workingText(Number(node.dataset.since) || 0)
     }
   }, 1000)
+}
+
+async function loadConnections() {
+  try {
+    connections = await connectionByBot()
+    if (latest) render(latest)
+  } catch {
+    // Without connection data the dots are left out; the Connections page shows the error.
+  }
+}
+
+function connectionDot(name) {
+  const c = connections[name]
+  if (!c) return null
+  const text = c.status === 'ok' ? `${c.label}: ${t('connections.ok', 'Connected')}` : `${c.label}: ${c.reason ?? t('connections.error', 'Failing')}`
+  return el('span', { class: 'conn-dot', dataset: { status: c.status }, role: 'img', 'aria-label': text, title: text })
 }
 
 export function botsSnapshot() {
@@ -47,15 +68,30 @@ async function load() {
   }
 }
 
+// Rebuilding the list restarts the busy ring's spin and the pulse, and a long list loses its scroll position for a
+// frame, which made the list jump on every poll while a bot worked. So it is redrawn only when what it shows changes
+// (the elapsed time is ticked in place), and the scroll position is kept.
+function signature(team, selected) {
+  return JSON.stringify([team.paused, team.pause_reason, selected, connections, team.agents.map((a) => [
+    a.name, a.system, a.enabled, a.busy, a.working_since, a.unread, a.sdk, a.role, a.context_tokens, a.context_window,
+    a.last_message?.id, a.last_message?.created_at,
+  ])])
+}
+
 function render(team) {
-  const label = !team.enabled ? t('bots.off', 'Off') : team.paused ? t('bots.paused', 'Paused') : t('bots.running', 'Running')
-  const mode = !team.enabled ? 'off' : team.paused ? 'paused' : 'running'
-  const toggle = !team.enabled ? null : team.paused
+  const selectedNow = currentView().view === 'bot' ? currentView().bot : null
+  const key = signature(team, selectedNow)
+  if (key === drawn) return
+  drawn = key
+  const scroll = list.scrollTop
+  const label = team.paused ? t('bots.paused', 'Paused') : t('bots.running', 'Running')
+  const mode = team.paused ? 'paused' : 'running'
+  const toggle = team.paused
     ? el('button', { type: 'button', class: 'quiet', text: t('bots.resume', 'Resume'), onclick: () => mutate(() => api.post('/bots/resume'), 'Bots resumed').then(load) })
     : el('button', { type: 'button', class: 'quiet', text: t('bots.pause', 'Pause'), onclick: () => mutate(() => api.post('/bots/pause'), 'Bots paused').then(load) })
   clear(state).append(el('span', {
     class: 'bots-state-label', dataset: { state: mode },
-    title: !team.enabled ? 'Set bots.enabled to true in taskq.config.json and restart' : team.pause_reason ?? '',
+    title: team.pause_reason ?? '',
     text: label,
   }), ...(toggle ? [toggle] : []))
   const selected = currentView().view === 'bot' ? currentView().bot : null
@@ -82,6 +118,7 @@ function render(team) {
     el('span', { class: 'side-bot-text' },
       el('span', { class: 'side-bot-top' },
         el('strong', { text: a.name }),
+        connectionDot(a.name),
         el('time', { class: 'meta', text: a.last_message ? shortTime(a.last_message.created_at) : '' }),
         a.context_window ? contextRing(a, 16) : null),
       a.busy
@@ -92,6 +129,7 @@ function render(team) {
       type: 'button', class: 'side-bot-gear', 'aria-label': `${a.name} settings`, title: 'Settings', text: '⚙',
       onclick: () => openBotSettings(a.name),
     }))))
+  list.scrollTop = scroll
 }
 
 // The elapsed time of a working bot, redrawn every second by the ticker in initBotsSidebar.

@@ -50,7 +50,6 @@ export const bots: Command = ({ config, db }, args) => {
       for (const a of listAgents(db)) {
         console.log(`${a.enabled ? ' ' : 'x'} ${a.name.padEnd(14)} ${a.role.padEnd(13)} ${a.session_id ? 'session' : 'new    '}  ${a.description}`)
       }
-      if (!config.bots.enabled) console.log('\nbots.enabled is false in taskq.config.json: messages wait until it is turned on.')
       if (isTeamPaused(db)) console.log(`\nbots paused: ${teamPauseReason(db)}`)
       return
     }

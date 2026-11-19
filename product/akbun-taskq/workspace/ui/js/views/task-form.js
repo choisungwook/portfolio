@@ -130,6 +130,7 @@ function body() {
   const out = { type: research ? 'research' : data.get('mode') }
   if (research) data.delete('access_skill')
   if (!data.get('draft')) out.status = 'ready'
+  if (data.get('review_required')) out.review_required = true
   for (const name of TEXT_FIELDS) {
     const value = String(data.get(name) ?? '').trim()
     if (value) out[name] = value
