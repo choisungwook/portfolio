@@ -3,7 +3,7 @@
 // shows the English text, so a new string never breaks the page.
 const KO = {
   'nav.calendar': '캘린더', 'nav.board': '보드', 'nav.graph': '그래프', 'nav.proposals': '제안',
-  'nav.bots': 'Bots', 'nav.discussions': '토론', 'nav.wiki': '위키', 'nav.shared': '공용 폴더', 'nav.search': '검색',
+  'nav.bots': 'Bots', 'nav.wiki': '위키', 'nav.shared': '공용 폴더', 'nav.search': '검색',
   'bots.add': 'bot 추가', 'bots.paused': '멈춤', 'bots.running': '동작 중', 'bots.pause': '멈추기', 'bots.resume': '다시 켜기',
   'bots.working': '작업 중', 'bots.disabled': '꺼진 bot', 'bots.settings': '설정',
   'chat.message': '메시지', 'chat.send': '보내기', 'chat.attach': '파일 첨부', 'chat.working': '작업 중', 'chat.esc': 'esc로 중단',
@@ -49,10 +49,6 @@ const KO = {
   'kiro.sign_in': 'AWS SSO로 로그인', 'kiro.check': '상태 확인', 'kiro.open': '열기:', 'kiro.enter': '에서 코드 입력:', 'kiro.waiting': 'kiro-cli를 기다리는 중…',
   'kiro.pending': '브라우저에서 승인하기를 기다립니다. 승인한 뒤 상태 확인을 누르세요.', 'kiro.signed_in': '로그인됨', 'kiro.signed_out': '로그인 안 됨',
   'chat.turn_failed': 'turn 실패', 'chat.no_reason': '이유 없음', 'chat.send_failed': '보내지 못함', 'chat.wont_answer': '아직 대답할 수 없음',
-  'nav.goals': '목표', 'goals.objective': '목표', 'goals.done_when': '완료 조건', 'goals.give': 'bot에게 맡기기', 'goals.given': 'taskq에게 맡겼습니다',
-  'goals.hint': '할 일 목록이 아니라 목표를 줍니다. taskq가 맞는 bot에게 작업을 나누고, bot끼리 일을 넘기며, 내 판단이 필요할 때만 묻습니다. 완료 조건이 채워지면 taskq가 요약과 함께 목표를 닫습니다.',
-  'goals.none': '아직 목표가 없습니다.', 'goals.drop': '그만두기', 'goals.dropped': '그만뒀습니다', 'goals.open_taskq': 'taskq 열기',
-  'goals.objective_ph': '내보내기 재시도 수정을 운영에 배포', 'goals.done_ph': '수정이 merge·배포되고 내보내기 job이 두 번 통과',
   'settings.review': '주간 점검', 'review.hint': 'bot과 routine이 돌았는지, 잘 됐는지, 없어도 되는지 봅니다. 자기 결과를 스스로 검토하면 놓치는 것이 있어서, 최근 결과 몇 개를 직접 확인하도록 골라 둡니다.',
   'review.prune': '끌까요?', 'review.nothing': '정리할 것이 없습니다. 모두 한 번 이상 돌았고 잘 됐습니다.', 'review.turn_off': '끄기', 'review.bots': 'bot',
   'review.turns': 'turn', 'review.success': '성공률', 'review.tasks': '작업 완료 / 실패', 'review.last': '마지막 turn', 'review.routines': 'routine',
@@ -83,11 +79,15 @@ const KO = {
   'search.title': '모든 bot 대화 검색', 'search.placeholder': '한글이나 영어로 검색', 'search.none': '찾은 대화가 없습니다.',
   'shared.title': '공용 폴더', 'shared.hint': '모든 bot이 같은 경로로 읽고 쓰는 폴더입니다. 첨부한 파일은 attachments/ 아래에 저장됩니다.',
   'shared.upload': '파일 올리기', 'shared.open': 'Finder/탐색기에서 열기', 'shared.empty': '비어 있습니다.',
+  'shared.view_list': '목록', 'shared.view_details': '자세히', 'shared.view_icons': '아이콘', 'shared.sort_name': '이름', 'shared.sort_kind': '종류',
+  'shared.sort_size': '크기', 'shared.sort_modified': '수정한 날짜', 'shared.asc': '오름차순', 'shared.desc': '내림차순', 'shared.folder': '폴더', 'shared.file': '파일',
+  'file.open': '열기', 'file.open_hint': '이 컴퓨터에서 연결된 앱으로 열기', 'file.in_shared': '공용 폴더에서 보기', 'file.download': '내려받기', 'file.close': '닫기',
+  'file.no_preview': '이 종류의 파일은 여기서 미리 볼 수 없습니다. 앱으로 열거나 공용 폴더에서 찾으세요.', 'file.too_big': '미리 보기에는 너무 큽니다. 앱으로 여세요.',
   'task.attach': '파일 첨부', 'task.drop': '파일을 끌어다 놓거나 붙여넣으세요',
   'nav.plugins': '플러그인', 'nav.workflows': '워크플로', 'plugins.hint': '여기 등록한 skill과 plugin을 bot 설정에서 bot마다 고릅니다. 업데이트는 git 저장소를 받아 오고 쓰는 bot을 모두 다시 불러옵니다.',
   'plugins.official': '공식 marketplace', 'plugins.anthropic_only': 'Anthropic 것만', 'plugins.filter': '거르기', 'plugins.remove': '삭제',
   'plugins.official_hint': 'Anthropic 공식 marketplace의 plugin 목록입니다. 설치하지 않습니다. 쓰려면 받아서 위에 폴더를 등록하세요.',
-  'wiki.search': '위키 검색', 'panel.must_check': '확인 필요', 'panel.queue_paused': '큐 멈춤', 'panel.pending': '승인 대기', 'discussions.title': '토론', 'wiki.title': '위키',
+  'wiki.search': '위키 검색', 'panel.must_check': '확인 필요', 'panel.queue_paused': '큐 멈춤', 'panel.pending': '승인 대기', 'wiki.title': '위키',
 }
 
 let language = 'ko'

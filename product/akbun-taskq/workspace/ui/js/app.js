@@ -7,7 +7,6 @@ import { initCalendar } from './views/calendar.js'
 import { initAlertsPanel } from './views/alerts-panel.js'
 import { initBoard } from './views/board.js'
 import { initGraph } from './views/graph.js'
-import { initProposals } from './views/proposals.js'
 import { initRunDialog } from './views/run-dialog.js'
 import { initSearch } from './views/search.js'
 import { initSettings } from './views/settings-dialog.js'
@@ -24,7 +23,6 @@ import { initWorkflowsView } from './views/workflows-view.js'
 import { initWikiTransfer } from './views/wiki-transfer.js'
 import { initUsageSettings } from './views/usage-settings.js'
 import { initConnections } from './views/connections.js'
-import { initGoalsView } from './views/goals-view.js'
 import { initReviewSettings } from './views/review-settings.js'
 import { initGlobalSettings, loadGlobalSettings } from './views/global-settings.js'
 import { initTokenNotice } from './views/token-notice.js'
@@ -37,7 +35,6 @@ initCalendar()
 initAlertsPanel()
 initBoard()
 initGraph()
-initProposals()
 initRunDialog()
 initSearch()
 initTaskDetail()
@@ -53,7 +50,6 @@ initWorkflowsView()
 initWikiTransfer()
 initUsageSettings()
 initConnections()
-initGoalsView()
 initReviewSettings()
 initNav()
 if (hasToken) {

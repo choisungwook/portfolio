@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>akbun-taskq</title>
 <link rel="stylesheet" href="css/theme/contract.css">
-<link rel="stylesheet" href="css/theme/soft.css">
+<link rel="stylesheet" href="css/theme/astryx.css">
 <link rel="stylesheet" href="css/base.css">
 <link rel="stylesheet" href="css/calendar.css">
 <link rel="stylesheet" href="css/work.css">
@@ -74,7 +74,6 @@
       <li><button type="button" class="side-item" data-view="calendar"><span class="side-icon" aria-hidden="true">◷</span><span data-i18n="nav.calendar">Calendar</span></button></li>
       <li><button type="button" class="side-item" data-view="board"><span class="side-icon" aria-hidden="true">▤</span><span data-i18n="nav.board">Board</span></button></li>
       <li><button type="button" class="side-item" data-view="graph"><span class="side-icon" aria-hidden="true">⋔</span><span data-i18n="nav.graph">Graph</span></button></li>
-      <li><button type="button" class="side-item" data-view="proposals"><span class="side-icon" aria-hidden="true">✎</span><span data-i18n="nav.proposals">Proposals</span></button></li>
     </ul>
     <div class="side-heading">
       <h2 id="bots-heading" data-i18n="nav.bots">Bots</h2>
@@ -83,8 +82,6 @@
     </div>
     <ul class="side-list side-bots" data-area="bot-list" aria-labelledby="bots-heading"></ul>
     <ul class="side-list" data-area="side-shared">
-      <li><button type="button" class="side-item" data-view="goals"><span class="side-icon" aria-hidden="true">◎</span><span data-i18n="nav.goals">Goals</span></button></li>
-      <li><button type="button" class="side-item" data-view="discussions"><span class="side-icon" aria-hidden="true">❝</span><span data-i18n="nav.discussions">Discussions</span></button></li>
       <li><button type="button" class="side-item" data-view="shared"><span class="side-icon" aria-hidden="true"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><path d="M3 6.5a1.5 1.5 0 0 1 1.5-1.5h4.4l2 2.2h8.6A1.5 1.5 0 0 1 21 8.7v9.8a1.5 1.5 0 0 1-1.5 1.5h-15A1.5 1.5 0 0 1 3 18.5z"/></svg></span><span data-i18n="nav.shared">Shared folder</span></button></li>
       <li><button type="button" class="side-item" data-view="workflows"><span class="side-icon" aria-hidden="true"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><rect x="3" y="4" width="6" height="5" rx="1.2"/><rect x="15" y="4" width="6" height="5" rx="1.2"/><rect x="9" y="15" width="6" height="5" rx="1.2"/><path d="M6 9v2.5h12V9M12 11.5V15"/></svg></span><span data-i18n="nav.workflows">Workflows</span></button></li>
       <li><button type="button" class="side-item" data-view="plugins"><span class="side-icon" aria-hidden="true"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><path d="M9 4h3.5v1.5a1.8 1.8 0 1 0 3.5 0V4H20v4.5h-1.5a1.8 1.8 0 1 0 0 3.5H20V20h-4.5v-1.5a1.8 1.8 0 1 0-3.5 0V20H4v-4.5h1.5a1.8 1.8 0 1 0 0-3.5H4V8h5z"/></svg></span><span data-i18n="nav.plugins">Plugins</span></button></li>
@@ -137,9 +134,6 @@
       <div data-area="graph-canvas"></div>
     </section>
 
-    <section id="view-proposals" data-view-panel="proposals" aria-label="Proposals" data-area="proposals" hidden>
-      <div data-area="proposal-list"></div>
-    </section>
 
     <section id="view-bot" class="chat-page" data-view-panel="bot" aria-label="Bot conversation" data-area="bot-chat" hidden>
      <div class="chat">
@@ -166,13 +160,9 @@
         <p class="drop-hint" data-i18n="chat.drop">Drop files here to attach them</p>
       </form>
      </div>
+     <aside class="file-pane" data-area="bot-file" aria-label="File" hidden></aside>
     </section>
 
-    <section id="view-goals" data-view-panel="goals" aria-label="Goals" data-area="goals-view" hidden></section>
-    <section id="view-discussions" data-view-panel="discussions" aria-label="Discussions" data-area="discussions" hidden>
-      <h2 class="view-title" data-i18n="discussions.title">Discussions</h2>
-      <ul class="thread-list" data-area="thread-list"></ul>
-    </section>
 
     <section id="view-search" data-view-panel="search" aria-label="Search" data-area="search-view" hidden>
       <h2 class="view-title" data-i18n="search.title">Search every bot conversation</h2>
@@ -187,12 +177,29 @@
       <p class="meta" data-i18n="shared.hint">Every bot reads and writes this folder at the same path. Attached files are saved under attachments/.</p>
       <div class="shared-bar">
         <nav class="shared-crumbs" data-area="shared-crumbs" aria-label="Folder path"></nav>
+        <div class="btn-group shared-views" role="group" aria-label="View" data-area="shared-views">
+          <button type="button" data-mode="list" title="List" data-i18n-title="shared.view_list" aria-label="List">☰</button>
+          <button type="button" data-mode="details" title="Details" data-i18n-title="shared.view_details" aria-label="Details">▤</button>
+          <button type="button" data-mode="icons" title="Icons" data-i18n-title="shared.view_icons" aria-label="Icons">▦</button>
+        </div>
+        <label class="shared-sort"><span class="sr-only">Sort by</span>
+          <select data-area="shared-sort" aria-label="Sort by">
+            <option value="name" data-i18n="shared.sort_name">Name</option>
+            <option value="kind" data-i18n="shared.sort_kind">Kind</option>
+            <option value="size" data-i18n="shared.sort_size">Size</option>
+            <option value="modified" data-i18n="shared.sort_modified">Date modified</option>
+          </select>
+        </label>
+        <button type="button" class="quiet" data-area="shared-dir" title="Ascending or descending" aria-label="Sort order">↑</button>
         <button type="button" data-area="shared-upload" data-i18n="shared.upload">Upload files</button>
         <button type="button" data-area="shared-open" data-i18n="shared.open">Open in file manager</button>
       </div>
-      <div class="shared-drop" data-area="shared-drop">
-        <div class="attach-chips" data-area="shared-chips" hidden></div>
-        <ul class="shared-list" data-area="shared-list"></ul>
+      <div class="shared-body">
+        <div class="shared-drop" data-area="shared-drop">
+          <div class="attach-chips" data-area="shared-chips" hidden></div>
+          <div data-area="shared-list"></div>
+        </div>
+        <aside class="file-pane" data-area="shared-file" aria-label="File" hidden></aside>
       </div>
     </section>
 

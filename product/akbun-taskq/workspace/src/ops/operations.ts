@@ -57,6 +57,8 @@ export const OPERATIONS: Operation[] = [
   op('bots_list', 'GET', '/bots', 'Every bot with its settings, whether it works now, queued messages and owned tasks; open discussions and recent turns.'),
   op('bot_presets', 'GET', '/bots/presets', 'Role presets for a new bot.'),
   op('bot_create', 'POST', '/bots', 'Create a bot. Fields: name, preset or role/description/instructions, sdk (claude|openai), model, effort, permission_mode, sandbox, allowed_domains, blocked_commands, workdir, skills, plugins, limits.'),
+  op('file_open', 'POST', '/open-file', 'Open a file of the shared folder with its default app on this machine, or reveal its folder. Fields: path (relative to the shared folder), reveal (true opens the folder).'),
+  op('file_preview', 'POST', '/shared/preview', 'A short-lived URL (/preview/<ticket>/<name>) that serves an HTML file of the shared folder, and the files beside it, sandboxed for the UI preview. Fields: path.'),
   op('bot_get', 'GET', '/bots/:name', 'One bot\'s settings.'),
   op('bot_turn_errors', 'GET', '/bots/:name/turn-errors', 'A bot\'s failed turns, newest first: id, outcome, error, ended_at. Fields: name, limit (default 50).'),
   op('bot_update', 'PUT', '/bots/:name', 'Change a bot\'s settings; only the fields given change. Same fields as bot_create, plus enabled.'),

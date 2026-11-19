@@ -1,0 +1,122 @@
+/* Theme: Astryx (Meta's open source design system, MIT, LICENSE-astryx.txt beside this file). The values come from the
+   Astryx neutral theme (@astryxdesign/theme-neutral 0.7.16): a monochrome accent (near-black in light, near-white in
+   dark), a gray page under white cards, blue only for links and focus, and status colors from its palette.
+   Astryx ships React components built with StyleX; taskq has no build step and no framework, so only the tokens are
+   carried over. Shapes follow its radius scale: 12px containers, 10px elements, 6px inner parts. Figtree is the
+   Astryx font; it is used when installed, and Korean falls back to the system Korean faces (no font is downloaded). */
+:root {
+  color-scheme: dark;
+  --bg: #1b1b1b;
+  --panel: #262626;
+  --panel-soft: #303030;
+  --stage: #303030;
+  --field: #303030;
+  --chip: #303030;
+  --control: #3a3a3a;
+  --hover: rgba(255, 255, 255, 0.05);
+
+  --fg: #f1f1f1;
+  --muted: #9e9e9e;
+  --border: rgba(255, 255, 255, 0.1);
+  --border-strong: #525252;
+
+  --accent: #f1f1f1;
+  --accent-hover: #ffffff;
+  --link: #a1caff;
+  --accent-soft: #474747;
+  --on-accent: #111111;
+  --focus: #6d9cfe;
+  --secondary: #303030;
+  --secondary-hover: #3a3a3a;
+  --on-secondary: #f1f1f1;
+  --on-danger: #111111;
+  --danger: #ff705d;
+  --danger-hover: #ffaea7;
+  --danger-fill: #ff705d;
+
+  --error-soft: #5b2b28;
+  --warning-soft: #453a1c;
+  --success-soft: #2b422b;
+  --info-soft: #253c5a;
+
+  --done: #64af4c;
+  --failed: #ff705d;
+  --needs-approval: #df843f;
+  --needs-auth: #eec448;
+  --review: #d885eb;
+  --running: #6d9cfe;
+  --stale: #9e9e9e;
+  --high: #df843f;
+
+  --avatar-1: #df843f;
+  --avatar-2: #fc78b1;
+  --avatar-3: #d885eb;
+  --avatar-4: #fa6762;
+  --avatar-5: #5aa0f8;
+  --avatar-6: #6ab26b;
+  --avatar-user: #f1f1f1;
+  --avatar-eye: #1b1b1b;
+
+  --radius: 10px;
+  --radius-s: 6px;
+  --radius-l: 12px;
+  --shadow-1: 0 2px 4px rgba(0, 0, 0, 0.25), 0 4px 8px rgba(0, 0, 0, 0.4), inset 0 0 0 1px rgba(255, 255, 255, 0.08);
+  --shadow-2: 0 2px 4px rgba(0, 0, 0, 0.35), 0 4px 12px rgba(0, 0, 0, 0.5), inset 0 0 0 1px rgba(255, 255, 255, 0.12);
+  --ease: 125ms cubic-bezier(0.2, 0, 0, 1);
+  --font-sans: Figtree, "Pretendard", "Apple SD Gothic Neo", "Noto Sans KR", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  --font-mono: ui-monospace, "SF Mono", Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+  --text-body: 14px/20px;
+  --text-small: 12px;
+}
+
+/* Light: chosen in Settings (data-theme="light"), or by the system when Settings says System. */
+:root[data-theme="light"] {
+  color-scheme: light;
+  --bg: #f1f1f1;
+  --panel: #ffffff;
+  --panel-soft: #f1f1f1;
+  --stage: #e2e2e2;
+  --field: #f1f1f1;
+  --chip: #e2e2e2;
+  --control: #e2e2e2;
+  --hover: rgba(0, 0, 0, 0.05);
+
+  --fg: #111111;
+  --muted: #474747;
+  --border: rgba(0, 0, 0, 0.08);
+  --border-strong: #919191;
+
+  --accent: #1b1b1b;
+  --accent-hover: #000000;
+  --link: #0067ce;
+  --accent-soft: #e2e2e2;
+  --on-accent: #ffffff;
+  --focus: #0074e2;
+  --secondary: #e2e2e2;
+  --secondary-hover: #d4d4d4;
+  --on-secondary: #1b1b1b;
+  --on-danger: #ffffff;
+  --danger: #c0262c;
+  --danger-hover: #9c1f24;
+  --danger-fill: #c9303a;
+
+  --error-soft: #ffe4e1;
+  --warning-soft: #fdf1cf;
+  --success-soft: #e1f0e0;
+  --info-soft: #e0edff;
+
+  --done: #2f7d33;
+  --failed: #c0262c;
+  --needs-approval: #a84f10;
+  --needs-auth: #836700;
+  --review: #8a3fa0;
+  --running: #0067ce;
+  --stale: #6b6b6b;
+  --high: #a84f10;
+
+  --avatar-user: #e2e2e2;
+  --avatar-eye: #111111;
+
+  --shadow-1: 0 2px 4px rgba(0, 0, 0, 0.05), 0 4px 8px rgba(0, 0, 0, 0.1);
+  --shadow-2: 0 2px 4px rgba(0, 0, 0, 0.05), 0 4px 12px rgba(0, 0, 0, 0.1);
+}

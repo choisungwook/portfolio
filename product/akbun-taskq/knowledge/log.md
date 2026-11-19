@@ -4,6 +4,9 @@ concept를 추가·수정·삭제할 때마다 오늘 날짜 섹션을 맨 위�
 
 ## 2026-11-19
 
+* **Creation**: [Astryx design tokens](decisions/2026-11-astryx-design-system.md) 결정 기록. React 컴포넌트 대신 토큰만 옮기고 soft·Carbon은 남김.
+* **Update**: [soft theme and sidebar](decisions/2026-11-soft-theme-sidebar.md)에 Proposals·Goals·Discussions 메뉴 제거와 기본 테마 변경을 더함.
+* **Update**: [Bots share one folder](decisions/2026-11-bot-workspace.md)에 bot 결과물을 `outputs/<bot>/`에 두고 `send_message` files로 넘기는 것과, HTML 미리 보기를 ticket URL과 sandbox CSP로 띄우는 이유를 더함.
 * **Update**: [resident agent team](decisions/2026-11-resident-agent-team.md)에 사용자가 말을 건 bot은 직접 답한다는 변경을 더함.
 * **Update**: [resident agent team](decisions/2026-11-resident-agent-team.md)에 bot 꺼짐 모드를 없애고 항상 돌게 한 이유를 더함.
 * **Update**: [ChatGPT-plan and Kiro bots run their own CLIs per turn](decisions/2026-11-bot-runtimes-beyond-sdks.md)에 로그인 실패 범위(bot만 끔)와 런타임 변경 시 세션 초기화의 이유를 더함.
