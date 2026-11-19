@@ -6,7 +6,7 @@ import { join } from 'node:path'
 // The UI theme is an interface: css/theme/contract.css names the tokens, a theme file implements them,
 // and component CSS reads only those names (or local ones it sets itself, such as --ink and --bar).
 const CSS = join(import.meta.dirname, '..', 'ui', 'css')
-const THEMES = ['carbon.css', 'soft.css']
+const THEMES = ['astryx.css', 'carbon.css', 'soft.css']
 
 function declared(text: string): Set<string> {
   return new Set([...text.matchAll(/(--[a-z0-9-]+)\s*:/g)].map((m) => m[1]))

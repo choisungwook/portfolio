@@ -1,4 +1,4 @@
-/* Board, graph, proposals and search results. Columns and cards are Carbon tiles: separation comes from layer color, not shadow. */
+/* Board, graph and search results. Columns and cards are Carbon tiles: separation comes from layer color, not shadow. */
 .board-columns {
   display: grid; grid-auto-flow: column; grid-auto-columns: minmax(190px, 1fr); gap: 8px; overflow-x: auto; align-items: start;
   background: var(--bg); padding: 0;
@@ -50,8 +50,6 @@
 .edge-discovered_from { stroke-dasharray: 6 4; }
 .arrow-head { fill: var(--muted); }
 
-.proposal { background: var(--panel); padding: 16px; margin-bottom: 8px; }
-.proposal h3 { margin-top: 0; }
 
 .search-list { list-style: none; padding: 0; margin: 0; display: grid; gap: 10px; }
 .search-list li { padding-top: 2px; }

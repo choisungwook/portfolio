@@ -3,13 +3,15 @@ type: Decision
 title: The UI uses a soft messenger theme and a left sidebar where bots read like chats
 description: Bots replace the Team tab as a chat list in a left sidebar; a new dark-first rounded theme implements the same token contract, and Carbon stays as a second theme.
 tags: [ui, design-system, bots]
-generated: { by: claude-code/claude-opus-5-5, at: 2026-11-18T15:00:00Z }
+generated: { by: claude-code/claude-opus-5-5, at: 2026-11-19T14:00:00Z }
 ---
 
 ## 결정
 
 - 사용자에게 보이는 이름은 Team이 아니라 Bots다. UI, CLI(`taskq bots`), API(`/api/bots`), 설정 키(`bots`)를 바꿨다. 코드와 테이블 이름(`src/team/`, `team_*`)은 그대로 둔다.
-- 탭 줄을 없애고 왼쪽 사이드바로 옮긴다. 화면(Calendar, Board, Graph, Proposals), Bots 목록, 공유 화면(Discussions, Wiki) 순이다.
+- 탭 줄을 없애고 왼쪽 사이드바로 옮긴다. 화면(Calendar, Board, Graph), Bots 목록, 공유 화면(공용 폴더, Workflows, Plugins, Wiki) 순이다.
+- Proposals, Goals, Discussions 메뉴는 2026-11-19에 사용자 요청으로 뺐다. 기능(API, CLI, bot 도구)은 남기고 화면만 없앴다.
+- 기본 테마는 2026-11-19부터 [Astryx](/decisions/2026-11-astryx-design-system.md)다. soft 테마는 두 번째 구현으로 남는다.
 - Bots 목록은 채팅 목록처럼 bot마다 아바타, 이름, 최근 메시지, 시각, 읽지 않음 점을 보인다. bot을 누르면 그 bot과의 대화가 말풍선으로 열리고 거기서 메시지를 보낸다.
 - 기본 테마를 `soft.css`로 바꾼다. 다크 우선, 둥근 모서리, 굵은 글씨, bot마다 다른 색과 모양의 아바타다. 토큰 계약에 아바타 색 8개와 큰 모서리(`--radius-l`)를 더했다. `carbon.css`는 같은 계약의 두 번째 구현으로 남긴다.
 

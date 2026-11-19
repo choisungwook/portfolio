@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>akbun-taskq</title>
 <link rel="stylesheet" href="css/theme/contract.css">
-<link rel="stylesheet" href="css/theme/soft.css">
+<link rel="stylesheet" href="css/theme/astryx.css">
 <link rel="stylesheet" href="css/base.css">
 <link rel="stylesheet" href="css/calendar.css">
 <link rel="stylesheet" href="css/work.css">
@@ -74,7 +74,6 @@
       <li><button type="button" class="side-item" data-view="calendar"><span class="side-icon" aria-hidden="true">◷</span><span data-i18n="nav.calendar">Calendar</span></button></li>
       <li><button type="button" class="side-item" data-view="board"><span class="side-icon" aria-hidden="true">▤</span><span data-i18n="nav.board">Board</span></button></li>
       <li><button type="button" class="side-item" data-view="graph"><span class="side-icon" aria-hidden="true">⋔</span><span data-i18n="nav.graph">Graph</span></button></li>
-      <li><button type="button" class="side-item" data-view="proposals"><span class="side-icon" aria-hidden="true">✎</span><span data-i18n="nav.proposals">Proposals</span></button></li>
     </ul>
     <div class="side-heading">
       <h2 id="bots-heading" data-i18n="nav.bots">Bots</h2>
@@ -83,8 +82,6 @@
     </div>
     <ul class="side-list side-bots" data-area="bot-list" aria-labelledby="bots-heading"></ul>
     <ul class="side-list" data-area="side-shared">
-      <li><button type="button" class="side-item" data-view="goals"><span class="side-icon" aria-hidden="true">◎</span><span data-i18n="nav.goals">Goals</span></button></li>
-      <li><button type="button" class="side-item" data-view="discussions"><span class="side-icon" aria-hidden="true">❝</span><span data-i18n="nav.discussions">Discussions</span></button></li>
       <li><button type="button" class="side-item" data-view="shared"><span class="side-icon" aria-hidden="true"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><path d="M3 6.5a1.5 1.5 0 0 1 1.5-1.5h4.4l2 2.2h8.6A1.5 1.5 0 0 1 21 8.7v9.8a1.5 1.5 0 0 1-1.5 1.5h-15A1.5 1.5 0 0 1 3 18.5z"/></svg></span><span data-i18n="nav.shared">Shared folder</span></button></li>
       <li><button type="button" class="side-item" data-view="workflows"><span class="side-icon" aria-hidden="true"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><rect x="3" y="4" width="6" height="5" rx="1.2"/><rect x="15" y="4" width="6" height="5" rx="1.2"/><rect x="9" y="15" width="6" height="5" rx="1.2"/><path d="M6 9v2.5h12V9M12 11.5V15"/></svg></span><span data-i18n="nav.workflows">Workflows</span></button></li>
       <li><button type="button" class="side-item" data-view="plugins"><span class="side-icon" aria-hidden="true"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><path d="M9 4h3.5v1.5a1.8 1.8 0 1 0 3.5 0V4H20v4.5h-1.5a1.8 1.8 0 1 0 0 3.5H20V20h-4.5v-1.5a1.8 1.8 0 1 0-3.5 0V20H4v-4.5h1.5a1.8 1.8 0 1 0 0-3.5H4V8h5z"/></svg></span><span data-i18n="nav.plugins">Plugins</span></button></li>
@@ -137,9 +134,6 @@
       <div data-area="graph-canvas"></div>
     </section>
 
-    <section id="view-proposals" data-view-panel="proposals" aria-label="Proposals" data-area="proposals" hidden>
-      <div data-area="proposal-list"></div>
-    </section>
 
     <section id="view-bot" class="chat-page" data-view-panel="bot" aria-label="Bot conversation" data-area="bot-chat" hidden>
      <div class="chat">
@@ -169,11 +163,6 @@
      <aside class="file-pane" data-area="bot-file" aria-label="File" hidden></aside>
     </section>
 
-    <section id="view-goals" data-view-panel="goals" aria-label="Goals" data-area="goals-view" hidden></section>
-    <section id="view-discussions" data-view-panel="discussions" aria-label="Discussions" data-area="discussions" hidden>
-      <h2 class="view-title" data-i18n="discussions.title">Discussions</h2>
-      <ul class="thread-list" data-area="thread-list"></ul>
-    </section>
 
     <section id="view-search" data-view-panel="search" aria-label="Search" data-area="search-view" hidden>
       <h2 class="view-title" data-i18n="search.title">Search every bot conversation</h2>

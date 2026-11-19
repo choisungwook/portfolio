@@ -186,15 +186,13 @@ taskq handoff accept HANDOFF_ID
 | Calendar | 언제 무엇이 실행됐는지. Day, Week, Month로 바꾸고 Today로 돌아온다. 빗금은 내 승인이나 로그인을 기다린 시간이다 |
 | Board | 상태별 태스크 카드 |
 | Graph | 태스크 사이의 의존 관계 |
-| Proposals | 태스크가 끝난 뒤 올라온 메모 제안. 내용을 보고 Apply 또는 Reject |
 | Bots (왼쪽 메뉴) | bot마다 채팅방처럼 최근 메시지와 시각을 보인다. bot을 누르면 대화 전체가 열리고 거기서 메시지를 보낸다. 맡은 작업은 대화 위에 칩으로 보인다 |
-| Discussions | bot끼리의 토론. 다음 차례, 결론, 결론 없이 닫기 |
 | Wiki | bot이 함께 쓰는 기록. 검색과 본문 보기 |
 | Settings | 접근 skill, 데이터베이스 위치, 현재 설정값(읽기 전용) |
 
 위쪽 검색창은 지난 실행의 요약을 찾는다.
 
-Proposals는 "다음에도 쓸 만한 것"을 정리한 메모다. Memory note는 적용하면 `memory/` 아래 파일에 덧붙고, Skill note는 skill 폴더에 `proposed-<시각>.md`로 저장된다. 기존 `SKILL.md`는 바뀌지 않으므로 반영은 직접 한다.
+메모 제안(Proposals)은 "다음에도 쓸 만한 것"을 정리한 메모다. 화면 메뉴는 없고 `taskq api proposals_list`와 `taskq api proposal_apply`로 다룬다. Memory note는 적용하면 `memory/` 아래 파일에 덧붙고, Skill note는 skill 폴더에 `proposed-<시각>.md`로 저장된다. 기존 `SKILL.md`는 바뀌지 않으므로 반영은 직접 한다.
 
 ## 9. 명령 한눈에 보기
 
@@ -251,7 +249,7 @@ bot은 계속 떠 있는 프로세스가 아니다. 메시지가 올 때마다 �
 
 작업 하나는 bot 하나가 맡는다(owner). 맡은 bot만 그 태스크를 시작할 수 있고, 시작하면 Board에서 실행 중으로 바뀌고 Calendar에 그 bot의 실행으로 남는다. 계정을 건드리는 초안은 내가 Queued로 바꿔야 bot이 시작할 수 있다. Board 카드의 `@coder` 같은 배지와 bot 대화 위의 작업 칩이 누가 무엇을 맡았는지 보여준다. 작업 상세의 Owner에서 다른 bot에게 넘기거나 되찾는다. taskq나 planner 역할 bot이 내 작업을 가져가면 그 bot이 대화로 알린다. bot이 열려 있는 작업과 비슷한 작업을 만들려 하면 거절되고 그 작업의 owner와 이야기하라는 답을 받는다. 이 비슷함 검사는 글자 겹침으로만 판단해서 표현이 다르면 놓치고, 비슷한 문장의 다른 작업을 잘못 막기도 한다.
 
-여러 bot의 의견이 필요한 질문은 토론으로 한다. 토론을 연 bot이 참가자와 라운드 수를 정하고, 참가자는 순서대로 앞사람의 말을 보고 의견을 낸다. 라운드가 끝나면 연 bot이 결론을 wiki에 남기고 필요한 작업을 맡긴다. 결론을 내지 않으면 토론은 결론 없이 닫히고 알림이 뜬다. Discussions 화면이나 `taskq bots close`로 직접 닫을 수도 있다.
+여러 bot의 의견이 필요한 질문은 토론으로 한다. 토론을 연 bot이 참가자와 라운드 수를 정하고, 참가자는 순서대로 앞사람의 말을 보고 의견을 낸다. 라운드가 끝나면 연 bot이 결론을 wiki에 남기고 필요한 작업을 맡긴다. 결론을 내지 않으면 토론은 결론 없이 닫히고 알림이 뜬다. `taskq bots close`로 직접 닫을 수도 있다. 토론 화면은 없고, 토론 차례의 말은 각 bot 대화에 "discussion #N"으로 보인다.
 
 bot이 할 수 있는 일은 bot 설정의 권한 모드, 샌드박스, 차단 명령이 정한다. bot이 만든 계정 조회·변경 태스크는 항상 초안으로 들어가므로, Board에서 내가 보고 Queued로 바꿔야 실행된다.
 

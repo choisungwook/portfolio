@@ -11,6 +11,8 @@ import { t } from '../core/i18n.js'
 import { parse } from '../pure/markdown.js'
 
 const PREVIEW_LIMIT = 5 * 1024 * 1024
+// Code and scripts preview as text; the server refuses to open them with an app (src/api/routes-files.ts).
+const NOT_OPENABLE = new Set(['ts', 'js', 'mjs', 'py', 'sh', 'go', 'rs', 'java', 'sql', 'css', 'tf', 'ini', 'conf', 'env', 'diff', 'patch', 'json', 'yaml', 'yml', 'toml', 'xml', 'log', 'ico', ''])
 const KINDS = {
   html: ['html', 'htm'],
   markdown: ['md', 'markdown'],
@@ -62,7 +64,7 @@ export async function showFile(box, path, { onClose } = {}) {
   const dir = path.split('/').slice(0, -1).join('/')
   const kind = kindOf(path)
   const actions = el('div', { class: 'file-actions' },
-    el('button', { type: 'button', text: t('file.open', 'Open'), title: t('file.open_hint', 'Open with its app on this computer'), onclick: () => mutate(() => api.post('/open-file', { path })) }),
+    NOT_OPENABLE.has(extOf(path)) ? null : el('button', { type: 'button', text: t('file.open', 'Open'), title: t('file.open_hint', 'Open with its app on this computer'), onclick: () => mutate(() => api.post('/open-file', { path })) }),
     el('button', { type: 'button', class: 'quiet', text: t('file.in_shared', 'Show in shared folder'), onclick: () => emit('open-shared', { dir, select: path }) }),
     el('button', { type: 'button', class: 'quiet', text: t('file.download', 'Download'), onclick: () => download(path) }),
     onClose ? el('button', { type: 'button', class: 'quiet file-close', 'aria-label': t('file.close', 'Close'), text: '×', onclick: onClose } ) : null)

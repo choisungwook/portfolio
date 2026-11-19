@@ -52,8 +52,13 @@ describe('files handed over through the shared folder', () => {
     assert.equal((await call({ path: 'outputs/taskq/report.html' })).status, 200)
     assert.equal((await call({ path: 'outputs/taskq/report.html', reveal: true })).status, 200)
     assert.equal((await call({ path: '../secret.txt' })).status, 404)
+    writeFileSync(join(shared, 'outputs', 'taskq', 'run.command'), 'echo hi')
+    writeFileSync(join(shared, 'outputs', 'taskq', 'notes.txt'), 'x', { mode: 0o755 })
+    assert.equal((await call({ path: 'outputs/taskq/run.command' })).status, 400, 'scripts do not open with an app')
+    assert.equal((await call({ path: 'outputs/taskq/notes.txt' })).status, 400, 'nor does a file with an exec bit')
+    assert.equal((await call({ path: 'outputs/taskq/run.command', reveal: true })).status, 200, 'its folder still opens')
     assert.equal((await call({ path: 'outputs/taskq/link.txt' })).status, 404)
-    assert.deepEqual(opened.map((p) => p.slice(env.home.length)), ['/shared/outputs/taskq/report.html', '/shared/outputs/taskq'])
+    assert.deepEqual(opened.map((p) => p.slice(env.home.length)), ['/shared/outputs/taskq/report.html', '/shared/outputs/taskq', '/shared/outputs/taskq'])
   })
 
   test('[critical] an HTML preview is served sandboxed under a short-lived ticket, with only the files beside it', async () => {
@@ -77,6 +82,7 @@ describe('files handed over through the shared folder', () => {
     assert.equal(await (await get(`${base}/style.css`)).text(), 'h1{color:red}')
     assert.equal((await get(`${base}/../notes.md`)).status, 404)
     assert.equal((await get(`${base}/%2e%2e/notes.md`)).status, 404)
+    assert.equal((await get(`${base}/%E0%A4`)).status, 404, 'bad percent-encoding is not found, not a server error')
     assert.equal((await get(`${base}/link.txt`)).status, 404, 'a link out of the folder is refused')
     assert.equal((await get('/preview/00000000000000000000000000000000/report.html')).status, 404)
   })

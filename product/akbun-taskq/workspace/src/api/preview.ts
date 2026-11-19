@@ -47,9 +47,9 @@ export function registerPreview(app: Hono, api: Hono, { config }: ApiDeps): void
   app.get('/preview/:id/*', async (c) => {
     const ticket = tickets.get(c.req.param('id'))
     if (!ticket || ticket.expires <= Date.now()) return c.text('this preview expired; open the file again', 404)
-    const rest = decodeURIComponent(c.req.path.split('/').slice(3).join('/'))
     let file: string
     try {
+      const rest = decodeURIComponent(c.req.path.split('/').slice(3).join('/'))
       file = realpathSync(resolve(ticket.dir, rest))
       if (!under(file, ticket.dir) || !statSync(file).isFile()) throw new Error('outside')
     } catch {
@@ -59,6 +59,8 @@ export function registerPreview(app: Hono, api: Hono, { config }: ApiDeps): void
       headers: {
         'content-type': TYPES[extname(file).toLowerCase()] ?? 'application/octet-stream',
         'content-security-policy': `sandbox allow-scripts; default-src 'self' https: data: blob: 'unsafe-inline' 'unsafe-eval'; frame-ancestors ${ancestors}; base-uri 'self'; form-action 'none'`,
+        // The page has an opaque origin; this lets it fetch its own data files (the ticket is what grants access).
+        'access-control-allow-origin': 'null',
         'cache-control': 'no-store',
         'x-content-type-options': 'nosniff',
         'referrer-policy': 'no-referrer',
