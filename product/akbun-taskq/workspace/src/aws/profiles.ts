@@ -72,6 +72,17 @@ export const makeBedrockToken: TokenMaker = async (profile, region) => {
   return token
 }
 
+// What to show when a profile gives no credentials: how to fix it depends on how the profile signs in. Never the SDK's
+// own message, which can hold a credential_process command line.
+export function profileFailure(profile: string, env: NodeJS.ProcessEnv = process.env): string {
+  const kind = listProfiles(env).find((p) => p.name === profile)?.kind
+  const fix = kind === 'sso' ? `run aws sso login --profile ${profile}`
+    : kind === undefined ? 'no such profile in ~/.aws; pick another in Settings > Connections'
+      : kind === 'process' ? 'its credential_process failed; run it by hand to see why'
+        : 'check its keys or role in ~/.aws'
+  return `the AWS profile ${profile} gave no credentials: ${fix}`
+}
+
 export function forgetBedrockTokens(): void {
   tokens.clear()
 }

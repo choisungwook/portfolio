@@ -439,7 +439,7 @@
         <h3 id="connections-title" data-i18n="settings.connections">Connections</h3>
         <button type="button" data-area="connections-refresh" data-i18n="connections.check">Check again</button>
       </div>
-      <p class="meta" data-i18n="connections.hint">How bots reach their models. Claude bots share the provider in taskq.config.json; an OpenAI bot uses the sign-in chosen in its settings; Kiro bots share the kiro-cli login. A bot that does not answer usually has a failing connection here.</p>
+      <p class="meta" data-i18n="connections.hint">How bots reach their models. Claude bots share the provider chosen below (it starts from taskq.config.json); an OpenAI bot uses the sign-in chosen in its settings, and on Bedrock the AWS profile chosen below; Kiro bots share the kiro-cli login. A bot that does not answer usually has a failing connection here.</p>
       <div data-area="connections-report"></div>
       <h4 data-i18n="connections.signin">How bots sign in</h4>
       <p class="meta" data-i18n="connections.signin_hint">Pick the AWS profile from this machine (an SSO profile uses the short-term credentials of aws sso login). Saving applies from the next turn and overrides taskq.config.json.</p>

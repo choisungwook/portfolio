@@ -4,7 +4,8 @@ import { getMeta, setMeta } from '../db/meta.ts'
 import { forgetBedrockTokens, PROFILE_NAME, REGION } from '../aws/profiles.ts'
 
 // How Claude and OpenAI-on-Bedrock bots sign in, changed in Settings > Connections. The values start from
-// taskq.config.json; a saved value overrides it and is applied to the running config, so the next turn uses it.
+// taskq.config.json; a saved value overrides it. Every process applies the saved values when it starts, the server's
+// bot hub again on each tick (so a change from the CLI or MCP arrives within pollSec), and a save from the UI at once.
 // - Claude: provider (bedrock | api_key | subscription), awsRegion, inferenceProfile (the AWS profile for Bedrock).
 // - OpenAI on Bedrock: bots.bedrockProfile (an AWS profile, often SSO, whose short-term credentials sign a Bedrock
 //   token; empty uses AWS_BEARER_TOKEN_BEDROCK) and bots.bedrockRegion.
@@ -50,8 +51,10 @@ export function applyConnectionSettings(db: Db, config: Config): void {
   put(config, saved)
 }
 
-// Checks, saves and applies; returns a message for a bad value.
+// Checks, saves and applies; returns a message for a bad value. It starts from what is saved, so a partial change (one
+// field from the CLI) keeps the others.
 export function saveConnectionSettings(db: Db, config: Config, body: Record<string, unknown>): ConnectionSettings | string {
+  applyConnectionSettings(db, config)
   const next = { ...connectionSettings(config) }
   const text = (field: keyof ConnectionSettings) => (typeof body[field] === 'string' ? String(body[field]).trim() : undefined)
   const provider = text('claude_provider')

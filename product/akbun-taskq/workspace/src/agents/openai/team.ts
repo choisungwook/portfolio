@@ -3,7 +3,7 @@ import { mkdirSync, readdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { agentDir } from '../../team/prompt.ts'
 import type { BotProvider } from '../../db/team.ts'
 import { runCodexTurn, spawnCodex, type CodexSpawn } from './codex.ts'
-import { makeBedrockToken, type TokenMaker } from '../../aws/profiles.ts'
+import { makeBedrockToken, profileFailure, type TokenMaker } from '../../aws/profiles.ts'
 import { join } from 'node:path'
 import { OpenAIProvider } from '@openai/agents-openai'
 import { z } from 'zod'
@@ -216,8 +216,9 @@ export function createOpenAITeamBackend(runFn?: OpenAIRunFn, fetcher: typeof fet
       if (provider === 'bedrock') {
         try {
           bedrockToken = await bedrockKey(config)
-        } catch (error) {
-          return { outcome: 'failed', cost_usd: 0, error: `the AWS profile ${config.bots.bedrockProfile} gave no credentials (${error instanceof Error ? error.message.slice(0, 200) : String(error)}); run aws sso login --profile ${config.bots.bedrockProfile}` }
+        } catch {
+          // The SDK's message can carry a credential_process command line or its output, so only a fixed sentence is kept.
+          return { outcome: 'failed', cost_usd: 0, error: profileFailure(config.bots.bedrockProfile) }
         }
         if (!runFn && !bedrockToken) return { outcome: 'failed', error: 'no Bedrock sign-in: choose an AWS profile in Settings > Connections, or set AWS_BEARER_TOKEN_BEDROCK (a Bedrock API key)' }
       }

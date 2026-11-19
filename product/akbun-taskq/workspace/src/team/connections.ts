@@ -4,7 +4,7 @@ import type { Db } from '../db/open.ts'
 import { getAgent, listAgents, type TeamAgent } from '../db/team.ts'
 import { preflight } from '../agents/claude/auth.ts'
 import { whoami } from '../agents/kiro/login.ts'
-import { makeBedrockToken, type TokenMaker } from '../aws/profiles.ts'
+import { makeBedrockToken, profileFailure, type TokenMaker } from '../aws/profiles.ts'
 import { isTeamPaused, teamPauseReason } from './hub.ts'
 
 // How each bot reaches its model, whether that connection works, and why a bot is not answering. Every bot uses one
@@ -113,7 +113,7 @@ async function check(config: Config, id: ConnectionId, checks: Checks): Promise<
           await (checks.bedrockToken ?? makeBedrockToken)(config.bots.bedrockProfile, config.bots.bedrockRegion)
           return ok
         } catch {
-          return fail(`the AWS profile ${config.bots.bedrockProfile} gave no credentials; run aws sso login --profile ${config.bots.bedrockProfile}`)
+          return fail(profileFailure(config.bots.bedrockProfile))
         }
       }
       return checks.env.AWS_BEARER_TOKEN_BEDROCK ? ok : fail('no Bedrock sign-in: choose an AWS profile below, or set AWS_BEARER_TOKEN_BEDROCK (a Bedrock API key)')
