@@ -53,7 +53,6 @@ export function registerBotsRoutes(api: Hono, { db, config, bots }: ApiDeps): vo
     const busy = new Set(openTurnAgents(db))
     const waiting = queued()
     return c.json({
-      enabled: config.bots.enabled,
       paused: isTeamPaused(db),
       pause_reason: teamPauseReason(db),
       agents: listAgents(db).map(({ instructions: _instructions, memory: _memory, ...agent }) => ({

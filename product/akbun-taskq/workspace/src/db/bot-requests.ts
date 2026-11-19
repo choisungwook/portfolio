@@ -23,8 +23,13 @@ export interface BotApproval {
 export function requestApproval(db: Db, bot: string, tool: string, command: string, rule: string): BotApproval {
   return inTransaction(db, () => {
     const text = mask(command).slice(0, 4000)
-    const open = db.prepare(`SELECT * FROM bot_approvals WHERE bot = ? AND tool = ? AND command = ? AND status = 'pending'`).get(bot, tool, text)
-    if (open) return open as unknown as BotApproval
+    const open = db.prepare(`SELECT * FROM bot_approvals WHERE bot = ? AND tool = ? AND command = ? AND status = 'pending'`).get(bot, tool, text) as unknown as BotApproval | undefined
+    if (open) {
+      // The user acknowledged the alert without deciding: ask again, so the request does not wait unseen.
+      const shown = db.prepare('SELECT 1 FROM alerts WHERE ref = ? AND acked_at IS NULL').get(`bot-approval:${open.id}`)
+      if (!shown) raiseAlert(db, { task_id: null, kind: 'approval_required', message: `${bot} asks before running (${rule}): ${text.slice(0, 160)}`, ref: `bot-approval:${open.id}` })
+      return open
+    }
     const id = Number(db.prepare(`INSERT INTO bot_approvals (bot, tool, command, rule, created_at) VALUES (?, ?, ?, ?, ?)`)
       .run(bot, tool, text, rule, nowSec()).lastInsertRowid)
     raiseAlert(db, { task_id: null, kind: 'approval_required', message: `${bot} asks before running (${rule}): ${text.slice(0, 160)}`, ref: `bot-approval:${id}` })

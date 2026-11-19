@@ -31,12 +31,17 @@ export interface ApprovalBroker {
   request(tool: string, command: string, rule: string): number
 }
 
-// Commands whose effect leaves the machine or cannot be taken back.
-export const DEFAULT_ASK_FIRST = [
-  'git push*', 'npm publish*', 'pnpm publish*', 'yarn publish*', 'gh pr merge*', 'gh release create*', 'docker push*',
-  'terraform apply*', 'terraform destroy*', 'kubectl apply*', 'kubectl delete*', 'helm install*', 'helm upgrade*', 'helm uninstall*',
-  'aws * delete-*', 'aws * terminate-*',
+// Commands whose effect leaves the machine or cannot be taken back. Each comes twice, so options between the tool and
+// its subcommand (git -C repo push, kubectl -n prod delete) still match. Like blocked commands this prevents accidents
+// and is not a boundary: a script or a variable can spell a command another way.
+const IRREVERSIBLE: [string, string][] = [
+  ['git', 'push'], ['npm', 'publish'], ['pnpm', 'publish'], ['yarn', 'publish'], ['gh', 'pr merge'], ['gh', 'release create'],
+  ['docker', 'push'], ['terraform', 'apply'], ['terraform', 'destroy'], ['kubectl', 'apply'], ['kubectl', 'delete'],
+  ['helm', 'install'], ['helm', 'upgrade'], ['helm', 'uninstall'], ['aws', 'delete-'], ['aws', 'terminate-'],
 ]
+export const DEFAULT_ASK_FIRST = IRREVERSIBLE.flatMap(([tool, sub]) => [`${tool} ${sub}*`, `${tool} * ${sub}*`])
+// A call longer than this cannot be approved: the user must be able to read all of what they approve.
+export const APPROVABLE_CHARS = 4000
 
 // The rule a call matches, if any. `tool:<pattern>` rules match the tool name (an MCP tool such as tool:mcp__slack__*);
 // the others match a Bash command.
@@ -106,6 +111,9 @@ export function botGate(config: Config, agent: TeamAgent, cwd: string, tool: str
   const rule = askFirstRule(agent, tool, input)
   if (rule !== null) {
     const text = callText(tool, input)
+    if (text.length > APPROVABLE_CHARS) {
+      return { action: 'deny', reason: `This call needs the user's approval (rule "${rule}") and is too long to approve (over ${APPROVABLE_CHARS} characters). Split it into shorter commands.` }
+    }
     if (approvals?.consume(tool, text)) return { action: 'allow' }
     const id = approvals?.request(tool, text, rule)
     return {

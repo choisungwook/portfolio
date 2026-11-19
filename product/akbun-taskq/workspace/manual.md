@@ -68,7 +68,6 @@ cp taskq.config.example.json taskq.config.json
 | `trustedRepos` | [] | 저장소 자체의 Claude 설정까지 로드해도 되는 저장소의 절대 경로 |
 | `retrospect` | true | 태스크가 끝난 뒤 메모 제안을 만들지 여부 |
 | `port` | 4517 | 화면과 API의 포트 |
-| `bots.enabled` | false | 상주 bot을 켠다. 자세한 값은 "10. bot에게 맡기기"에 있다 |
 | `caBundle` | 없음 | 회사 TLS 검사 장비의 CA를 포함한 PEM 파일의 절대 경로. 세션의 `AWS_CA_BUNDLE`(aws CLI)과 `NODE_EXTRA_CA_CERTS`(Claude Code)에 함께 들어간다 |
 
 데이터는 실행한 디렉터리 아래에 생긴다. 다른 곳에 두려면 `TASKQ_HOME`을 지정한다.
@@ -260,11 +259,10 @@ OpenAI bot은 bot 설정의 Agent SDK에서 고른다. taskq를 실행하는 환
 
 정해진 순서로 일을 시키려면 Workflows를 쓴다. 왼쪽 메뉴의 Workflows에서 단계(실행, 검증, 다른 bot에 넘김, 사용자 승인)와 순서를 그래프로 만들고, 새 작업 창에서 Bot과 Workflow를 고르거나 작업 상세의 Workflow 행에서 지정한다. 그 bot이 작업을 시작하면 단계마다 결과를 보고한다. 검증 단계는 실행한 명령과 출력을 증거로 남겨야 성공하고, 승인 단계는 내가 실행 기록 화면에서 승인해야 넘어간다. 성공은 bot의 말이 아니라 모든 단계가 끝났는지로 taskq가 판정한다. 실행 기록에는 어느 bot이 언제 실행했는지와, 지운 workflow면 "삭제됨"이 남는다. bot 없이 workflow만 지정한 작업은 큐가 실행하지 않는다.
 
-bot을 쓰려면 설정 파일에 `bots`를 넣고 다시 시작한다.
+bot은 taskq와 함께 항상 돈다. 멈추려면 메뉴 Bots 옆의 Pause를 누르거나 `taskq bots pause`를 실행한다. 예산과 범위는 설정 파일의 `bots`에서 정한다.
 
 ```json
 "bots": {
-  "enabled": true,
   "dailyBudgetUsd": 10,
   "readRoots": ["/Users/me/work"]
 }
@@ -272,7 +270,6 @@ bot을 쓰려면 설정 파일에 `bots`를 넣고 다시 시작한다.
 
 | 키 | 기본값 | 뜻 |
 |---|---|---|
-| `enabled` | false | 팀을 켠다 |
 | `dailyBudgetUsd` | 10 | 자정 이후 bot 턴 비용과, bot이 맡은 뒤 실행된 태스크 비용을 합한 상한. 넘으면 bot이 멈춘다. 이미 큐에 들어간 태스크는 큐를 멈춰야 멈춘다 |
 | `hourlyTurnsPerAgent` | 20 | bot 하나가 1시간에 할 수 있는 턴 수. bot끼리 메시지를 주고받는 루프를 막는다. 넘으면 bot이 멈춘다 |
 | `turnMaxTurns`, `turnBudgetUsd` | 30, 1 | bot 턴 한 번의 모델 턴 수와 비용 상한 |
@@ -360,7 +357,7 @@ bot과 대화할 때 쓰는 기능은 아래와 같다.
 | OpenAI나 Kiro bot이 꺼져 있고 Must check에 "login failed"가 있다 | 그 bot의 로그인(API 키, `codex login`, 설정 > 연결의 Kiro 로그인)이 실패해 그 bot만 꺼졌다. 다시 로그인한 뒤 bot을 켠다 |
 | bot이 "승인을 기다린다"고 한다 | 되돌릴 수 없는 명령(push, 배포, 클라우드 자원 삭제 등)이나 bot 설정의 "먼저 묻기"에 걸렸다. Must check에서 명령을 보고 "한 번 승인"이나 "거부"를 누른다 |
 | 매일 같은 일을 시키고 싶다 | bot에게 "매일 7시에 …"라고 말하거나 bot 설정의 Routines에서 cron 일정이나 트리거로 추가한다. 설정의 주간 점검에서 돌았는지 본다 |
-| bot이 대답하지 않는다 | bot 대화 오른쪽의 연결 패널에 "대답하지 않는 이유"가 나온다. 흔한 원인은 `bots.enabled`가 false(기본값)이거나, Claude `provider`가 기본값 bedrock인데 AWS 프로파일이 없거나, 그 bot의 로그인(API 키, Codex, Kiro)이 실패한 경우다. 설정의 연결 페이지에서 연결마다 상태를 보고 다시 확인한다 |
+| bot이 대답하지 않는다 | bot 대화 오른쪽의 연결 패널에 "대답하지 않는 이유"가 나온다. 흔한 원인은 bot이 일시정지됐거나, Claude `provider`가 기본값 bedrock인데 AWS 프로파일이 없거나, 그 bot의 로그인(API 키, Codex, Kiro)이 실패한 경우다. 설정의 연결 페이지에서 연결마다 상태를 보고 다시 확인한다 |
 | Must check에 "Bots paused"가 떠 있다 | 일일 예산을 다 썼거나, bot 하나가 1시간 턴 상한을 넘었거나(메시지 루프 의심), Claude 모델 로그인이 실패했거나, bot이 taskq 데이터를 읽으려 했다. `taskq bots log`로 원인을 보고 `taskq bots resume`이나 메뉴 Bots 옆의 Resume으로 다시 켠다 |
 | 고친 화면이 안 보인다 | 브라우저를 새로 고친다 |
 | 회사 네트워크에서 `certificate verify failed`나 `self-signed certificate in certificate chain`이 뜬다 | TLS 검사 장비가 인증서를 자기 CA로 다시 서명한다. 그 CA를 넣은 PEM 파일을 `caBundle`에 적고 다시 시작한다 |

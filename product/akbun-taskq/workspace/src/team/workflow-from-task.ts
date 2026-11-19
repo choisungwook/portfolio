@@ -34,5 +34,9 @@ export function workflowFromTask(db: Db, taskId: string): Workflow | string {
   })
   if (!parsed.ok) return parsed.error
   const title = (task.data.title ?? task.data.intent).replace(/\s+/g, ' ').slice(0, 60)
-  return createWorkflow(db, { name: `${title} (from ${task.id})`, description: `Saved from task ${task.id} after it ended done.`, definition: parsed.value })
+  // Saving the same task again makes "(from id) 2", "(from id) 3": live workflow names are unique.
+  const base = `${title} (from ${task.id})`
+  let name = base
+  for (let n = 2; db.prepare('SELECT 1 FROM workflows WHERE name = ? AND deleted_at IS NULL').get(name); n += 1) name = `${base} ${n}`
+  return createWorkflow(db, { name, description: `Saved from task ${task.id} after it ended done.`, definition: parsed.value })
 }

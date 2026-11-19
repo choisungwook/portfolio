@@ -4,6 +4,7 @@ concept를 추가·수정·삭제할 때마다 오늘 날짜 섹션을 맨 위�
 
 ## 2026-11-19
 
+* **Update**: [resident agent team](decisions/2026-11-resident-agent-team.md)에 bot 꺼짐 모드를 없애고 항상 돌게 한 이유를 더함.
 * **Update**: [ChatGPT-plan and Kiro bots run their own CLIs per turn](decisions/2026-11-bot-runtimes-beyond-sdks.md)에 로그인 실패 범위(bot만 끔)와 런타임 변경 시 세션 초기화의 이유를 더함.
 * **Creation**: [ChatGPT-plan and Kiro bots run their own CLIs per turn](decisions/2026-11-bot-runtimes-beyond-sdks.md) 결정 기록. provider 선택, codex exec, kiro-cli headless와 SSO, `taskq mcp --bot`, Usage와 context.
 

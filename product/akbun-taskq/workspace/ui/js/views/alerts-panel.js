@@ -17,6 +17,7 @@ let banner
 let bannerText
 let toggle
 let paused = false
+let approvals = new Map()   // open bot approval requests by id, so their alert shows the whole call
 
 export function initAlertsPanel() {
   list = area('alerts-list')
@@ -32,7 +33,8 @@ export function initAlertsPanel() {
 
 async function load() {
   try {
-    const [alerts, queue] = await Promise.all([api.get('/alerts'), api.get('/queue')])
+    const [alerts, queue, requests] = await Promise.all([api.get('/alerts'), api.get('/queue'), api.get('/bot-approvals').catch(() => [])])
+    approvals = new Map(requests.map((r) => [String(r.id), r]))
     const unacked = alerts
       .filter((a) => a.acked_at === null)
       .sort((a, b) => SEVERITY_RANK[a.severity] - SEVERITY_RANK[b.severity] || b.created_at - a.created_at)
@@ -82,6 +84,16 @@ function actionsFor(alert) {
   }))
 }
 
+// The whole call a bot waits to run, so the user reads all of what "Approve once" lets through.
+function fullCall(alert) {
+  const [refKind, refId] = String(alert.ref ?? '').split(':')
+  const request = refKind === 'bot-approval' ? approvals.get(refId) : null
+  if (!request) return null
+  return el('details', { class: 'alert-call', open: request.command.length <= 300 || null },
+    el('summary', { text: `${request.tool} · ${request.command.length} characters` }),
+    el('pre', { class: 'mono', text: request.command }))
+}
+
 function item(alert) {
   const acked = () => mutate(() => api.post(`/alerts/${alert.id}/ack`, {}), 'Acknowledged')
   return el('li', { class: `alert sev-${alert.severity}` },
@@ -92,6 +104,7 @@ function item(alert) {
       ? el('button', { type: 'button', class: 'link', text: alert.task_title ?? alert.task_id, onclick: () => emit('open-task', alert.task_id) })
       : el('span', { class: 'meta', text: 'No task' }),
     el('p', { class: 'alert-message', text: alert.message }),
+    fullCall(alert),
     el('time', { datetime: new Date(alert.created_at * 1000).toISOString(), text: fmtDateTime(alert.created_at) }),
     el('div', { class: 'actions' }, ...actionsFor(alert), el('button', { type: 'button', text: 'Acknowledge', onclick: acked })))
 }

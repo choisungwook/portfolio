@@ -2,7 +2,7 @@ import type { Hono } from 'hono'
 import { decideApprovalRequest, openApprovals } from '../db/bot-requests.ts'
 import { createRoutine, deleteRoutine, fireWebhookRoutine, getRoutine, listRoutines, setRoutineEnabled, type Trigger } from '../db/routines.ts'
 import { closeGoal, createGoal, getGoal, listGoals } from '../db/goals.ts'
-import { getAgent, USER } from '../db/team.ts'
+import { getAgent, ORCHESTRATOR, postMessage, USER } from '../db/team.ts'
 import { weeklyReview } from '../team/review.ts'
 import { workflowFromTask } from '../team/workflow-from-task.ts'
 import { teamChanged } from '../wake.ts'
@@ -82,6 +82,8 @@ export function registerAutonomyRoutes(api: Hono, { db }: ApiDeps): void {
     if (!getGoal(db, id)) throw new HttpError(404, 'no such goal')
     const closed = closeGoal(db, id, status, typeof body.summary === 'string' ? body.summary : 'closed by the user')
     if (!closed) throw new HttpError(409, 'that goal is already closed')
+    postMessage(db, { sender: USER, recipient: ORCHESTRATOR, body: `I closed goal #${id} as ${status}: ${closed.objective}. Stop work that was only for it and tell its bots.` })
+    teamChanged.notify()
     return c.json(closed)
   })
 

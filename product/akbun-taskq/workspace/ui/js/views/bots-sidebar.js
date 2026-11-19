@@ -48,14 +48,14 @@ async function load() {
 }
 
 function render(team) {
-  const label = !team.enabled ? t('bots.off', 'Off') : team.paused ? t('bots.paused', 'Paused') : t('bots.running', 'Running')
-  const mode = !team.enabled ? 'off' : team.paused ? 'paused' : 'running'
-  const toggle = !team.enabled ? null : team.paused
+  const label = team.paused ? t('bots.paused', 'Paused') : t('bots.running', 'Running')
+  const mode = team.paused ? 'paused' : 'running'
+  const toggle = team.paused
     ? el('button', { type: 'button', class: 'quiet', text: t('bots.resume', 'Resume'), onclick: () => mutate(() => api.post('/bots/resume'), 'Bots resumed').then(load) })
     : el('button', { type: 'button', class: 'quiet', text: t('bots.pause', 'Pause'), onclick: () => mutate(() => api.post('/bots/pause'), 'Bots paused').then(load) })
   clear(state).append(el('span', {
     class: 'bots-state-label', dataset: { state: mode },
-    title: !team.enabled ? 'Set bots.enabled to true in taskq.config.json and restart' : team.pause_reason ?? '',
+    title: team.pause_reason ?? '',
     text: label,
   }), ...(toggle ? [toggle] : []))
   const selected = currentView().view === 'bot' ? currentView().bot : null

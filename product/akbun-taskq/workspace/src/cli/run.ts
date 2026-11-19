@@ -40,9 +40,8 @@ export async function runCommand(config: Config, db: Db): Promise<void> {
 }
 
 function teamHub(config: Config, db: Db, agent: ReturnType<typeof agentFor>): TeamHub | undefined {
-  if (!config.bots.enabled) return undefined
   if (!agent.team) {
-    console.warn(`taskq: the ${agent.name} backend has no bots support; bots.enabled is ignored`)
+    console.warn(`taskq: the ${agent.name} backend has no bots support; bots do not run`)
     return undefined
   }
   // OpenAI bots run on their own backend next to the Claude one; it needs OPENAI_API_KEY only when such a bot works.

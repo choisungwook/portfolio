@@ -54,6 +54,19 @@ describe('bot autonomy', () => {
     assert.equal((await call('POST', '/bot-approvals/1', { approve: false })).status, 409)
 
     assert.equal(botGate(env.config, coder, env.home, 'Bash', { command: 'git status' }, broker('coder')).action, 'allow', 'reversible work runs alone')
+    for (const command of ['git -C /repo push origin main', 'kubectl -n prod delete deploy api', 'terraform -chdir=infra apply -auto-approve']) {
+      assert.equal(botGate(env.config, coder, env.home, 'Bash', { command }, broker('coder')).action, 'deny', `${command}: options between tool and subcommand`)
+    }
+    const long = botGate(env.config, coder, env.home, 'Bash', { command: `git push ${'x'.repeat(4100)}` }, broker('coder'))
+    assert.match(long.action === 'deny' ? long.reason : '', /too long to approve/)
+    env.db.prepare(`UPDATE alerts SET acked_at = 1 WHERE kind = 'approval_required'`).run()
+    botGate(env.config, coder, env.home, 'Bash', { command: 'git -C /repo push origin main' }, broker('coder'))
+    const before = Number(env.db.prepare(`SELECT count(*) AS n FROM alerts WHERE kind = 'approval_required' AND acked_at IS NULL`).get()?.n)
+    botGate(env.config, coder, env.home, 'Bash', { command: 'git -C /repo push origin main' }, broker('coder'))
+    assert.equal(Number(env.db.prepare(`SELECT count(*) AS n FROM alerts WHERE kind = 'approval_required' AND acked_at IS NULL`).get()?.n), before, 'an open alert is not doubled')
+    env.db.prepare(`UPDATE alerts SET acked_at = 1 WHERE kind = 'approval_required'`).run()
+    botGate(env.config, coder, env.home, 'Bash', { command: 'git -C /repo push origin main' }, broker('coder'))
+    assert.equal(Number(env.db.prepare(`SELECT count(*) AS n FROM alerts WHERE kind = 'approval_required' AND acked_at IS NULL`).get()?.n), 1, 'an acknowledged but undecided request asks again')
     const bypass = { ...coder, permission_mode: 'bypassPermissions' as const }
     assert.equal(botGate(env.config, bypass, env.home, 'Bash', push, broker('coder')).action, 'allow', 'bypass skips the built-in list')
     const own = { ...bypass, ask_first: ['git commit*', 'tool:mcp__gmail__send*'] }
@@ -67,6 +80,7 @@ describe('bot autonomy', () => {
     assert.equal(nextRun('0 7 * * 1-5', saturday), Math.floor(new Date(2026, 10, 23, 7, 0).getTime() / 1000), 'next weekday 7am is Monday')
     assert.equal(nextRun('*/15 * * * *', Math.floor(new Date(2026, 10, 21, 12, 7).getTime() / 1000)), Math.floor(new Date(2026, 10, 21, 12, 15).getTime() / 1000))
     assert.equal(typeof createRoutine(env.db, { bot: 'coder', name: 'x', prompt: 'y', schedule: '61 * * * *', created_by: USER }), 'string')
+    assert.match(String(createRoutine(env.db, { bot: 'coder', name: 'x', prompt: 'y', schedule: '0 0 31 2 *', created_by: USER })), /never comes due/)
 
     const routine = createRoutine(env.db, { bot: 'coder', name: 'Morning brief', prompt: 'Summarise failures', schedule: '0 7 * * *', created_by: USER })
     assert.ok(typeof routine !== 'string')
@@ -85,6 +99,14 @@ describe('bot autonomy', () => {
     assert.equal(runTriggeredRoutines(env.db), 1)
     assert.equal(runTriggeredRoutines(env.db), 0, 'each failure fires once')
     assert.match(inbox('planner').at(-1) ?? '', new RegExp(`Failed since the last check:\\ntask ${task.id}: find the slow query`))
+
+    const onNew = createRoutine(env.db, { bot: 'planner', name: 'Intake', prompt: 'Sort it', trigger: 'task_created', created_by: USER })
+    assert.ok(typeof onNew !== 'string')
+    runTriggeredRoutines(env.db)
+    const fresh = (await (await call('POST', '/tasks', { type: 'research', intent: 'same second as the tick' })).json()) as { id: string }
+    env.db.prepare('UPDATE tasks SET created_at = ? WHERE id = ?').run(nowSec() - 5, fresh.id)
+    assert.equal(runTriggeredRoutines(env.db), 1, 'a task created in the same second as a tick still fires')
+    assert.match(inbox('planner').at(-1) ?? '', /same second as the tick/)
 
     const hook = (await (await call('POST', '/routines', { bot: 'coder', name: 'Deploy hook', prompt: 'Check the deploy', trigger: 'webhook' })).json()) as { id: number }
     assert.equal((await call('POST', `/routines/${hook.id}/fire`, { text: 'build 42 finished' })).status, 200)
@@ -139,6 +161,8 @@ describe('bot autonomy', () => {
     const work = workflow.definition.steps[0].instructions
     assert.ok(work.includes('logrotate -f /etc/logrotate.conf') && work.includes('/etc/logrotate.d/app') && work.includes('df shows 40% free'))
     assert.deepEqual(workflow.definition.steps.map((s) => s.id), ['do', 'check'])
+    const again = (await (await call('POST', `/tasks/${task.id}/save-workflow`)).json()) as { name: string }
+    assert.match(again.name, /\(from .*\) 2$/, 'saving again gets a new name')
 
     env.db.prepare(`UPDATE runs SET bot = 'coder' WHERE id = 'r1'`).run()
     const old = createRoutine(env.db, { bot: 'planner', name: 'Stale report', prompt: 'p', schedule: '0 7 1 1 *', created_by: USER })
@@ -150,5 +174,14 @@ describe('bot autonomy', () => {
     assert.ok(!review.prune.some((p) => p.ref === 'taskq'), 'the orchestrator is never a prune candidate')
     assert.equal(review.bots.find((b) => b.bot === 'coder')?.tasks_done, 1)
     assert.deepEqual(review.spot_checks.map((s) => s.task_id), [task.id])
+  })
+
+  test('deleting a bot removes its routines and denies its unused approvals', async () => {
+    const routine = createRoutine(env.db, { bot: 'coder', name: 'n', prompt: 'p', schedule: '0 7 * * *', created_by: USER })
+    assert.ok(typeof routine !== 'string')
+    const request = requestApproval(env.db, 'coder', 'Bash', 'git push', 'git push*')
+    assert.ok((await call('DELETE', '/bots/coder')).ok)
+    assert.equal(env.db.prepare('SELECT count(*) AS n FROM bot_routines WHERE bot = ?').get('coder')?.n, 0)
+    assert.equal(env.db.prepare('SELECT status FROM bot_approvals WHERE id = ?').get(request.id)?.status, 'denied')
   })
 })

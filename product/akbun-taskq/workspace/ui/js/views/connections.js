@@ -23,9 +23,8 @@ function lastLine(last, lastOk) {
       : null)
 }
 
-// A warning when no bot can answer at all: bots off in the config, or paused.
+// A warning when no bot can answer at all: the bots are paused.
 export function teamBanner(team) {
-  if (!team.enabled) return el('p', { class: 'conn-banner', role: 'alert', text: t('connections.off', 'Bots are off. Set bots.enabled to true in taskq.config.json and restart taskq; while off, no bot answers.') })
   if (team.paused) return el('p', { class: 'conn-banner', role: 'alert', text: `${t('connections.paused', 'Bots are paused')}: ${team.pause_reason ?? ''}` })
   return null
 }

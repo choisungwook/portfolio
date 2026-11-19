@@ -11,10 +11,9 @@ export interface SandboxConfig {
   allowWrite: string[]
 }
 
-// The resident bots (the code calls them the team). Off by default: every turn is a paid model call that nobody asked
-// for directly.
+// The resident bots (the code calls them the team). They always run with taskq; the budget, the loop guards and Pause
+// in the menu are what stop them. An old config's bots.enabled is ignored.
 export interface BotsConfig {
-  enabled: boolean
   maxConcurrentTurns: number   // agent turns running at once, separate from maxConcurrent for tasks
   turnMaxTurns: number         // model turns inside one agent turn
   turnBudgetUsd: number        // cost limit of one agent turn
@@ -75,7 +74,7 @@ export const DEFAULTS: Omit<Config, 'home'> = {
   trustedRepos: [],
   retrospect: true,
   bots: {
-    enabled: false, maxConcurrentTurns: 2, turnMaxTurns: 30, turnBudgetUsd: 1, dailyBudgetUsd: 10,
+    maxConcurrentTurns: 2, turnMaxTurns: 30, turnBudgetUsd: 1, dailyBudgetUsd: 10,
     hourlyTurnsPerAgent: 20, maxOpenTasks: 10, maxAttempts: 3, readRoots: [],
     openaiInputPerMTok: 1.25, openaiOutputPerMTok: 10, bedrockRegion: 'us-west-2', codexPath: 'codex', kiroPath: 'kiro-cli',
   },

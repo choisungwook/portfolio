@@ -19,7 +19,6 @@
   "trustedRepos": [],
   "retrospect": true,
   "bots": {
-    "enabled": false,
     "maxConcurrentTurns": 2,
     "turnMaxTurns": 30,
     "turnBudgetUsd": 1,

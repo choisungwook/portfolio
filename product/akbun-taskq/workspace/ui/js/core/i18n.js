@@ -4,7 +4,7 @@
 const KO = {
   'nav.calendar': '캘린더', 'nav.board': '보드', 'nav.graph': '그래프', 'nav.proposals': '제안',
   'nav.bots': 'Bots', 'nav.discussions': '토론', 'nav.wiki': '위키', 'nav.shared': '공용 폴더', 'nav.search': '검색',
-  'bots.add': 'bot 추가', 'bots.off': '꺼짐', 'bots.paused': '멈춤', 'bots.running': '동작 중', 'bots.pause': '멈추기', 'bots.resume': '다시 켜기',
+  'bots.add': 'bot 추가', 'bots.paused': '멈춤', 'bots.running': '동작 중', 'bots.pause': '멈추기', 'bots.resume': '다시 켜기',
   'bots.working': '작업 중', 'bots.disabled': '꺼진 bot', 'bots.settings': '설정',
   'chat.message': '메시지', 'chat.send': '보내기', 'chat.attach': '파일 첨부', 'chat.working': '작업 중', 'chat.esc': 'esc로 중단',
   'chat.stop': '중단', 'chat.find': '대화에서 찾기', 'chat.drop': '여기에 놓으면 첨부됩니다', 'chat.empty': '아직 대화가 없습니다.',
@@ -60,7 +60,7 @@ const KO = {
   'review.runs': '실행', 'review.ok': '성공 / 실패', 'review.last_run': '마지막 실행', 'review.spot': '직접 확인할 결과', 'review.no_spot': '이 기간에 bot 결과가 없습니다.', 'review.open_task': '작업 열기',
   'settings.connections': '연결', 'connections.check': '다시 확인', 'connections.hint': 'bot이 모델에 닿는 방법입니다. Claude bot은 taskq.config.json의 provider를 함께 쓰고, OpenAI bot은 bot 설정에서 고른 로그인 방식을, Kiro bot은 kiro-cli 로그인을 함께 씁니다. 대답하지 않는 bot은 보통 여기서 연결이 실패합니다.',
   'connections.ok': '연결됨', 'connections.error': '실패', 'connections.unused': '쓰는 bot 없음', 'connections.used_by': '쓰는 bot', 'connections.last': '마지막 turn',
-  'connections.last_ok': '마지막 응답', 'connections.never': '없음', 'connections.checked': '확인', 'connections.off': 'bot이 꺼져 있습니다. taskq.config.json에서 bots.enabled를 true로 바꾸고 taskq를 다시 시작하세요. 꺼져 있으면 어떤 bot도 대답하지 않습니다.',
+  'connections.last_ok': '마지막 응답', 'connections.never': '없음', 'connections.checked': '확인',
   'connections.paused': 'bot이 일시정지됐습니다', 'connections.title': '연결', 'connections.answering': '대답할 수 있음', 'connections.why': '대답하지 않는 이유',
   'connections.waiting': '기다리는 메시지', 'connections.open': '연결 설정 열기',
   'ctx.context': 'context', 'ctx.unknown': '아직 context 크기를 모릅니다', 'ctx.title': '마지막 turn 뒤 context가 찬 정도',

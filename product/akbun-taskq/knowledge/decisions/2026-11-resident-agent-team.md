@@ -3,7 +3,7 @@ type: Decision
 title: Resident role agents are resumed sessions with a mailbox, and work still runs as tasks
 description: Each agent is one Claude session resumed per turn; agents talk through an async mailbox, share a SQLite wiki, and only read files themselves.
 tags: [team, agents, architecture]
-generated: { by: claude-code/claude-opus-5-5, at: 2026-11-18T23:00:00Z }
+generated: { by: claude-code/claude-opus-5-5, at: 2026-11-19T06:00:00Z }
 sources:
   - id: grok-bot
     resource: https://composio.dev/content/guide-to-frok-bot
@@ -18,7 +18,7 @@ sources:
 - (2026-11-18 변경) 처음에는 bot이 Read, Glob, Grep만 쓰고 실제 일을 큐 작업으로 보냈다. 지금은 bot이 자기 task를 직접 처리하고 권한은 bot마다 정한다. [bots execute tasks 결정](2026-11-bots-execute-tasks.md)을 본다.
 - 장기 기억은 SQLite의 `wiki_pages`다. 쓰기는 읽은 revision을 같이 보내야 하고(낙관적 동시성), 이전 revision은 `wiki_revisions`에 남는다.
 - 사용자에게 메시지를 보내는 bot은 기본으로 오케스트레이터 taskq 하나다. bot 설정에서 다른 bot에게도 허용할 수 있다.
-- 팀은 기본으로 꺼져 있다(`team.enabled: false`). 켜면 일일 예산, agent별 시간당 턴 수, 열린 작업 수, 메시지 재시도 횟수로 자동 동작의 범위를 묶는다. 예산이나 루프 상한에 걸리면 팀 전체를 멈추고 경고 하나를 띄운다.
+- (2026-11-19 변경) 처음에는 팀이 기본으로 꺼져 있었다(`bots.enabled: false`). 켜는 설정을 몰라 bot이 대답하지 않는 일이 생겨, 지금은 taskq와 함께 항상 돌고 멈춤(Pause)만 둔다. 일일 예산, agent별 시간당 턴 수, 열린 작업 수, 메시지 재시도 횟수로 자동 동작의 범위를 묶는다. 예산이나 루프 상한에 걸리면 팀 전체를 멈추고 경고 하나를 띄운다.
 - 메시지를 보내거나 작업을 만든 뒤 실패한 turn은 다시 돌리지 않는다. 그 메시지는 내려놓고 사용자에게 알린다.
 - 시간에 맞춰 일을 시작해야 하면 `deliver_at`을 붙인 메시지를 보낸다. 받는 agent는 그 시각에 깨어난다.
 

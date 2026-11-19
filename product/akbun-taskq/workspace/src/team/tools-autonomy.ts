@@ -8,6 +8,7 @@ import { ackOpenAlerts } from '../db/alerts.ts'
 import { nowSec } from '../time.ts'
 import { queueChanged, teamChanged } from '../wake.ts'
 import { ToolError, type ScopedTools, type TeamTool } from './tools.ts'
+import { queueSecurityReview } from './report.ts'
 
 // Tools for work that runs without the user in the loop each time: routines on a schedule or an event, closing a goal,
 // and reviewing another bot's result.
@@ -111,6 +112,8 @@ export function autonomyTools(scope: ScopedTools): TeamTool[] {
         db.prepare('UPDATE tasks SET status = ?, updated_at = ? WHERE id = ?').run(approve ? 'done' : 'ready', nowSec(), id)
         insertEvent(db, { task_id: id, run_id: null, kind: 'finished', payload: { outcome: approve ? 'done' : 'rejected', reviewed_by: agent } })
         ackOpenAlerts(db, id, 'review_ready')
+        // The automatic security review a code task gets when its bot finishes it as done, now that it is done.
+        if (approve && task.type === 'code') queueSecurityReview(db, { ...task, status: 'done' })
         if (task.owner) {
           postMessage(db, {
             sender: SYSTEM, recipient: task.owner, task_id: id,

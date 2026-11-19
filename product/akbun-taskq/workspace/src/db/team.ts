@@ -129,6 +129,10 @@ export function deleteAgent(db: Db, name: string): boolean {
     db.prepare(`UPDATE tasks SET owner = NULL, owner_since = NULL, status = CASE WHEN status = 'ready' THEN 'draft' ELSE status END
       WHERE owner = ? AND status NOT IN ('done', 'failed', 'cancelled', 'running')`).run(name)
     db.prepare(`UPDATE team_messages SET failed_at = ? WHERE recipient = ? AND read_at IS NULL AND failed_at IS NULL`).run(nowSec(), name)
+    // Its routines go, and approvals it never used are denied, so a new bot of the same name inherits neither.
+    db.prepare('DELETE FROM bot_routines WHERE bot = ?').run(name)
+    db.prepare(`UPDATE alerts SET acked_at = ? WHERE acked_at IS NULL AND ref IN (SELECT 'bot-approval:' || id FROM bot_approvals WHERE bot = ? AND status = 'pending')`).run(nowSec(), name)
+    db.prepare(`UPDATE bot_approvals SET status = 'denied', decided_at = ? WHERE bot = ? AND status IN ('pending', 'approved')`).run(nowSec(), name)
     db.prepare('DELETE FROM team_agents WHERE name = ?').run(name)
     return true
   })

@@ -8,7 +8,7 @@ bot이 사람 없이 일하는 범위를 넓히고, 사람이 결정하거나 �
 
 ### Added
 
-- 먼저 묻기: 되돌릴 수 없는 명령(push, publish, release, `terraform apply`·`destroy`, `kubectl apply`·`delete`, helm, `docker push`, `aws … delete-`·`terminate-`)과 bot 설정의 "먼저 묻기" 패턴(`tool:<이름>`으로 MCP 도구도)은 실행되지 않고 Must check에 승인 요청으로 뜬다. "한 번 승인"하면 그 호출이 한 번만 통과하고, 거부하면 bot이 듣는다. bypass 모드는 기본 목록만 건너뛴다.
+- 먼저 묻기: 되돌릴 수 없는 명령(push, publish, release, `terraform apply`·`destroy`, `kubectl apply`·`delete`, helm, `docker push`, `aws … delete-`·`terminate-`. `git -C repo push`처럼 사이에 옵션이 있어도)과 bot 설정의 "먼저 묻기" 패턴(`tool:<이름>`으로 MCP 도구도)은 실행되지 않고 Must check에 승인 요청으로 뜬다. 알림에 호출 전체가 보이고, "한 번 승인"하면 그 호출이 한 번만 통과하며, 거부하면 bot이 듣는다. 4,000자가 넘는 호출은 승인할 수 없다. bypass 모드는 기본 목록만 건너뛴다. 차단 명령처럼 글자 비교라서 사고를 막는 장치이지 경계는 아니다.
 - routine: bot마다 cron 일정(로컬 시간)이나 트리거(작업 실패, 새 작업, webhook)로 도는 일. bot 설정에서 추가하거나 bot에게 대화로 부탁한다(`schedule_routine`). 놓친 실행은 한 번만 온다.
 - bot 헌장: 맡는 일, 좋은 결과, 묻지 않고 하지 말 것. 지시문에 붙는다.
 - 설정의 주간 점검: bot·routine별로 돌았는지와 성공률, 끌 후보와 끄기 버튼, 직접 확인할 최근 결과 5개.
@@ -19,6 +19,7 @@ bot이 사람 없이 일하는 범위를 넓히고, 사람이 결정하거나 �
 
 ### Changed
 
+- bot의 꺼짐 모드(`bots.enabled`)를 없앴다. bot은 taskq와 함께 항상 돌고, 멈추려면 메뉴의 Pause나 `taskq bots pause`를 쓴다. 기존 설정 파일의 `bots.enabled`는 무시한다. 연결 페이지와 bot 패널의 "bot이 꺼져 있음" 안내도 뺐다.
 - 스키마 010: `team_agents`에 헌장과 `ask_first`, `bot_approvals`, `bot_routines`, `goals`, `team_messages.routine_id`.
 
 ### SDK

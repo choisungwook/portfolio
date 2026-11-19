@@ -8,7 +8,7 @@ import { agentDir } from './prompt.ts'
 import type { Catalog, TeamBackend } from './types.ts'
 
 // The model list and slash commands shown in a bot's compose bar. The SDK is asked once per bot and the answer kept for
-// CACHE_SEC; the refresh button asks again. When the SDK cannot answer (no login, no network, bots off), a built-in
+// CACHE_SEC; the refresh button asks again. When the SDK cannot answer (no login, no network), a built-in
 // list is shown with `fallback` set, so the menus still work and say where the list came from.
 
 const CACHE_SEC = 600

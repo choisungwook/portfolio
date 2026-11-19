@@ -68,6 +68,7 @@ export function createRoutine(db: Db, input: NewRoutine): Routine | string {
     } catch (error) {
       return error instanceof Error ? error.message : String(error)
     }
+    if (nextRun(schedule, nowSec()) === null) return `"${schedule}" never comes due`
   }
   const count = Number(db.prepare('SELECT count(*) AS n FROM bot_routines WHERE bot = ?').get(input.bot)?.n ?? 0)
   if (count >= MAX_PER_BOT) return `a bot has at most ${MAX_PER_BOT} routines`
@@ -109,24 +110,26 @@ export function runDueRoutines(db: Db, now = nowSec()): number {
 }
 
 // The earliest scheduled run, so the hub can wake for it.
-export function nextRoutineAt(db: Db): number | undefined {
-  const row = db.prepare('SELECT min(next_run_at) AS at FROM bot_routines WHERE enabled = 1 AND next_run_at IS NOT NULL').get()
+export function nextRoutineAt(db: Db, now = nowSec()): number | undefined {
+  // Only future runs: a past one is delivered by the next tick, and while the bots are paused it must not spin the loop.
+  const row = db.prepare('SELECT min(next_run_at) AS at FROM bot_routines WHERE enabled = 1 AND next_run_at > ?').get(now)
   return row?.at === null || row?.at === undefined ? undefined : Number(row.at)
 }
 
-// Event triggers read what happened since the last check: failed tasks from the events table, new tasks by creation
-// time. The cursors start at "now" the first time, so old history does not fire routines.
+// Event triggers read what happened since the last check: failed tasks from the events table, new tasks by rowid. Both
+// cursors only grow and start at the newest row the first time, so old history does not fire routines.
 export function runTriggeredRoutines(db: Db, now = nowSec()): number {
   const triggered = db.prepare(`SELECT * FROM bot_routines WHERE enabled = 1 AND trigger IN ('task_failed', 'task_created')`).all().map(toRoutine)
   const lastEvent = Number(db.prepare('SELECT coalesce(max(id), 0) AS id FROM events').get()?.id ?? 0)
   const eventCursor = Number(getMeta(db, 'routine_event_cursor') ?? lastEvent)
-  const taskCursor = Number(getMeta(db, 'routine_task_cursor') ?? now)
+  const lastTask = Number(db.prepare('SELECT coalesce(max(rowid), 0) AS id FROM tasks').get()?.id ?? 0)
+  const taskCursor = Number(getMeta(db, 'routine_task_rowid') ?? lastTask)
   let fired = 0
   if (triggered.length > 0) {
     const failed = db.prepare(`SELECT e.task_id, e.payload, t.data FROM events e JOIN tasks t ON t.id = e.task_id
       WHERE e.id > ? AND e.kind = 'finished' ORDER BY e.id`).all(eventCursor)
       .filter((row) => (JSON.parse(String(row.payload)) as { outcome?: string }).outcome === 'failed')
-    const created = db.prepare('SELECT id, data FROM tasks WHERE created_at > ? AND created_at <= ? ORDER BY created_at').all(taskCursor, now)
+    const created = db.prepare('SELECT id, data FROM tasks WHERE rowid > ? AND rowid <= ? ORDER BY rowid').all(taskCursor, lastTask)
     const describe = (id: unknown, data: unknown) => `task ${String(id)}: ${String((JSON.parse(String(data)) as { intent?: string }).intent ?? '').slice(0, 300)}`
     for (const routine of triggered) {
       const rows = routine.trigger === 'task_failed' ? failed.map((r) => describe(r.task_id, r.data)) : created.map((r) => describe(r.id, r.data))
@@ -136,7 +139,7 @@ export function runTriggeredRoutines(db: Db, now = nowSec()): number {
     }
   }
   setMeta(db, 'routine_event_cursor', String(lastEvent))
-  setMeta(db, 'routine_task_cursor', String(now))
+  setMeta(db, 'routine_task_rowid', String(lastTask))
   return fired
 }
 

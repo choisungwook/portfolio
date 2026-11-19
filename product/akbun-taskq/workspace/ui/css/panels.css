@@ -122,3 +122,5 @@ dialog.wide { width: min(1180px, calc(100vw - 32px)); }
   .task-detail-grid { grid-template-columns: 1fr; }
   .task-aside { position: static; }
 }
+/* The whole call a bot waits to run, in its approval alert. */
+.alert-call pre { white-space: pre-wrap; overflow-wrap: anywhere; max-height: 240px; overflow: auto; margin: 4px 0 0; font-size: var(--text-small); }
