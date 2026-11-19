@@ -10,7 +10,7 @@ import { noteReload, reload, reloadAll } from '../team/bot-plugin.ts'
 import { PRESETS } from '../team/roster.ts'
 import { releaseBotTasks } from '../team/bot-work.ts'
 import { getMemory, MEMORY_LIMIT, setMemory } from '../team/memory.ts'
-import { resolveShared } from '../team/shared.ts'
+import { sharedRelative } from '../team/shared.ts'
 import { searchMessages } from '../db/message-search.ts'
 import { getPage, listPages } from '../db/wiki.ts'
 import { forceClose, listThreads } from '../db/threads.ts'
@@ -97,8 +97,9 @@ export function registerBotsRoutes(api: Hono, { db, config, bots }: ApiDeps): vo
     const body = await readJson(c) as { to?: unknown; body?: unknown; attachments?: unknown } | null
     const to = typeof body?.to === 'string' ? body.to : ORCHESTRATOR
     const files = Array.isArray(body?.attachments) ? body.attachments : []
-    if (files.length > 20 || !files.every((f) => typeof f === 'string' && f.startsWith('attachments/') && !f.split('/').includes('..') && resolveShared(config, f))) {
-      throw new HttpError(400, 'attachments must be up to 20 paths returned by POST /api/files')
+    // An upload (POST /api/files) or any existing file of the shared folder the user picked with @, relative to it.
+    if (files.length > 20 || !files.every((f) => typeof f === 'string' && !f.split('/').includes('..') && sharedRelative(config, f) === f)) {
+      throw new HttpError(400, 'attachments must be up to 20 existing files of the shared folder, as paths relative to it')
     }
     const text = typeof body?.body === 'string' ? body.body.trim() : ''
     if ((!text && files.length === 0) || text.length > 8000) throw new HttpError(400, 'body must be a string up to 8000 characters, or attach a file')

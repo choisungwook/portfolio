@@ -43,7 +43,7 @@ export function initBotChat() {
   initAttachMenu()
   area('bot-stop').addEventListener('click', cancel)
   initChatFind(nodes.log)
-  initComposeMenus(nodes.input)
+  initComposeMenus(nodes.input, { onPickFile: (path) => files.addExisting(path) })
   nodes.form.addEventListener('submit', send)
   nodes.input.addEventListener('keydown', (event) => {
     // Enter sends, Shift+Enter breaks the line. IME composition (Korean) must not send.
@@ -157,7 +157,7 @@ function renderHead() {
     }, icon('settings', 20))),
   )
   showComposeMenus(agent)
-  nodes.input.placeholder = `${t('chat.message', 'Message')} ${agent.name}`
+  nodes.input.placeholder = `${t('chat.message', 'Message')} ${agent.name} · ${t('chat.at_hint', '@ for bots and files')}`
   nodes.input.disabled = !agent.enabled
 }
 
@@ -423,6 +423,12 @@ function showBrowser() {
   if (!browserUrl) input.focus()
 }
 
+// Enabled bots named with @ in the text, other than the one this conversation is with.
+function mentionedBots(body) {
+  const names = new Set((botsSnapshot()?.agents ?? []).filter((a) => a.enabled && a.name !== bot).map((a) => a.name))
+  return [...new Set([...body.matchAll(/(?:^|\s)@([a-z][a-z0-9-]*)(?=[\s,!?]|\.(?:\s|$)|$)/g)].map((m) => m[1]))].filter((name) => names.has(name))
+}
+
 async function send(event) {
   event.preventDefault()
   const body = nodes.input.value.trim()
@@ -443,6 +449,14 @@ async function send(event) {
     return
   }
   if (ok) {
+    // "@coder" in the message asks that bot too: it gets the same message and files in its own conversation. The
+    // message to this bot is already sent, so a failed copy is reported and not retried by sending again.
+    const others = mentionedBots(body)
+    const results = await Promise.allSettled(others.map((name) => api.post('/bots/messages', { to: name, body, attachments: attached })))
+    const sent = others.filter((_, i) => results[i].status === 'fulfilled')
+    const failed = others.filter((_, i) => results[i].status === 'rejected')
+    if (sent.length) notify(`${t('chat.also_sent', 'Also sent to')} ${sent.map((name) => `@${name}`).join(', ')}`)
+    if (failed.length) notify(`${t('chat.not_sent_to', 'Not sent to')} ${failed.map((name) => `@${name}`).join(', ')}: ${results.find((r) => r.status === 'rejected').reason.message}`, true)
     sendError = null
     showConnection()
     nodes.input.value = ''

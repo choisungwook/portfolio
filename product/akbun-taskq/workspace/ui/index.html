@@ -16,26 +16,7 @@
 <link rel="stylesheet" href="css/settings.css">
 </head>
 <body>
-<header class="top">
-  <h1>akbun-taskq</h1>
-  <form class="search" role="search" data-area="search">
-    <label class="sr-only" for="search-input">Search past runs</label>
-    <input id="search-input" type="search" name="q" maxlength="200" placeholder="Search past runs" data-i18n-placeholder="header.search_runs">
-    <button type="submit" class="quiet" data-i18n="header.search">Search</button>
-  </form>
-  <button type="button" class="alerts-button" data-area="alerts-button" aria-expanded="false" aria-controls="must-check" title="Must check">
-    <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"></path><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"></path></svg>
-    <span class="alerts-count" data-area="alerts-count" hidden></span>
-    <span class="sr-only" data-i18n="panel.must_check">Must check</span>
-  </button>
-  <button type="button" class="settings-button" data-area="settings-button" title="Settings">
-    <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round" aria-hidden="true">
-      <path d="M10.0 4.7 L10.4 1.9 L13.6 1.9 L14.0 4.7 L15.8 5.4 L18.0 3.7 L20.3 6.0 L18.6 8.2 L19.3 10.0 L22.1 10.4 L22.1 13.6 L19.3 14.0 L18.6 15.8 L20.3 18.0 L18.0 20.3 L15.8 18.6 L14.0 19.3 L13.6 22.1 L10.4 22.1 L10.0 19.3 L8.2 18.6 L6.0 20.3 L3.7 18.0 L5.4 15.8 L4.7 14.0 L1.9 13.6 L1.9 10.4 L4.7 10.0 L5.4 8.2 L3.7 6.0 L6.0 3.7 L8.2 5.4Z"></path>
-      <circle cx="12" cy="12" r="3.2"></circle>
-    </svg>
-    <span data-i18n="header.settings">Settings</span>
-  </button>
-  <aside class="must-check" id="must-check" data-area="alerts-panel" aria-labelledby="must-check-title" hidden>
+<aside class="must-check" id="must-check" data-area="alerts-panel" aria-labelledby="must-check-title" hidden>
     <h2 id="must-check-title" data-area="must-check-title" tabindex="-1" data-i18n="panel.must_check">Must check</h2>
     <div class="alert-badges" data-area="alert-badges"></div>
     <div class="queue-banner" data-area="queue-banner" data-state="running">
@@ -48,16 +29,10 @@
     </section>
     <ul class="alerts" data-area="alerts-list"></ul>
   </aside>
-  <div class="notice" data-area="notice"><span class="notice-text" role="status" aria-live="polite"></span></div>
-</header>
+<div class="notice" data-area="notice"><span class="notice-text" role="status" aria-live="polite"></span></div>
 
 <section class="token-notice" data-area="token-notice" role="alert" hidden>
   <p>Open the URL that <code>taskq run</code> printed in the terminal. This tab has no valid access token, so no data is loaded or refreshed.</p>
-</section>
-
-<section class="search-results" data-area="search-results" hidden aria-label="Search results">
-  <button type="button" class="close" data-area="search-close">Close results</button>
-  <div class="search-body"></div>
 </section>
 
 <div class="layout">
@@ -83,6 +58,20 @@
       <button type="button" class="add-bot" data-area="bot-add" aria-label="Add a bot" title="Add a bot" data-i18n-title="bots.add" data-icon="plus" data-icon-size="16"></button>
     </div>
     <ul class="side-list side-bots" data-area="bot-list" aria-labelledby="bots-heading"></ul>
+    <div class="side-foot" data-area="side-foot">
+      <button type="button" class="foot-icon alerts-button" data-area="alerts-button" aria-expanded="false" aria-controls="must-check" title="Must check">
+    <span class="side-icon" aria-hidden="true"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"></path><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"></path></svg></span>
+    <span class="alerts-count" data-area="alerts-count" hidden></span>
+    <span class="sr-only" data-i18n="panel.must_check">Must check</span>
+  </button>
+      <button type="button" class="foot-icon settings-button" data-area="settings-button" title="Settings">
+    <span class="side-icon" aria-hidden="true"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round" aria-hidden="true">
+      <path d="M10.0 4.7 L10.4 1.9 L13.6 1.9 L14.0 4.7 L15.8 5.4 L18.0 3.7 L20.3 6.0 L18.6 8.2 L19.3 10.0 L22.1 10.4 L22.1 13.6 L19.3 14.0 L18.6 15.8 L20.3 18.0 L18.0 20.3 L15.8 18.6 L14.0 19.3 L13.6 22.1 L10.4 22.1 L10.0 19.3 L8.2 18.6 L6.0 20.3 L3.7 18.0 L5.4 15.8 L4.7 14.0 L1.9 13.6 L1.9 10.4 L4.7 10.0 L5.4 8.2 L3.7 6.0 L6.0 3.7 L8.2 5.4Z"></path>
+      <circle cx="12" cy="12" r="3.2"></circle>
+    </svg></span>
+    <span class="sr-only" data-i18n="header.settings">Settings</span>
+  </button>
+    </div>
   </nav>
   <main class="main" tabindex="-1">
 
@@ -293,7 +282,6 @@
         <label>Workflow <select name="workflow_id" data-area="task-workflow-select"><option value="">none</option></select></label>
         <p class="meta wide" data-area="task-workflow-hint" hidden>Only a bot runs workflows: pick the bot that runs it.</p>
         <label class="check wide"><input name="draft" type="checkbox" checked> Save as draft</label>
-        <label class="check wide"><input name="review_required" type="checkbox"> Needs a second check: done only after a reviewer bot (or I) approves the result</label>
       </div>
       <p class="error" data-area="task-form-error" role="alert"></p>
     </div>

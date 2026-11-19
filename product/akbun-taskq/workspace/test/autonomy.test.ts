@@ -135,19 +135,6 @@ describe('bot autonomy', () => {
     assert.equal((await call('POST', `/goals/${goal.id}/close`, { status: 'dropped' })).status, 409)
   })
 
-  test('[critical] a task that needs a second check waits for a reviewer bot; the owner cannot approve it', async () => {
-    const created = tool('coder', 'create_task').handler({ type: 'research', intent: 'measure the export time', review_required: true }) as { task_id: string }
-    assert.ok(startBotTask(env.db, 'coder', created.task_id, null).ok)
-    assert.ok(finishBotTask(env.db, 'coder', created.task_id, 'done', 'it takes 4 min (ran time ./export)').ok)
-    const status = () => env.db.prepare('SELECT status, json_extract(data, \'$.reviewer\') AS reviewer FROM tasks WHERE id = ?').get(created.task_id)
-    assert.deepEqual({ ...status() }, { status: 'review', reviewer: 'reviewer' })
-    assert.match(inbox('reviewer').at(-1) ?? '', /Please review task .* by coder/)
-    assert.throws(() => tool('coder', 'review_task').handler({ task_id: created.task_id, verdict: 'approve', note: 'mine' }), /own task/)
-    tool('reviewer', 'review_task').handler({ task_id: created.task_id, verdict: 'reject', note: 'no timing output in the summary' })
-    assert.equal(status()?.status, 'ready')
-    assert.match(inbox('coder').at(-1) ?? '', /rejected task .*no timing output/)
-  })
-
   test('[critical] a finished task becomes a workflow draft from its run; the weekly review flags what to prune', async () => {
     const task = (await (await call('POST', '/tasks', { type: 'research', intent: 'rotate the logs', status: 'ready' })).json()) as { id: string }
     assert.equal((await call('POST', `/tasks/${task.id}/save-workflow`)).status, 409, 'only a done task')

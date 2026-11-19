@@ -63,14 +63,17 @@ function setOpen(open) {
   load()
 }
 
-// Under the bell, its right edge on the bell's, and never past either side of the window. The bell stays at the
-// header's right edge even when the header wraps on a narrow window.
+// Beside the bell at the bottom of the sidebar: to its right, bottoms aligned, never past the window's edges.
 function place() {
   const box = bell.getBoundingClientRect()
   const width = panel.offsetWidth
-  const right = Math.min(Math.max(16, Math.round(window.innerWidth - box.right)), Math.max(16, window.innerWidth - width - 16))
-  panel.style.top = `${Math.round(box.bottom + 8)}px`
-  panel.style.right = `${right}px`
+  const left = Math.max(16, Math.min(Math.round(box.right + 8), window.innerWidth - width - 16))
+  panel.style.left = `${left}px`
+  panel.style.right = 'auto'
+  panel.style.top = 'auto'
+  const bottom = Math.max(16, Math.round(window.innerHeight - box.bottom))
+  panel.style.bottom = `${bottom}px`
+  panel.style.maxHeight = `${window.innerHeight - bottom - 16}px`
 }
 
 // The bell's count: open critical and high alerts, plus waiting approvals that have no open alert of their own (a task

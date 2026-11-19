@@ -8,7 +8,6 @@ import { initCalendar } from './views/calendar.js'
 import { initAlertsPanel } from './views/alerts-panel.js'
 import { initBoard } from './views/board.js'
 import { initRunDialog } from './views/run-dialog.js'
-import { initSearch } from './views/search.js'
 import { initSettings } from './views/settings-dialog.js'
 import { initTaskDetail } from './views/task-detail.js'
 import { initTaskForm } from './views/task-form.js'
@@ -36,7 +35,6 @@ initCalendar()
 initAlertsPanel()
 initBoard()
 initRunDialog()
-initSearch()
 initTaskDetail()
 initTaskForm()
 initSettings()

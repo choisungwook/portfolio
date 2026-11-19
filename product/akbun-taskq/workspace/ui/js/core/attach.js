@@ -97,6 +97,12 @@ export function attachments({ zone, button, chips, pasteTarget }) {
   return {
     files: () => items.filter((item) => item.path).map((item) => item.path),
     pick: () => picker.click(),
+    // A file already in the shared folder (picked with @): no upload, just its path.
+    addExisting: (path) => {
+      if (items.some((item) => item.path === path)) return
+      items.push({ name: path.split('/').pop(), state: 'ready', path })
+      render()
+    },
     pickFolder: () => folderPicker.click(),
     busy: () => items.some((item) => item.state === 'uploading'),
     clear: () => {
