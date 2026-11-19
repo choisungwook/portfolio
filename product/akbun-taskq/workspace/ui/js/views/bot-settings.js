@@ -1,5 +1,6 @@
-// The bot settings dialog: create a bot (from a preset or blank) or edit one. The gear on a bot and the right-click
-// menu open it. Name is fixed after creation; taskq, the orchestrator, can be neither disabled nor deleted.
+// The bot settings dialog: create a bot or edit one. Creating asks only for a name, a description and the SDK; everything
+// else starts with defaults and is edited later. The gear on a bot and the right-click menu open it. Name is fixed after
+// creation; taskq, the orchestrator, can be neither disabled nor deleted.
 import { api, mutate, notify } from '../core/api.js'
 import { area, clear, el } from '../core/dom.js'
 import { emit } from '../core/bus.js'
@@ -17,7 +18,6 @@ const MODES = [
 let dialog
 let form
 let editing = null
-let presets = {}
 
 function lines(text) {
   return text.split('\n').map((line) => line.trim()).filter(Boolean)
@@ -31,13 +31,6 @@ function init() {
   form.elements.provider.addEventListener('change', () => showSdk(form.elements.permission_mode.value))
   dialog.querySelector('[data-close]').addEventListener('click', () => dialog.close())
   form.addEventListener('submit', save)
-  area('bot-preset').addEventListener('change', () => {
-    const preset = presets[area('bot-preset').value]
-    if (!preset) return
-    form.elements.role.value = preset.role
-    form.elements.description.value = preset.description
-    form.elements.instructions.value = preset.instructions
-  })
   area('bot-session-folder').addEventListener('click', () => mutate(() => api.post('/open-folder', { target: 'bot', bot: editing })))
   const remove = area('bot-delete')
   remove.addEventListener('click', async () => {
@@ -75,17 +68,15 @@ export async function openBotSettings(name) {
   remove.textContent = 'Delete bot'
   area('bot-form-error').textContent = ''
   try {
-    const [settings, bot, loadedPresets] = await Promise.all([
-      api.get('/settings'), name ? api.get(`/bots/${name}`) : null, name ? presets : api.get('/bots/presets'),
-    ])
-    presets = loadedPresets
+    const [settings, bot] = await Promise.all([api.get('/settings'), name ? api.get(`/bots/${name}`) : null])
     const value = bot ?? { role: 'custom', description: '', instructions: '', model: null, workdir: null, permission_mode: 'auto',
       sandbox: false, allowed_domains: [], blocked_commands: [], skills: [], plugins: [], enabled: true, may_message_user: false,
       hourly_turns: null, turn_budget_usd: null, turn_max_turns: null }
     area('bot-settings-title').textContent = name ? `${name} settings` : 'New bot'
     area('bot-name-row').hidden = Boolean(name)
-    area('bot-preset-row').hidden = Boolean(name)
-    clear(area('bot-preset')).append(el('option', { value: '', text: 'Blank' }), ...Object.keys(presets).map((key) => el('option', { value: key, text: key })))
+    for (const node of form.querySelectorAll('[data-edit-only]')) node.hidden = !name
+    for (const node of form.querySelectorAll('[data-create-only]')) node.hidden = Boolean(name)
+    area('bot-save').textContent = name ? 'Save' : 'Create'
     const f = form.elements
     f.name.value = ''
     f.role.value = value.role
