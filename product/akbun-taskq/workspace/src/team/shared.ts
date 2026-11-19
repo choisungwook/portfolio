@@ -1,5 +1,5 @@
 import { mkdirSync, readdirSync, realpathSync, statSync, writeFileSync } from 'node:fs'
-import { basename, dirname, join, relative, resolve, sep } from 'node:path'
+import { basename, dirname, isAbsolute, join, relative, resolve, sep } from 'node:path'
 import type { Config } from '../config.ts'
 import { newId } from '../ids.ts'
 import { under } from '../worker/paths.ts'
@@ -25,6 +25,22 @@ export function resolveShared(config: Config, path: string): string | null {
   } catch {
     return under(dirname(target), root) ? target : null
   }
+}
+
+// An existing file in the shared folder, given absolute or relative to it, as its path relative to the folder; null when
+// it is outside the folder or not a file. Bots hand files over by these paths.
+export function sharedRelative(config: Config, path: string): string | null {
+  let root: string
+  let real: string
+  try {
+    root = realpathSync(sharedDir(config))
+    real = realpathSync(isAbsolute(path) ? path : resolve(root, path))
+    if (!statSync(real).isFile()) return null
+  } catch {
+    return null
+  }
+  if (!under(real, root)) return null
+  return relative(root, real).split(sep).join('/')
 }
 
 function safeName(name: string): string {

@@ -166,6 +166,7 @@
         <p class="drop-hint" data-i18n="chat.drop">Drop files here to attach them</p>
       </form>
      </div>
+     <aside class="file-pane" data-area="bot-file" aria-label="File" hidden></aside>
     </section>
 
     <section id="view-goals" data-view-panel="goals" aria-label="Goals" data-area="goals-view" hidden></section>
@@ -187,12 +188,29 @@
       <p class="meta" data-i18n="shared.hint">Every bot reads and writes this folder at the same path. Attached files are saved under attachments/.</p>
       <div class="shared-bar">
         <nav class="shared-crumbs" data-area="shared-crumbs" aria-label="Folder path"></nav>
+        <div class="btn-group shared-views" role="group" aria-label="View" data-area="shared-views">
+          <button type="button" data-mode="list" title="List" data-i18n-title="shared.view_list" aria-label="List">☰</button>
+          <button type="button" data-mode="details" title="Details" data-i18n-title="shared.view_details" aria-label="Details">▤</button>
+          <button type="button" data-mode="icons" title="Icons" data-i18n-title="shared.view_icons" aria-label="Icons">▦</button>
+        </div>
+        <label class="shared-sort"><span class="sr-only">Sort by</span>
+          <select data-area="shared-sort" aria-label="Sort by">
+            <option value="name" data-i18n="shared.sort_name">Name</option>
+            <option value="kind" data-i18n="shared.sort_kind">Kind</option>
+            <option value="size" data-i18n="shared.sort_size">Size</option>
+            <option value="modified" data-i18n="shared.sort_modified">Date modified</option>
+          </select>
+        </label>
+        <button type="button" class="quiet" data-area="shared-dir" title="Ascending or descending" aria-label="Sort order">↑</button>
         <button type="button" data-area="shared-upload" data-i18n="shared.upload">Upload files</button>
         <button type="button" data-area="shared-open" data-i18n="shared.open">Open in file manager</button>
       </div>
-      <div class="shared-drop" data-area="shared-drop">
-        <div class="attach-chips" data-area="shared-chips" hidden></div>
-        <ul class="shared-list" data-area="shared-list"></ul>
+      <div class="shared-body">
+        <div class="shared-drop" data-area="shared-drop">
+          <div class="attach-chips" data-area="shared-chips" hidden></div>
+          <div data-area="shared-list"></div>
+        </div>
+        <aside class="file-pane" data-area="shared-file" aria-label="File" hidden></aside>
       </div>
     </section>
 

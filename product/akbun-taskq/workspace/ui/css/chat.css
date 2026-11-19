@@ -93,17 +93,46 @@ mark.find.current { background: var(--accent); color: var(--on-accent); }
 .task-attach { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding: 8px; border-radius: var(--radius); background: var(--panel-soft); }
 
 /* Search view and shared folder. */
-.search-hits, .shared-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+.search-hits { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
 .search-hit { display: flex; gap: 12px; align-items: flex-start; width: 100%; text-align: left; padding: 10px 14px; border-radius: var(--radius); background: var(--panel); color: var(--fg); }
 .search-hit-text { display: grid; gap: 2px; min-width: 0; }
 .search-snippet { overflow-wrap: anywhere; }
 .search-snippet mark { background: var(--accent-soft); color: inherit; border-radius: 3px; padding: 0 1px; }
 .shared-bar { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: 8px 0 12px; }
-.shared-crumbs { flex: 1; min-width: 0; }
+.shared-crumbs { flex: 1 1 240px; min-width: 0; }
 .shared-drop { min-height: 160px; padding: 6px; border-radius: var(--radius-l); }
-.shared-item { display: grid; grid-template-columns: 20px minmax(0, 1fr) 90px 180px; gap: 10px; align-items: center; width: 100%; text-align: left; padding: 8px 12px; border-radius: var(--radius); background: var(--panel); color: var(--fg); }
-.shared-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-@media (max-width: 700px) { .shared-item { grid-template-columns: 20px minmax(0, 1fr); } .shared-item .meta { display: none; } }
+.shared-body { display: grid; gap: 12px; align-items: start; }
+.shared-body:has(> .file-pane:not([hidden])) { grid-template-columns: minmax(0, 1fr) minmax(360px, 46%); }
+@media (max-width: 1100px) { .shared-body:has(> .file-pane:not([hidden])) { grid-template-columns: 1fr; } }
+.shared-views button[aria-pressed="true"] { background: var(--accent-soft); color: var(--fg); }
+.shared-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+.shared-item, .shared-tile { color: var(--fg); background: transparent; border-radius: var(--radius); text-align: left; }
+.shared-item:hover, .shared-tile:hover { background: var(--panel-soft); }
+.shared-item[aria-current="true"], .shared-tile[aria-current="true"] { background: var(--accent-soft); }
+/* List: names only, in columns like a file manager's list view. */
+.shared-rows { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 2px 12px; }
+.shared-item { display: flex; align-items: center; gap: 8px; width: 100%; min-height: 32px; padding: 4px 8px; }
+/* Details: a table; the headers sort. */
+.shared-table { width: 100%; border-collapse: collapse; table-layout: fixed; }
+.shared-table th { text-align: left; font-weight: 600; padding: 4px 8px; border-bottom: 1px solid var(--border); }
+.shared-table td { padding: 0 8px; border-bottom: 1px solid var(--border); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.shared-table td:first-child { padding: 0; }
+.shared-table tr[aria-selected="true"] td { background: var(--accent-soft); }
+.shared-table .col-kind { width: 90px; } .shared-table .col-size { width: 90px; } .shared-table .col-date { width: 190px; }
+.sort-head { font-weight: inherit; color: inherit; }
+@media (max-width: 700px) { .shared-table .col-kind, .shared-table .col-date { display: none; } }
+/* Icons: a grid of tiles. */
+.shared-icons { display: grid; grid-template-columns: repeat(auto-fill, minmax(104px, 1fr)); gap: 8px; }
+.shared-tile { display: grid; justify-items: center; gap: 6px; padding: 10px 6px; text-align: center; }
+.shared-tile .shared-name { max-width: 100%; }
+/* File and folder glyphs drawn in CSS: a page with its extension, a folder with a tab. */
+.ficon { position: relative; flex: none; width: 16px; height: 20px; border-radius: 3px; border: 1.5px solid var(--muted); }
+.ficon[data-kind="folder"] { width: 20px; height: 15px; border-color: var(--accent); background: var(--accent-soft); border-radius: 2px 3px 3px 3px; }
+.ficon[data-kind="folder"]::before { content: ''; position: absolute; left: -1.5px; top: -5px; width: 9px; height: 4px; border: 1.5px solid var(--accent); border-bottom: 0; border-radius: 2px 2px 0 0; background: var(--accent-soft); }
+.ficon-big { width: 44px; height: 54px; border-radius: 6px; }
+.ficon-big[data-kind="folder"] { width: 56px; height: 42px; border-radius: 4px 6px 6px 6px; }
+.ficon-big[data-kind="folder"]::before { top: -9px; width: 24px; height: 8px; border-radius: 4px 4px 0 0; }
+.ficon-ext { position: absolute; left: 0; right: 0; bottom: 6px; font-size: 10px; font-weight: 700; text-transform: uppercase; color: var(--muted); text-align: center; }
 
 /* Compose bar tools: refresh on the left, model / effort / permission menus on the right. */
 .compose-tools { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; font-size: 0.85em; }
@@ -128,8 +157,29 @@ mark.find.current { background: var(--accent); color: var(--on-accent); }
 .compose-context { display: inline-flex; align-items: center; gap: 4px; color: var(--muted); }
 .side-bot .context-ring { margin-left: 4px; }
 
-/* A bot's page: the conversation (the wrapper keeps the drop highlight on the whole page). */
-.chat-page { display: grid; }
+/* A bot's page: the conversation (the wrapper keeps the drop highlight on the whole page), and a file from a message
+   in a pane beside it. */
+.chat-page { display: grid; gap: 12px; }
+.chat-page:has(> .file-pane:not([hidden])) { grid-template-columns: minmax(0, 1fr) minmax(360px, 46%); }
+@media (max-width: 1100px) { .chat-page:has(> .file-pane:not([hidden])) { grid-template-columns: 1fr; } }
+
+/* A file from the shared folder: name and actions, then the preview. */
+.file-pane { display: grid; grid-template-rows: auto minmax(0, 1fr); height: calc(100vh - 92px); min-height: 420px; background: var(--panel); border-radius: var(--radius-l); overflow: hidden; }
+.file-head { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding: 12px 14px; border-bottom: 1px solid var(--border); }
+.file-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.file-actions { display: flex; flex-wrap: wrap; gap: 6px; }
+.file-close { width: 32px; min-height: 32px; padding: 0; font-size: 1.3em; }
+.file-body { overflow: auto; min-height: 0; }
+.file-body > p { margin: 16px; }
+.file-frame { display: block; width: 100%; height: 100%; min-height: 400px; border: 0; background: #fff; }
+.file-body img { display: block; max-width: 100%; margin: 12px auto; }
+.file-text { margin: 0; padding: 14px; white-space: pre-wrap; overflow-wrap: anywhere; font-size: var(--text-small); }
+.file-md { padding: 4px 20px 20px; line-height: 1.6; overflow-wrap: anywhere; }
+.file-md pre { padding: 10px 12px; border-radius: var(--radius); background: var(--panel-soft); overflow: auto; }
+.file-md code { font-family: var(--font-mono, monospace); }
+.file-md table { border-collapse: collapse; }
+.file-md th, .file-md td { border: 1px solid var(--border); padding: 4px 8px; text-align: left; }
+.file-md blockquote { margin: 0; padding-left: 12px; border-left: 3px solid var(--border); color: var(--muted); }
 /* A failed turn or a refused message, shown in the conversation where it happened. */
 .msg[data-side="error"] { align-self: stretch; max-width: none; }
 .msg[data-side="error"] .bubble { background: var(--warning-soft); color: var(--fg); box-shadow: inset 3px 0 0 var(--danger); border-radius: var(--radius); }

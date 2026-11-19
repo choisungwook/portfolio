@@ -2,6 +2,22 @@
 
 <!-- markdownlint-configure-file {"MD024": {"siblings_only": true}} -->
 
+## 0.14.0
+
+bot이 만든 파일을 공용 폴더에 모으고, 대화에서 바로 열어 보게 한다. 공용 폴더를 파일 관리자처럼 보고 정렬한다.
+
+### Added
+
+- bot이 만든 파일(HTML, Markdown, 슬라이드, 문서 등)은 공용 폴더의 `outputs/<bot>/`에 저장하고 `send_message`의 `files`로 넘긴다. 공용 폴더 밖의 파일은 거부한다.
+- 대화의 파일 칩을 누르면 오른쪽 파일 창에 보인다. HTML은 sandbox iframe(별도 미리 보기 주소, 인라인 스타일·스크립트와 같은 폴더의 이미지·CSS 동작), Markdown은 렌더링, 이미지·텍스트는 그대로 보이고, 그 밖의 파일은 열기(이 컴퓨터의 앱)와 공용 폴더에서 보기를 제공한다.
+- 공용 폴더의 보기(목록, 자세히, 아이콘)와 정렬(이름, 종류, 크기, 수정한 날짜, 오름·내림차순). 파일을 누르면 같은 파일 창에 보인다.
+- `POST /api/shared/preview`(operation `file_preview`): HTML 미리 보기용 10분짜리 주소.
+- `POST /api/open-file`(operation `file_open`): 공용 폴더의 파일을 이 컴퓨터의 앱으로 열거나 그 폴더를 연다.
+
+### SDK
+
+SDK 사용 변경 없음.
+
 ## 0.13.1
 
 ### Changed

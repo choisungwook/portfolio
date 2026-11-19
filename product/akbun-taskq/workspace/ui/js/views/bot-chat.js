@@ -16,6 +16,9 @@ import { openBotSettings } from './bot-settings.js'
 import { initChatFind, refreshFind } from './chat-find.js'
 import { initComposeMenus, showComposeMenus } from './compose-menus.js'
 import { botConnection } from './connections.js'
+import { download, showFile } from './file-viewer.js'
+
+export { download }
 
 const POLL_MS = 5000
 
@@ -61,6 +64,7 @@ export function initBotChat() {
     lastKey = null
     clear(nodes.log)
     files.clear()
+    area('bot-file').hidden = true
     sendError = null
     blocker = null
     renderHead()
@@ -271,26 +275,17 @@ function bubble(m, name) {
       side === 'other' ? el('span', { class: 'msg-sender', text: m.sender }) : null,
       el('div', { class: 'bubble', text: cancelled ? t('chat.cancelled', 'Cancelled') : m.body }),
       attached.length === 0 ? null : el('div', { class: 'msg-files' }, ...attached.map((path) => el('button', {
-        type: 'button', class: 'file-chip', text: path.split('/').pop(), title: path, onclick: () => download(path),
+        type: 'button', class: 'file-chip', text: path.split('/').pop(), title: path, onclick: () => openFile(path),
       }))),
       el('span', { class: 'msg-meta' },
         `${shortTime(m.created_at)}${notes.length ? ` · ${notes.join(' · ')}` : ''}`,
         m.task_id ? el('button', { type: 'button', class: 'link', text: ` · task ${m.task_id}`, onclick: () => emit('open-task', m.task_id) }) : null)))
 }
 
-// Downloads go through fetch, because the API needs the token header that a plain link cannot send.
-export async function download(path) {
-  try {
-    const blob = await api.blob(`/shared/file?path=${encodeURIComponent(path)}`)
-    const url = URL.createObjectURL(blob)
-    const link = el('a', { href: url, download: path.split('/').pop() })
-    document.body.append(link)
-    link.click()
-    link.remove()
-    setTimeout(() => URL.revokeObjectURL(url), 10_000)
-  } catch (error) {
-    notify(error.message, true)
-  }
+// A file in a message opens in the pane beside the conversation.
+function openFile(path) {
+  const pane = area('bot-file')
+  showFile(pane, path, { onClose: () => { pane.hidden = true } })
 }
 
 async function send(event) {

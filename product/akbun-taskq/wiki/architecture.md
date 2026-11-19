@@ -364,7 +364,7 @@ user --bot chat / taskq bots say--> team_messages --hub--> bot turn (resumed Cla
 | Tool | What it does |
 |---|---|
 | `list_agents` | the enabled bots with role, description and whether each is busy |
-| `send_message` | a message to a bot, or to the user: always for a bot the user has written to (it answers directly), otherwise only with `may_message_user`, which governs conversations the bot would start; `deliver_at` schedules it |
+| `send_message` | a message to a bot, or to the user: always for a bot the user has written to (it answers directly), otherwise only with `may_message_user`, which governs conversations the bot would start; `deliver_at` schedules it; `files` hands over files in the shared folder (stored as paths relative to it, the user opens them from the message; anything outside is refused) |
 | `start_discussion`, `discuss`, `conclude_discussion` | bounded discussions, below |
 | `create_task`, `assign_task` | record a task with an owner; hand it on |
 | `start_task`, `finish_task` | work on an owned task within one turn |
@@ -649,6 +649,8 @@ Writes (any non-GET under `/api`) must send `Content-Type: application/json`, op
 | `POST /settings/limits` | any of `daily_budget_usd`, `turns_per_hour_total`, `max_concurrent_turns`, `bot_turns_per_hour`, `turn_budget_usd`, `turn_max_turns`; all are checked before any is saved |
 | `POST /files` | upload `{ "name", "data": base64 }` up to 20 MB; saved under `shared/attachments/<day>/<id>-<name>`; returns `{ path }` relative to the shared folder |
 | `GET /shared?dir=` `GET /shared/file?path=` | list a folder of the shared folder (up to 500 entries, symlinks left out); download a file. A path outside the shared folder is 400 |
+| `POST /shared/preview` | `{ "path" }` for an HTML file of the shared folder returns `{ "url": "/preview/<ticket>/<name>" }`. The ticket lasts 10 minutes and serves that file and the files in its folder, outside `/api` and without the token, with `content-security-policy: sandbox allow-scripts; …; frame-ancestors <taskq>` so the page runs in an opaque origin. 404 for anything else |
+| `POST /open-file` | `{ "path", "reveal"? }` opens a file of the shared folder (path relative to it) with its default app on this machine, or with `reveal: true` the folder that holds it. 404 for anything that is not an existing file inside the shared folder (links out of it included) |
 | `POST /open-folder` | `{ "target": "shared" | "home" | "sessions" | "bot", "bot"? }` opens that folder in the desktop file manager and returns its path. Only folders taskq names; 404 when it does not exist yet |
 | `GET /plugins/catalog` | the official plugin marketplace (`anthropics/claude-plugins-official`), fetched on demand and cached for an hour, as `{ plugins: [{ name, description, anthropic, source, homepage }], fetched_at }`. Listed only; nothing is installed. 502 when it cannot be fetched |
 | `POST /settings/queue-autorun` | `{ "enabled": false }` stops the queue from running unowned tasks on its own |

@@ -7,6 +7,7 @@ import { nowSec } from '../time.ts'
 import { teamChanged } from '../wake.ts'
 import { ToolError, type ScopedTools, type TeamTool } from './tools.ts'
 import { mirrorPage } from './wiki-files.ts'
+import { sharedDir, sharedRelative } from './shared.ts'
 
 // Each open discussion costs a turn per speaker per round, so few may run at once.
 const MAX_OPEN_THREADS = 3
@@ -48,10 +49,18 @@ export function talkTools(scope: ScopedTools): TeamTool[] {
         reply_to: z.number().int().positive().optional(),
         task_id: z.string().regex(/^[0-9a-f]{8}$/).optional(),
         deliver_at: z.string().max(40).optional(),
+        files: z.array(z.string().max(500)).max(20).optional().describe('files in the shared folder to hand over (relative to it, or absolute paths inside it); the recipient opens them from the message'),
       },
       readOnly: false,
       handler(args) {
         const to = String(args.to)
+        // Files travel as paths relative to the shared folder, the way the user's attachments do.
+        const files: string[] = []
+        for (const path of (args.files as string[] | undefined) ?? []) {
+          const rel = sharedRelative(config, path)
+          if (!rel) throw new ToolError(`${path} is not a file in the shared folder; save what you hand over under ${sharedDir(config)}/outputs/${agent}/`)
+          files.push(rel)
+        }
         const deliverAt = args.deliver_at === undefined ? undefined : timeOf(String(args.deliver_at))
         if (to === agent && (deliverAt === undefined || deliverAt < nowSec() + MIN_SELF_DELAY_SEC)) {
           throw new ToolError('a message to yourself needs deliver_at at least 10 minutes ahead; for notes, use the wiki')
@@ -65,7 +74,7 @@ export function talkTools(scope: ScopedTools): TeamTool[] {
         }
         const id = postMessage(db, {
           sender: agent, recipient: to, body: String(args.body), deliver_at: deliverAt,
-          reply_to: args.reply_to as number | undefined, task_id: args.task_id as string | undefined,
+          reply_to: args.reply_to as number | undefined, task_id: args.task_id as string | undefined, attachments: files,
         })
         wrote()
         if (to === USER) {

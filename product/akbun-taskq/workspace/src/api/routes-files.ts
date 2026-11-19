@@ -1,10 +1,10 @@
 import { existsSync } from 'node:fs'
 import type { Hono } from 'hono'
 import { createReadStream, statSync } from 'node:fs'
-import { basename } from 'node:path'
+import { basename, dirname, join } from 'node:path'
 import { Readable } from 'node:stream'
 import { HttpError, readJson, type ApiDeps } from './http.ts'
-import { listShared, resolveShared, saveAttachment, sharedDir, UPLOAD_LIMIT } from '../team/shared.ts'
+import { listShared, resolveShared, saveAttachment, sharedDir, sharedRelative, UPLOAD_LIMIT } from '../team/shared.ts'
 import { agentDir } from '../team/prompt.ts'
 import { getAgent } from '../db/team.ts'
 import { getTask } from '../db/tasks.ts'
@@ -43,6 +43,17 @@ export function registerFileRoutes(api: Hono, { config, db }: ApiDeps, open: Ope
     c.header('content-disposition', `attachment; filename*=UTF-8''${encodeURIComponent(basename(path))}`)
     c.header('content-length', String(size))
     return c.body(Readable.toWeb(createReadStream(path)) as ReadableStream)
+  })
+
+  // Opens a file of the shared folder with its default app on this machine, or with { reveal: true } the folder that
+  // holds it. Only files inside the shared folder.
+  api.post('/open-file', async (c) => {
+    const body = await readJson(c) as { path?: unknown; reveal?: unknown } | null
+    const rel = typeof body?.path === 'string' ? sharedRelative(config, body.path) : null
+    if (!rel) throw new HttpError(404, 'no such file in the shared folder')
+    const full = join(sharedDir(config), rel)
+    open(body?.reveal === true ? dirname(full) : full)
+    return c.json({ path: full })
   })
 
   // Opens one of taskq's own folders on this machine: the shared folder, TASKQ_HOME, the Claude session transcripts,
