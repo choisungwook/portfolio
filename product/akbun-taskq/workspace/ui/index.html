@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="en">
+<html lang="en" data-theme="light">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -275,27 +275,18 @@
   <form method="dialog" class="dialog-foot"><button type="button" data-close>Close</button></form>
 </dialog>
 
-<dialog data-area="task-form" aria-labelledby="task-form-title">
+<dialog data-area="task-form" aria-label="New task">
   <form data-area="task-form-form" class="dialog-form">
     <div class="dialog-body">
-      <h2 id="task-form-title">New task</h2>
       <div class="task-form">
-        <fieldset class="kind wide">
-          <legend>Type</legend>
-          <div class="segmented" data-area="task-kind">
-            <label><input type="radio" name="kind" value="research" checked><span>Research</span></label>
-            <label><input type="radio" name="kind" value="task"><span>Task</span></label>
-          </div>
-          <p class="meta" data-area="task-kind-hint"></p>
-        </fieldset>
-        <label class="wide">Intent <textarea name="intent" rows="3" maxlength="4000" required placeholder="What should be done, and what to be careful about" data-area="task-intent"></textarea></label>
+        <label class="wide task-title-field"><span class="sr-only">Title</span><input name="title" type="text" maxlength="200" required placeholder="Title" data-i18n-placeholder="task.title" autocomplete="off"></label>
+        <label class="wide"><span class="sr-only">Intent</span><textarea name="intent" rows="3" maxlength="4000" required placeholder="What should be done, and what to be careful about" data-area="task-intent"></textarea></label>
         <div class="wide task-attach" data-area="task-attach-zone">
           <button type="button" class="attach-button" data-area="task-attach" data-i18n-title="task.attach" title="Attach files" aria-label="Attach files" data-icon="plus" data-icon-size="20"></button>
           <span class="meta" data-i18n="task.drop">Drop or paste files to attach them</span>
           <div class="attach-chips" data-area="task-attachments" hidden></div>
         </div>
-        <label class="wide" data-area="task-skill-field">Access skill <select name="access_skill"><option value="">none</option></select></label>
-        <label class="wide">Repository or folder <input name="repo" type="text" maxlength="500" list="repo-options" autocomplete="off" spellcheck="false" placeholder="pick a repository or type an absolute folder path" data-area="task-repo"><datalist id="repo-options" data-area="repo-options"></datalist></label>
+        <label class="wide">Repository or folder <input name="repo" type="text" maxlength="500" list="repo-options" autocomplete="off" spellcheck="false" placeholder="optional: a repository or an absolute folder path" data-area="task-repo"><datalist id="repo-options" data-area="repo-options"></datalist></label>
         <p class="meta wide" data-area="task-repo-info"></p>
         <label class="check wide" data-area="task-worktree-field" hidden><input name="worktree" type="checkbox" checked> Work in a new git worktree (its own branch; your checkout stays as it is)</label>
         <label>Bot <select name="owner" data-area="task-owner-select"><option value="">none (the queue runs it)</option></select></label>
@@ -303,26 +294,6 @@
         <p class="meta wide" data-area="task-workflow-hint" hidden>Only a bot runs workflows: pick the bot that runs it.</p>
         <label class="check wide"><input name="draft" type="checkbox" checked> Save as draft</label>
         <label class="check wide"><input name="review_required" type="checkbox"> Needs a second check: done only after a reviewer bot (or I) approves the result</label>
-        <details class="wide more" data-area="task-more">
-          <summary>More options</summary>
-          <div class="task-form">
-            <label class="wide" data-area="task-mode-field">What a task may do
-              <select name="mode">
-                <option value="ops_change">Change an account, each change waits for approval</option>
-                <option value="ops_read">Read an account only</option>
-                <option value="code">Work in a repository</option>
-              </select>
-            </label>
-            <label class="wide">Title <input name="title" type="text" maxlength="200" placeholder="Defaults to the start of the intent"></label>
-            <label class="wide">Cautions <textarea name="cautions" rows="2" maxlength="4000"></textarea></label>
-            <label>Target profile <input name="target_profile" type="text" maxlength="100"></label>
-            <label>Lock key <input name="lock_key" type="text" maxlength="100" placeholder="account or repository"></label>
-            <label>Depends on <input name="depends_on" type="text" maxlength="8" pattern="[0-9a-f]{8}" placeholder="task id"></label>
-            <label class="check wide"><input name="auto_accept_handoffs" type="checkbox" checked> Automatically accept incoming handoffs</label>
-            <label>Priority <input name="priority" type="number" min="-100" max="100" step="1" value="0"></label>
-            <label class="wide">Output path <input name="output_path" type="text" maxlength="500" placeholder="relative path under outputs/"></label>
-          </div>
-        </details>
       </div>
       <p class="error" data-area="task-form-error" role="alert"></p>
     </div>
@@ -346,7 +317,7 @@
       <label class="wide">Description <span class="meta">What this bot does. Other bots hand work to it by this text.</span><textarea name="description" rows="2" maxlength="500" required placeholder="Developer. Takes code tasks, changes the repository and runs the tests."></textarea></label>
       <p class="meta wide" data-create-only>Role, instructions, model, permissions, skills and limits start with defaults; change them later with the gear next to the bot.</p>
       <label class="wide" data-edit-only>Instructions <textarea name="instructions" rows="5" maxlength="8000"></textarea></label>
-      <label class="wide" data-edit-only>Working directory <input name="workdir" type="text" maxlength="500" autocomplete="off" spellcheck="false" placeholder="the bot's own folder"></label>
+      <label class="wide" data-edit-only>Working directory <input name="workdir" type="text" maxlength="500" autocomplete="off" spellcheck="false" placeholder="its own folder: shared/bots/<name>"></label>
     </div>
     <fieldset data-edit-only>
       <legend>Charter</legend>

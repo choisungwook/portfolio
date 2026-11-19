@@ -86,7 +86,7 @@ const KO = {
   'chat.add_files': '파일 또는 사진 추가', 'chat.add_folder': '폴더 추가', 'chat.slash': '슬래시 명령어',
   'file.open': '열기', 'file.open_hint': '이 컴퓨터에서 연결된 앱으로 열기', 'file.in_shared': '공용 폴더에서 보기', 'file.download': '내려받기', 'file.close': '닫기',
   'file.no_preview': '이 종류의 파일은 여기서 미리 볼 수 없습니다. 앱으로 열거나 공용 폴더에서 찾으세요.', 'file.too_big': '미리 보기에는 너무 큽니다. 앱으로 여세요.',
-  'task.attach': '파일 첨부', 'task.drop': '파일을 끌어다 놓거나 붙여넣으세요',
+  'task.title': '제목', 'task.attach': '파일 첨부', 'task.drop': '파일을 끌어다 놓거나 붙여넣으세요',
   'nav.plugins': '플러그인', 'nav.workflows': '워크플로', 'plugins.hint': '여기 등록한 skill과 plugin을 bot 설정에서 bot마다 고릅니다. 업데이트는 git 저장소를 받아 오고 쓰는 bot을 모두 다시 불러옵니다.',
   'plugins.official': '공식 marketplace', 'plugins.anthropic_only': 'Anthropic 것만', 'plugins.filter': '거르기', 'plugins.remove': '삭제',
   'plugins.official_hint': 'Anthropic 공식 marketplace의 plugin 목록입니다. 설치하지 않습니다. 쓰려면 받아서 위에 폴더를 등록하세요.',

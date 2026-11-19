@@ -11,7 +11,8 @@ import { icon } from '../core/icons.js'
 import { senderAvatar } from './avatar.js'
 import { botsSnapshot, shortTime } from './bots-sidebar.js'
 
-const TABS = [['all', 'search.all', 'All'], ['messages', 'search.messages', 'Conversations'], ['tasks', 'search.tasks', 'Tasks'], ['bots', 'nav.bots', 'Bots']]
+// Bots covers a bot by name and what was said in its conversations; there is no separate conversations tab.
+const TABS = [['all', 'search.all', 'All'], ['tasks', 'search.tasks', 'Tasks'], ['bots', 'nav.bots', 'Bots']]
 const NEEDS_ME = new Set(['needs_approval', 'needs_auth'])
 
 let dialog
@@ -128,7 +129,7 @@ async function run() {
     const recent = [...team.agents].filter((a) => a.last_message).sort((a, b) => b.last_message.created_at - a.last_message.created_at).slice(0, 6)
     draw(
       tab === 'all' ? section(t('search.needs_me', 'Needs attention'), needs) : null,
-      wants('messages') || wants('bots') ? section(t('search.recent', 'Recent'), recent.map(botRow)) : null,
+      wants('bots') ? section(t('search.recent', 'Recent'), recent.map(botRow)) : null,
       wants('tasks') ? section(t('search.open_tasks', 'Open tasks'), tab === 'tasks' ? allTasks.slice(0, 20).map(taskRow) : []) : null,
       tab === 'all' ? section(t('search.actions', 'Actions'), [
         item(icon('plus', 20), t('header.new_task', 'New task'), '', () => area('new-task-button').click()),
@@ -145,7 +146,7 @@ async function run() {
   draw.pending = false
   try {
     const [hits, runs] = await Promise.all([
-      wants('messages') ? api.get(`/bots/search?q=${encodeURIComponent(query)}`).catch(() => []) : [],
+      wants('bots') ? api.get(`/bots/search?q=${encodeURIComponent(query)}`).catch(() => []) : [],
       wants('tasks') ? api.get(`/search?q=${encodeURIComponent(query)}`).catch(() => []) : [],
     ])
     if (id !== seq) return

@@ -1,41 +1,31 @@
-// Add-task dialog. Empty optional fields are left out so the server applies its defaults.
-// Saved as a draft unless the draft box is cleared, which sends status "ready".
-// The form offers two kinds. Research writes a document. Task acts on something; what it may do is the mode under
-// More options, and the default mode asks for approval before every change.
+// Add-task dialog: title, intent, files, an optional folder, the bot and workflow. Empty optional fields are left out so
+// the server applies its defaults. Saved as a draft unless the draft box is cleared, which sends status "ready".
+// There is no type to pick: a task with a folder works in it (code), one without writes a document (research).
 import { api, mutate } from '../core/api.js'
 import { area, el } from '../core/dom.js'
 import { autosize } from '../core/autosize.js'
 import { attachments } from '../core/attach.js'
-import { emit, on } from '../core/bus.js'
+import { emit } from '../core/bus.js'
 
-const TEXT_FIELDS = ['title', 'intent', 'cautions', 'lock_key', 'access_skill', 'target_profile', 'repo', 'output_path', 'workflow_id']
+const TEXT_FIELDS = ['title', 'intent', 'repo', 'workflow_id']
 
 let dialog
 let form
 let files
 let fitIntent
 let error
-let skillSelect
-
-const HINTS = {
-  research: 'Reads, searches and writes a document under outputs/. Changes nothing else.',
-  task: 'Acts on an account or a repository. By default every change waits for your approval.',
-}
 
 export function initTaskForm() {
   dialog = area('task-form')
   form = area('task-form-form')
   error = area('task-form-error')
-  skillSelect = form.elements.access_skill
   area('new-task-button').addEventListener('click', () => {
     form.reset()
     files?.clear()
     setTimeout(() => fitIntent?.(), 0)
-    area('task-more').open = false
-    showKind()
     error.textContent = ''
     dialog.showModal()
-    loadSkillOptions()
+    form.elements.title.focus()
     loadBotOptions()
     loadRepoOptions()
     showRepo()
@@ -50,13 +40,8 @@ export function initTaskForm() {
   })
   files = attachments({ zone: area('task-attach-zone'), button: area('task-attach'), chips: area('task-attachments'), pasteTarget: form })
   form.addEventListener('change', (event) => {
-    if (event.target.name === 'kind' || event.target.name === 'mode') {
-      showKind()
-      showRepo()
-    }
     if (event.target.name === 'workflow_id' || event.target.name === 'owner') showWorkflowHint()
   })
-  on('settings-closed', loadSkillOptions)
 }
 
 // Bots that can own the task and the workflows it can follow. A workflow without a bot would never run.
@@ -99,47 +84,19 @@ async function showRepo() {
       repoInfo = null
     }
   }
-  const writes = form.elements.kind.value === 'task' && form.elements.mode.value === 'code'
   info.textContent = !path ? '' : !repoInfo?.exists ? 'This folder does not exist.' : repoInfo.git ? `git repository on ${repoInfo.branch ?? '?'}` : 'plain folder (no git)'
-  area('task-worktree-field').hidden = !(writes && repoInfo?.git)
-}
-
-// The access skill list comes from the registry. A name that is no longer registered falls back to none.
-async function loadSkillOptions() {
-  const current = skillSelect.value
-  try {
-    const settings = await api.get('/settings')
-    const names = settings.access_skills.map((skill) => skill.name)
-    skillSelect.replaceChildren(el('option', { value: '', text: 'none' }), ...names.map((name) => el('option', { value: name, text: name })))
-    skillSelect.value = names.includes(current) ? current : ''
-  } catch (failure) {
-    error.textContent = `Access skills could not be loaded: ${failure.message}`
-  }
-}
-
-function showKind() {
-  const kind = form.elements.kind.value
-  area('task-kind-hint').textContent = HINTS[kind]
-  area('task-skill-field').hidden = kind !== 'task'
-  area('task-mode-field').hidden = kind !== 'task'
+  area('task-worktree-field').hidden = !repoInfo?.git
 }
 
 function body() {
   const data = new FormData(form)
-  const research = data.get('kind') === 'research'
-  const out = { type: research ? 'research' : data.get('mode') }
-  if (research) data.delete('access_skill')
+  const out = { type: String(data.get('repo') ?? '').trim() ? 'code' : 'research' }
   if (!data.get('draft')) out.status = 'ready'
   if (data.get('review_required')) out.review_required = true
   for (const name of TEXT_FIELDS) {
     const value = String(data.get(name) ?? '').trim()
     if (value) out[name] = value
   }
-  const priority = String(data.get('priority') ?? '').trim()
-  if (priority !== '') out.priority = Number(priority)
-  const dependsOn = String(data.get('depends_on') ?? '').trim()
-  if (dependsOn !== '') out.depends_on = [dependsOn]
-  out.auto_accept_handoffs = data.has('auto_accept_handoffs')
   if (!area('task-worktree-field').hidden) out.worktree = data.has('worktree')
   const attached = files.files()
   if (attached.length) out.attachments = attached
@@ -159,5 +116,5 @@ async function submit(event) {
   if (owner) await mutate(() => api.post(`/bots/tasks/${created.id}/owner`, { owner }))
   files.clear()
   dialog.close()
-  emit('open-task', created.id)
+  emit('tasks-changed')
 }
