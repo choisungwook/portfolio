@@ -50,7 +50,7 @@
 | 사용량(Usage) | `usage-period`, `usage-report`, `.usage-card`, `.usage-table` | `GET /api/usage?period=` | 설정 dialog의 사용량 페이지. 기간(오늘, 7일, 30일, 전체)을 고르면 SDK·로그인 방식별 카드(비용, turn, 입력·출력·캐시 토큰)와 일회성 작업 실행 카드, bot 세션별 표(bot, SDK, 모델, 세션, turn, 입력, 출력, 비용, 마지막)를 보인다. Kiro는 credit, ChatGPT 구독은 "구독"으로 보인다 |
 | Kiro 로그인 | `kiro-status`, `kiro-form`, `kiro-check`, `kiro-login` | `GET /api/kiro/status`, `POST /api/kiro/login` | 설정 dialog의 연결 페이지. 로그인 상태(`kiro-cli whoami`), SSO start URL과 region, AWS SSO로 로그인(브라우저에서 열 URL과 코드 표시), 상태 확인 |
 | 언어와 테마 | `ui-language`, `ui-theme` | `POST /api/settings/appearance` | 언어는 한국어(기본)와 English, 테마는 라이트(기본), 다크, 시스템. 바꾸는 즉시 적용된다 |
-| 사용량 제한 | `limits-form` | `POST /api/settings/limits` | 하루 예산, 전체 시간당 turn, 동시에 일하는 bot, bot별 시간당 turn·turn당 예산·turn당 모델 턴의 기본값. 저장 버튼으로 한꺼번에 저장하고 하나라도 범위를 벗어나면 아무것도 저장하지 않는다 |
+| 사용량 제한 | `limits-form` | `POST /api/settings/limits` | 하루 예산, 전체 시간당 turn, 동시에 일하는 bot, bot별 시간당 turn·turn당 예산·turn당 모델 턴의 기본값, 새 세션으로 넘기는 대화 크기(토큰). 저장 버튼으로 한꺼번에 저장하고 하나라도 범위를 벗어나면 아무것도 저장하지 않는다 |
 | 폴더 | `folder-list` | `POST /api/open-folder` | 공용 폴더, 세션 대화 기록(`~/.claude/projects`), taskq 데이터 폴더의 경로와 열기 버튼 |
 | 글꼴 설정 | `font-family`, `font-size`, `font-size-value` | `POST /api/settings/appearance` | 글꼴(System, Pretendard, Noto Sans KR, IBM Plex Sans, Serif, Monospace)과 크기(12~20 px). 바꾸는 즉시 앱 전체에 적용되고 SQLite에 저장되어 다음에 열 때도 유지된다. 설치되지 않은 글꼴은 시스템 글꼴로 보인다 |
 | 큐 자동 실행 | `queue-autorun` | `POST /api/settings/queue-autorun` | 켜면(기본) owner 없는 ready task를 큐가 스스로 실행한다. 끄면 시작 버튼을 눌러야 실행된다. bot의 task는 이 설정과 상관없이 그 bot을 기다린다 |

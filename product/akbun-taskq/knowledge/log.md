@@ -4,6 +4,7 @@ concept를 추가·수정·삭제할 때마다 오늘 날짜 섹션을 맨 위�
 
 ## 2026-11-20
 
+* **Creation**: [session handover](decisions/2026-11-session-handover.md) 결정 기록. 토큰 한도를 넘은 대화를 bot의 인수인계 메모와 함께 새 세션으로 넘김.
 * **Creation**: [rejected turns](decisions/2026-11-rejected-turns.md) 결정 기록. 거부된 turn은 재시도하지 않고 비용 0, 예산 80% 표시.
 * **Update**: [Bedrock inference profiles](decisions/2026-11-bedrock-inference-profiles.md)에 도구와 reasoning을 함께 받지 않는 모델을 `reasoning_effort: none`으로 다시 부르는 결정과 이유를 추가.
 

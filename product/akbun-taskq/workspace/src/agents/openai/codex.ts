@@ -15,6 +15,7 @@ import { selfCommand } from '../../mcp/server.ts'
 //   worktrees (workspace-write), bypassPermissions is danger-full-access. Approvals are never asked: nobody watches.
 // - Usage: tokens from turn.completed; the plan has no per-turn price, so the cost is 0, failed turns included.
 //   turn.completed sums every model call of the turn, so it does not tell the context size: the ring stays unknown.
+// - Long conversations: Codex compacts the thread itself at model_auto_compact_token_limit, set to the session limit.
 
 export interface CodexEvent {
   type: string
@@ -59,6 +60,8 @@ export function codexArgs(config: Config, request: TurnRequest): string[] {
   args.push('--skip-git-repo-check')
   if (agent.effort) override('model_reasoning_effort', agent.effort === 'max' ? 'xhigh' : agent.effort)
   override('approval_policy', 'never')
+  // Codex summarizes its own thread; taskq only tells it when (the same limit the hub hands other bots over at).
+  if (request.sessionMaxTokens) override('model_auto_compact_token_limit', request.sessionMaxTokens)
   if (request.resume) args.push('resume', request.resume)
   return args
 }

@@ -179,6 +179,57 @@ describe('team hub', () => {
     assert.equal(budgetState(db, config).spent_usd, 0)
   })
 
+  test('[critical] a conversation over the token limit is handed over: the bot is asked for a note, then starts a new session', async () => {
+    const { db, config } = env
+    let n = 0
+    const { backend, requests } = fakeBackend((request, call) => {
+      n += 1
+      if (request.prompt.includes('call write_handover')) call('write_handover', { text: 'step 2 of the migration is next' })
+      // Every turn ends over the limit: the first turn of a session is never asked, so the new session does not loop.
+      return { outcome: 'done', session_id: `s${n}`, context: { tokens: 150_000, window: null } }
+    })
+    hub = createTeamHub({ db, config, backend, retryAfterSec: 0 })
+    await hub.start()
+    postMessage(db, { sender: USER, recipient: 'coder', body: 'a long job' })
+    teamChanged.notify()
+    await waitFor(() => requests.length === 1)
+    await sleep(30)
+    assert.equal(requests.length, 1, 'the first turn of a session is not asked')
+    postMessage(db, { sender: USER, recipient: 'coder', body: 'more' })
+    teamChanged.notify()
+    await waitFor(() => requests.length === 4)
+    await sleep(30)
+    assert.equal(requests.length, 4, 'one handover, not a loop')
+    assert.match(requests[2].prompt, /call write_handover/)
+    assert.equal(requests[2].resume, 's2', 'the bot writes the note in the session that holds the conversation')
+    assert.equal(requests[3].resume, null, 'the next turn starts an empty session')
+    assert.match(requests[3].prompt, /step 2 of the migration/, 'and its first message is the note')
+    assert.equal(requests[0].sessionMaxTokens, 100_000)
+  })
+
+  test('[critical] a handover asked in a session that is gone is withdrawn, and the next turn over the limit is asked afresh', async () => {
+    const { db, config } = env
+    let n = 0
+    const { backend, requests } = fakeBackend(() => {
+      n += 1
+      return { outcome: 'done', session_id: `s${n}`, context: { tokens: 150_000, window: null } }
+    })
+    hub = createTeamHub({ db, config, backend, retryAfterSec: 0 })
+    db.prepare("UPDATE team_agents SET session_id = 's0' WHERE name = 'coder'").run()
+    db.prepare("INSERT INTO meta (key, value) VALUES ('team_handover_note:coder', 'an old note')").run()
+    // A request left by a session that is gone: its message is still unread.
+    const stale = postMessage(db, { sender: 'queue', recipient: 'coder', body: 'call write_handover' })
+    db.prepare("INSERT INTO meta (key, value) VALUES ('team_handover:coder', ?)").run(`${stale}:gone`)
+    postMessage(db, { sender: USER, recipient: 'coder', body: 'do X' })
+    await hub.start()
+    teamChanged.notify()
+    await waitFor(() => requests.length === 2)
+    assert.doesNotMatch(requests[0].prompt, /write_handover/, 'the stale request is not delivered')
+    assert.equal(requests[0].resume, 's0', 'and the session is kept')
+    assert.match(requests[1].prompt, /call write_handover/, 'the turn over the limit is asked afresh')
+    assert.equal(db.prepare("SELECT 1 FROM meta WHERE key = 'team_handover_note:coder'").get(), undefined, 'an old note is not carried into a new handover')
+  })
+
   test('a missing session is dropped so the next turn starts a new one', async () => {
     const { db, config } = env
     let first = true

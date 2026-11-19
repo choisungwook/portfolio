@@ -3,7 +3,7 @@ import { join } from 'node:path'
 import type { Config } from '../config.ts'
 import type { Db } from '../db/open.ts'
 import {
-  SYSTEM, agentsWithMail, endTurn, getAgent, joinTurn, leaveTurn, postMessage, listAgents, nextDelivery, recoverTurns, replaceAgentSession, seedAgents, setAgentEnabled, spentSince,
+  SYSTEM, agentsWithMail, endTurn, getAgent, joinTurn, leaveTurn, postMessage, listAgents, nextDelivery, recoverTurns, replaceAgentSession, resetAgentSession, seedAgents, setAgentEnabled, spentSince,
   startTurn, turnsSince, type BotSdk, type TeamMessage, type TurnEnd,
 } from '../db/team.ts'
 import { closeUnconcluded, passStalled, skipDisabledSpeakers } from '../db/threads.ts'
@@ -158,6 +158,7 @@ export function createTeamHub({ db, config, backend: claude, backends = {}, retr
   }
 
   function launch(name: string): void {
+    dropStaleHandover(name)
     const started = startTurn(db, name, BATCH)
     const agent = getAgent(db, name)
     if (!started || !agent) return
@@ -192,6 +193,7 @@ export function createTeamHub({ db, config, backend: claude, backends = {}, retr
         sharedDir: shared,
         maxTurns: agent.turn_max_turns ?? t.turn_max_turns,
         budgetUsd: agent.turn_budget_usd ?? t.turn_budget_usd,
+        sessionMaxTokens: t.session_max_tokens,
         resume: agent.session_id,
         signal: controller.signal,
         turnId: started.turn.id,
@@ -229,6 +231,7 @@ export function createTeamHub({ db, config, backend: claude, backends = {}, retr
     }, result.rejected ? 1 : config.bots.maxAttempts)
     recordUsage(db, turnId, name, result)
     reportSetAside(name, end, result.error, result.rejected)
+    if (outcome === 'done') handOver(name, session, messages)
     if (result.tampered) pauseTeam(db, `${name} tried to reach taskq itself: ${result.tampered}`, 'security_finding')
     if (result.auth_failed) signedOut(name)
     // Work on a task happens inside one turn. A task still running when the turn ends goes back to ready, and the bot is
@@ -279,6 +282,63 @@ export function createTeamHub({ db, config, backend: claude, backends = {}, retr
     setAgentEnabled(db, name, false)
     const runtime = agent.sdk === 'openai' ? `OpenAI (${agent.provider ?? 'api'})` : 'Kiro'
     raiseAlert(db, { task_id: null, kind: 'auth_required', message: `${name} was turned off: its ${runtime} login failed. Sign in, then turn the bot on again.` })
+  }
+
+  // A resumed conversation is sent, or billed, again with every turn, so a bot that talks for weeks pays for its whole
+  // past each time. When the context a turn ended with passes session_max_tokens (or 80% of the model's window), the bot
+  // is asked once to write itself a handover note (write_handover). The turn that reads the request is the session's
+  // last: it handles its other messages as usual, and when it ends the session is dropped and the note is the first
+  // message of the new one. The bot summarizes itself because only its own session holds the conversation; a bot that
+  // writes no note still has its memory and the wiki.
+  // The marker is `<request message id>:<session it was asked in>`.
+  // Codex is left out: it reports no context size and compacts its own thread at the same limit (codex.ts).
+  const handoverKey = (name: string) => `team_handover:${name}`
+  const handoverNoteKey = (name: string) => `team_handover_note:${name}`
+  const clearHandover = (name: string) => db.prepare('DELETE FROM meta WHERE key IN (?, ?)').run(handoverKey(name), handoverNoteKey(name))
+
+  // Before a turn starts: a request that no longer waits in the inbox (its turn was cancelled, or it was set aside), or
+  // that was made in another session (the user reset the bot, or its SDK or provider changed), is withdrawn, so a new
+  // conversation is not told it is ending.
+  function dropStaleHandover(name: string): void {
+    const asked = getMeta(db, handoverKey(name))
+    if (asked === null) return
+    const cut = asked.indexOf(':')
+    const id = Number(asked.slice(0, cut))
+    const row = db.prepare('SELECT read_at, failed_at FROM team_messages WHERE id = ?').get(id)
+    const waiting = row !== undefined && row.read_at === null && row.failed_at === null
+    if (waiting && getAgent(db, name)?.session_id === asked.slice(cut + 1)) return
+    if (waiting) db.prepare('UPDATE team_messages SET read_at = ? WHERE id = ?').run(nowSec(), id)
+    clearHandover(name)
+  }
+
+  // After a turn ended done. `session` is the one the turn resumed; null means it was the first turn of its session.
+  function handOver(name: string, session: string | null, messages: TeamMessage[]): void {
+    const asked = getMeta(db, handoverKey(name))
+    if (asked !== null) {
+      if (!messages.some((m) => m.id === Number(asked.slice(0, asked.indexOf(':'))))) return   // not delivered yet
+      const note = getMeta(db, handoverNoteKey(name))
+      clearHandover(name)
+      resetAgentSession(db, name)
+      if (note) postMessage(db, { sender: SYSTEM, recipient: name, body: `Your previous conversation was closed to keep turns small. This is the handover note you wrote in it:\n\n${note}` })
+      return
+    }
+    // The size of a session's first turn is its floor (system prompt, tools, memory, the note itself): a new session
+    // would start as large, so asking again would only loop.
+    if (session === null) return
+    const bot = db.prepare('SELECT sdk, provider, session_id, context_tokens AS tokens, context_window AS window FROM team_agents WHERE name = ?').get(name)
+    if (!bot || bot.session_id === null || bot.tokens === null || (bot.sdk === 'openai' && bot.provider === 'chatgpt')) return
+    const tokens = Number(bot.tokens)
+    const window = bot.window === null ? null : Number(bot.window)
+    const max = limits(db, config).session_max_tokens
+    // Kiro reports a percentage (window 100), not tokens.
+    const over = window === 100 ? tokens >= 80 : tokens >= Math.min(max, window ? window * 0.8 : max)
+    if (!over) return
+    clearHandover(name)
+    const id = postMessage(db, {
+      sender: SYSTEM, recipient: name,
+      body: `This conversation has grown to ${window === 100 ? `${tokens}% of its context` : `${tokens} tokens`}, and all of it is sent again with every turn. This turn is its last: the next one starts with an empty conversation. Handle the other messages of this turn as usual. Then, as the last thing you do, call write_handover with a handover note: the work in progress and its next step, what the user asked for and is still waiting on, decisions made and why, and the files and task ids involved. If more messages arrive after that, handle them and call write_handover again. Put lasting facts in memory_write or the wiki instead.`,
+    })
+    setMeta(db, handoverKey(name), `${id}:${String(bot.session_id)}`)
   }
 
   function reportSetAside(name: string, end: TurnEnd, error: string | undefined, rejected = false): void {
