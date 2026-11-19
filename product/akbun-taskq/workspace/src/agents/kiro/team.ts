@@ -56,6 +56,7 @@ export function agentFile(config: Config, request: TurnRequest): { dir: string; 
 
 export function kiroArgs(request: TurnRequest, name: string): string[] {
   const agent = request.agent
+  // --v3 stays: since Kiro CLI 3.0 only scripts with --trust-all-tools start on V3 by default; the rest start on V2.
   const args = ['chat', '--v3', '--no-interactive', '--output-format', 'stream-json', '--agent', name]
   if (agent.model && agent.model !== 'auto') args.push('--model', agent.model)
   if (agent.effort) args.push('--effort', agent.effort)
