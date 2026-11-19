@@ -441,6 +441,24 @@
       </div>
       <p class="meta" data-i18n="connections.hint">How bots reach their models. Claude bots share the provider in taskq.config.json; an OpenAI bot uses the sign-in chosen in its settings; Kiro bots share the kiro-cli login. A bot that does not answer usually has a failing connection here.</p>
       <div data-area="connections-report"></div>
+      <h4 data-i18n="connections.signin">How bots sign in</h4>
+      <p class="meta" data-i18n="connections.signin_hint">Pick the AWS profile from this machine (an SSO profile uses the short-term credentials of aws sso login). Saving applies from the next turn and overrides taskq.config.json.</p>
+      <form class="conn-settings" data-area="conn-settings-form">
+        <fieldset>
+          <legend>Claude</legend>
+          <label>Provider <select name="claude_provider"><option value="bedrock">Amazon Bedrock (AWS profile)</option><option value="api_key">Anthropic API key (ANTHROPIC_API_KEY)</option><option value="subscription">Claude subscription (signed-in Claude Code)</option></select></label>
+          <label data-area="conn-claude-aws">AWS profile <input name="claude_profile" type="text" list="aws-profile-list" maxlength="64" autocomplete="off" spellcheck="false"></label>
+          <label data-area="conn-claude-region">Region <input name="claude_region" type="text" maxlength="30" autocomplete="off" spellcheck="false" placeholder="us-east-1"></label>
+        </fieldset>
+        <fieldset>
+          <legend>OpenAI on Amazon Bedrock</legend>
+          <label>AWS profile <input name="bedrock_profile" type="text" list="aws-profile-list" maxlength="64" autocomplete="off" spellcheck="false" placeholder="empty: AWS_BEARER_TOKEN_BEDROCK"></label>
+          <label>Region <input name="bedrock_region" type="text" maxlength="30" autocomplete="off" spellcheck="false" placeholder="us-west-2"></label>
+        </fieldset>
+        <datalist id="aws-profile-list" data-area="aws-profile-list"></datalist>
+        <p class="meta" data-area="aws-profile-note"></p>
+        <button type="submit" data-i18n="connections.save">Save sign-in</button>
+      </form>
       <h4 id="kiro-title">Kiro (AWS) sign-in</h4>
       <p class="meta" data-i18n="kiro.hint">Kiro bots use your AWS IAM Identity Center session. Enter your SSO start URL and region and sign in: kiro-cli shows a code to approve in the browser and keeps the session; taskq stores no token.</p>
       <p data-area="kiro-status"></p>

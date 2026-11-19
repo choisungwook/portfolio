@@ -4,6 +4,7 @@ import type { Db } from '../db/open.ts'
 import { getAgent, listAgents, type TeamAgent } from '../db/team.ts'
 import { preflight } from '../agents/claude/auth.ts'
 import { whoami } from '../agents/kiro/login.ts'
+import { makeBedrockToken, type TokenMaker } from '../aws/profiles.ts'
 import { isTeamPaused, teamPauseReason } from './hub.ts'
 
 // How each bot reaches its model, whether that connection works, and why a bot is not answering. Every bot uses one
@@ -37,6 +38,7 @@ export interface Connection extends Check {
 
 export interface Checks {
   claude(config: Config): Promise<Check>
+  bedrockToken?: TokenMaker
   codex(config: Config): Promise<Check>
   kiro(config: Config): Promise<Check>
   env: NodeJS.ProcessEnv
@@ -86,7 +88,10 @@ function describe(config: Config, id: ConnectionId): { label: string; detail: st
     case 'openai:api':
       return { label: 'OpenAI · API key', detail: 'OPENAI_API_KEY in the environment taskq runs in' }
     case 'openai:bedrock':
-      return { label: 'OpenAI · Amazon Bedrock', detail: `AWS_BEARER_TOKEN_BEDROCK, region ${config.bots.bedrockRegion}` }
+      return {
+        label: 'OpenAI · Amazon Bedrock',
+        detail: config.bots.bedrockProfile ? `AWS profile ${config.bots.bedrockProfile}, region ${config.bots.bedrockRegion}` : `AWS_BEARER_TOKEN_BEDROCK, region ${config.bots.bedrockRegion}`,
+      }
     case 'openai:chatgpt':
       return { label: 'OpenAI · ChatGPT plan', detail: `Codex CLI (${config.bots.codexPath}) signed in with ChatGPT` }
     case 'kiro':
@@ -101,7 +106,17 @@ async function check(config: Config, id: ConnectionId, checks: Checks): Promise<
     case 'openai:api':
       return checks.env.OPENAI_API_KEY ? ok : fail('OPENAI_API_KEY is not set in the environment taskq runs in')
     case 'openai:bedrock':
-      return checks.env.AWS_BEARER_TOKEN_BEDROCK ? ok : fail('AWS_BEARER_TOKEN_BEDROCK (a Bedrock API key) is not set in the environment taskq runs in')
+      if (config.bots.bedrockProfile) {
+        // The profile's credentials sign a token; an SSO profile fails here when its session expired. Only a fixed
+        // sentence reaches the UI.
+        try {
+          await (checks.bedrockToken ?? makeBedrockToken)(config.bots.bedrockProfile, config.bots.bedrockRegion)
+          return ok
+        } catch {
+          return fail(`the AWS profile ${config.bots.bedrockProfile} gave no credentials; run aws sso login --profile ${config.bots.bedrockProfile}`)
+        }
+      }
+      return checks.env.AWS_BEARER_TOKEN_BEDROCK ? ok : fail('no Bedrock sign-in: choose an AWS profile below, or set AWS_BEARER_TOKEN_BEDROCK (a Bedrock API key)')
     case 'openai:chatgpt':
       return checks.codex(config)
     case 'kiro':

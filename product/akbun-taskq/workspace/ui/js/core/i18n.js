@@ -58,6 +58,8 @@ const KO = {
   'review.turns': 'turn', 'review.success': '성공률', 'review.tasks': '작업 완료 / 실패', 'review.last': '마지막 turn', 'review.routines': 'routine',
   'review.no_routines': 'routine이 없습니다. bot 설정에서 추가하거나 bot에게 대화로 부탁하세요.', 'review.routine': 'routine', 'review.when': '언제',
   'review.runs': '실행', 'review.ok': '성공 / 실패', 'review.last_run': '마지막 실행', 'review.spot': '직접 확인할 결과', 'review.no_spot': '이 기간에 bot 결과가 없습니다.', 'review.open_task': '작업 열기',
+  'connections.signin': 'bot 로그인 방식', 'connections.signin_hint': '이 컴퓨터의 AWS 프로파일을 고릅니다(SSO 프로파일은 aws sso login의 단기 자격증명을 씁니다). 저장하면 다음 turn부터 적용되고 taskq.config.json보다 우선합니다.',
+  'connections.save': '로그인 방식 저장', 'connections.saved': '저장했습니다. 다음 turn부터 적용됩니다', 'connections.profiles': '이 컴퓨터의 프로파일', 'connections.no_profiles': '~/.aws/config에 AWS 프로파일이 없습니다.',
   'settings.connections': '연결', 'connections.check': '다시 확인', 'connections.hint': 'bot이 모델에 닿는 방법입니다. Claude bot은 taskq.config.json의 provider를 함께 쓰고, OpenAI bot은 bot 설정에서 고른 로그인 방식을, Kiro bot은 kiro-cli 로그인을 함께 씁니다. 대답하지 않는 bot은 보통 여기서 연결이 실패합니다.',
   'connections.ok': '연결됨', 'connections.error': '실패', 'connections.unused': '쓰는 bot 없음', 'connections.used_by': '쓰는 bot', 'connections.last': '마지막 turn',
   'connections.last_ok': '마지막 응답', 'connections.never': '없음', 'connections.checked': '확인',

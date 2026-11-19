@@ -187,7 +187,7 @@ async function renderRoutines(name) {
 const NO_AUTO_MODES = ['plan', 'acceptEdits', 'bypassPermissions']
 const HINTS = {
   api: 'OpenAI Agents SDK with OPENAI_API_KEY. No auto mode: plan reads files, accept edits also writes in its folder and the shared folder, bypass also runs shell commands.',
-  bedrock: 'OpenAI open-weight models (gpt-oss) on Amazon Bedrock with a Bedrock API key in AWS_BEARER_TOKEN_BEDROCK; the region is bots.bedrockRegion. Same tools as the API key bot.',
+  bedrock: 'OpenAI open-weight models (gpt-oss) on Amazon Bedrock. It signs in with the AWS profile chosen in Settings > Connections (an SSO profile works), or a Bedrock API key in AWS_BEARER_TOKEN_BEDROCK. Same tools as the API key bot.',
   chatgpt: 'Your ChatGPT plan through the Codex CLI: install codex and run codex login (Sign in with ChatGPT). Plan is a read-only sandbox, accept edits writes its folders, bypass has full access. No per-turn cost.',
   kiro: 'Kiro headless with your AWS IAM Identity Center session: sign in under Settings > Connections. Plan sees read tools, accept edits also write, bypass trusts every tool. Kiro reports credits, not dollars.',
 }

@@ -1,7 +1,7 @@
 // The Connections page of Settings, plus the connection data the bot list (status dots) and a bot's conversation (why it
 // may not answer) use: how each bot reaches its model and whether that works.
-import { api } from '../core/api.js'
-import { on } from '../core/bus.js'
+import { api, mutate } from '../core/api.js'
+import { emit, on } from '../core/bus.js'
 import { area, el, fill } from '../core/dom.js'
 import { t } from '../core/i18n.js'
 import { fmtDateTime } from '../core/time.js'
@@ -70,9 +70,45 @@ export async function connectionByBot() {
   return out
 }
 
+// The sign-in form: Claude's provider, region and AWS profile, and the AWS profile OpenAI-on-Bedrock bots use. The
+// profile fields suggest the profiles found in ~/.aws.
+async function loadSignIn() {
+  const form = area('conn-settings-form')
+  try {
+    const [settings, profiles] = await Promise.all([api.get('/connection-settings'), api.get('/aws/profiles')])
+    for (const [name, value] of Object.entries(settings)) if (form.elements[name]) form.elements[name].value = value ?? ''
+    fill(area('aws-profile-list'), ...profiles.map((p) => el('option', { value: p.name, label: `${p.name} (${p.kind}${p.region ? `, ${p.region}` : ''})` })))
+    area('aws-profile-note').textContent = profiles.length
+      ? `${t('connections.profiles', 'Profiles on this machine')}: ${profiles.map((p) => `${p.name} (${p.kind})`).join(', ')}`
+      : t('connections.no_profiles', 'No AWS profiles found in ~/.aws/config.')
+    showClaudeFields()
+  } catch (error) {
+    area('aws-profile-note').textContent = error.message
+  }
+}
+
+function showClaudeFields() {
+  const bedrock = area('conn-settings-form').elements.claude_provider.value === 'bedrock'
+  area('conn-claude-aws').hidden = !bedrock
+  area('conn-claude-region').hidden = !bedrock
+}
+
 export function initConnections() {
   on('settings-page', (page) => {
-    if (page === 'connections') loadConnections()
+    if (page === 'connections') {
+      loadConnections()
+      loadSignIn()
+    }
+  })
+  const form = area('conn-settings-form')
+  form.elements.claude_provider.addEventListener('change', showClaudeFields)
+  form.addEventListener('submit', async (event) => {
+    event.preventDefault()
+    const body = Object.fromEntries(new FormData(form).entries())
+    if (await mutate(() => api.put('/connection-settings', body), t('connections.saved', 'Sign-in saved; it applies from the next turn'))) {
+      loadConnections(true)
+      emit('bots-changed')
+    }
   })
   area('connections-refresh').addEventListener('click', () => loadConnections(true))
 }

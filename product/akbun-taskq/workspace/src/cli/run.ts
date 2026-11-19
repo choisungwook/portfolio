@@ -1,6 +1,7 @@
 import { randomBytes } from 'node:crypto'
 import type { Config } from '../config.ts'
 import type { Db } from '../db/open.ts'
+import { applyConnectionSettings } from '../team/connection-settings.ts'
 import { createRunner } from '../runner/runner.ts'
 import { agentFor } from '../agents/index.ts'
 import { startServer } from '../api/server.ts'
@@ -14,6 +15,8 @@ import { JOB_HANDLERS } from '../jobs/handlers.ts'
 // Runs the loop and the API in this process until SIGINT or SIGTERM. The API token lives in memory only: a new start
 // issues a new token, and the UI gets it from the URL fragment printed below.
 export async function runCommand(config: Config, db: Db): Promise<void> {
+  // Sign-in chosen in Settings > Connections wins over taskq.config.json.
+  applyConnectionSettings(db, config)
   const agent = agentFor(config)
   const runner = createRunner({
     db, config, worker: agent.createWorker(config), preflight: () => agent.preflight(config),

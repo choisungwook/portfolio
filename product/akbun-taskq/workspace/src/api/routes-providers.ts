@@ -2,6 +2,8 @@ import type { Hono } from 'hono'
 import { kiroSso, loginState, setKiroSso, startLogin, whoami } from '../agents/kiro/login.ts'
 import { PERIODS, usageReport, type Period } from '../db/usage.ts'
 import { botConnection, clearConnectionCache, listConnections } from '../team/connections.ts'
+import { connectionSettings, saveConnectionSettings } from '../team/connection-settings.ts'
+import { listProfiles } from '../aws/profiles.ts'
 import { HttpError, optionalJson, type ApiDeps } from './http.ts'
 
 // Connections (how bots reach their models and whether that works), sign-in for the SDKs that keep their own session
@@ -25,6 +27,17 @@ export function registerProviderRoutes(api: Hono, { db, config }: ApiDeps): void
 
   // Every connection with its check, the bots on it and its last turn. Checks are cached for a minute; ?refresh=1 reruns.
   api.get('/connections', async (c) => c.json(await listConnections(db, config, { refresh: c.req.query('refresh') === '1' })))
+
+  // How Claude and OpenAI-on-Bedrock sign in: provider, region and AWS profile. Saving applies at once and reruns checks.
+  api.get('/connection-settings', (c) => c.json(connectionSettings(config)))
+  api.put('/connection-settings', async (c) => {
+    const saved = saveConnectionSettings(db, config, await optionalJson(c))
+    if (typeof saved === 'string') throw new HttpError(400, saved)
+    clearConnectionCache()
+    return c.json(saved)
+  })
+  // The AWS profiles on this machine (names, how each signs in, region); never keys.
+  api.get('/aws/profiles', (c) => c.json(listProfiles()))
 
   // One bot's connection and the first reason it would not answer (paused, bot off, connection, last turn).
   api.get('/bots/:name/connection', async (c) => {

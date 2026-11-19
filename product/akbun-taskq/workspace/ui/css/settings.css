@@ -166,3 +166,10 @@ dialog[data-area="settings-dialog"] { width: min(960px, calc(100vw - 32px)); }
 .goal-form label { display: grid; gap: 4px; color: var(--muted); font-size: var(--text-small); }
 .goal-form button { justify-self: start; }
 #view-goals { background: var(--panel); border-radius: var(--radius-l); padding: 20px; }
+
+/* How bots sign in, on the Connections page. */
+.conn-settings { display: grid; gap: 10px; margin: 8px 0 18px; }
+.conn-settings fieldset { border: 0; border-radius: var(--radius); background: var(--panel-soft); padding: 10px 12px; margin: 0; display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 8px 12px; }
+.conn-settings legend { float: left; width: 100%; padding: 0; font-weight: 700; }
+.conn-settings label { display: grid; gap: 4px; font-size: var(--text-small); color: var(--muted); }
+.conn-settings button { justify-self: start; }
