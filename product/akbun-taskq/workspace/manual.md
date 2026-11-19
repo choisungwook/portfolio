@@ -328,7 +328,7 @@ bot과 대화할 때 쓰는 기능은 아래와 같다.
 | 문서를 bot이 쓰게 넣기 | Wiki에서 가져오기로 zip, 파일, 폴더를 넣는다. 문서가 절 단위 페이지와 링크로 바뀌고 색인 페이지가 생긴다. 멈추면 "마지막 단계부터 다시" |
 | wiki 백업 | Wiki에서 zip으로 내보내기. 공용 폴더의 `exports/`에 생기고, 다른 taskq에서 가져오기로 그대로 복원된다 |
 | OpenAI bot을 다른 방식으로 쓰기 | bot 설정에서 Agent SDK를 OpenAI로 두고 Sign in with를 고른다. API 키는 `OPENAI_API_KEY`, Bedrock은 `AWS_BEARER_TOKEN_BEDROCK`(Bedrock API 키)와 설정 파일의 `bots.bedrockRegion`, ChatGPT 구독은 Codex CLI를 설치하고 `codex login`에서 Sign in with ChatGPT |
-| Kiro bot 쓰기 | kiro-cli를 설치하고 설정의 Kiro 절에 IAM Identity Center start URL과 region을 넣어 AWS SSO로 로그인한다(화면의 URL에서 코드 입력). 그다음 bot 설정에서 Agent SDK를 Kiro로 고른다 |
+| Kiro bot 쓰기 | kiro-cli를 설치하고 설정의 연결 페이지에서 IAM Identity Center start URL과 region을 넣어 AWS SSO로 로그인한다(화면의 URL에서 코드 입력). 그다음 bot 설정에서 Agent SDK를 Kiro로 고른다 |
 | 얼마나 썼는지 보기 | 설정의 사용량. SDK별 합계와 bot 세션별 토큰·비용이 보인다 |
 | context가 얼마나 찼는지 보기 | 입력창 아래 원과 %, 왼쪽 bot 이름 옆 작은 원. 85%를 넘으면 빨갛게 보이니 bot 메뉴의 새 세션으로 비운다 |
 | bot에게 MCP server 주기 | Plugins 메뉴에서 MCP server를 등록하고 bot 설정에서 고른다. Claude와 OpenAI bot 모두 쓴다 |
@@ -357,7 +357,7 @@ bot과 대화할 때 쓰는 기능은 아래와 같다.
 | 태스크가 계속 "Login needed"다 | 대상 계정 로그인이 만료됐다. 터미널에서 로그인한 뒤 Resume |
 | 조회 태스크에서 명령이 거부된다 | 조회 전용 규칙에 없는 명령이다. 변경이 필요하면 Task의 기본 모드(Change an account)로 만든다 |
 | 태스크가 "Interrupted"로 남는다 | 실행 중에 프로세스가 죽었다. 다음 실행에서 이전 세션을 이어받는다 |
-| OpenAI나 Kiro bot이 꺼져 있고 Must check에 "login failed"가 있다 | 그 bot의 로그인(API 키, `codex login`, 설정의 Kiro)이 실패해 그 bot만 꺼졌다. 다시 로그인한 뒤 bot을 켠다 |
+| OpenAI나 Kiro bot이 꺼져 있고 Must check에 "login failed"가 있다 | 그 bot의 로그인(API 키, `codex login`, 설정 > 연결의 Kiro 로그인)이 실패해 그 bot만 꺼졌다. 다시 로그인한 뒤 bot을 켠다 |
 | bot이 대답하지 않는다 | bot 대화 오른쪽의 연결 패널에 "대답하지 않는 이유"가 나온다. 흔한 원인은 `bots.enabled`가 false(기본값)이거나, Claude `provider`가 기본값 bedrock인데 AWS 프로파일이 없거나, 그 bot의 로그인(API 키, Codex, Kiro)이 실패한 경우다. 설정의 연결 페이지에서 연결마다 상태를 보고 다시 확인한다 |
 | Must check에 "Bots paused"가 떠 있다 | 일일 예산을 다 썼거나, bot 하나가 1시간 턴 상한을 넘었거나(메시지 루프 의심), Claude 모델 로그인이 실패했거나, bot이 taskq 데이터를 읽으려 했다. `taskq bots log`로 원인을 보고 `taskq bots resume`이나 메뉴 Bots 옆의 Resume으로 다시 켠다 |
 | 고친 화면이 안 보인다 | 브라우저를 새로 고친다 |

@@ -69,6 +69,11 @@ describe('connections', () => {
     assert.equal(failed?.blocker, 'Its last turn failed: model access denied')
     assert.ok((failed?.waiting ?? 0) >= 1)
 
+    const retry = startTurn(env.db, 'coder', 5)!
+    assert.equal((await botConnection(env.db, env.config, 'coder', { checks: passing }))?.blocker, null, 'a bot with an open turn is working')
+    endTurn(env.db, retry.turn.id, { outcome: 'cancelled', error: 'stopped' }, 3)
+    assert.equal((await botConnection(env.db, env.config, 'coder', { checks: passing }))?.blocker, null, 'a cancelled turn is not a failure')
+
     const healthy = await botConnection(env.db, env.config, 'planner', { checks: passing })
     assert.equal(healthy?.blocker, null)
   })

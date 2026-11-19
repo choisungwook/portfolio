@@ -54,8 +54,10 @@ export const defaultChecks: Checks = {
     return new Promise((resolve) => {
       execFile(config.bots.codexPath, ['login', 'status'], { timeout: 10_000 }, (error, stdout, stderr) => {
         const text = `${stdout}${stderr}`.trim().slice(0, 300)
+        // Only a fixed sentence reaches the UI: the CLI's own output can name the account.
         if (error && (error as { code?: unknown }).code === 'ENOENT') resolve(fail(`the Codex CLI was not found (${config.bots.codexPath})`))
-        else if (error || /not logged in/i.test(text)) resolve(fail(text || 'Codex is not signed in: run codex login'))
+        else if (/not logged in/i.test(text)) resolve(fail('Codex is not signed in: run codex login and choose Sign in with ChatGPT'))
+        else if (error) resolve(fail(`codex login status failed (exit ${(error as { code?: unknown }).code ?? '?'})`))
         else resolve(ok)
       })
     })
@@ -149,7 +151,10 @@ export async function listConnections(db: Db, config: Config, options: { refresh
   return { team: teamState(db, config), connections }
 }
 
-// One bot's connection and the first reason it would not answer, checked in the order a message meets them.
+// One bot's connection and the likeliest reason it is not answering: bots off in the config (the hub never starts),
+// bots paused, the bot turned off, then two hints the hub does not gate on: a failing connection check and a failed
+// last turn (the hub retries after bots.retryAfterSec). A bot with an open turn is working, so it has no blocker.
+// Cancelled and interrupted turns are not failures.
 export async function botConnection(db: Db, config: Config, name: string, options: { refresh?: boolean; checks?: Checks } = {}) {
   const agent = getAgent(db, name)
   if (!agent) return undefined
@@ -162,17 +167,20 @@ export async function botConnection(db: Db, config: Config, name: string, option
   const team = teamState(db, config)
   const row = db.prepare('SELECT outcome, error, ended_at FROM team_turns WHERE agent = ? AND ended_at IS NOT NULL ORDER BY id DESC LIMIT 1').get(name)
   const last = row ? { outcome: String(row.outcome), error: row.error === null ? null : String(row.error), at: Number(row.ended_at) } : null
+  const working = Boolean(db.prepare('SELECT 1 FROM team_turns WHERE agent = ? AND ended_at IS NULL').get(name))
   const waiting = Number(db.prepare(`SELECT count(*) AS n FROM team_messages WHERE recipient = ? AND read_at IS NULL AND failed_at IS NULL`).get(name)?.n ?? 0)
   const blocker = !team.enabled ? 'Bots are off: set bots.enabled to true in taskq.config.json and restart taskq.'
     : team.paused ? `Bots are paused: ${team.pause_reason ?? 'no reason given'}. Resume them next to Bots in the menu.`
       : !agent.enabled ? 'This bot is turned off. Turn it on in its settings.'
-        : connection.status === 'error' ? `Its connection fails: ${connection.reason}`
-          : last && last.outcome !== 'done' && last.error ? `Its last turn failed: ${last.error}`
-            : null
-  return { bot: name, connection, team, last_turn: last, waiting, blocker }
+        : working ? null
+          : connection.status === 'error' ? `Its connection fails: ${connection.reason}`
+            : last?.outcome === 'failed' ? `Its last turn failed: ${last.error ?? 'no reason given'}`
+              : null
+  return { bot: name, connection, team, last_turn: last, waiting, working, blocker }
 }
 
-// Tests start from an empty cache.
-export function clearConnectionCache(): void {
-  cache.clear()
+// Tests start from an empty cache; a sign-in drops the cached check of its connection.
+export function clearConnectionCache(id?: ConnectionId): void {
+  if (id) cache.delete(id)
+  else cache.clear()
 }

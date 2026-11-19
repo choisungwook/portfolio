@@ -150,12 +150,12 @@ export function createKiroTeamBackend(run: KiroSpawn = spawnKiro): TeamBackend {
         // Kiro bills credits, not dollars: a failed turn costs 0 here, not the turn budget.
         const failed = { outcome: 'failed' as const, cost_usd: 0 }
         if (request.signal.aborted) return { ...failed, error: 'stopped' }
-        if (/ENOENT/.test(message)) return { ...failed, error: `kiro-cli was not found (${config.bots.kiroPath}); install it and sign in under Settings > Kiro` }
+        if (/ENOENT/.test(message)) return { ...failed, error: `kiro-cli was not found (${config.bots.kiroPath}); install it and sign in under Settings > Connections` }
         if (request.resume && /session/i.test(message) && /not found|no such|invalid/i.test(message)) {
           return { ...failed, error: 'the Kiro session is gone; the next turn starts a new one', session_missing: true }
         }
         if (KIRO_SIGNED_OUT.test(message)) {
-          return { ...failed, error: 'Kiro is not signed in: sign in with your AWS SSO session under Settings > Kiro', auth_failed: true }
+          return { ...failed, error: 'Kiro is not signed in: sign in with your AWS SSO session under Settings > Connections', auth_failed: true }
         }
         return { ...failed, error: message.slice(0, 300) }
       }

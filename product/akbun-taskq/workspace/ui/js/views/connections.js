@@ -18,7 +18,7 @@ function statusBadge(status) {
 function lastLine(last, lastOk) {
   return el('p', { class: 'meta' },
     `${t('connections.last_ok', 'Last answer')}: ${when(lastOk)}`,
-    last && last.outcome !== 'done'
+    last?.outcome === 'failed'
       ? el('span', { class: 'conn-error', text: ` · ${t('connections.last', 'Last turn')} (${last.agent ?? ''} ${last.outcome}, ${fmtDateTime(last.at)}): ${last.error ?? ''}` })
       : null)
 }
@@ -54,11 +54,13 @@ async function loadConnections(refresh = false) {
   }
 }
 
-// The panel on the right of a bot's conversation. Returns what it showed, so the conversation can say the bot will not
-// answer.
-export async function renderBotConnection(box, name, refresh = false) {
+// The panel on the right of a bot's conversation. It draws only while that bot is still the one shown (current), and
+// hands each answer to onInfo, so the conversation can say the bot will not answer; Check again does the same.
+export async function renderBotConnection(box, name, { refresh = false, current = () => true, onInfo = () => {} } = {}) {
   try {
     const info = await api.get(`/bots/${name}/connection${refresh ? '?refresh=1' : ''}`)
+    if (!current()) return null
+    onInfo(info)
     const c = info.connection
     fill(box,
       el('h3', { text: t('connections.title', 'Connection') }),
@@ -73,11 +75,11 @@ export async function renderBotConnection(box, name, refresh = false) {
         info.last_turn ? `${info.last_turn.outcome}, ${fmtDateTime(info.last_turn.at)}` : t('connections.never', 'never')),
       el('p', { class: 'meta', text: `${t('connections.used_by', 'Used by')}: ${c.bots.join(', ')}` }),
       el('div', { class: 'conn-actions' },
-        el('button', { type: 'button', text: t('connections.check', 'Check again'), onclick: () => renderBotConnection(box, name, true) }),
+        el('button', { type: 'button', text: t('connections.check', 'Check again'), onclick: () => renderBotConnection(box, name, { refresh: true, current, onInfo }) }),
         el('button', { type: 'button', class: 'quiet', text: t('connections.open', 'Connection settings'), onclick: () => emit('open-settings', 'connections') })))
     return info
   } catch (error) {
-    fill(box, el('p', { class: 'error', text: error.message }))
+    if (current()) fill(box, el('p', { class: 'error', text: error.message }))
     return null
   }
 }

@@ -15,6 +15,7 @@ let configList
 let notificationToggle
 let savingNotification = false
 let loadId = 0
+let opener = null
 const PAGE_KEY = 'taskq.settings.page'
 
 function savedPage() {
@@ -56,17 +57,20 @@ export function initSettings() {
     const button = event.target.closest('[data-page]')
     if (button) showSettingsPage(button.dataset.page)
   })
+  // Opened from elsewhere (the bot connection panel): the gear's own listeners load every page, then the page shows and
+  // focus goes back to where it came from.
   on('open-settings', (page) => {
     if (!dialog.open) {
-      dialog.showModal()
-      load()
+      opener = document.activeElement
+      gear.click()
     }
     showSettingsPage(page)
   })
   dialog.querySelector('[data-close]').addEventListener('click', () => dialog.close())
   dialog.addEventListener('close', () => {
     resetPicker()
-    gear.focus()
+    ;(opener?.isConnected ? opener : gear).focus()
+    opener = null
     emit('settings-closed')
   })
   on('skills-changed', load)

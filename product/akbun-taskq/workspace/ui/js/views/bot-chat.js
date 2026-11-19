@@ -93,11 +93,14 @@ function showConnection() {
   connectionShownAt = Date.now()
   const name = bot
   if (!name) return
-  renderBotConnection(area('bot-side'), name).then((info) => {
-    if (bot !== name || (info?.blocker ?? null) === blocker) return
-    blocker = info?.blocker ?? null
-    lastKey = null
-    load()
+  renderBotConnection(area('bot-side'), name, {
+    current: () => bot === name,
+    onInfo: (info) => {
+      if ((info.blocker ?? null) === blocker) return
+      blocker = info.blocker ?? null
+      lastKey = null
+      load()
+    },
   })
 }
 
