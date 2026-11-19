@@ -42,6 +42,7 @@ export function initWorkflowsView() {
       notify(error.message, true)
     }
   })
+  document.addEventListener('keydown', editorKeys)
   on('open-workflow-run', (id) => {
     openRun = id
     screen = 'run'
@@ -70,8 +71,8 @@ function header(title, ...actions) {
   return el('div', { class: 'wf-head' },
     el('h2', { class: 'view-title', text: title }),
     el('div', { class: 'wf-tabs', role: 'tablist' },
-      el('button', { type: 'button', role: 'tab', 'aria-selected': String(screen === 'list' || screen === 'edit'), text: t('wf.list', 'Workflows'), onclick: () => go('list') }),
-      el('button', { type: 'button', role: 'tab', 'aria-selected': String(screen === 'runs' || screen === 'run'), text: t('wf.runs', 'Run history'), onclick: () => go('runs') })),
+      el('button', { type: 'button', role: 'tab', 'aria-selected': String(screen === 'list' || screen === 'edit'), text: t('wf.list', 'Workflows'), onclick: () => leave('list') }),
+      el('button', { type: 'button', role: 'tab', 'aria-selected': String(screen === 'runs' || screen === 'run'), text: t('wf.runs', 'Run history'), onclick: () => leave('runs') })),
     el('span', { class: 'compose-spacer' }),
     ...actions)
 }
@@ -135,6 +136,33 @@ function edit(w) {
 let canvas = null
 let inspector = null
 let dirty = false
+let editorForm = null
+
+// Leaving the editor asks first when there are unsaved changes; the header tabs and Cancel both come through here.
+function leave(next) {
+  if (screen === 'edit' && dirty && !confirm(t('wf.discard', 'Discard the changes?'))) return
+  dirty = false
+  go(next)
+}
+
+// Editor shortcuts: Cmd/Ctrl+S or Cmd/Ctrl+Enter saves, Esc leaves a field and then the editor, Alt+1..4 adds a step of
+// the palette's kind in order. Only while the editor is on screen and no dialog is open.
+function editorKeys(event) {
+  if (screen !== 'edit' || !editorForm?.isConnected || root.hidden || document.querySelector('dialog[open]') || event.isComposing) return
+  const mod = event.metaKey || event.ctrlKey
+  const field = event.target instanceof HTMLElement && event.target.matches('input, textarea, select')
+  if (mod && (event.key.toLowerCase() === 's' || event.key === 'Enter')) {
+    editorForm.requestSubmit()
+  } else if (event.key === 'Escape' && !event.defaultPrevented) {
+    if (field) event.target.blur()
+    else leave('list')
+  } else if (event.altKey && !mod && /^Digit[1-9]$/.test(event.code) && !field) {
+    const kind = Object.keys(KINDS)[Number(event.code.slice(5)) - 1]
+    if (!kind) return
+    canvas.add(newStep(kind))
+  } else return
+  event.preventDefault()
+}
 
 // The editor: a palette of step kinds on the left, the canvas in the middle, the selected step's fields on the right.
 function renderEditor() {
@@ -164,10 +192,15 @@ function renderEditor() {
     el('div', { class: 'wf-actions' },
       count,
       el('span', { class: 'compose-spacer' }),
-      el('button', { type: 'button', text: t('wf.cancel', 'Cancel'), onclick: () => { if (!dirty || confirm(t('wf.discard', 'Discard the changes?'))) go('list') } }),
+      el('span', { class: 'meta', text: t('wf.keys', 'Save ⌘S · Cancel Esc · Add step Alt+1–4') }),
+      el('button', { type: 'button', text: t('wf.cancel', 'Cancel'), onclick: () => leave('list') }),
       el('button', { type: 'submit', class: 'primary', text: t('wf.save', 'Save') })),
   )
-  fill(root, header(editing.id ? editing.name || t('wf.edit', 'Edit') : t('wf.new', 'New workflow')), form)
+  editorForm = form
+  // Cancel and Save also sit at the top, next to the title, so a new workflow can be left without scrolling.
+  fill(root, header(editing.id ? editing.name || t('wf.edit', 'Edit') : t('wf.new', 'New workflow'),
+    el('button', { type: 'button', text: t('wf.cancel', 'Cancel'), title: 'Esc', onclick: () => leave('list') }),
+    el('button', { type: 'button', class: 'primary', text: t('wf.save', 'Save'), title: '⌘S / Ctrl+S', onclick: () => form.requestSubmit() })), form)
   renderInspector(null)
   if (editing.steps.length === 0) canvas.add(newStep('do'))
 }

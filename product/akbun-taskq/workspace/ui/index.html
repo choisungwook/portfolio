@@ -388,6 +388,7 @@
       <button type="button" data-page="access-skills">Access skills</button>
       <button type="button" data-page="database">Database</button>
       <button type="button" data-page="configuration">Configuration</button>
+      <button type="button" data-page="update" data-i18n="settings.update">Update</button>
     </nav>
     <div class="settings-pages">
     <section class="settings-section" data-settings-page="appearance" aria-labelledby="appearance-title">
@@ -469,6 +470,11 @@
       <h3 id="queue-title" data-i18n="settings.queue">Queue</h3>
       <label class="check"><input type="checkbox" data-area="queue-autorun"> <span data-i18n="settings.autorun">Run tasks no bot owns automatically</span></label>
       <p class="meta">Off, a task without an owner runs only when you press its run button. A bot's task always waits for that bot.</p>
+    </section>
+    <section class="settings-section" data-settings-page="update" aria-labelledby="update-title" hidden>
+      <h3 id="update-title" data-i18n="settings.update">Update</h3>
+      <div data-area="update-status"></div>
+      <button type="button" class="quiet" data-area="update-check" data-i18n="update.check">Check again</button>
     </section>
     <section class="settings-section" data-settings-page="notifications" aria-labelledby="notifications-title" hidden>
       <h3 id="notifications-title">Notifications</h3>

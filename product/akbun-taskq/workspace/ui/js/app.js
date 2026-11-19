@@ -9,6 +9,7 @@ import { initAlertsPanel } from './views/alerts-panel.js'
 import { initBoard } from './views/board.js'
 import { initRunDialog } from './views/run-dialog.js'
 import { initSettings } from './views/settings-dialog.js'
+import { initUpdateSettings } from './views/update-settings.js'
 import { initTaskDetail } from './views/task-detail.js'
 import { initTaskForm } from './views/task-form.js'
 import { initBotChat } from './views/bot-chat.js'
@@ -38,6 +39,7 @@ initRunDialog()
 initTaskDetail()
 initTaskForm()
 initSettings()
+initUpdateSettings()
 initGlobalSettings()
 initBotChat()
 initSharedViews()

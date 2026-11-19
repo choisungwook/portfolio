@@ -10,6 +10,9 @@ export interface ApiDeps {
   control?: RunControl   // the runner in the same process; without one, run-now waits for the next claim
   bots?: Pick<TeamHub, 'cancel' | 'busy'> & Partial<Pick<TeamHub, 'catalog'>>// the bot hub in the same process, when bots are on
   opener?: (path: string) => void                              // tests replace the desktop file manager
+  fetcher?: typeof fetch                                       // tests replace GitHub for the update check
+  binary?: boolean                                             // tests say whether taskq runs as the single-file binary
+  updateTarget?: string                                        // tests install the update over a scratch file
 }
 
 export class HttpError extends Error {
