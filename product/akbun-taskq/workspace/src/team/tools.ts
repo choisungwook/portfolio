@@ -9,6 +9,7 @@ import { talkTools } from './tools-talk.ts'
 import { wikiTools } from './tools-wiki.ts'
 import { memoryTools } from './tools-memory.ts'
 import { workflowTools } from './tools-workflows.ts'
+import { autonomyTools } from './tools-autonomy.ts'
 
 // The tools every agent session gets, independent of the agent SDK. A backend wraps each one in its own tool format.
 // A handler returns a JSON object, or throws ToolError with a message the model can act on.
@@ -42,7 +43,7 @@ export function teamTools(scope: ToolScope): TeamTool[] {
       if (scope.turnId !== undefined) noteWrite(scope.db, scope.turnId)
     },
   }
-  return [...talkTools(scoped), ...taskTools(scoped), ...wikiTools(scoped), ...memoryTools(scoped), ...workflowTools(scoped)].map(validated)
+  return [...talkTools(scoped), ...taskTools(scoped), ...wikiTools(scoped), ...memoryTools(scoped), ...workflowTools(scoped), ...autonomyTools(scoped)].map(validated)
 }
 
 // The input schema is checked here as well as by the SDK, so a backend that skips it, or a test, cannot pass an

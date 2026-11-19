@@ -65,6 +65,7 @@
     </div>
     <ul class="side-list side-bots" data-area="bot-list" aria-labelledby="bots-heading"></ul>
     <ul class="side-list" data-area="side-shared">
+      <li><button type="button" class="side-item" data-view="goals"><span class="side-icon" aria-hidden="true">◎</span><span data-i18n="nav.goals">Goals</span></button></li>
       <li><button type="button" class="side-item" data-view="discussions"><span class="side-icon" aria-hidden="true">❝</span><span data-i18n="nav.discussions">Discussions</span></button></li>
       <li><button type="button" class="side-item" data-view="shared"><span class="side-icon" aria-hidden="true"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><path d="M3 6.5a1.5 1.5 0 0 1 1.5-1.5h4.4l2 2.2h8.6A1.5 1.5 0 0 1 21 8.7v9.8a1.5 1.5 0 0 1-1.5 1.5h-15A1.5 1.5 0 0 1 3 18.5z"/></svg></span><span data-i18n="nav.shared">Shared folder</span></button></li>
       <li><button type="button" class="side-item" data-view="workflows"><span class="side-icon" aria-hidden="true"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><rect x="3" y="4" width="6" height="5" rx="1.2"/><rect x="15" y="4" width="6" height="5" rx="1.2"/><rect x="9" y="15" width="6" height="5" rx="1.2"/><path d="M6 9v2.5h12V9M12 11.5V15"/></svg></span><span data-i18n="nav.workflows">Workflows</span></button></li>
@@ -150,6 +151,7 @@
      <aside class="chat-side" data-area="bot-side" aria-label="Connection"></aside>
     </section>
 
+    <section id="view-goals" data-view-panel="goals" aria-label="Goals" data-area="goals-view" hidden></section>
     <section id="view-discussions" data-view-panel="discussions" aria-label="Discussions" data-area="discussions" hidden>
       <h2 class="view-title" data-i18n="discussions.title">Discussions</h2>
       <ul class="thread-list" data-area="thread-list"></ul>
@@ -295,6 +297,7 @@
         <label>Workflow <select name="workflow_id" data-area="task-workflow-select"><option value="">none</option></select></label>
         <p class="meta wide" data-area="task-workflow-hint" hidden>Only a bot runs workflows: pick the bot that runs it.</p>
         <label class="check wide"><input name="draft" type="checkbox" checked> Save as draft</label>
+        <label class="check wide"><input name="review_required" type="checkbox"> Needs a second check: done only after a reviewer bot (or I) approves the result</label>
         <details class="wide more" data-area="task-more">
           <summary>More options</summary>
           <div class="task-form">
@@ -340,12 +343,20 @@
       <label class="wide" data-edit-only>Instructions <textarea name="instructions" rows="5" maxlength="8000"></textarea></label>
       <label class="wide" data-edit-only>Working directory <input name="workdir" type="text" maxlength="500" autocomplete="off" spellcheck="false" placeholder="the bot's own folder"></label>
     </div>
+    <fieldset data-edit-only>
+      <legend>Charter</legend>
+      <p class="meta">What this bot owns, what good looks like, and what it never does without asking you. It is added to the bot's standing orders.</p>
+      <label class="wide">Owns <textarea name="charter_owns" rows="2" maxlength="2000" placeholder="The inbox: triage, labels, drafts of replies"></textarea></label>
+      <label class="wide">Good looks like <textarea name="charter_good" rows="2" maxlength="2000" placeholder="Inbox at zero by 9am; every draft cites the thread it answers"></textarea></label>
+      <label class="wide">Never without asking <textarea name="charter_never" rows="2" maxlength="2000" placeholder="Sending mail, deleting threads, anything with money"></textarea></label>
+    </fieldset>
     <fieldset class="bot-gate" data-edit-only>
       <legend>Permissions and gate</legend>
       <label>Permission mode <select name="permission_mode" data-area="bot-mode"></select></label>
       <label class="check"><input type="checkbox" name="sandbox"> Run commands in a sandbox</label>
       <label class="wide">Allowed network hosts in the sandbox <span class="meta">One per line.</span><textarea name="allowed_domains" rows="2" spellcheck="false"></textarea></label>
       <label class="wide">Blocked commands <span class="meta">One pattern per line; * matches anything; matched anywhere in the command. Example: git push*. This prevents accidents; it is not a security boundary: use the sandbox for that.</span><textarea name="blocked_commands" rows="3" spellcheck="false"></textarea></label>
+      <label class="wide">Ask me first <span class="meta">One pattern per line, like blocked commands. A matching command does not run: it waits in Must check until you approve it once. tool:mcp__slack__* matches a tool by name. Pushing, publishing, deploying and deleting cloud resources always ask (except in bypass mode).</span><textarea name="ask_first" rows="3" spellcheck="false" placeholder="git commit*&#10;tool:mcp__gmail__send*"></textarea></label>
       <p class="meta">taskq's own data and config are always off limits; a call that reaches them stops the turn and pauses the bots.</p>
     </fieldset>
     <fieldset data-edit-only>
@@ -354,6 +365,11 @@
       <div class="bot-picks" data-area="bot-skills"></div>
       <div class="bot-picks" data-area="bot-plugins"></div>
       <div class="bot-picks" data-area="bot-mcp"></div>
+    </fieldset>
+    <fieldset data-edit-only>
+      <legend>Routines</legend>
+      <p class="meta">Work this bot does without being asked: on a schedule (cron in local time: "0 7 * * 1-5" is 7am on weekdays) or when a task fails, a task is created, or a webhook is called. Bots can also set routines when you ask them in chat.</p>
+      <div data-area="bot-routines"></div>
     </fieldset>
     <fieldset data-edit-only>
       <legend>Limits</legend>
@@ -401,6 +417,7 @@
       <button type="button" data-page="connections" data-i18n="settings.connections">Connections</button>
       <button type="button" data-page="limits" data-i18n="settings.limits">Rate limits</button>
       <button type="button" data-page="usage" data-i18n="settings.usage">Usage</button>
+      <button type="button" data-page="review" data-i18n="settings.review">Weekly review</button>
       <button type="button" data-page="folders" data-i18n="settings.folders">Folders</button>
       <button type="button" data-page="queue" data-i18n="settings.queue">Queue</button>
       <button type="button" data-page="notifications">Notifications</button>
@@ -453,6 +470,14 @@
       </div>
       <p class="meta" data-i18n="usage.hint">Tokens and cost of every bot session, by SDK. OpenAI cost is estimated from the prices in taskq.config.json; the ChatGPT plan has no per-turn price; Kiro reports credits when kiro-cli gives them.</p>
       <div data-area="usage-report"></div>
+    </section>
+    <section class="settings-section" data-settings-page="review" aria-labelledby="review-title" hidden>
+      <div class="plugins-head">
+        <h3 id="review-title" data-i18n="settings.review">Weekly review</h3>
+        <select data-area="review-days" aria-label="Period"><option value="7" selected>7 days</option><option value="14">14 days</option><option value="30">30 days</option></select>
+      </div>
+      <p class="meta" data-i18n="review.hint">Did each bot and routine run, did it go well, and would you miss it? A bot that checks its own work misses what it misses, so a few recent results are picked for you to check by hand.</p>
+      <div data-area="review-report"></div>
     </section>
     <section class="settings-section" data-settings-page="folders" aria-labelledby="folders-title" hidden>
       <h3 id="folders-title" data-i18n="settings.folders">Folders</h3>

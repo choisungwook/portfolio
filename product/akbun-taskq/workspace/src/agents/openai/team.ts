@@ -218,7 +218,7 @@ export function createOpenAITeamBackend(runFn?: OpenAIRunFn, fetcher: typeof fet
       const tools = [
         ...request.tools.map(teamTool),
         ...(skill ? [skill] : []),
-        ...localTools(config, request.agent, request.cwd, request.sharedDir).map((t) => local(t, (reason) => {
+        ...localTools(config, request.agent, request.cwd, request.sharedDir, request.approvals).map((t) => local(t, (reason) => {
           tampered = reason
           abort.abort()
         })),

@@ -64,6 +64,20 @@ function renderBanner(queue) {
 }
 
 function actionsFor(alert) {
+  // A bot's call that waits for approval, and a bot stopped at a login wall, are answered right here.
+  const [refKind, refId] = String(alert.ref ?? '').split(':')
+  if (refKind === 'bot-approval') {
+    return [
+      el('button', { type: 'button', text: 'Approve once', onclick: () => mutate(() => api.post(`/bot-approvals/${refId}`, { approve: true }), 'Approved; the bot may run it once') }),
+      el('button', { type: 'button', class: 'danger', text: 'Deny', onclick: () => mutate(() => api.post(`/bot-approvals/${refId}`, { approve: false }), 'Denied') }),
+    ]
+  }
+  if (refKind === 'bot-login') {
+    return [
+      el('button', { type: 'button', text: 'I signed in', onclick: () => mutate(() => api.post(`/bot-logins/${refId}`, { signed_in: true }), 'The bot continues') }),
+      el('button', { type: 'button', text: 'Not now', onclick: () => mutate(() => api.post(`/bot-logins/${refId}`, { signed_in: false }), 'The bot was told') }),
+    ]
+  }
   if (alert.kind === 'approval_required') {
     return [el('button', { type: 'button', text: 'Review', onclick: () => emit('review-approval', alert.task_id) })]
   }

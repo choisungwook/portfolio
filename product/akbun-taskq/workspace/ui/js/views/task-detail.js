@@ -175,6 +175,15 @@ function actionButtons(task) {
     runNowButton(task, { primary: true }),
     make('resume', 'Resume', 'Resumed'),
     make('done', 'Done', 'Marked done'),
+    task.status === 'done'
+      ? el('button', {
+        type: 'button', text: 'Save as workflow', title: 'Make a workflow draft from this task, its last run and the commands it used',
+        onclick: async () => {
+          const saved = await mutate(() => api.post(`/tasks/${task.id}/save-workflow`, {}), 'Saved as a workflow draft')
+          if (saved) emit('open-workflow', saved.id)
+        },
+      })
+      : null,
     el('button', {
       type: 'button',
       disabled: task.status !== 'draft',

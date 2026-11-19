@@ -12,6 +12,7 @@ import { registerRunRoutes } from './routes-runs.ts'
 import { registerAlertRoutes } from './routes-alerts.ts'
 import { registerHandoffRoutes } from './routes-handoffs.ts'
 import { registerApprovalRoutes } from './routes-approvals.ts'
+import { registerAutonomyRoutes } from './routes-autonomy.ts'
 import { registerMiscRoutes } from './routes-misc.ts'
 import { registerSse } from './sse.ts'
 import { registerSettingsRoutes } from './routes-settings.ts'
@@ -50,6 +51,7 @@ export function createApp(deps: ApiDeps, token: string): Hono {
   registerWorkspaceRoutes(api, deps)
   registerJobRoutes(api, deps)
   registerProviderRoutes(api, deps)
+  registerAutonomyRoutes(api, deps)
   registerSse(api, deps)
   app.route('/api', api)
   const index = resourcePath('ui/index.html')

@@ -153,7 +153,7 @@ function gateHook(config: Config, request: TurnRequest, abort: AbortController, 
     let reason: string
     try {
       const toolInput = typeof input.tool_input === 'object' && input.tool_input !== null ? input.tool_input as Record<string, unknown> : {}
-      const verdict = botGate(config, request.agent, request.cwd, input.tool_name, toolInput)
+      const verdict = botGate(config, request.agent, request.cwd, input.tool_name, toolInput, request.approvals)
       if (verdict.action === 'allow') return {}
       if (verdict.action === 'stop') {
         state.tampered ??= verdict.reason

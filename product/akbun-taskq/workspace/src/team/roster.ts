@@ -2,6 +2,10 @@ import { ORCHESTRATOR, type BotSettings } from '../db/team.ts'
 
 // A new bot runs in auto mode with no sandbox and no blocked commands; the user tightens it in its settings.
 export const BOT_DEFAULTS: Omit<BotSettings, 'role' | 'description' | 'instructions'> = {
+  charter_owns: '',
+  charter_good: '',
+  charter_never: '',
+  ask_first: [],
   may_message_user: false,
   enabled: true,
   permission_mode: 'auto',

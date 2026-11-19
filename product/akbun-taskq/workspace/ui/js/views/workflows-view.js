@@ -32,6 +32,16 @@ export function initWorkflowsView() {
     }, POLL_MS)
     render()
   })
+  // A workflow saved from a task opens in the editor.
+  on('open-workflow', async (id) => {
+    try {
+      const w = await api.get(`/workflows/${id}`)
+      show('workflows')
+      edit(w)
+    } catch (error) {
+      notify(error.message, true)
+    }
+  })
   on('open-workflow-run', (id) => {
     openRun = id
     screen = 'run'

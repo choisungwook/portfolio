@@ -2,6 +2,34 @@
 
 <!-- markdownlint-configure-file {"MD024": {"siblings_only": true}} -->
 
+## 0.12.0
+
+bot이 사람 없이 일하는 범위를 넓히고, 사람이 결정하거나 해야 하는 곳에서는 멈추게 한다. 처음 읽는 agent는 `wiki/architecture.md`의 "Bots on their own" 절을 먼저 읽는다.
+
+### Added
+
+- 먼저 묻기: 되돌릴 수 없는 명령(push, publish, release, `terraform apply`·`destroy`, `kubectl apply`·`delete`, helm, `docker push`, `aws … delete-`·`terminate-`)과 bot 설정의 "먼저 묻기" 패턴(`tool:<이름>`으로 MCP 도구도)은 실행되지 않고 Must check에 승인 요청으로 뜬다. "한 번 승인"하면 그 호출이 한 번만 통과하고, 거부하면 bot이 듣는다. bypass 모드는 기본 목록만 건너뛴다.
+- routine: bot마다 cron 일정(로컬 시간)이나 트리거(작업 실패, 새 작업, webhook)로 도는 일. bot 설정에서 추가하거나 bot에게 대화로 부탁한다(`schedule_routine`). 놓친 실행은 한 번만 온다.
+- 로그인 넘겨받기: bot이 로그인 벽에서 `request_login`을 부르면 Must check에 로그인 필요가 뜨고, 사용자가 "로그인했음"을 누를 때까지 그 bot은 turn을 받지 않는다.
+- bot 헌장: 맡는 일, 좋은 결과, 묻지 않고 하지 말 것. 지시문에 붙는다.
+- 설정의 주간 점검: bot·routine별로 돌았는지와 성공률, 끌 후보와 끄기 버튼, 직접 확인할 최근 결과 5개.
+- 목표: 왼쪽 메뉴에서 목표와 완료 조건을 주면 taskq가 bot에게 나눠 맡기고 `close_goal`로 요약과 함께 닫는다.
+- 끝난 작업을 workflow로 저장: 작업 상세의 "Save as workflow"가 의도, 마지막 실행 요약, 쓴 명령과 고친 파일로 workflow 초안을 만들고 편집기를 연다.
+- 교차 확인: "Needs a second check" 작업은 owner가 끝내면 review로 가고, 다른 reviewer bot이 `review_task`로 승인하거나 반려해야 done이 된다. reviewer bot이 없으면 사용자가 확인한다.
+- API와 operation: `/bot-approvals`, `/bot-logins`, `/routines`, `/goals`, `/review`, `/tasks/:id/save-workflow`.
+
+### Changed
+
+- 스키마 010: `team_agents`에 헌장과 `ask_first`, `bot_approvals`, `bot_logins`, `bot_routines`, `goals`, `team_messages.routine_id`.
+
+### SDK
+
+`@anthropic-ai/claude-agent-sdk`와 `@openai/agents-core`: 사용 방식 변경 없음. 먼저 묻기는 기존 `PreToolUse` hook(Claude)과 로컬 도구 게이트(OpenAI)에서 `botGate`가 판단한다. Codex와 Kiro bot의 자체 도구는 이 게이트를 지나지 않는다.
+
+### Not verified with a real model
+
+- 실제 모델이 `request_login`, `schedule_routine`, `review_task`를 지시문대로 부르는지는 돌려 보지 않았다. 가짜 backend와 도구 호출 테스트로만 확인했다.
+
 ## 0.11.0
 
 bot이 대답하지 않을 때 이유를 화면에서 찾을 수 있게 한다. 처음 읽는 agent는 `wiki/architecture.md`의 Connections 절을 먼저 읽는다.

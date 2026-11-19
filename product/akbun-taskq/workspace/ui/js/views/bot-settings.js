@@ -96,6 +96,11 @@ export async function openBotSettings(name) {
     f.hourly_turns.value = value.hourly_turns ?? ''
     f.turn_budget_usd.value = value.turn_budget_usd ?? ''
     f.turn_max_turns.value = value.turn_max_turns ?? ''
+    f.charter_owns.value = value.charter_owns ?? ''
+    f.charter_good.value = value.charter_good ?? ''
+    f.charter_never.value = value.charter_never ?? ''
+    f.ask_first.value = (value.ask_first ?? []).join('\n')
+    if (name) renderRoutines(name)
     area('bot-session-folder').hidden = !name
     remove.hidden = !name || Boolean(bot?.system)
     picks('bot-skills', 'skill', settings.bot_skills, value.skills)
@@ -121,6 +126,8 @@ async function save(event) {
     hourly_turns: f.hourly_turns.value === '' ? null : Number(f.hourly_turns.value),
     turn_budget_usd: f.turn_budget_usd.value === '' ? null : Number(f.turn_budget_usd.value),
     turn_max_turns: f.turn_max_turns.value === '' ? null : Number(f.turn_max_turns.value),
+    charter_owns: f.charter_owns.value, charter_good: f.charter_good.value, charter_never: f.charter_never.value,
+    ask_first: lines(f.ask_first.value),
   }
   const error = area('bot-form-error')
   try {
@@ -133,6 +140,47 @@ async function save(event) {
   } catch (failure) {
     error.textContent = failure.message
   }
+}
+
+// The bot's routines, with a row to add one. The inputs have no name, so they are not part of the settings form.
+async function renderRoutines(name) {
+  const box = area('bot-routines')
+  let routines = []
+  try {
+    routines = await api.get(`/routines?bot=${encodeURIComponent(name)}`)
+  } catch (error) {
+    clear(box).append(el('p', { class: 'error', text: error.message }))
+    return
+  }
+  const when = (r) => r.schedule ?? `on ${r.trigger}`
+  const next = (r) => (r.next_run_at ? ` · next ${new Date(r.next_run_at * 1000).toLocaleString()}` : '')
+  const fields = {
+    name: el('input', { type: 'text', maxlength: 100, placeholder: 'Morning brief', 'aria-label': 'Routine name' }),
+    kind: el('select', { 'aria-label': 'When' }, ...[['schedule', 'On a schedule'], ['task_failed', 'When a task fails'], ['task_created', 'When a task is created'], ['webhook', 'When a webhook is called']]
+      .map(([value, text]) => el('option', { value, text }))),
+    schedule: el('input', { type: 'text', maxlength: 100, placeholder: '0 7 * * *', 'aria-label': 'Cron schedule', spellcheck: 'false' }),
+    prompt: el('textarea', { rows: 2, maxlength: 4000, placeholder: 'Summarise yesterday\'s failed tasks and what to do about each', 'aria-label': 'What to do' }),
+  }
+  fields.kind.addEventListener('change', () => { fields.schedule.hidden = fields.kind.value !== 'schedule' })
+  const add = async () => {
+    const schedule = fields.kind.value === 'schedule'
+    const made = await mutate(() => api.post('/routines', {
+      bot: name, name: fields.name.value, prompt: fields.prompt.value,
+      ...(schedule ? { schedule: fields.schedule.value } : { trigger: fields.kind.value }),
+    }), 'Routine added')
+    if (made) renderRoutines(name)
+  }
+  clear(box).append(
+    routines.length === 0 ? el('p', { class: 'meta', text: 'No routines yet.' }) : el('ul', { class: 'routine-list' }, ...routines.map((r) => el('li', {},
+      el('label', { class: 'check' }, el('input', {
+        type: 'checkbox', checked: r.enabled || null, 'aria-label': `${r.name} on`,
+        onchange: (event) => mutate(() => api.post(`/routines/${r.id}`, { enabled: event.target.checked })),
+      }), ` ${r.name}`),
+      el('span', { class: 'meta mono', text: ` ${when(r)}${next(r)}${r.trigger === 'webhook' ? ` · POST /api/routines/${r.id}/fire` : ''}` }),
+      el('p', { class: 'meta', text: r.prompt }),
+      el('button', { type: 'button', class: 'quiet', text: 'Delete', onclick: async () => { if (await mutate(() => api.del(`/routines/${r.id}`), 'Routine deleted')) renderRoutines(name) } })))),
+    el('div', { class: 'routine-add' }, fields.name, fields.kind, fields.schedule, fields.prompt, el('button', { type: 'button', text: 'Add routine', onclick: add })),
+  )
 }
 
 // The permission modes the bot's SDK has. OpenAI has no auto mode, so a Claude bot switched to OpenAI moves to accept edits.

@@ -358,6 +358,9 @@ bot과 대화할 때 쓰는 기능은 아래와 같다.
 | 조회 태스크에서 명령이 거부된다 | 조회 전용 규칙에 없는 명령이다. 변경이 필요하면 Task의 기본 모드(Change an account)로 만든다 |
 | 태스크가 "Interrupted"로 남는다 | 실행 중에 프로세스가 죽었다. 다음 실행에서 이전 세션을 이어받는다 |
 | OpenAI나 Kiro bot이 꺼져 있고 Must check에 "login failed"가 있다 | 그 bot의 로그인(API 키, `codex login`, 설정 > 연결의 Kiro 로그인)이 실패해 그 bot만 꺼졌다. 다시 로그인한 뒤 bot을 켠다 |
+| bot이 "승인을 기다린다"고 한다 | 되돌릴 수 없는 명령(push, 배포, 클라우드 자원 삭제 등)이나 bot 설정의 "먼저 묻기"에 걸렸다. Must check에서 명령을 보고 "한 번 승인"이나 "거부"를 누른다 |
+| bot이 로그인을 기다린다 | Must check의 로그인 필요에 적힌 방법으로 터미널이나 브라우저에서 로그인하고 "로그인했음"을 누른다. 비밀번호를 채팅에 붙여넣지 않는다 |
+| 매일 같은 일을 시키고 싶다 | bot에게 "매일 7시에 …"라고 말하거나 bot 설정의 Routines에서 cron 일정이나 트리거로 추가한다. 설정의 주간 점검에서 돌았는지 본다 |
 | bot이 대답하지 않는다 | bot 대화 오른쪽의 연결 패널에 "대답하지 않는 이유"가 나온다. 흔한 원인은 `bots.enabled`가 false(기본값)이거나, Claude `provider`가 기본값 bedrock인데 AWS 프로파일이 없거나, 그 bot의 로그인(API 키, Codex, Kiro)이 실패한 경우다. 설정의 연결 페이지에서 연결마다 상태를 보고 다시 확인한다 |
 | Must check에 "Bots paused"가 떠 있다 | 일일 예산을 다 썼거나, bot 하나가 1시간 턴 상한을 넘었거나(메시지 루프 의심), Claude 모델 로그인이 실패했거나, bot이 taskq 데이터를 읽으려 했다. `taskq bots log`로 원인을 보고 `taskq bots resume`이나 메뉴 Bots 옆의 Resume으로 다시 켠다 |
 | 고친 화면이 안 보인다 | 브라우저를 새로 고친다 |

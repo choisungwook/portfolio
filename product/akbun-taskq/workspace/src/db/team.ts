@@ -41,6 +41,10 @@ export interface BotSettings {
   hourly_turns: number | null    // per-bot rate limit; null uses the global default
   turn_budget_usd: number | null // per-turn spend limit; null uses the global default
   turn_max_turns: number | null  // per-turn model turns; null uses the global default
+  charter_owns: string           // charter: what this bot is responsible for
+  charter_good: string           // charter: what a good result looks like
+  charter_never: string          // charter: what it never does without asking
+  ask_first: string[]            // Bash patterns (or tool:<name pattern>) that wait for the user's approval
 }
 
 export interface TeamAgent extends BotSettings {
@@ -77,7 +81,7 @@ export interface TeamTurn {
 }
 
 const BODY_LIMIT = 8000
-const JSON_FIELDS = ['allowed_domains', 'blocked_commands', 'skills', 'plugins', 'mcp_servers'] as const
+const JSON_FIELDS = ['allowed_domains', 'blocked_commands', 'skills', 'plugins', 'mcp_servers', 'ask_first'] as const
 const BOOL_FIELDS = ['may_message_user', 'enabled', 'sandbox', 'system'] as const
 
 function toAgent(row: Record<string, unknown>): TeamAgent {
@@ -91,13 +95,14 @@ function toAgent(row: Record<string, unknown>): TeamAgent {
 export function createAgent(db: Db, name: string, settings: BotSettings, system = false): void {
   db.prepare(`INSERT INTO team_agents (name, role, description, instructions, may_message_user, enabled, system,
     permission_mode, sandbox, allowed_domains, blocked_commands, workdir, skills, plugins, model, sdk, hourly_turns,
-    turn_budget_usd, turn_max_turns, effort, mcp_servers, provider, created_at)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`).run(
+    turn_budget_usd, turn_max_turns, effort, mcp_servers, provider, charter_owns, charter_good, charter_never, ask_first, created_at)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`).run(
     name, settings.role, settings.description, settings.instructions, settings.may_message_user ? 1 : 0, settings.enabled ? 1 : 0,
     system ? 1 : 0, settings.permission_mode, settings.sandbox ? 1 : 0, JSON.stringify(settings.allowed_domains),
     JSON.stringify(settings.blocked_commands), settings.workdir, JSON.stringify(settings.skills), JSON.stringify(settings.plugins),
     settings.model, settings.sdk, settings.hourly_turns, settings.turn_budget_usd, settings.turn_max_turns, settings.effort,
-    JSON.stringify(settings.mcp_servers ?? []), settings.provider ?? null, nowSec())
+    JSON.stringify(settings.mcp_servers ?? []), settings.provider ?? null, settings.charter_owns ?? '', settings.charter_good ?? '',
+    settings.charter_never ?? '', JSON.stringify(settings.ask_first ?? []), nowSec())
 }
 
 export function updateAgent(db: Db, name: string, settings: BotSettings): boolean {
@@ -106,12 +111,14 @@ export function updateAgent(db: Db, name: string, settings: BotSettings): boolea
     WHERE name = ? AND (sdk IS NOT ? OR coalesce(provider, 'api') IS NOT coalesce(?, 'api'))`).run(name, settings.sdk, settings.provider ?? null)
   return db.prepare(`UPDATE team_agents SET role = ?, description = ?, instructions = ?, may_message_user = ?, enabled = ?,
     permission_mode = ?, sandbox = ?, allowed_domains = ?, blocked_commands = ?, workdir = ?, skills = ?, plugins = ?, model = ?,
-    sdk = ?, hourly_turns = ?, turn_budget_usd = ?, turn_max_turns = ?, effort = ?, mcp_servers = ?, provider = ?
+    sdk = ?, hourly_turns = ?, turn_budget_usd = ?, turn_max_turns = ?, effort = ?, mcp_servers = ?, provider = ?,
+    charter_owns = ?, charter_good = ?, charter_never = ?, ask_first = ?
     WHERE name = ?`).run(
     settings.role, settings.description, settings.instructions, settings.may_message_user ? 1 : 0, settings.enabled ? 1 : 0,
     settings.permission_mode, settings.sandbox ? 1 : 0, JSON.stringify(settings.allowed_domains), JSON.stringify(settings.blocked_commands),
     settings.workdir, JSON.stringify(settings.skills), JSON.stringify(settings.plugins), settings.model, settings.sdk,
-    settings.hourly_turns, settings.turn_budget_usd, settings.turn_max_turns, settings.effort, JSON.stringify(settings.mcp_servers ?? []), settings.provider ?? null, name).changes === 1
+    settings.hourly_turns, settings.turn_budget_usd, settings.turn_max_turns, settings.effort, JSON.stringify(settings.mcp_servers ?? []), settings.provider ?? null,
+    settings.charter_owns ?? '', settings.charter_good ?? '', settings.charter_never ?? '', JSON.stringify(settings.ask_first ?? []), name).changes === 1
 }
 
 // The orchestrator is refused. Its tasks go back to the user; its messages stay for the record.
@@ -170,13 +177,13 @@ export function firstAgentWithRole(db: Db, role: string): string | undefined {
 // until that time, which is how an agent schedules work for later.
 export function postMessage(db: Db, message: {
   sender: string; recipient: string; body: string; task_id?: string | null; reply_to?: number | null
-  thread_id?: number | null; deliver_at?: number; attachments?: string[]
+  thread_id?: number | null; deliver_at?: number; attachments?: string[]; routine_id?: number | null
 }): number {
   const body = mask(message.body.slice(0, BODY_LIMIT))
   const now = nowSec()
-  const result = db.prepare(`INSERT INTO team_messages (sender, recipient, body, task_id, reply_to, thread_id, attachments, created_at, deliver_at)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`).run(message.sender, message.recipient, body, message.task_id ?? null, message.reply_to ?? null,
-    message.thread_id ?? null, JSON.stringify(message.attachments ?? []), now, message.deliver_at ?? now)
+  const result = db.prepare(`INSERT INTO team_messages (sender, recipient, body, task_id, reply_to, thread_id, attachments, created_at, deliver_at, routine_id)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`).run(message.sender, message.recipient, body, message.task_id ?? null, message.reply_to ?? null,
+    message.thread_id ?? null, JSON.stringify(message.attachments ?? []), now, message.deliver_at ?? now, message.routine_id ?? null)
   return Number(result.lastInsertRowid)
 }
 
@@ -188,6 +195,7 @@ export function agentsWithMail(db: Db, now: number, retryAfterSec: number): stri
   return db.prepare(`SELECT a.name FROM team_agents a
     JOIN team_messages m ON m.recipient = a.name AND ${DELIVERABLE}
     WHERE a.enabled = 1 AND NOT EXISTS (SELECT 1 FROM team_turns t WHERE t.agent = a.name AND t.ended_at IS NULL)
+      AND NOT EXISTS (SELECT 1 FROM bot_logins l WHERE l.bot = a.name AND l.done_at IS NULL)
       AND NOT EXISTS (SELECT 1 FROM team_turns t WHERE t.id = (SELECT max(id) FROM team_turns WHERE agent = a.name)
         AND t.outcome = 'failed' AND t.ended_at > ?)
     GROUP BY a.name ORDER BY min(m.id)`).all(now, now - retryAfterSec).map((row) => String(row.name))
