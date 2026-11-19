@@ -73,7 +73,7 @@ describe('connections', () => {
     assert.equal(healthy?.blocker, null)
   })
 
-  test('the API answers for every connection and for one bot; an unknown bot is 404', async () => {
+  test('the API answers for every connection, for one bot and its failed turns; an unknown bot is 404', async () => {
     const app = createApp({ db: env.db, config: env.config }, TOKEN)
     const get = (path: string) => app.request(`/api${path}`, { headers: { 'x-taskq-token': TOKEN, host: `127.0.0.1:${env.config.port}` } })
     env.config.provider = 'api_key'
@@ -83,5 +83,11 @@ describe('connections', () => {
     const one = await get('/bots/coder/connection')
     assert.equal(((await one.json()) as { connection: { id: string } }).connection.id, 'claude')
     assert.equal((await get('/bots/nobody/connection')).status, 404)
+    postMessage(env.db, { sender: USER, recipient: 'coder', body: 'hi' })
+    const turn = startTurn(env.db, 'coder', 5)!
+    endTurn(env.db, turn.turn.id, { outcome: 'failed', error: 'ANTHROPIC_API_KEY is not set' }, 3)
+    const errors = (await (await get('/bots/coder/turn-errors')).json()) as { outcome: string; error: string }[]
+    assert.deepEqual(errors.map((e) => [e.outcome, e.error]), [['failed', 'ANTHROPIC_API_KEY is not set']])
+    assert.equal((await get('/bots/nobody/turn-errors')).status, 404)
   })
 })

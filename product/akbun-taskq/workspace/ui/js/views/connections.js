@@ -54,7 +54,8 @@ async function loadConnections(refresh = false) {
   }
 }
 
-// The panel on the right of a bot's conversation.
+// The panel on the right of a bot's conversation. Returns what it showed, so the conversation can say the bot will not
+// answer.
 export async function renderBotConnection(box, name, refresh = false) {
   try {
     const info = await api.get(`/bots/${name}/connection${refresh ? '?refresh=1' : ''}`)
@@ -74,8 +75,10 @@ export async function renderBotConnection(box, name, refresh = false) {
       el('div', { class: 'conn-actions' },
         el('button', { type: 'button', text: t('connections.check', 'Check again'), onclick: () => renderBotConnection(box, name, true) }),
         el('button', { type: 'button', class: 'quiet', text: t('connections.open', 'Connection settings'), onclick: () => emit('open-settings', 'connections') })))
+    return info
   } catch (error) {
     fill(box, el('p', { class: 'error', text: error.message }))
+    return null
   }
 }
 

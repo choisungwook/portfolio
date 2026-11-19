@@ -139,3 +139,6 @@ mark.find.current { background: var(--accent); color: var(--on-accent); }
   .chat-side { order: -1; padding: 10px 14px; gap: 4px; }
   .chat-side .meta, .chat-side h3 { display: none; }
 }
+/* A failed turn or a refused message, shown in the conversation where it happened. */
+.msg[data-side="error"] { align-self: stretch; max-width: none; }
+.msg[data-side="error"] .bubble { background: var(--warning-soft); color: var(--fg); box-shadow: inset 3px 0 0 var(--danger); border-radius: var(--radius); }

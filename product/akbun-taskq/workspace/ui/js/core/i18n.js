@@ -48,6 +48,7 @@ const KO = {
   'kiro.hint': 'Kiro bot은 AWS IAM Identity Center 세션을 씁니다. SSO start URL과 region을 넣고 로그인하면 kiro-cli가 브라우저에서 승인할 코드를 보여 주고 세션을 보관합니다. taskq는 토큰을 저장하지 않습니다.',
   'kiro.sign_in': 'AWS SSO로 로그인', 'kiro.check': '상태 확인', 'kiro.open': '열기:', 'kiro.enter': '에서 코드 입력:', 'kiro.waiting': 'kiro-cli를 기다리는 중…',
   'kiro.pending': '브라우저에서 승인하기를 기다립니다. 승인한 뒤 상태 확인을 누르세요.', 'kiro.signed_in': '로그인됨', 'kiro.signed_out': '로그인 안 됨',
+  'chat.turn_failed': 'turn 실패', 'chat.no_reason': '이유 없음', 'chat.send_failed': '보내지 못함', 'chat.wont_answer': '아직 대답할 수 없음',
   'settings.connections': '연결', 'connections.check': '다시 확인', 'connections.hint': 'bot이 모델에 닿는 방법입니다. Claude bot은 taskq.config.json의 provider를 함께 쓰고, OpenAI bot은 bot 설정에서 고른 로그인 방식을, Kiro bot은 kiro-cli 로그인을 함께 씁니다. 대답하지 않는 bot은 보통 여기서 연결이 실패합니다.',
   'connections.ok': '연결됨', 'connections.error': '실패', 'connections.unused': '쓰는 bot 없음', 'connections.used_by': '쓰는 bot', 'connections.last': '마지막 turn',
   'connections.last_ok': '마지막 응답', 'connections.never': '없음', 'connections.checked': '확인', 'connections.off': 'bot이 꺼져 있습니다. taskq.config.json에서 bots.enabled를 true로 바꾸고 taskq를 다시 시작하세요. 꺼져 있으면 어떤 bot도 대답하지 않습니다.',

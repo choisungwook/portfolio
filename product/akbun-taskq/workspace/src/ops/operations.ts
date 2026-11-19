@@ -58,6 +58,7 @@ export const OPERATIONS: Operation[] = [
   op('bot_presets', 'GET', '/bots/presets', 'Role presets for a new bot.'),
   op('bot_create', 'POST', '/bots', 'Create a bot. Fields: name, preset or role/description/instructions, sdk (claude|openai), model, effort, permission_mode, sandbox, allowed_domains, blocked_commands, workdir, skills, plugins, limits.'),
   op('bot_get', 'GET', '/bots/:name', 'One bot\'s settings.'),
+  op('bot_turn_errors', 'GET', '/bots/:name/turn-errors', 'A bot\'s failed turns, newest first: id, outcome, error, ended_at. Fields: name, limit (default 50).'),
   op('bot_update', 'PUT', '/bots/:name', 'Change a bot\'s settings; only the fields given change. Same fields as bot_create, plus enabled.'),
   op('bot_delete', 'DELETE', '/bots/:name', 'Delete a bot (not taskq). Its running turn is cancelled; its tasks go back to the user as drafts.'),
   op('bot_cancel', 'POST', '/bots/:name/cancel', 'Stop the bot\'s running turn; its running task becomes cancelled.'),
