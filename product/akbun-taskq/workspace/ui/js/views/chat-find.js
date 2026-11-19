@@ -26,7 +26,10 @@ export function initChatFind(logNode) {
   input.addEventListener('input', refreshFind)
   input.addEventListener('keydown', (event) => {
     if (event.key === 'Enter') step(event.shiftKey ? -1 : 1)
-    if (event.key === 'Escape') close()
+    if (event.key === 'Escape') {
+      event.preventDefault()
+      close()
+    }
   })
   area('chat-find-next').addEventListener('click', () => step(1))
   area('chat-find-prev').addEventListener('click', () => step(-1))

@@ -1,4 +1,4 @@
-import { mkdtempSync, rmSync } from 'node:fs'
+import { mkdtempSync, realpathSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { resolveConfig, type Config } from '../src/config.ts'
@@ -17,7 +17,8 @@ export interface TestEnv {
 // Fresh temp TASKQ_HOME with short poll intervals so the suite finishes in seconds.
 export function setup(overrides: Partial<Config> = {}): TestEnv {
   process.env.TASKQ_NO_NOTIFY = '1'
-  const home = mkdtempSync(join(tmpdir(), 'taskq-test-'))
+  // The real path: on macOS the temp folder is a symlink (/var -> /private/var) and git reports the resolved one.
+  const home = realpathSync(mkdtempSync(join(tmpdir(), 'taskq-test-')))
   const db = openDb(home)
   const config = resolveConfig(home, { pollSec: 0.02, heartbeatSec: 0.05, ...overrides })
   return {

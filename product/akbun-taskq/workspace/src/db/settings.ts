@@ -64,5 +64,5 @@ export function language(db: Db): Language {
 
 export function themeMode(db: Db): ThemeMode {
   const value = getMeta(db, 'ui_theme')
-  return value === 'dark' || value === 'light' ? value : 'system'
+  return value === 'dark' || value === 'system' ? value : 'light'
 }

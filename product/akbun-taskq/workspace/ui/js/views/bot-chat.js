@@ -55,6 +55,12 @@ export function initBotChat() {
       event.preventDefault()
       files.pick()
     }
+    // Esc closes an open right pane first; only with nothing open does it interrupt the bot or clear the input.
+    if (event.key === 'Escape' && !event.isComposing && !event.defaultPrevented && paneMode !== null) {
+      event.preventDefault()
+      setPane(null)
+      return
+    }
     // Esc interrupts a working bot; when it is idle, Esc twice clears the input.
     if (event.key === 'Escape' && !event.isComposing) {
       event.preventDefault()
@@ -334,6 +340,14 @@ function initAttachMenu() {
   })
   document.addEventListener('click', (event) => {
     if (!menu.hidden && !menu.contains(event.target) && !button.contains(event.target)) close()
+  })
+  // Esc anywhere on the page closes what is on top: the + menu, else the right pane. A dialog's own Esc stays its own.
+  document.addEventListener('keydown', (event) => {
+    if (event.key !== 'Escape' || event.defaultPrevented || event.isComposing || document.querySelector('dialog[open]')) return
+    if (!menu.hidden) close(true)
+    else if (paneMode !== null && currentView().view === 'bot') setPane(null)
+    else return
+    event.preventDefault()
   })
 }
 

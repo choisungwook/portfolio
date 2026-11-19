@@ -82,7 +82,8 @@ export function appearance(db: Db): Appearance {
   const theme = getMeta(db, 'ui_theme')
   return {
     font_family: family, font_size: Number.isInteger(size) ? size : 15, language,
-    theme: theme === 'dark' || theme === 'light' ? theme : 'system',
+    // Light until the user picks otherwise in Settings; an explicit 'system' follows the OS.
+    theme: theme === 'dark' || theme === 'system' ? theme : 'light',
   }
 }
 
