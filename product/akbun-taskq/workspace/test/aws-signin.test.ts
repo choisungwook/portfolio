@@ -2,7 +2,7 @@ import { test, describe } from 'node:test'
 import assert from 'node:assert/strict'
 import { mkdirSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
-import { listProfiles } from '../src/aws/profiles.ts'
+import { bedrockModelId, listProfiles, signGet } from '../src/aws/profiles.ts'
 import { applyConnectionSettings, saveConnectionSettings } from '../src/team/connection-settings.ts'
 import { createOpenAITeamBackend, type OpenAIRunFn } from '../src/agents/openai/team.ts'
 import { clearConnectionCache, listConnections, type Checks } from '../src/team/connections.ts'
@@ -83,7 +83,7 @@ describe('AWS profile sign-in', () => {
     const ok = await createOpenAITeamBackend(run, fetch, undefined, async (profile, region) => {
       asked.push(`${profile}@${region}`)
       return 'bedrock-api-key-token'
-    }).runTurn(env.config, request)
+    }, async () => []).runTurn(env.config, request)
     assert.equal(ok.outcome, 'done')
     assert.deepEqual(asked, ['example-sso@us-east-1'])
     const expired = await createOpenAITeamBackend(run, fetch, undefined, async () => {
@@ -98,6 +98,46 @@ describe('AWS profile sign-in', () => {
     assert.match(leaky.error ?? '', /keys-only gave no credentials: check its keys or role/)
     env.config.bots.bedrockProfile = 'example-sso'
     assert.equal(expired.auth_failed, undefined, 'the bot stays on; the user signs in by hand and it works again')
+  })
+
+  test('[critical] SigV4 matches the AWS examples; openai.* becomes the region\'s inference profile', () => {
+    const creds = { accessKeyId: 'AKIDEXAMPLE', secretAccessKey: 'wJalrXUtnFEMI/K7MDENG+bPxRfiCYEXAMPLEKEY' }
+    const at = new Date('2015-08-30T12:36:00Z')
+    const iam = signGet(new URL('https://iam.amazonaws.com/?Action=ListUsers&Version=2010-05-08'), 'us-east-1', 'iam', creds, at, { 'Content-Type': 'application/x-www-form-urlencoded; charset=utf-8' })
+    assert.match(iam.authorization, /Signature=5d672d79c15b13162d9279b0855cfba6789a8edb4c82c400e06b5924a6f2b5d7$/)
+    const vanilla = signGet(new URL('https://example.amazonaws.com/'), 'us-east-1', 'service', creds, at)
+    assert.match(vanilla.authorization, /Signature=5fa00fa31553b73ebf1942676e86291e8372ff2a2260956d9b8aae1d763fbf31$/)
+    const profiles = [{ id: 'us.openai.gpt-5-v1:0', name: 'US GPT-5' }, { id: 'global.openai.gpt-5-mini-v1:0', name: 'Global GPT-5 mini' }, { id: 'eu.openai.gpt-5-v1:0', name: 'EU GPT-5' }]
+    assert.equal(bedrockModelId('openai.gpt-5-v1:0', 'us-west-2', profiles), 'us.openai.gpt-5-v1:0')
+    assert.equal(bedrockModelId('openai.gpt-5-v1:0', 'eu-central-1', profiles), 'eu.openai.gpt-5-v1:0')
+    assert.equal(bedrockModelId('openai.gpt-5-mini-v1:0', 'us-west-2', profiles), 'global.openai.gpt-5-mini-v1:0', 'no us. profile: global.')
+    assert.equal(bedrockModelId('openai.gpt-oss-120b-1:0', 'us-west-2', profiles), 'openai.gpt-oss-120b-1:0', 'no profile: the id stays (on-demand model)')
+    assert.equal(bedrockModelId('us.openai.gpt-5-v1:0', 'us-west-2', profiles), 'us.openai.gpt-5-v1:0', 'a profile id stays')
+  })
+
+  test('[critical] an OpenAI bot on Bedrock lists inference profiles as its models and runs openai.* through one', async () => {
+    const agent = { ...getAgent(env.db, 'coder')!, sdk: 'openai' as const, provider: 'bedrock' as const, model: 'openai.gpt-5-v1:0' }
+    const request: TurnRequest = {
+      agent, system: 'orders', prompt: 'hi', cwd: env.home, plugins: [], sharedDir: env.home, maxTurns: 5, budgetUsd: 1, tools: [],
+      resume: null, signal: new AbortController().signal,
+    }
+    env.config.bots.bedrockProfile = 'example-sso'
+    env.config.bots.bedrockRegion = 'us-west-2'
+    const models: string[] = []
+    const run: OpenAIRunFn = async (args) => {
+      models.push(args.model)
+      return { inputTokens: 1, outputTokens: 1, requests: 1, history: [] }
+    }
+    const lister = async () => [{ id: 'us.openai.gpt-5-v1:0', name: 'US GPT-5' }, { id: 'us.anthropic.claude-x', name: 'not openai' }]
+    const backend = createOpenAITeamBackend(run, fetch, undefined, async () => 'token', lister)
+    const result = await backend.runTurn(env.config, request)
+    assert.deepEqual([result.outcome, models[0], result.model], ['done', 'us.openai.gpt-5-v1:0', 'us.openai.gpt-5-v1:0'])
+    const catalog = await backend.catalog!(env.config, { agent, cwd: env.home, plugins: [] })
+    assert.deepEqual(catalog.models.map((m) => m.id), ['us.openai.gpt-5-v1:0'])
+    const failing = createOpenAITeamBackend(run, fetch, undefined, async () => 'token', async () => { throw new Error('HTTP 403') })
+    assert.equal((await failing.runTurn(env.config, request)).outcome, 'done', 'a failed listing keeps the typed id')
+    assert.equal(models.at(-1), 'openai.gpt-5-v1:0')
+    assert.deepEqual((await failing.catalog!(env.config, { agent, cwd: env.home, plugins: [] })).models, [], 'empty: the built-in list is shown')
   })
 
   test('the Bedrock connection checks the profile; the API serves settings and profiles', async () => {

@@ -1,3 +1,4 @@
+import { createHash, createHmac } from 'node:crypto'
 import { existsSync, readFileSync } from 'node:fs'
 import { homedir } from 'node:os'
 import { join } from 'node:path'
@@ -85,4 +86,68 @@ export function profileFailure(profile: string, env: NodeJS.ProcessEnv = process
 
 export function forgetBedrockTokens(): void {
   tokens.clear()
+}
+
+// AWS Signature Version 4 for a GET without a body, the shape of the Bedrock control-plane list calls. Returns the headers
+// to send. Written here with node:crypto because the AWS SDK clients are not dependencies of taskq.
+export interface AwsCredentials { accessKeyId: string; secretAccessKey: string; sessionToken?: string }
+
+const sha256hex = (text: string) => createHash('sha256').update(text).digest('hex')
+const hmac = (key: string | Buffer, text: string) => createHmac('sha256', key).update(text).digest()
+const encode = (text: string) => encodeURIComponent(text).replace(/[!'()*]/g, (c) => `%${c.charCodeAt(0).toString(16).toUpperCase()}`)
+
+export function signGet(url: URL, region: string, service: string, creds: AwsCredentials, now = new Date(), extra: Record<string, string> = {}): Record<string, string> {
+  const amzDate = now.toISOString().replace(/[:-]|\.\d{3}/g, '')
+  const day = amzDate.slice(0, 8)
+  const headers: Record<string, string> = { host: url.host, 'x-amz-date': amzDate }
+  for (const [name, value] of Object.entries(extra)) headers[name.toLowerCase()] = value
+  if (creds.sessionToken) headers['x-amz-security-token'] = creds.sessionToken
+  const names = Object.keys(headers).sort()
+  const query = [...url.searchParams].map(([k, v]) => `${encode(k)}=${encode(v)}`).sort().join('&')
+  const canonical = ['GET', url.pathname || '/', query, names.map((n) => `${n}:${headers[n].trim()}\n`).join(''), names.join(';'), sha256hex('')].join('\n')
+  const scope = `${day}/${region}/${service}/aws4_request`
+  const toSign = ['AWS4-HMAC-SHA256', amzDate, scope, sha256hex(canonical)].join('\n')
+  const key = hmac(hmac(hmac(hmac(`AWS4${creds.secretAccessKey}`, day), region), service), 'aws4_request')
+  const signature = createHmac('sha256', key).update(toSign).digest('hex')
+  return { ...headers, authorization: `AWS4-HMAC-SHA256 Credential=${creds.accessKeyId}/${scope}, SignedHeaders=${names.join(';')}, Signature=${signature}` }
+}
+
+// The Bedrock inference profiles the profile's credentials can see in the region (ListInferenceProfiles, system-defined
+// cross-region profiles such as us.openai.* and global.openai.*). Kept for 10 minutes.
+export interface InferenceProfile { id: string; name: string }
+export type InferenceProfileLister = (profile: string, region: string) => Promise<InferenceProfile[]>
+const profileLists = new Map<string, { list: InferenceProfile[]; at: number }>()
+
+export const listInferenceProfiles: InferenceProfileLister = async (profile, region) => {
+  const key = `${profile}@${region}`
+  const hit = profileLists.get(key)
+  if (hit && Date.now() - hit.at < TOKEN_TTL_MS) return hit.list
+  const creds = await fromIni({ profile })()
+  const list: InferenceProfile[] = []
+  let next: string | undefined
+  do {
+    const url = new URL(`https://bedrock.${region}.amazonaws.com/inference-profiles`)
+    url.searchParams.set('maxResults', '1000')
+    if (next) url.searchParams.set('nextToken', next)
+    const res = await fetch(url, { headers: signGet(url, region, 'bedrock', creds) })
+    if (!res.ok) throw new Error(`ListInferenceProfiles: HTTP ${res.status}`)
+    const body = await res.json() as { inferenceProfileSummaries?: { inferenceProfileId: string; inferenceProfileName?: string }[]; nextToken?: string }
+    for (const p of body.inferenceProfileSummaries ?? []) list.push({ id: p.inferenceProfileId, name: p.inferenceProfileName ?? p.inferenceProfileId })
+    next = body.nextToken
+  } while (next)
+  profileLists.set(key, { list, at: Date.now() })
+  return list
+}
+
+// A bare model id (openai.gpt-oss-120b-1:0) becomes the inference profile for the endpoint's region when one exists:
+// the region's geography first (us., eu., apac., jp., au.), then global. Without a matching profile the id stays.
+export function bedrockModelId(model: string, region: string, profiles: InferenceProfile[]): string {
+  if (!model.startsWith('openai.')) return model
+  const ids = new Set(profiles.map((p) => p.id))
+  const geo = /^(us|ca)-/.test(region) ? ['us']
+    : region.startsWith('eu-') ? ['eu']
+      : region === 'ap-northeast-1' ? ['jp', 'apac']
+        : region === 'ap-southeast-2' ? ['au', 'apac']
+          : region.startsWith('ap-') ? ['apac'] : []
+  return [...geo, 'global'].map((prefix) => `${prefix}.${model}`).find((id) => ids.has(id)) ?? model
 }
