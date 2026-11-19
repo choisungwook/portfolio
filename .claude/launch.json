@@ -67,6 +67,17 @@
         "4780"
       ],
       "port": 4780
+    },
+    {
+      "name": "akbun-taskq-demo",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": [
+        "--prefix",
+        "product/akbun-taskq/workspace",
+        "run",
+        "demo"
+      ],
+      "port": 4599
     }
   ]
 }

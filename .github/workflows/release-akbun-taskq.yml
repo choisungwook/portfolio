@@ -29,14 +29,12 @@ defaults:
 
 jobs:
   # The Claude Code binary comes from the platform package npm installs, so each target builds on its own OS.
+  # A pull request builds Linux only: it proves the bundle compiles, and a macOS runner can queue for many minutes.
+  # master builds both targets for the release.
   build:
     strategy:
       matrix:
-        include:
-          - runner: macos-latest
-            target: darwin-arm64
-          - runner: ubuntu-latest
-            target: linux-x64
+        include: ${{ fromJSON(github.event_name == 'pull_request' && '[{"runner":"ubuntu-latest","target":"linux-x64"}]' || '[{"runner":"macos-latest","target":"darwin-arm64"},{"runner":"ubuntu-latest","target":"linux-x64"}]') }}
     runs-on: ${{ matrix.runner }}
     steps:
       - uses: actions/checkout@v7

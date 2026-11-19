@@ -3,12 +3,13 @@ type: Decision
 title: Bots share one folder, keep memory and settings in SQLite, and cancel a turn without retrying it
 description: The shared folder is mounted into every bot session; uploads stay JSON; memory, limits, language and theme live in SQLite; a cancelled turn's work is not replayed.
 tags: [bots, storage, ui]
-generated: { by: claude-code/claude-opus-5-5, at: 2026-11-19T13:00:00Z }
+generated: { by: claude-code/claude-opus-5-5, at: 2026-11-19T15:30:00Z }
 ---
 
 ## 결정
 
 - `TASKQ_HOME/shared`를 모든 bot 세션의 `additionalDirectories`로 넘긴다. 첨부파일은 `shared/attachments/<날짜>/<id>-<이름>`에 저장하고, 메시지와 task에는 이 폴더 기준 경로만 남긴다. task 실행은 유형과 관계없이 이 폴더를 읽을 수 있지만 쓸 수는 없다.
+- bot이 작업하는 기본 폴더(세션 cwd)는 `shared/bots/<bot>/`이다(0.15.0부터, 이전은 `TASKQ_HOME/team/<bot>`). bot 설정의 작업 디렉터리를 정하면 그쪽을 쓴다. 메모리, OpenAI 기록, Kiro 설정은 `team/<bot>/`에 남는다. 사용자가 공용 폴더 화면에서 bot마다 무엇을 했는지 보게 하려는 것이고, 설정 파일까지 옮기면 bot이 자기 설정을 고칠 수 있게 되므로 작업 폴더만 옮겼다.
 - 업로드는 base64를 담은 JSON(`POST /api/files`, 20 MB)이다. multipart를 받지 않는다.
 - bot 메모리는 `team_agents.memory`에 두고 매 turn system prompt 끝에 붙인다. bot은 `memory_write`로, 사용자는 메모리 창으로 같은 글을 고친다.
 - 사용량 제한, 언어(한국어 기본), 테마, 글꼴은 SQLite(`meta`)에 둔다. `taskq.config.json`은 제한의 시작값만 준다.

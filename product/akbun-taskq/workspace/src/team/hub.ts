@@ -23,7 +23,7 @@ import { wikiDir } from './wiki-files.ts'
 import { pluginPaths, skillsFor } from './bot-plugin.ts'
 import { mcpServersFor } from '../db/mcp-registry.ts'
 import { recoverBotTasks, releaseBotTasks } from './bot-work.ts'
-import { sharedDir } from './shared.ts'
+import { botWorkdir, sharedDir } from './shared.ts'
 import { LiveInput } from './live-input.ts'
 import type { TeamBackend, TurnResult } from './types.ts'
 import { createCatalog, type CatalogFn } from './catalog.ts'
@@ -160,7 +160,7 @@ export function createTeamHub({ db, config, backend: claude, backends = {}, retr
       const controller = new AbortController()
       const own = agentDir(config, name)
       mkdirSync(own, { recursive: true })
-      const cwd = agent.workdir ?? own
+      const cwd = botWorkdir(config, agent)
       const wiki = wikiDir(config)
       mkdirSync(wiki, { recursive: true })
       let plugins: string[] = []

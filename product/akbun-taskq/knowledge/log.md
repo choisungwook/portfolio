@@ -4,6 +4,8 @@ concept를 추가·수정·삭제할 때마다 오늘 날짜 섹션을 맨 위�
 
 ## 2026-11-19
 
+* **Update**: [bot workspace](decisions/2026-11-bot-workspace.md)에 bot 기본 작업 폴더를 `shared/bots/<bot>`으로 옮긴 결정과 이유를 추가.
+* **Update**: [soft theme sidebar](decisions/2026-11-soft-theme-sidebar.md)에 0.15.0 사이드바 순서(taskq 위 가운데, 메뉴 위, Bots 아래)와 Graph 삭제를 반영.
 * **Creation**: [impeccable craft floor](decisions/2026-11-impeccable-ui-floor.md) 결정 기록. 점검 방법, 측정값, SVG 아이콘·줄무늬 금지·AA 대비 규칙.
 * **Creation**: [Astryx design tokens](decisions/2026-11-astryx-design-system.md) 결정 기록. React 컴포넌트 대신 토큰만 옮기고 soft·Carbon은 남김.
 * **Update**: [soft theme and sidebar](decisions/2026-11-soft-theme-sidebar.md)에 Proposals·Goals·Discussions 메뉴 제거와 기본 테마 변경을 더함.

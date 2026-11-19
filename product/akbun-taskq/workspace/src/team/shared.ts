@@ -75,3 +75,12 @@ export function listShared(config: Config, dir: string): SharedEntry[] | null {
     .sort((a, b) => Number(b.dir) - Number(a.dir) || a.name.localeCompare(b.name))
     .slice(0, 500)
 }
+
+// A bot's own folder inside the shared folder (shared/bots/<name>), where it works unless its settings name another
+// directory. The user sees every bot's work in the Shared folder view. Config and history stay in TASKQ_HOME/team/<name>.
+export function botWorkdir(config: Config, agent: { name: string; workdir: string | null }): string {
+  if (agent.workdir) return agent.workdir
+  const dir = join(sharedDir(config), 'bots', agent.name)
+  mkdirSync(dir, { recursive: true })
+  return dir
+}

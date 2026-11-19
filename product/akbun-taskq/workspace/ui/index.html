@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="en">
+<html lang="en" data-theme="light">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -23,10 +23,6 @@
     <input id="search-input" type="search" name="q" maxlength="200" placeholder="Search past runs" data-i18n-placeholder="header.search_runs">
     <button type="submit" class="quiet" data-i18n="header.search">Search</button>
   </form>
-  <button type="button" class="primary-button" data-area="new-task-button">
-    <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"></path></svg>
-    <span data-i18n="header.new_task">New task</span>
-  </button>
   <button type="button" class="alerts-button" data-area="alerts-button" aria-expanded="false" aria-controls="must-check" title="Must check">
     <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"></path><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"></path></svg>
     <span class="alerts-count" data-area="alerts-count" hidden></span>
@@ -66,14 +62,20 @@
 
 <div class="layout">
   <nav class="sidebar" data-area="sidebar" aria-label="Navigation">
-    <div class="side-me">
-      <strong class="side-title">akbun-taskq</strong>
-      <button type="button" class="side-search" data-view="search" data-i18n-title="nav.search" title="Search every bot conversation" aria-label="Search every bot conversation" data-icon="search" data-icon-size="20"></button>
-    </div>
+    <div class="side-hero" data-area="side-hero"></div>
+    <ul class="side-list side-top">
+      <li><button type="button" class="side-item" data-area="new-task-button"><span class="side-icon" aria-hidden="true" data-icon="plus"></span><span data-i18n="header.new_task">New task</span></button></li>
+      <li><button type="button" class="side-item" data-area="search-open" aria-haspopup="dialog" title="Search (Cmd/Ctrl+K)"><span class="side-icon" aria-hidden="true" data-icon="search"></span><span data-i18n="nav.search">Search</span></button></li>
+    </ul>
     <ul class="side-list" data-area="side-views">
       <li><button type="button" class="side-item" data-view="calendar"><span class="side-icon" aria-hidden="true" data-icon="calendar"></span><span data-i18n="nav.calendar">Calendar</span></button></li>
       <li><button type="button" class="side-item" data-view="board"><span class="side-icon" aria-hidden="true" data-icon="board"></span><span data-i18n="nav.board">Task status board</span></button></li>
-      <li><button type="button" class="side-item" data-view="graph"><span class="side-icon" aria-hidden="true" data-icon="graph"></span><span data-i18n="nav.graph">Graph</span></button></li>
+    </ul>
+    <ul class="side-list" data-area="side-shared">
+      <li><button type="button" class="side-item" data-view="shared"><span class="side-icon" aria-hidden="true"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><path d="M3 6.5a1.5 1.5 0 0 1 1.5-1.5h4.4l2 2.2h8.6A1.5 1.5 0 0 1 21 8.7v9.8a1.5 1.5 0 0 1-1.5 1.5h-15A1.5 1.5 0 0 1 3 18.5z"/></svg></span><span data-i18n="nav.shared">Shared folder</span></button></li>
+      <li><button type="button" class="side-item" data-view="workflows"><span class="side-icon" aria-hidden="true"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><rect x="3" y="4" width="6" height="5" rx="1.2"/><rect x="15" y="4" width="6" height="5" rx="1.2"/><rect x="9" y="15" width="6" height="5" rx="1.2"/><path d="M6 9v2.5h12V9M12 11.5V15"/></svg></span><span data-i18n="nav.workflows">Workflows</span></button></li>
+      <li><button type="button" class="side-item" data-view="plugins"><span class="side-icon" aria-hidden="true"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><path d="M9 4h3.5v1.5a1.8 1.8 0 1 0 3.5 0V4H20v4.5h-1.5a1.8 1.8 0 1 0 0 3.5H20V20h-4.5v-1.5a1.8 1.8 0 1 0-3.5 0V20H4v-4.5h1.5a1.8 1.8 0 1 0 0-3.5H4V8h5z"/></svg></span><span data-i18n="nav.plugins">Plugins</span></button></li>
+      <li><button type="button" class="side-item" data-view="wiki"><span class="side-icon" aria-hidden="true" data-icon="wiki"></span><span data-i18n="nav.wiki">Wiki</span></button></li>
     </ul>
     <div class="side-heading">
       <h2 id="bots-heading" data-i18n="nav.bots">Bots</h2>
@@ -81,12 +83,6 @@
       <button type="button" class="add-bot" data-area="bot-add" aria-label="Add a bot" title="Add a bot" data-i18n-title="bots.add" data-icon="plus" data-icon-size="16"></button>
     </div>
     <ul class="side-list side-bots" data-area="bot-list" aria-labelledby="bots-heading"></ul>
-    <ul class="side-list" data-area="side-shared">
-      <li><button type="button" class="side-item" data-view="shared"><span class="side-icon" aria-hidden="true"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><path d="M3 6.5a1.5 1.5 0 0 1 1.5-1.5h4.4l2 2.2h8.6A1.5 1.5 0 0 1 21 8.7v9.8a1.5 1.5 0 0 1-1.5 1.5h-15A1.5 1.5 0 0 1 3 18.5z"/></svg></span><span data-i18n="nav.shared">Shared folder</span></button></li>
-      <li><button type="button" class="side-item" data-view="workflows"><span class="side-icon" aria-hidden="true"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><rect x="3" y="4" width="6" height="5" rx="1.2"/><rect x="15" y="4" width="6" height="5" rx="1.2"/><rect x="9" y="15" width="6" height="5" rx="1.2"/><path d="M6 9v2.5h12V9M12 11.5V15"/></svg></span><span data-i18n="nav.workflows">Workflows</span></button></li>
-      <li><button type="button" class="side-item" data-view="plugins"><span class="side-icon" aria-hidden="true"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><path d="M9 4h3.5v1.5a1.8 1.8 0 1 0 3.5 0V4H20v4.5h-1.5a1.8 1.8 0 1 0 0 3.5H20V20h-4.5v-1.5a1.8 1.8 0 1 0-3.5 0V20H4v-4.5h1.5a1.8 1.8 0 1 0 0-3.5H4V8h5z"/></svg></span><span data-i18n="nav.plugins">Plugins</span></button></li>
-      <li><button type="button" class="side-item" data-view="wiki"><span class="side-icon" aria-hidden="true" data-icon="wiki"></span><span data-i18n="nav.wiki">Wiki</span></button></li>
-    </ul>
   </nav>
   <main class="main" tabindex="-1">
 
@@ -129,10 +125,6 @@
       <div class="board-columns" data-area="board-columns"></div>
     </section>
 
-    <section id="view-graph" data-view-panel="graph" aria-label="Graph" data-area="graph" hidden>
-      <p class="legend">Solid arrow = blocks. Dashed arrow = discovered from. Thick outline = failed, waiting for a person, or has stale runs.</p>
-      <div data-area="graph-canvas"></div>
-    </section>
 
 
     <section id="view-bot" class="chat-page" data-view-panel="bot" aria-label="Bot conversation" data-area="bot-chat" hidden>
@@ -150,11 +142,13 @@
       <form class="chat-compose" data-area="bot-compose">
         <div class="attach-chips" data-area="bot-attachments" hidden></div>
         <ul class="slash-list" data-area="bot-slash" role="listbox" aria-label="Slash commands" hidden></ul>
+        <ul class="attach-menu" data-area="bot-attach-menu" role="menu" aria-label="Add" hidden></ul>
         <div class="compose-row">
-          <button type="button" class="attach-button" data-area="bot-attach" data-i18n-title="chat.attach" title="Attach files" aria-label="Attach files" data-icon="plus" data-icon-size="20"></button>
+          <button type="button" class="attach-button" data-area="bot-attach" data-i18n-title="chat.attach" title="Add" aria-label="Add" aria-haspopup="menu" aria-expanded="false" data-icon="plus" data-icon-size="20"></button>
           <label class="sr-only" for="bot-input">Message</label>
           <textarea id="bot-input" data-area="bot-input" rows="1" maxlength="8000" placeholder="Message"></textarea>
-          <button type="submit" data-i18n="chat.send">Send</button>
+          <button type="button" class="stop-button" data-area="bot-stop" aria-label="Stop" title="Stop (esc)" data-i18n-title="chat.stop" hidden><span aria-hidden="true"></span></button>
+          <button type="submit" class="send-button" aria-label="Send" title="Send" data-i18n-title="chat.send" data-icon="arrow-up" data-icon-size="18"></button>
         </div>
         <div class="compose-tools" data-area="bot-tools"></div>
         <p class="drop-hint" data-i18n="chat.drop">Drop files here to attach them</p>
@@ -163,14 +157,6 @@
      <aside class="file-pane" data-area="bot-file" aria-label="File" hidden></aside>
     </section>
 
-
-    <section id="view-search" data-view-panel="search" aria-label="Search" data-area="search-view" hidden>
-      <h2 class="view-title" data-i18n="search.title">Search every bot conversation</h2>
-      <form class="wiki-search" data-area="msg-search" role="search">
-        <input type="search" data-area="msg-query" data-i18n-placeholder="search.placeholder" placeholder="Search in Korean or English" aria-label="Search every bot conversation">
-      </form>
-      <ul class="search-hits" data-area="msg-hits"></ul>
-    </section>
 
     <section id="view-shared" data-view-panel="shared" aria-label="Shared folder" data-area="shared-view" hidden>
       <h2 class="view-title" data-i18n="shared.title">Shared folder</h2>
@@ -271,6 +257,14 @@
 
 </div>
 
+<dialog class="search-dialog" data-area="search-dialog" aria-label="Search">
+  <div class="sd-head">
+    <input type="search" data-area="msg-query" data-i18n-placeholder="nav.search" placeholder="Search" aria-label="Search" autocomplete="off">
+    <button type="button" class="quiet sd-close" data-area="search-close-dialog" aria-label="Close" data-icon="close" data-icon-size="20"></button>
+  </div>
+  <div class="sd-tabs" data-area="search-tabs" role="tablist"></div>
+  <div class="sd-body" data-area="msg-hits"></div>
+</dialog>
 <dialog data-area="run-dialog" aria-label="Run">
   <div class="dialog-body" data-area="run-body"></div>
   <form method="dialog" class="dialog-foot"><button type="button" data-close>Close</button></form>
@@ -281,27 +275,18 @@
   <form method="dialog" class="dialog-foot"><button type="button" data-close>Close</button></form>
 </dialog>
 
-<dialog data-area="task-form" aria-labelledby="task-form-title">
+<dialog data-area="task-form" aria-label="New task">
   <form data-area="task-form-form" class="dialog-form">
     <div class="dialog-body">
-      <h2 id="task-form-title">New task</h2>
       <div class="task-form">
-        <fieldset class="kind wide">
-          <legend>Type</legend>
-          <div class="segmented" data-area="task-kind">
-            <label><input type="radio" name="kind" value="research" checked><span>Research</span></label>
-            <label><input type="radio" name="kind" value="task"><span>Task</span></label>
-          </div>
-          <p class="meta" data-area="task-kind-hint"></p>
-        </fieldset>
-        <label class="wide">Intent <textarea name="intent" rows="3" maxlength="4000" required placeholder="What should be done, and what to be careful about" data-area="task-intent"></textarea></label>
+        <label class="wide task-title-field"><span class="sr-only">Title</span><input name="title" type="text" maxlength="200" required placeholder="Title" data-i18n-placeholder="task.title" autocomplete="off"></label>
+        <label class="wide"><span class="sr-only">Intent</span><textarea name="intent" rows="3" maxlength="4000" required placeholder="What should be done, and what to be careful about" data-area="task-intent"></textarea></label>
         <div class="wide task-attach" data-area="task-attach-zone">
           <button type="button" class="attach-button" data-area="task-attach" data-i18n-title="task.attach" title="Attach files" aria-label="Attach files" data-icon="plus" data-icon-size="20"></button>
           <span class="meta" data-i18n="task.drop">Drop or paste files to attach them</span>
           <div class="attach-chips" data-area="task-attachments" hidden></div>
         </div>
-        <label class="wide" data-area="task-skill-field">Access skill <select name="access_skill"><option value="">none</option></select></label>
-        <label class="wide">Repository or folder <input name="repo" type="text" maxlength="500" list="repo-options" autocomplete="off" spellcheck="false" placeholder="pick a repository or type an absolute folder path" data-area="task-repo"><datalist id="repo-options" data-area="repo-options"></datalist></label>
+        <label class="wide">Repository or folder <input name="repo" type="text" maxlength="500" list="repo-options" autocomplete="off" spellcheck="false" placeholder="optional: a repository or an absolute folder path" data-area="task-repo"><datalist id="repo-options" data-area="repo-options"></datalist></label>
         <p class="meta wide" data-area="task-repo-info"></p>
         <label class="check wide" data-area="task-worktree-field" hidden><input name="worktree" type="checkbox" checked> Work in a new git worktree (its own branch; your checkout stays as it is)</label>
         <label>Bot <select name="owner" data-area="task-owner-select"><option value="">none (the queue runs it)</option></select></label>
@@ -309,26 +294,6 @@
         <p class="meta wide" data-area="task-workflow-hint" hidden>Only a bot runs workflows: pick the bot that runs it.</p>
         <label class="check wide"><input name="draft" type="checkbox" checked> Save as draft</label>
         <label class="check wide"><input name="review_required" type="checkbox"> Needs a second check: done only after a reviewer bot (or I) approves the result</label>
-        <details class="wide more" data-area="task-more">
-          <summary>More options</summary>
-          <div class="task-form">
-            <label class="wide" data-area="task-mode-field">What a task may do
-              <select name="mode">
-                <option value="ops_change">Change an account, each change waits for approval</option>
-                <option value="ops_read">Read an account only</option>
-                <option value="code">Work in a repository</option>
-              </select>
-            </label>
-            <label class="wide">Title <input name="title" type="text" maxlength="200" placeholder="Defaults to the start of the intent"></label>
-            <label class="wide">Cautions <textarea name="cautions" rows="2" maxlength="4000"></textarea></label>
-            <label>Target profile <input name="target_profile" type="text" maxlength="100"></label>
-            <label>Lock key <input name="lock_key" type="text" maxlength="100" placeholder="account or repository"></label>
-            <label>Depends on <input name="depends_on" type="text" maxlength="8" pattern="[0-9a-f]{8}" placeholder="task id"></label>
-            <label class="check wide"><input name="auto_accept_handoffs" type="checkbox" checked> Automatically accept incoming handoffs</label>
-            <label>Priority <input name="priority" type="number" min="-100" max="100" step="1" value="0"></label>
-            <label class="wide">Output path <input name="output_path" type="text" maxlength="500" placeholder="relative path under outputs/"></label>
-          </div>
-        </details>
       </div>
       <p class="error" data-area="task-form-error" role="alert"></p>
     </div>
@@ -352,7 +317,7 @@
       <label class="wide">Description <span class="meta">What this bot does. Other bots hand work to it by this text.</span><textarea name="description" rows="2" maxlength="500" required placeholder="Developer. Takes code tasks, changes the repository and runs the tests."></textarea></label>
       <p class="meta wide" data-create-only>Role, instructions, model, permissions, skills and limits start with defaults; change them later with the gear next to the bot.</p>
       <label class="wide" data-edit-only>Instructions <textarea name="instructions" rows="5" maxlength="8000"></textarea></label>
-      <label class="wide" data-edit-only>Working directory <input name="workdir" type="text" maxlength="500" autocomplete="off" spellcheck="false" placeholder="the bot's own folder"></label>
+      <label class="wide" data-edit-only>Working directory <input name="workdir" type="text" maxlength="500" autocomplete="off" spellcheck="false" placeholder="its own folder: shared/bots/<name>"></label>
     </div>
     <fieldset data-edit-only>
       <legend>Charter</legend>

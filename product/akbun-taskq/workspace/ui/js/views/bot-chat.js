@@ -3,9 +3,9 @@
 // While the bot works, a bar above the input says so with the elapsed time; Esc or Stop cancels the turn, as in
 // Claude Code. Cmd/Ctrl+F finds text in the conversation. Files can be dropped, pasted or picked as attachments.
 import { api, mutate, notify } from '../core/api.js'
-import { area, clear, el } from '../core/dom.js'
+import { area, clear, el, fill } from '../core/dom.js'
 import { emit, on } from '../core/bus.js'
-import { currentView } from '../core/nav.js'
+import { currentView, show } from '../core/nav.js'
 import { label } from '../core/vocab.js'
 import { t } from '../core/i18n.js'
 import { autosize } from '../core/autosize.js'
@@ -32,13 +32,16 @@ let files
 let fit
 let lastEsc = 0
 let pendingMessage = null
+let conversationFiles = []
 
 export function initBotChat() {
   nodes = {
     head: area('bot-head'), log: area('bot-log'), form: area('bot-compose'), input: area('bot-input'), working: area('chat-working'),
   }
   fit = autosize(nodes.input, 240)
-  files = attachments({ zone: area('bot-chat'), button: area('bot-attach'), chips: area('bot-attachments'), pasteTarget: nodes.input })
+  files = attachments({ zone: area('bot-chat'), chips: area('bot-attachments'), pasteTarget: nodes.input })
+  initAttachMenu()
+  area('bot-stop').addEventListener('click', cancel)
   initChatFind(nodes.log)
   initComposeMenus(nodes.input)
   nodes.form.addEventListener('submit', send)
@@ -47,6 +50,16 @@ export function initBotChat() {
     if (event.key === 'Enter' && !event.shiftKey && !event.isComposing) {
       event.preventDefault()
       nodes.form.requestSubmit()
+    }
+    if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'u') {
+      event.preventDefault()
+      files.pick()
+    }
+    // Esc closes an open right pane first; only with nothing open does it interrupt the bot or clear the input.
+    if (event.key === 'Escape' && !event.isComposing && !event.defaultPrevented && paneMode !== null) {
+      event.preventDefault()
+      setPane(null)
+      return
     }
     // Esc interrupts a working bot; when it is idle, Esc twice clears the input.
     if (event.key === 'Escape' && !event.isComposing) {
@@ -65,7 +78,8 @@ export function initBotChat() {
     lastKey = null
     clear(nodes.log)
     files.clear()
-    area('bot-file').hidden = true
+    conversationFiles = []
+    setPane(null)
     sendError = null
     blocker = null
     renderHead()
@@ -134,10 +148,13 @@ function renderHead() {
           el('button', { type: 'button', class: 'chip-button', dataset: { status: task.status }, onclick: () => emit('open-task', task.id) },
             el('span', { text: task.task_title }), el('span', { class: 'meta', text: ` · ${label(task.status)}` }))))),
     ),
+    el('div', { class: 'chat-tools' },
+      el('button', { type: 'button', class: 'chat-gear', dataset: { pane: 'files' }, 'aria-pressed': String(paneMode === 'files'), 'aria-label': t('chat.files', 'Files in this conversation'), title: t('chat.files', 'Files in this conversation'), onclick: () => togglePane('files') }, icon('files', 20)),
+      el('button', { type: 'button', class: 'chat-gear', dataset: { pane: 'browser' }, 'aria-pressed': String(paneMode === 'browser'), 'aria-label': t('chat.browser', 'Browser'), title: t('chat.browser', 'Browser'), onclick: () => togglePane('browser') }, icon('globe', 20)),
     el('button', {
       type: 'button', class: 'chat-gear', 'aria-label': `${agent.name} ${t('bots.settings', 'settings')}`, title: t('bots.settings', 'Settings'),
       onclick: () => openBotSettings(agent.name),
-    }, icon('settings', 20)),
+    }, icon('settings', 20))),
   )
   showComposeMenus(agent)
   nodes.input.placeholder = `${t('chat.message', 'Message')} ${agent.name}`
@@ -148,6 +165,7 @@ function renderHead() {
 function renderWorking() {
   clearInterval(tick)
   const agent = agentNow()
+  area('bot-stop').hidden = !agent?.busy
   const queued = agent?.queued ? ` · ${agent.queued} ${t('chat.queued', 'waiting')}` : ''
   if (agent && !agent.busy && agent.queued) {
     // Mail is waiting but every turn slot is taken (or the bots are paused): say so instead of looking idle.
@@ -195,6 +213,8 @@ async function load() {
     ])
     const messages = list.reverse()
     if (bot !== name) return
+    conversationFiles = [...new Set(messages.flatMap((m) => parseFiles(m.attachments)))].reverse()
+    if (paneMode === 'files') showFiles()
     const oldest = messages[0]?.created_at ?? 0
     const failures = errors.filter((turn) => turn.ended_at >= oldest).map((turn) => ({ at: turn.ended_at, node: () => turnError(turn) }))
     const items = [...messages.map((m) => ({ at: m.created_at, node: () => bubble(m, name) })), ...failures]
@@ -275,18 +295,132 @@ function bubble(m, name) {
     el('div', { class: 'msg-body' },
       side === 'other' ? el('span', { class: 'msg-sender', text: m.sender }) : null,
       el('div', { class: 'bubble', text: cancelled ? t('chat.cancelled', 'Cancelled') : m.body }),
-      attached.length === 0 ? null : el('div', { class: 'msg-files' }, ...attached.map((path) => el('button', {
-        type: 'button', class: 'file-chip', text: path.split('/').pop(), title: path, onclick: () => openFile(path),
-      }))),
+      attached.length === 0 ? null : el('div', { class: 'msg-files' }, ...attached.map(fileCard)),
       el('span', { class: 'msg-meta' },
         `${shortTime(m.created_at)}${notes.length ? ` · ${notes.join(' · ')}` : ''}`,
         m.task_id ? el('button', { type: 'button', class: 'link', text: ` · task ${m.task_id}`, onclick: () => emit('open-task', m.task_id) }) : null)))
 }
 
-// A file in a message opens in the pane beside the conversation.
-function openFile(path) {
+// The + in the input opens a menu, as in Claude Desktop: files or photos (Cmd/Ctrl+U), a folder, slash commands, plugins.
+function initAttachMenu() {
+  const button = area('bot-attach')
+  const menu = area('bot-attach-menu')
+  const close = (focus = false) => {
+    menu.hidden = true
+    button.setAttribute('aria-expanded', 'false')
+    if (focus) button.focus()
+  }
+  const item = (name, text, run, extra = null) => el('li', { role: 'none' },
+    el('button', { type: 'button', role: 'menuitem', onclick: () => { close(); run() } }, icon(name, 20), el('span', { text }), extra))
+  const isMac = /Mac|iPhone|iPad/.test(navigator.platform)
+  menu.append(
+    item('clip', t('chat.add_files', 'Add files or photos'), () => files.pick(), el('kbd', { text: isMac ? '⌘U' : 'Ctrl+U' })),
+    item('folder', t('chat.add_folder', 'Add a folder'), () => files.pickFolder()),
+    item('slash', t('chat.slash', 'Slash commands'), () => {
+      nodes.input.value = '/'
+      nodes.input.focus()
+      nodes.input.dispatchEvent(new Event('input'))
+    }),
+    item('plug', t('nav.plugins', 'Plugins'), () => show('plugins'), icon('chevron-right', 16)),
+  )
+  button.addEventListener('click', () => {
+    const open = menu.hidden
+    menu.hidden = !open
+    button.setAttribute('aria-expanded', String(open))
+    if (open) menu.querySelector('button')?.focus()
+  })
+  menu.addEventListener('keydown', (event) => {
+    const items = [...menu.querySelectorAll('button')]
+    const index = items.indexOf(document.activeElement)
+    if (event.key === 'Escape') close(true)
+    else if (event.key === 'ArrowDown') items[(index + 1) % items.length].focus()
+    else if (event.key === 'ArrowUp') items[(index - 1 + items.length) % items.length].focus()
+    else return
+    event.preventDefault()
+  })
+  document.addEventListener('click', (event) => {
+    if (!menu.hidden && !menu.contains(event.target) && !button.contains(event.target)) close()
+  })
+  // Esc anywhere on the page closes what is on top: the + menu, else the right pane. A dialog's own Esc stays its own.
+  document.addEventListener('keydown', (event) => {
+    if (event.key !== 'Escape' || event.defaultPrevented || event.isComposing || document.querySelector('dialog[open]')) return
+    if (!menu.hidden) close(true)
+    else if (paneMode !== null && currentView().view === 'bot') setPane(null)
+    else return
+    event.preventDefault()
+  })
+}
+
+// A file in a message is a card wide enough to notice: icon, name, folder. It opens in the pane beside the conversation.
+function fileCard(path) {
+  const dir = path.split('/').slice(0, -1).join('/')
+  return el('button', { type: 'button', class: 'file-card', title: path, onclick: () => openFile(path) },
+    icon('file', 20),
+    el('span', { class: 'file-card-name', text: path.split('/').pop() }),
+    el('span', { class: 'file-card-dir', text: dir || t('nav.shared', 'Shared folder') }))
+}
+
+// The right pane shows one of: a file, every file in this conversation, or a browser. The header buttons toggle it.
+let paneMode = null
+let browserUrl = ''
+
+function setPane(mode) {
+  paneMode = mode
   const pane = area('bot-file')
-  showFile(pane, path, { onClose: () => { pane.hidden = true } })
+  pane.hidden = mode === null
+  for (const button of nodes.head.querySelectorAll('[data-pane]')) button.setAttribute('aria-pressed', String(button.dataset.pane === mode))
+  return pane
+}
+
+function togglePane(mode) {
+  if (paneMode === mode) setPane(null)
+  else if (mode === 'files') showFiles()
+  else showBrowser()
+}
+
+function openFile(path) {
+  showFile(setPane('file'), path, { onClose: () => setPane(null) })
+}
+
+function paneHead(title) {
+  return el('div', { class: 'file-head' }, el('strong', { class: 'file-name', text: title }),
+    el('button', { type: 'button', class: 'quiet file-close', 'aria-label': t('file.close', 'Close'), onclick: () => setPane(null) }, icon('close', 18)))
+}
+
+function showFiles() {
+  const pane = setPane('files')
+  fill(pane, paneHead(t('chat.files', 'Files in this conversation')),
+    el('div', { class: 'file-body' }, conversationFiles.length === 0
+      ? el('p', { class: 'meta', text: t('chat.no_files', 'No files in this conversation yet.') })
+      : el('div', { class: 'file-list' }, ...conversationFiles.map(fileCard))))
+}
+
+// Any page a bot built (a local dev server, a report) without leaving the conversation. Sites that forbid framing stay blank;
+// "Open in a new tab" covers them.
+function showBrowser() {
+  const pane = setPane('browser')
+  const input = el('input', { type: 'url', value: browserUrl, placeholder: 'http://localhost:3000', 'aria-label': 'URL' })
+  const frame = el('iframe', { class: 'file-frame', sandbox: 'allow-scripts allow-forms allow-same-origin allow-popups', referrerpolicy: 'no-referrer', title: t('chat.browser', 'Browser'), src: browserUrl || 'about:blank' })
+  const go = (event) => {
+    event.preventDefault()
+    let url = input.value.trim()
+    if (!url) return
+    if (!/^https?:\/\//i.test(url)) url = `http://${url}`
+    // taskq's own origin never loads here: with allow-same-origin it could read the access token.
+    if (URL.canParse(url) && new URL(url).origin === location.origin) {
+      notify(t('chat.own_origin', 'taskq itself does not open in this pane'), true)
+      return
+    }
+    browserUrl = input.value = url
+    frame.src = url
+  }
+  fill(pane,
+    el('form', { class: 'file-head browser-bar', onsubmit: go }, input,
+      el('button', { type: 'submit', text: t('chat.go', 'Go') }),
+      el('button', { type: 'button', class: 'quiet', text: t('chat.new_tab', 'New tab'), onclick: () => browserUrl && window.open(browserUrl, '_blank', 'noopener') }),
+      el('button', { type: 'button', class: 'quiet file-close', 'aria-label': t('file.close', 'Close'), onclick: () => setPane(null) }, icon('close', 18))),
+    el('div', { class: 'file-body' }, frame))
+  if (!browserUrl) input.focus()
 }
 
 async function send(event) {

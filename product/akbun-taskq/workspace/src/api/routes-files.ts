@@ -4,8 +4,7 @@ import { createReadStream, statSync } from 'node:fs'
 import { basename, dirname, extname, join } from 'node:path'
 import { Readable } from 'node:stream'
 import { HttpError, readJson, type ApiDeps } from './http.ts'
-import { listShared, resolveShared, saveAttachment, sharedDir, sharedRelative, UPLOAD_LIMIT } from '../team/shared.ts'
-import { agentDir } from '../team/prompt.ts'
+import { botWorkdir, listShared, resolveShared, saveAttachment, sharedDir, sharedRelative, UPLOAD_LIMIT } from '../team/shared.ts'
 import { getAgent } from '../db/team.ts'
 import { getTask } from '../db/tasks.ts'
 import { claudeProjectsDir, existing, openWithSystem, sessionFolder, type Opener } from '../open-folder.ts'
@@ -80,7 +79,7 @@ export function registerFileRoutes(api: Hono, { config, db }: ApiDeps, open: Ope
       case 'bot': {
         const bot = typeof body.bot === 'string' ? getAgent(db, body.bot) : undefined
         if (!bot) throw new HttpError(404, 'no such bot')
-        path = existing(sessionFolder(bot.workdir ?? agentDir(config, bot.name)))
+        path = existing(sessionFolder(botWorkdir(config, bot)))
         break
       }
       case 'task': {

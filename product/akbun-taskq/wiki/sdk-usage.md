@@ -28,7 +28,7 @@ taskq calls the SDK from three places. All three run the Claude Code executable 
 
 | Option | Task worker | Bot turn | Ask |
 |---|---|---|---|
-| `cwd` | the task's repo or `outputs/` | the bot's workdir, else `TASKQ_HOME/team/<bot>` | the caller's folder |
+| `cwd` | the task's repo or `outputs/` | the bot's workdir, else its folder in the shared folder, `TASKQ_HOME/shared/bots/<bot>` | the caller's folder |
 | `env` | `buildEnv(config)`: provider variables and the CA bundle only | same | same |
 | `pathToClaudeCodeExecutable` | the embedded Claude Code | same | same |
 | `model` | `config.model` | the bot's model, else `config.model` | `config.model` |

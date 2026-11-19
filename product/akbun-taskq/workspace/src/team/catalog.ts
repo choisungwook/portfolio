@@ -1,10 +1,9 @@
-import { mkdirSync } from 'node:fs'
 import type { Config } from '../config.ts'
 import type { Db } from '../db/open.ts'
 import { EFFORTS, PERMISSION_MODES, getAgent, type BotPermissionMode, type BotProvider, type BotSdk, type TeamAgent } from '../db/team.ts'
 import { listEntries } from '../db/bot-registry.ts'
 import { pluginPaths } from './bot-plugin.ts'
-import { agentDir } from './prompt.ts'
+import { botWorkdir } from './shared.ts'
 import type { Catalog, TeamBackend } from './types.ts'
 
 // The model list and slash commands shown in a bot's compose bar. The SDK is asked once per bot and the answer kept for
@@ -99,8 +98,7 @@ export function createCatalog(db: Db, config: Config, backendFor: (sdk: BotSdk) 
       return { ...base, fallback: true, error: `the ${agent.sdk} backend is not running`, models: staticModels(agent), commands: skillCommands(db, agent) }
     }
     try {
-      const cwd = agent.workdir ?? agentDir(config, name)
-      mkdirSync(cwd, { recursive: true })
+      const cwd = botWorkdir(config, agent)
       const answer = await withTimeout(backend.catalog(config, { agent, cwd, plugins: pluginPaths(db, config, name) }), ASK_TIMEOUT_MS)
       const result: BotCatalog = { ...base, fallback: answer.models.length === 0, models: answer.models.length ? answer.models : staticModels(agent), commands: answer.commands }
       cache.set(name, result)
