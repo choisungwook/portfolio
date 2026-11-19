@@ -377,7 +377,6 @@ user --bot chat / taskq bots say--> team_messages --hub--> bot turn (resumed Cla
 | `workflow_status` | the steps of a run with their state (ready, running, succeeded, failed, skipped), the run status, and whether the workflow was deleted |
 | `schedule_routine`, `list_routines`, `cancel_routine` | routines on a cron schedule or a trigger; a coordinator may manage another bot's |
 | `close_goal` | the orchestrator closes a goal as done or dropped with a summary; the user is told |
-| `review_task` | a reviewer approves (done) or rejects (back to its owner) a task that needed a second check; never the owner |
 | `workflow_step` | reports one step: `running`, then `succeeded` (a `check` step needs `evidence`; an `approval` step only the user can approve), `failed` or `skipped` (with the reason). A failed step fails the run; the run succeeds when every step is done |
 
 ### Messages to a working bot
@@ -430,7 +429,6 @@ Bots finish reversible work alone and stop where the user has to decide or act (
 - Routines: `bot_routines` rows have a 5-field cron in local time (`src/util/cron.ts`) or a trigger (`task_failed`, `task_created`, `webhook`). The hub's tick delivers due ones as messages from `routine` tagged with `team_messages.routine_id`, then computes the next run (missed runs come once); it also wakes for the next routine. Triggers read failed `finished` events (by event id) and new tasks (by rowid) since cursors in `meta`, so old history does not fire them and a task created in the same second as a tick is not missed. A schedule that never comes due is refused. A webhook routine fires on `POST /routines/:id/fire` with the API token.
 - Charter: `charter_owns`, `charter_good`, `charter_never` go into the standing orders as "Your charter".
 - Goals: `POST /goals` stores the objective and done-when and messages taskq, whose orders say to split it into owned tasks and to `close_goal` with evidence.
-- Second checks: a task with `data.review_required` that its owner finishes as done becomes `review`. A reviewer-role bot other than the owner is set as `data.reviewer` and messaged; with none, the user gets `review_ready`. `review_task` approves (done) or rejects (ready, owner told). A code task that reaches done this way, or by the user's Mark done, gets the automatic security review its bot's own done would have queued.
 - Weekly review (`src/team/review.ts`): per bot turns, success rate and tasks done or failed; per routine the deliveries and how the turns that took them ended; prune candidates (idle or always-failing bots other than taskq, routines that never ran or always failed); and up to five random recent bot results to check by hand.
 - Save as workflow (`src/team/workflow-from-task.ts`): a done task becomes a two-step draft (do, check) from its intent, cautions, the last done run's summary, and the Bash commands and edited files of that run's `tool_call` events.
 
