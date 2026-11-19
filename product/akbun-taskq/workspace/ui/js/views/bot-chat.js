@@ -43,7 +43,7 @@ export function initBotChat() {
   initAttachMenu()
   area('bot-stop').addEventListener('click', cancel)
   initChatFind(nodes.log)
-  initComposeMenus(nodes.input)
+  initComposeMenus(nodes.input, { onPickFile: (path) => files.addExisting(path) })
   nodes.form.addEventListener('submit', send)
   nodes.input.addEventListener('keydown', (event) => {
     // Enter sends, Shift+Enter breaks the line. IME composition (Korean) must not send.
@@ -157,7 +157,7 @@ function renderHead() {
     }, icon('settings', 20))),
   )
   showComposeMenus(agent)
-  nodes.input.placeholder = `${t('chat.message', 'Message')} ${agent.name}`
+  nodes.input.placeholder = `${t('chat.message', 'Message')} ${agent.name} · ${t('chat.at_hint', '@ for bots and files')}`
   nodes.input.disabled = !agent.enabled
 }
 
@@ -423,6 +423,12 @@ function showBrowser() {
   if (!browserUrl) input.focus()
 }
 
+// Enabled bots named with @ in the text, other than the one this conversation is with.
+function mentionedBots(body) {
+  const names = new Set((botsSnapshot()?.agents ?? []).filter((a) => a.enabled && a.name !== bot).map((a) => a.name))
+  return [...new Set([...body.matchAll(/(?:^|\s)@([a-z][a-z0-9-]*)(?=[\s.,!?]|$)/g)].map((m) => m[1]))].filter((name) => names.has(name))
+}
+
 async function send(event) {
   event.preventDefault()
   const body = nodes.input.value.trim()
@@ -435,6 +441,10 @@ async function send(event) {
   let ok = false
   try {
     ok = await api.post('/bots/messages', { to: bot, body, attachments: attached })
+    // "@coder" in the message asks that bot too: it gets the same message and files in its own conversation.
+    const others = mentionedBots(body)
+    for (const name of others) await api.post('/bots/messages', { to: name, body, attachments: attached })
+    if (others.length) notify(`${t('chat.also_sent', 'Also sent to')} ${others.map((name) => `@${name}`).join(', ')}`)
   } catch (error) {
     sendError = { bot, body, message: error.message, at: Math.floor(Date.now() / 1000) }
     lastKey = null

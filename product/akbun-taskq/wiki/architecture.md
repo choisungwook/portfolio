@@ -458,7 +458,7 @@ A code task whose `repo` is a git repository gets its own worktree when it is cr
 
 - A bot is working while its turn row is open. `GET /bots` gives `working_since` and `running_tasks`; the sidebar turns a ring around the avatar and counts seconds, and the conversation shows a working bar with Stop.
 - Stop, Esc in the input, or the menu's Cancel call `POST /bots/:name/cancel`. The hub aborts the turn; `endTurn` records `cancelled`, the turn's messages count as handled (not retried), and a task the bot had running becomes `cancelled` (a task status, retryable like `failed`).
-- Attachments are uploaded with `POST /files` into `shared/attachments/` and named in the message (`team_messages.attachments`) or the task (`data.attachments`). A bot's prompt and a task's prompt list their absolute paths. Task runs may read the shared folder for every type and never write it; bots read and write it (`additionalDirectories`).
+- Attachments are uploaded with `POST /files` into `shared/attachments/`, or are any existing shared file the user picked with `@`, and are named in the message (`team_messages.attachments`) or the task (`data.attachments`). A bot's prompt and a task's prompt list their absolute paths. Task runs may read the shared folder for every type and never write it; bots read and write it (`additionalDirectories`).
 - Search: `team_messages_fts` (trigram, kept by triggers) answers `GET /bots/search`. The wiki has its own index (below).
 
 ### Settings that persist
@@ -696,7 +696,7 @@ Writes (any non-GET under `/api`) must send `Content-Type: application/json`, op
 | `GET /bots/presets` | role, description and instructions for planner, coder, reviewer, doc-reviewer |
 | `GET /bots` fields | Agents carry `busy`, `last_message` and `unread` (messages to the user not yet read) and no `instructions`; `tasks` are unfinished agent-owned tasks with `owner` and `task_title`. Creates the orchestrator when it is missing |
 | `POST /bots/tasks/:id/owner` | body `{ "owner": "coder" }` or `{ "owner": null }`. 409 for a done or failed task or an unknown agent |
-| `GET /bots/messages?agent=&limit=` `POST /bots/messages` | log, newest first; send `{ "to": "taskq", "body": "…" }` as the user (`to` defaults to taskq). 404 for an unknown or disabled bot |
+| `GET /bots/messages?agent=&limit=` `POST /bots/messages` | log, newest first; send `{ "to": "taskq", "body": "…", "attachments": ["attachments/…"] }` as the user (`to` defaults to taskq). `attachments` are up to 20 existing files of the shared folder, relative to it: an upload or a file picked with `@`. 404 for an unknown or disabled bot |
 | `POST /bots/messages/read` | mark unread messages to the user as read; body `{ "agent": "coder" }` limits it to one bot |
 | `POST /bots/threads/:id/close` | close a discussion without a conclusion. 409 when already closed |
 | `POST /bots/pause` `POST /bots/resume` | pause state of the bots, separate from the queue |

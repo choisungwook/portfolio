@@ -45,8 +45,14 @@ describe('files, search, memory, limits and settings', () => {
     assert.equal((await call('POST', '/files', { name: 'x', data: '@@notbase64' })).status, 400)
   })
 
-  test('a message can carry attachments, and only uploaded paths are accepted', async () => {
+  test('a message can carry attachments: uploads and existing shared files, nothing outside', async () => {
     const { path } = await (await call('POST', '/files', { name: 'a.txt', data: Buffer.from('a').toString('base64') })).json() as { path: string }
+    const shared = join(env.home, 'shared', 'outputs', 'coder')
+    mkdirSync(shared, { recursive: true })
+    writeFileSync(join(shared, 'report.md'), '# r')
+    assert.equal((await call('POST', '/bots/messages', { to: 'coder', body: 'see @outputs/coder/report.md', attachments: ['outputs/coder/report.md'] })).status, 201, 'a file picked with @')
+    assert.equal((await call('POST', '/bots/messages', { to: 'coder', body: 'x', attachments: ['outputs/coder/missing.md'] })).status, 400)
+    assert.equal((await call('POST', '/bots/messages', { to: 'coder', body: 'x', attachments: ['outputs/coder'] })).status, 400, 'a folder is not a file')
     assert.equal((await call('POST', '/bots/messages', { to: 'coder', body: 'look', attachments: [path] })).status, 201)
     assert.equal((await call('POST', '/bots/messages', { to: 'coder', body: 'x', attachments: ['../etc/passwd'] })).status, 400)
     const stored = env.db.prepare('SELECT attachments FROM team_messages ORDER BY id DESC LIMIT 1').get()

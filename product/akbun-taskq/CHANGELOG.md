@@ -2,6 +2,20 @@
 
 <!-- markdownlint-configure-file {"MD024": {"siblings_only": true}} -->
 
+## 0.16.0
+
+### Added
+
+- bot 대화 입력창에서 `@`를 치면 다른 bot과 공용 폴더 파일을 자동완성한다. bot을 고르면 보낼 때 그 bot에게도 같은 메시지와 파일이 간다. 파일을 고르면 그 파일이 첨부된다.
+
+### Changed
+
+- `POST /api/bots/messages`의 `attachments`가 업로드한 파일뿐 아니라 공용 폴더 안의 기존 파일도 받는다. 폴더, 없는 파일, 공용 폴더 밖 경로는 거부한다.
+
+### SDK
+
+SDK 사용 변경 없음.
+
 ## 0.15.0
 
 Claude Desktop처럼 사이드바와 대화 화면을 다시 배치했다.
