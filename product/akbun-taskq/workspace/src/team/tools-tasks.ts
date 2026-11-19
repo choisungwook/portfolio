@@ -57,7 +57,6 @@ export function taskTools(scope: ScopedTools): TeamTool[] {
         draft: z.boolean().optional(),
         not_duplicate_of: z.array(TASK_ID).max(10).optional(),
         workflow: z.string().max(100).optional().describe('a workflow (name or id) the owner runs for this task; list_workflows shows them'),
-        review_required: z.boolean().optional().describe('the task counts as done only after a reviewer bot (or the user) checks the owner\'s result'),
       },
       readOnly: false,
       handler(args) {

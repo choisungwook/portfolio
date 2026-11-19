@@ -26,7 +26,6 @@ export interface TaskData {
   workflow_id?: string       // the workflow the owner bot runs for this task; '' or absent: none
   source_repo?: string       // the repository the user picked, when `repo` is the task's own worktree
   worktree?: { path: string; branch: string; base: string; base_branch: string }
-  review_required?: boolean  // done only after another bot (or the user) approves the owner's result
   reviewer?: string          // the bot asked to review; set when the owner finishes
 }
 

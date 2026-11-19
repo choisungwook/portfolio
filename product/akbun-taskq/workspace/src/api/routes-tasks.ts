@@ -1,5 +1,4 @@
 import type { Hono } from 'hono'
-import { queueSecurityReview } from '../team/report.ts'
 import { createFromInput, getTask, listTasks, moveStatus, patchData, setPriority, workflowIdOf } from '../db/tasks.ts'
 import type { Context } from 'hono'
 import { ApprovalError, decideApproval } from '../db/approvals.ts'
@@ -57,10 +56,7 @@ export function registerTaskRoutes(api: Hono, { db, config, control = noRunContr
 
   api.post('/tasks/:id/done', (c) => {
     const id = c.req.param('id')
-    const before = getTask(db, id)
     if (!moveStatus(db, id, 'review', 'done')) throw new HttpError(409, 'task is not in review')
-    // A bot's code task that waited for a second check gets the security review its bot's done would have queued.
-    if (before?.type === 'code' && before.owner && before.data.review_required) queueSecurityReview(db, { ...before, status: 'done' })
     return c.json(getTask(db, id))
   })
 

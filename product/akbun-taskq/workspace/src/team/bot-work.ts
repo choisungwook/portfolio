@@ -46,11 +46,6 @@ export function startBotTask(db: Db, bot: string, taskId: string, sessionId: str
 }
 
 // A bot other than the author with a reviewer role; none means the user reviews.
-function pickReviewer(db: Db, author: string): string | null {
-  const row = db.prepare(`SELECT name FROM team_agents WHERE enabled = 1 AND name != ? AND role IN ('reviewer', 'doc_reviewer') ORDER BY rowid LIMIT 1`).get(author)
-  return row ? String(row.name) : null
-}
-
 export function finishBotTask(db: Db, bot: string, taskId: string, outcome: BotOutcome, summary: string, costUsd?: number): { ok: true } | { ok: false; error: string } {
   return inTransaction(db, () => {
     const task = getTask(db, taskId)
@@ -70,10 +65,6 @@ export function finishBotTask(db: Db, bot: string, taskId: string, outcome: BotO
         endRun(db, flow.id, 'failed', `task finished as failed: ${summary.slice(0, 200)}`)
       }
     }
-    // A task that needs a second pair of eyes is not done on its owner's word: it waits in review for another bot (a
-    // reviewer) or, with none, for the user.
-    const reviewer = outcome === 'done' && task.data.review_required ? pickReviewer(db, bot) : null
-    if (outcome === 'done' && task.data.review_required) outcome = 'review'
     const run = db.prepare('SELECT id FROM runs WHERE task_id = ? AND bot = ? AND ended_at IS NULL ORDER BY started_at DESC LIMIT 1').get(taskId, bot)
     if (run) {
       endTaskRun(db, {
@@ -84,20 +75,6 @@ export function finishBotTask(db: Db, bot: string, taskId: string, outcome: BotO
     releaseTask(db, taskId, STATUS[outcome], botClaim(bot))
     insertEvent(db, { task_id: taskId, run_id: run ? String(run.id) : null, kind: 'finished', payload: { outcome, bot } })
     if (outcome === 'failed') raiseAlert(db, { task_id: taskId, kind: 'failed', message: `${bot} failed: ${summary.slice(0, 200)}` })
-    if (outcome === 'review' && reviewer) {
-      db.prepare(`UPDATE tasks SET data = json_set(data, '$.reviewer', ?) WHERE id = ?`).run(reviewer, taskId)
-      postMessage(db, {
-        sender: SYSTEM, recipient: reviewer, task_id: taskId,
-        body: `Please review task ${taskId} by ${bot} before it counts as done: ${task.data.intent.slice(0, 300)}
-
-${bot}'s summary:
-${summary.slice(0, 2000)}
-
-Check the evidence yourself (do not trust the summary alone), then call review_task with approve or reject and a note.`,
-      })
-    } else if (outcome === 'review') {
-      raiseAlert(db, { task_id: taskId, kind: 'review_ready', message: `${bot} asks you to review: ${task.data.intent.slice(0, 120)}` })
-    }
     // The same automatic security review a queue run of a code task gets, owned by a bot other than the author.
     if (task.type === 'code' && outcome === 'done') queueSecurityReview(db, task)
     return { ok: true }
