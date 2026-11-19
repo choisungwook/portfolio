@@ -34,7 +34,7 @@ h3 { font-size: 14px; margin: 16px 0 8px; }
 /* Toast notification (Carbon): top right under the header, so the header keeps one height. Status bar, icon, message
    and a close button. It stays until closed or replaced. The icon's alternative text is empty: the message says it. */
 .notice {
-  position: fixed; top: 60px; right: 16px; z-index: 20; width: min(360px, calc(100vw - 32px));
+  position: fixed; top: 60px; right: 16px; z-index: 40; width: min(360px, calc(100vw - 32px));
   display: flex; align-items: center; gap: 10px; margin: 0; padding: 0 0 0 16px; min-height: 48px;
   font-size: var(--text-small); background: var(--info-soft); color: var(--fg);
   box-shadow: inset 3px 0 0 var(--running), inset 0 0 0 1px var(--border), var(--shadow-2);

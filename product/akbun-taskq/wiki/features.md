@@ -38,9 +38,9 @@
 | 인계 기록 | `task-handoffs` | `GET /api/tasks/:id`, `POST /api/handoffs/:id/accept`, `POST /api/tasks/:id/handoff-mode` | 발신·수신 작업, 산출물 경로, 도착 시각과 수락 결과를 본다. 자동 수락을 설정하거나 대기 중인 수신 인계를 직접 수락한다 |
 | 그래프 | `graph`, `graph-canvas` | `GET /api/graph` | 작업을 노드, 의존을 간선으로 그린다. 의존 깊이별로 왼쪽에서 오른쪽으로 배치한다. 실패·승인·로그인 대기 상태이거나 stale run이 있고 done이 아니면 굵은 테두리를 그린다. 툴팁에 stale run 수를 보인다 |
 | 제안 | `proposals`, `proposal-list` | `GET /api/proposals?status=pending`, `POST /api/proposals/:id/{apply,reject}` | 대기 중인 제안의 대상 경로와 추가될 텍스트를 보여주고 적용하거나 거절한다 |
-| 확인 필요 패널 | `alerts-button`, `alerts-count`, `alerts-panel`, `alert-badges`, `alerts-list` | `GET /api/alerts`, `GET /api/queue`, `POST /api/alerts/:id/ack` | 확인되지 않은 알림을 심각도 순으로 보여준다. 작업 제목은 알림 행의 `task_title`을 쓴다. critical은 위에 붉게 고정된다. 오른쪽 열이 아니라 헤더의 종 아이콘이다. 숫자는 열린 critical·high 알림과 승인 대기 수이고, 누르면 아이콘 아래에 패널이 페이지 위로 열리며 Escape나 바깥 클릭으로 닫힌다. normal 알림은 보이지 않는다 |
+| 확인 필요 패널 | `alerts-button`, `alerts-count`, `alerts-panel`, `alert-badges`, `alerts-list` | `GET /api/alerts`, `GET /api/queue`, `POST /api/alerts/:id/ack` | 확인되지 않은 알림을 심각도 순으로 보여준다. 작업 제목은 알림 행의 `task_title`을 쓴다. critical은 위에 붉게 고정된다. 오른쪽 열이 아니라 헤더의 종 아이콘이다. 숫자는 열린 critical·high 알림 수와, 자기 알림이 없는 승인 대기 수의 합이고(task 승인은 알림이 함께 뜨므로 한 번만 센다), 누르면 아이콘 아래에 패널이 페이지 위로 열리며 Escape나 바깥 클릭으로 닫힌다. normal 알림은 보이지 않는다 |
 | 승인 대기 목록 | `pending-approvals`, `pending-list` | `GET /api/approvals` | 확인 필요 패널 위에 열린 승인 요청을 모은다. 각 행은 명령 앞 120자와 Review 버튼만 가진다. Approve는 두지 않는다. 요청이 없으면 영역을 숨긴다 |
-| 큐 일시정지 배너 | `queue-banner`, `queue-text`, `queue-toggle` | `GET /api/queue`, `POST /api/queue/{pause,resume}` | 배너는 항상 보인다. 큐가 도는 동안은 Queue running과 Pause queue 버튼을, 멈춘 동안은 이유와 Resume queue 버튼을 보여준다. 버튼 하나가 두 역할을 바꿔 가진다 |
+| 큐 일시정지 배너 | `queue-banner`, `queue-text`, `queue-toggle` | `GET /api/queue`, `POST /api/queue/{pause,resume}` | 배너는 확인 필요 패널 맨 위에 있다. 패널이 닫혀 있을 때 큐가 멈추면 종 아이콘에 "!"가 뜬다(다른 알림이 없을 때). 큐가 도는 동안은 Queue running과 Pause queue 버튼을, 멈춘 동안은 이유와 Resume queue 버튼을 보여준다. 버튼 하나가 두 역할을 바꿔 가진다 |
 | 설정 버튼 | `settings-button` | 없음 | 헤더의 톱니 아이콘이다. 누르면 설정 dialog가 열리고, 닫으면 포커스가 이 버튼으로 돌아간다. Escape로 닫는다 |
 | 데스크톱 알림 설정 | `desktop-notifications` | `GET /api/settings`, `POST /api/settings/desktop-notifications` | 인계와 중요 경고의 OS 알림을 켜거나 끈다. 설정은 SQLite에 저장되고 앱 내 이력은 계속 기록된다 |
 | 입력창 도구 | `bot-tools`, `bot-slash` | `GET /api/bots/:name/catalog`, `PUT /api/bots/:name`, `POST /api/bots/:name/reload` | 입력창 아래 줄. 왼쪽 새로고침(↻)은 skill·plugin을 다시 읽고 모델·명령 목록을 새로 불러온다. 오른쪽에 모델, effort, 권한 메뉴가 있고 바꾸면 bot에 저장되어 다음 turn부터 적용된다. SDK가 목록을 주지 못하면 "내장 목록"이 표시된다. OpenAI bot의 권한 메뉴에는 auto가 없다. 입력창에 `/`를 치면 명령 목록(`bot-slash`)이 뜨고 ↑↓, Enter·Tab으로 고르며 Esc로 닫는다 새로고침 옆의 원은 마지막 turn 뒤 context가 찬 정도(%)다. 60%와 85%에서 색이 바뀌고, 아직 모르면 점선이다 |
@@ -71,7 +71,7 @@
 |---|---|
 | `approval_required` | Review (승인 패널로 이동한다. 승인 결정은 거기서 한다) |
 | `auth_required` | Resume |
-| `review_ready` | Mark done |
+| `review_ready` | Mark done(normal 등급이라 지금은 목록에 보이지 않는다. 작업 상세의 Done으로 처리한다) |
 | 모든 알림 | Acknowledge |
 
 ## 승인 패널

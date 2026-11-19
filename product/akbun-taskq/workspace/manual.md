@@ -150,7 +150,7 @@ node bin/taskq add --type ops_read --access-skill example-readonly --target-prof
 
 ### 인계 알림과 수락
 
-새 인계는 Must check 패널과 태스크 상세의 Handoffs에 기록된다. macOS와 Windows에서는 시스템 알림도 뜬다. Windows에서 WSL2로 taskq를 실행할 때는 WSL의 Windows 상호 운용이 활성화되어 있고 `powershell.exe`가 WSL의 PATH에 있어야 한다. Handoffs에서 발신·수신 태스크, 산출물 경로, 도착 시각, 수락 방식과 시각을 확인할 수 있다.
+새 인계는 태스크 상세의 Handoffs에 기록된다(normal 등급이라 Must check 목록에는 보이지 않는다). macOS와 Windows에서는 시스템 알림도 뜬다. Windows에서 WSL2로 taskq를 실행할 때는 WSL의 Windows 상호 운용이 활성화되어 있고 `powershell.exe`가 WSL의 PATH에 있어야 한다. Handoffs에서 발신·수신 태스크, 산출물 경로, 도착 시각, 수락 방식과 시각을 확인할 수 있다.
 
 자동 수락은 기본으로 켜져 있다. 태스크에서 Automatically accept incoming handoffs를 끄면 Accept handoff를 누르기까지 실행이 대기한다. 다시 켜면 현재 대기 중인 인계를 수락한다. 선행 태스크를 재실행하면 새 산출물은 새 인계로 기록된다.
 
@@ -249,7 +249,7 @@ bot 설정에서 정하는 것은 아래와 같다.
 
 bot은 계속 떠 있는 프로세스가 아니다. 메시지가 올 때마다 그 bot의 세션을 이어서 한 번 일하고 멈춘다. 그래서 taskq를 다시 시작해도 대화가 이어지고, 메시지가 없으면 비용이 들지 않는다. 메시지 없이 스스로 깨어나지는 않는다. 나중에 할 일은 bot이 시각을 정한 메시지(`deliver_at`)로 예약하고, 그 시각에 깨어난다. 자기 자신에게는 10분 이상 뒤로만 예약할 수 있다.
 
-작업 하나는 bot 하나가 맡는다(owner). 맡은 bot만 그 태스크를 시작할 수 있고, 시작하면 Board에서 실행 중으로 바뀌고 Calendar에 그 bot의 실행으로 남는다. 계정을 건드리는 초안은 내가 Queued로 바꿔야 bot이 시작할 수 있다. Board 카드의 `@coder` 같은 배지와 bot 대화 위의 작업 칩이 누가 무엇을 맡았는지 보여준다. 작업 상세의 Owner에서 다른 bot에게 넘기거나 되찾는다. taskq나 planner 역할 bot이 내 작업을 가져가면 Must check에 알림이 뜬다. bot이 열려 있는 작업과 비슷한 작업을 만들려 하면 거절되고 그 작업의 owner와 이야기하라는 답을 받는다. 이 비슷함 검사는 글자 겹침으로만 판단해서 표현이 다르면 놓치고, 비슷한 문장의 다른 작업을 잘못 막기도 한다.
+작업 하나는 bot 하나가 맡는다(owner). 맡은 bot만 그 태스크를 시작할 수 있고, 시작하면 Board에서 실행 중으로 바뀌고 Calendar에 그 bot의 실행으로 남는다. 계정을 건드리는 초안은 내가 Queued로 바꿔야 bot이 시작할 수 있다. Board 카드의 `@coder` 같은 배지와 bot 대화 위의 작업 칩이 누가 무엇을 맡았는지 보여준다. 작업 상세의 Owner에서 다른 bot에게 넘기거나 되찾는다. taskq나 planner 역할 bot이 내 작업을 가져가면 그 bot이 대화로 알린다. bot이 열려 있는 작업과 비슷한 작업을 만들려 하면 거절되고 그 작업의 owner와 이야기하라는 답을 받는다. 이 비슷함 검사는 글자 겹침으로만 판단해서 표현이 다르면 놓치고, 비슷한 문장의 다른 작업을 잘못 막기도 한다.
 
 여러 bot의 의견이 필요한 질문은 토론으로 한다. 토론을 연 bot이 참가자와 라운드 수를 정하고, 참가자는 순서대로 앞사람의 말을 보고 의견을 낸다. 라운드가 끝나면 연 bot이 결론을 wiki에 남기고 필요한 작업을 맡긴다. 결론을 내지 않으면 토론은 결론 없이 닫히고 알림이 뜬다. Discussions 화면이나 `taskq bots close`로 직접 닫을 수도 있다.
 
@@ -288,7 +288,7 @@ taskq bots log
 taskq bots wiki
 ```
 
-taskq가 나에게 보낸 메시지는 Must check에도 "Message from a bot"으로 뜨고, 메뉴의 taskq 옆에 파란 점이 붙는다. CLI로 보낸 메시지는 실행 중인 taskq가 `pollSec`(기본 60초) 안에 가져가고, 화면에서 보낸 메시지는 바로 전달된다.
+taskq가 나에게 보낸 메시지는 메뉴의 taskq 옆에 파란 점으로 알린다(Must check에는 normal 등급이라 보이지 않는다). CLI로 보낸 메시지는 실행 중인 taskq가 `pollSec`(기본 60초) 안에 가져가고, 화면에서 보낸 메시지는 바로 전달된다.
 
 bot이 공유하는 기억은 wiki다. bot은 일을 시작하기 전에 wiki를 찾고, 결정과 출처가 있는 사실, 진행 상태를 적는다. 세션을 새로 시작해도(`taskq bots reset NAME`) wiki는 남는다.
 
@@ -307,7 +307,7 @@ taskq bots export
 
 bot은 내 Claude Code 설정(~/.claude의 권한 규칙, hook, skill)을 읽지 않는다. bot 설정 화면에 보이는 것만으로 동작한다.
 
-멈춘 bot을 Resume하면 예산과 턴 수 계산이 그 시점부터 다시 시작된다. 상한에 걸린 원인을 확인하고 켠다. 메시지를 보내거나 작업을 만든 뒤 실패한 턴은 같은 일을 반복하지 않도록 다시 돌리지 않는다. 이때 Must check에 어떤 메시지를 내려놓았는지 뜨므로, 필요하면 다시 보낸다.
+멈춘 bot을 Resume하면 예산과 턴 수 계산이 그 시점부터 다시 시작된다. 상한에 걸린 원인을 확인하고 켠다. 메시지를 보내거나 작업을 만든 뒤 실패한 턴은 같은 일을 반복하지 않도록 다시 돌리지 않는다. 이때 Must check에 어떤 메시지를 내려놓았는지 뜨므로, 필요하면 다시 보낸다(normal 등급이면 Must check에는 보이지 않고, 그 bot 대화에 남는다).
 
 bot과 대화할 때 쓰는 기능은 아래와 같다.
 

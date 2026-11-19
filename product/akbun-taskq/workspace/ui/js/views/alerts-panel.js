@@ -37,11 +37,15 @@ export function initAlertsPanel() {
   panel = area('alerts-panel')
   bell = area('alerts-button')
   bell.addEventListener('click', () => setOpen(panel.hidden))
+  // Escape closes it, unless a dialog it opened is on top (that Escape is the dialog's) or another handler took the key.
   document.addEventListener('keydown', (event) => {
-    if (event.key === 'Escape' && !panel.hidden) {
-      setOpen(false)
-      bell.focus()
-    }
+    if (event.key !== 'Escape' || panel.hidden || event.defaultPrevented || document.querySelector('dialog[open]')) return
+    const inside = panel.contains(document.activeElement) || document.activeElement === bell
+    setOpen(false)
+    if (inside) bell.focus()
+  })
+  window.addEventListener('resize', () => {
+    if (!panel.hidden) place()
   })
   // A click outside closes it; clicks on its own buttons, and on dialogs it opens, do not.
   document.addEventListener('click', (event) => {
@@ -50,25 +54,38 @@ export function initAlertsPanel() {
   })
 }
 
-// Opens under the bell, its right edge on the bell's, kept inside the window.
 function setOpen(open) {
   panel.hidden = !open
   bell.setAttribute('aria-expanded', String(open))
   if (!open) return
-  const box = bell.getBoundingClientRect()
-  panel.style.top = `${Math.round(box.bottom + 8)}px`
-  panel.style.right = `${Math.max(16, Math.round(window.innerWidth - box.right))}px`
+  place()
+  area('must-check-title').focus()
   load()
 }
 
-// The bell's count: open critical and high alerts plus approvals waiting; red when one is critical.
-function renderBell(shown, pending, queuePaused) {
+// Under the bell, its right edge on the bell's, and never past either side of the window (the header wraps on a narrow
+// window, which puts the bell on the left).
+function place() {
+  const box = bell.getBoundingClientRect()
+  const width = panel.offsetWidth
+  const right = Math.min(Math.max(16, Math.round(window.innerWidth - box.right)), Math.max(16, window.innerWidth - width - 16))
+  panel.style.top = `${Math.round(box.bottom + 8)}px`
+  panel.style.right = `${right}px`
+}
+
+// The bell's count: open critical and high alerts, plus waiting approvals that have no open alert of their own (a task
+// approval raises one, so it is counted once). Red when one is critical. A paused queue shows "!" when nothing else does.
+function renderBell(shown, approvalsWaiting, queuePaused) {
   const count = area('alerts-count')
+  const alerted = new Set(shown.filter((a) => a.kind === 'approval_required').map((a) => a.task_id))
+  const pending = approvalsWaiting.filter((p) => !alerted.has(p.task_id)).length
   const total = shown.length + pending
-  count.hidden = total === 0
-  count.textContent = total > 99 ? '99+' : String(total)
-  count.dataset.level = shown.some((a) => a.severity === 'critical') || pending > 0 ? 'critical' : 'high'
-  bell.title = `${t('panel.must_check', 'Must check')}${total ? ` (${total})` : ''}${queuePaused ? ` · ${t('panel.queue_paused', 'queue paused')}` : ''}`
+  count.hidden = total === 0 && !queuePaused
+  count.textContent = total === 0 ? '!' : total > 99 ? '99+' : String(total)
+  count.dataset.level = shown.some((a) => a.severity === 'critical') || pending > 0 || total === 0 ? 'critical' : 'high'
+  const text = `${t('panel.must_check', 'Must check')}${total ? ` (${total})` : ''}${queuePaused ? ` · ${t('panel.queue_paused', 'queue paused')}` : ''}`
+  bell.title = text
+  bell.setAttribute('aria-label', text)
 }
 
 async function load() {
@@ -82,7 +99,7 @@ async function load() {
       .sort((a, b) => SEVERITY_RANK[a.severity] - SEVERITY_RANK[b.severity] || b.created_at - a.created_at)
     renderBadges(unacked)
     renderBanner(queue)
-    renderBell(unacked, taskApprovals.length, queue.paused)
+    renderBell(unacked, taskApprovals, queue.paused)
     clear(list).append(...(unacked.length === 0
       ? [el('li', { class: 'empty', text: 'Nothing to check.' })]
       : unacked.map((a) => item(a))))
@@ -99,7 +116,8 @@ function renderBadges(unacked) {
   )
 }
 
-// Always shown: the text says whether the queue runs, and the one button pauses or resumes it.
+// At the top of the panel: whether the queue runs, and the one button that pauses or resumes it. While the panel is
+// closed, a paused queue shows on the bell.
 function renderBanner(queue) {
   paused = queue.paused
   banner.dataset.state = paused ? 'paused' : 'running'

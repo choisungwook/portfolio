@@ -27,7 +27,7 @@
     <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"></path></svg>
     <span data-i18n="header.new_task">New task</span>
   </button>
-  <button type="button" class="alerts-button" data-area="alerts-button" aria-haspopup="dialog" aria-expanded="false" aria-controls="must-check" title="Must check" data-i18n-title="panel.must_check">
+  <button type="button" class="alerts-button" data-area="alerts-button" aria-expanded="false" aria-controls="must-check" title="Must check">
     <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"></path><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"></path></svg>
     <span class="alerts-count" data-area="alerts-count" hidden></span>
     <span class="sr-only" data-i18n="panel.must_check">Must check</span>
@@ -40,7 +40,7 @@
     <span data-i18n="header.settings">Settings</span>
   </button>
   <aside class="must-check" id="must-check" data-area="alerts-panel" aria-labelledby="must-check-title" hidden>
-    <h2 id="must-check-title" data-i18n="panel.must_check">Must check</h2>
+    <h2 id="must-check-title" data-area="must-check-title" tabindex="-1" data-i18n="panel.must_check">Must check</h2>
     <div class="alert-badges" data-area="alert-badges"></div>
     <div class="queue-banner" data-area="queue-banner" data-state="running">
       <p data-area="queue-text" aria-live="polite"></p>
