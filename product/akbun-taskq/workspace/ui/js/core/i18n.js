@@ -82,7 +82,7 @@ const KO = {
   'shared.upload': '파일 올리기', 'shared.open': 'Finder/탐색기에서 열기', 'shared.empty': '비어 있습니다.',
   'shared.view_list': '목록', 'shared.view_details': '자세히', 'shared.view_icons': '아이콘', 'shared.sort_name': '이름', 'shared.sort_kind': '종류',
   'shared.sort_size': '크기', 'shared.sort_modified': '수정한 날짜', 'shared.asc': '오름차순', 'shared.desc': '내림차순', 'shared.folder': '폴더', 'shared.file': '파일',
-  'chat.files': '이 대화의 파일', 'chat.no_files': '이 대화에 아직 파일이 없습니다.', 'chat.browser': '브라우저', 'chat.go': '이동', 'chat.new_tab': '새 탭', 'chat.also_sent': '함께 보냄:', 'chat.at_hint': '@로 bot·파일', 'compose.mention_bot': '이 bot에게도 보냄', 'chat.own_origin': 'taskq 자체는 이 창에서 열지 않습니다',
+  'chat.files': '이 대화의 파일', 'chat.no_files': '이 대화에 아직 파일이 없습니다.', 'chat.browser': '브라우저', 'chat.go': '이동', 'chat.new_tab': '새 탭', 'chat.also_sent': '함께 보냄:', 'chat.not_sent_to': '보내지 못함:', 'chat.at_hint': '@로 bot·파일', 'compose.mention_bot': '이 bot에게도 보냄', 'chat.own_origin': 'taskq 자체는 이 창에서 열지 않습니다',
   'chat.add_files': '파일 또는 사진 추가', 'chat.add_folder': '폴더 추가', 'chat.slash': '슬래시 명령어',
   'file.open': '열기', 'file.open_hint': '이 컴퓨터에서 연결된 앱으로 열기', 'file.in_shared': '공용 폴더에서 보기', 'file.download': '내려받기', 'file.close': '닫기',
   'file.no_preview': '이 종류의 파일은 여기서 미리 볼 수 없습니다. 앱으로 열거나 공용 폴더에서 찾으세요.', 'file.too_big': '미리 보기에는 너무 큽니다. 앱으로 여세요.',

@@ -426,7 +426,7 @@ function showBrowser() {
 // Enabled bots named with @ in the text, other than the one this conversation is with.
 function mentionedBots(body) {
   const names = new Set((botsSnapshot()?.agents ?? []).filter((a) => a.enabled && a.name !== bot).map((a) => a.name))
-  return [...new Set([...body.matchAll(/(?:^|\s)@([a-z][a-z0-9-]*)(?=[\s.,!?]|$)/g)].map((m) => m[1]))].filter((name) => names.has(name))
+  return [...new Set([...body.matchAll(/(?:^|\s)@([a-z][a-z0-9-]*)(?=[\s,!?]|\.(?:\s|$)|$)/g)].map((m) => m[1]))].filter((name) => names.has(name))
 }
 
 async function send(event) {
@@ -441,10 +441,6 @@ async function send(event) {
   let ok = false
   try {
     ok = await api.post('/bots/messages', { to: bot, body, attachments: attached })
-    // "@coder" in the message asks that bot too: it gets the same message and files in its own conversation.
-    const others = mentionedBots(body)
-    for (const name of others) await api.post('/bots/messages', { to: name, body, attachments: attached })
-    if (others.length) notify(`${t('chat.also_sent', 'Also sent to')} ${others.map((name) => `@${name}`).join(', ')}`)
   } catch (error) {
     sendError = { bot, body, message: error.message, at: Math.floor(Date.now() / 1000) }
     lastKey = null
@@ -453,6 +449,14 @@ async function send(event) {
     return
   }
   if (ok) {
+    // "@coder" in the message asks that bot too: it gets the same message and files in its own conversation. The
+    // message to this bot is already sent, so a failed copy is reported and not retried by sending again.
+    const others = mentionedBots(body)
+    const results = await Promise.allSettled(others.map((name) => api.post('/bots/messages', { to: name, body, attachments: attached })))
+    const sent = others.filter((_, i) => results[i].status === 'fulfilled')
+    const failed = others.filter((_, i) => results[i].status === 'rejected')
+    if (sent.length) notify(`${t('chat.also_sent', 'Also sent to')} ${sent.map((name) => `@${name}`).join(', ')}`)
+    if (failed.length) notify(`${t('chat.not_sent_to', 'Not sent to')} ${failed.map((name) => `@${name}`).join(', ')}: ${results.find((r) => r.status === 'rejected').reason.message}`, true)
     sendError = null
     showConnection()
     nodes.input.value = ''

@@ -27,7 +27,7 @@
 .bot-menu button.danger { color: var(--danger); }
 .bot-menu hr { border: 0; border-top: 1px solid var(--border); margin: 4px 0; }
 .sidebar {
-  position: sticky; top: 64px; max-height: calc(100vh - 80px); overflow: auto;
+  position: sticky; top: 12px; height: calc(100vh - 24px); overflow: auto; display: flex; flex-direction: column;
   background: var(--panel); border-radius: var(--radius-l); padding: 16px 8px;
 }
 /* New task and search first, like a chat app; the views follow, then the bots. */
@@ -104,3 +104,12 @@
 .side-hero-bot strong { font-size: 1.0em; font-weight: 600; }
 .side-hero .avatar { background: #111 !important; color: #fff; }
 .side-hero .unread-dot { top: 4px; left: auto; right: 4px; }
+/* Must check and Settings at the bottom of the sidebar; there is no top bar. */
+.side-foot {
+  margin-top: auto; padding: 10px 4px 0; box-shadow: inset 0 1px 0 var(--border); position: sticky; bottom: -16px; background: var(--panel);
+  display: flex; justify-content: flex-end; gap: 4px;
+}
+.foot-icon { position: relative; display: inline-flex; align-items: center; justify-content: center; width: 40px; height: 40px; min-height: 40px; padding: 0; border-radius: 50%; color: var(--fg); background: transparent; }
+.foot-icon:hover { background: var(--hover); }
+.foot-icon .side-icon { width: auto; color: inherit; }
+.foot-icon svg { width: 20px; height: 20px; }

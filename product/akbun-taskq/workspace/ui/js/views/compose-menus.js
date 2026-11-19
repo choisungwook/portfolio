@@ -167,15 +167,19 @@ async function loadSharedFiles() {
       const { entries } = await api.get(`/shared?dir=${encodeURIComponent(dir)}`)
       for (const entry of entries) {
         if (entry.dir) {
-          if (entry.name !== '.git' && entry.name !== 'node_modules') queue.push(entry.path)
+          // outputs/ (what bots hand over) before attachments/ (one folder per day), so the folder limit hits uploads first.
+          if (entry.name === 'outputs') queue.unshift(entry.path)
+          else if (entry.name !== '.git' && entry.name !== 'node_modules') queue.push(entry.path)
         } else found.push(entry.path)
       }
     }
   } catch {
-    // Bots still complete; files come on the next "@".
-  } finally {
+    // Bots still complete; a failed walk is not cached, so the next "@" reads again.
     loading = false
+    sharedFiles = found
+    return
   }
+  loading = false
   sharedFiles = found
   sharedAt = Date.now()
   if (!nodes.slash.hidden || /(^|\s)@[^\s@]*$/.test(nodes.input.value.slice(0, nodes.input.selectionStart ?? 0))) renderSlash()
