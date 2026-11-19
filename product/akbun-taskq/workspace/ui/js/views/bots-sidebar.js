@@ -10,12 +10,14 @@ import { openBotMenu } from './bot-menu.js'
 import { openBotSettings } from './bot-settings.js'
 import { t } from '../core/i18n.js'
 import { contextRing } from './context-ring.js'
+import { connectionByBot } from './connections.js'
 
 const POLL_MS = 5000
 
 let list
 let state
 let latest = null
+let connections = {}   // bot -> { status, label, reason }, read every minute (the server caches the checks)
 
 export function initBotsSidebar() {
   list = area('bot-list')
@@ -25,11 +27,29 @@ export function initBotsSidebar() {
   on('bots-changed', load)
   load()
   setInterval(load, POLL_MS)
+  loadConnections()
+  setInterval(loadConnections, 60_000)
   setInterval(() => {
     for (const node of list.querySelectorAll('.side-bot-working')) {
       node.querySelector('.working-text').textContent = workingText(Number(node.dataset.since) || 0)
     }
   }, 1000)
+}
+
+async function loadConnections() {
+  try {
+    connections = await connectionByBot()
+    if (latest) render(latest)
+  } catch {
+    // Without connection data the dots are left out; the Connections page shows the error.
+  }
+}
+
+function connectionDot(name) {
+  const c = connections[name]
+  if (!c) return null
+  const text = c.status === 'ok' ? `${c.label}: ${t('connections.ok', 'Connected')}` : `${c.label}: ${c.reason ?? t('connections.error', 'Failing')}`
+  return el('span', { class: 'conn-dot', dataset: { status: c.status }, role: 'img', 'aria-label': text, title: text })
 }
 
 export function botsSnapshot() {
@@ -82,6 +102,7 @@ function render(team) {
     el('span', { class: 'side-bot-text' },
       el('span', { class: 'side-bot-top' },
         el('strong', { text: a.name }),
+        connectionDot(a.name),
         el('time', { class: 'meta', text: a.last_message ? shortTime(a.last_message.created_at) : '' }),
         a.context_window ? contextRing(a, 16) : null),
       a.busy

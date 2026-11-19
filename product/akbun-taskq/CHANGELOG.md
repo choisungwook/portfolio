@@ -19,6 +19,8 @@ bot이 사람 없이 일하는 범위를 넓히고, 사람이 결정하거나 �
 
 ### Changed
 
+- bot 대화 오른쪽의 연결 패널을 뺐다. 연결은 설정의 연결 페이지에서 보고, 왼쪽 bot 목록의 이름 옆 점이 연결 상태를 보인다(초록 연결됨, 빨강 실패). 대답할 수 없는 이유는 계속 대화 안에 나온다.
+- bot 목록과 대화 머리의 설정 톱니를 키우고 항상 보이게 했다(전에는 마우스를 올릴 때만 보였다).
 - bot의 꺼짐 모드(`bots.enabled`)를 없앴다. bot은 taskq와 함께 항상 돌고, 멈추려면 메뉴의 Pause나 `taskq bots pause`를 쓴다. 기존 설정 파일의 `bots.enabled`는 무시한다. 연결 페이지와 bot 패널의 "bot이 꺼져 있음" 안내도 뺐다.
 - 스키마 010: `team_agents`에 헌장과 `ask_first`, `bot_approvals`, `bot_routines`, `goals`, `team_messages.routine_id`.
 

@@ -6,11 +6,16 @@
 }
 .side-bot-row { display: flex; align-items: center; position: relative; }
 .side-bot-row .side-bot { flex: 1; min-width: 0; }
+/* Always shown, next to the bot rather than over its preview. */
 .side-bot-gear {
-  position: absolute; right: 6px; bottom: 6px; width: 28px; min-height: 28px; padding: 0; border-radius: 50%;
-  color: var(--muted); opacity: 0; transition: opacity var(--ease);
+  flex: none; width: 36px; min-height: 36px; margin-left: 2px; padding: 0; border-radius: 50%;
+  font-size: 1.35em; color: var(--muted); background: transparent;
 }
-.side-bot-row:hover .side-bot-gear, .side-bot-gear:focus-visible { opacity: 1; }
+.side-bot-gear:hover { color: var(--fg); background: var(--panel-soft); }
+/* Whether the bot's connection (its model sign-in) works: green connected, red failing. */
+.conn-dot { flex: none; width: 9px; height: 9px; border-radius: 50%; align-self: center; }
+.conn-dot[data-status="ok"] { background: #2e9e5b; }
+.conn-dot[data-status="error"] { background: var(--danger); }
 .side-bot-row[data-system="true"] .side-bot { box-shadow: inset 0 -1px 0 var(--border); border-radius: var(--radius) var(--radius) 0 0; }
 .add-bot { width: 28px; min-height: 28px; padding: 0; border-radius: 50%; font-size: 1.2em; color: var(--fg); background: var(--panel-soft); }
 .bot-menu {
@@ -90,3 +95,4 @@
 .side-me { align-items: flex-start; padding: 4px 12px 14px; }
 .side-icon svg { display: block; margin: 0 auto; }
 .danger-quiet { color: var(--danger); }
+.side-bot-top .conn-dot { margin-right: auto; }
