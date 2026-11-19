@@ -83,6 +83,7 @@ mark.find.current { background: var(--accent); color: var(--on-accent); }
 .drop-hint { display: none; margin: 0; color: var(--accent); font-size: var(--text-small); }
 .chat-page[data-dragging="true"] .drop-hint { display: block; }
 .msg-files { display: flex; flex-wrap: wrap; gap: 6px; }
+.file-chip { min-height: 26px; padding: 2px 10px; border-radius: 999px; background: var(--chip); color: var(--link); font-size: var(--text-small); }
 .task-attach { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding: 8px; border-radius: var(--radius); background: var(--panel-soft); }
 
 /* Search view and shared folder. */

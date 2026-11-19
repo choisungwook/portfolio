@@ -386,12 +386,17 @@ function showFiles() {
 function showBrowser() {
   const pane = setPane('browser')
   const input = el('input', { type: 'url', value: browserUrl, placeholder: 'http://localhost:3000', 'aria-label': 'URL' })
-  const frame = el('iframe', { class: 'file-frame', referrerpolicy: 'no-referrer', title: t('chat.browser', 'Browser'), src: browserUrl || 'about:blank' })
+  const frame = el('iframe', { class: 'file-frame', sandbox: 'allow-scripts allow-forms allow-same-origin allow-popups', referrerpolicy: 'no-referrer', title: t('chat.browser', 'Browser'), src: browserUrl || 'about:blank' })
   const go = (event) => {
     event.preventDefault()
     let url = input.value.trim()
     if (!url) return
     if (!/^https?:\/\//i.test(url)) url = `http://${url}`
+    // taskq's own origin never loads here: with allow-same-origin it could read the access token.
+    if (URL.canParse(url) && new URL(url).origin === location.origin) {
+      notify(t('chat.own_origin', 'taskq itself does not open in this pane'), true)
+      return
+    }
     browserUrl = input.value = url
     frame.src = url
   }

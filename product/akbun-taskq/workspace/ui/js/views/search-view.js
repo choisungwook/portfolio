@@ -21,6 +21,7 @@ let tabs
 let tab = 'all'
 let timer
 let seq = 0
+let allTasks = []
 
 export function initSearchView() {
   dialog = area('search-dialog')
@@ -46,11 +47,16 @@ export function initSearchView() {
   renderTabs()
 }
 
-function open() {
+// Tasks come from the full list (bot-owned and queue tasks); the bots snapshot only has bot-owned ones.
+async function open() {
   if (!dialog.open) dialog.showModal()
   input.value = ''
   input.focus()
   run()
+  allTasks = (await api.get('/tasks').catch(() => []))
+    .filter((task) => !['done', 'failed', 'cancelled'].includes(task.status))
+    .map((task) => ({ id: task.id, status: task.status, owner: task.owner, task_title: task.data?.title ?? task.data?.intent ?? task.id }))
+  if (dialog.open && !input.value.trim()) run()
 }
 
 function renderTabs() {
@@ -105,25 +111,25 @@ const botRow = (agent) => item(senderAvatar(agent.name, 22), agent.name, agent.l
 
 function draw(...sections) {
   const shown = sections.filter(Boolean)
-  clear(body).append(...(shown.length ? shown : [el('p', { class: 'empty sd-empty', text: t('search.none', 'Nothing matches.') })]))
+  clear(body).append(...(shown.length || draw.pending ? shown : [el('p', { class: 'empty sd-empty', text: t('search.none', 'Nothing matches.') })]))
   activate([...body.querySelectorAll('.sd-item')], 0)
 }
 
 async function run() {
   const query = input.value.trim()
   const id = ++seq
-  const team = botsSnapshot() ?? { agents: [], tasks: [] }
+  const team = botsSnapshot() ?? { agents: [] }
   const wants = (kind) => tab === 'all' || tab === kind
   if (!query) {
     const needs = [
       ...team.agents.filter((a) => a.unread > 0).map((a) => item(senderAvatar(a.name, 22), a.name, `${a.unread} ${t('search.unread', 'unread')}`, () => show('bot', a.name))),
-      ...team.tasks.filter((task) => NEEDS_ME.has(task.status)).map(taskRow),
+      ...allTasks.filter((task) => NEEDS_ME.has(task.status)).map(taskRow),
     ]
     const recent = [...team.agents].filter((a) => a.last_message).sort((a, b) => b.last_message.created_at - a.last_message.created_at).slice(0, 6)
     draw(
       tab === 'all' ? section(t('search.needs_me', 'Needs attention'), needs) : null,
       wants('messages') || wants('bots') ? section(t('search.recent', 'Recent'), recent.map(botRow)) : null,
-      wants('tasks') ? section(t('search.open_tasks', 'Open tasks'), tab === 'tasks' ? team.tasks.slice(0, 20).map(taskRow) : []) : null,
+      wants('tasks') ? section(t('search.open_tasks', 'Open tasks'), tab === 'tasks' ? allTasks.slice(0, 20).map(taskRow) : []) : null,
       tab === 'all' ? section(t('search.actions', 'Actions'), [
         item(icon('plus', 20), t('header.new_task', 'New task'), '', () => area('new-task-button').click()),
         item(icon('plus', 20), t('bots.add', 'Add a bot'), '', () => area('bot-add').click()),
@@ -133,11 +139,13 @@ async function run() {
   }
   const lower = query.toLowerCase()
   const bots = wants('bots') ? team.agents.filter((a) => `${a.name} ${a.description ?? ''}`.toLowerCase().includes(lower)).map(botRow) : []
-  const tasks = wants('tasks') ? team.tasks.filter((task) => (task.task_title ?? '').toLowerCase().includes(lower)).map(taskRow) : []
+  const tasks = wants('tasks') ? allTasks.filter((task) => (task.task_title ?? '').toLowerCase().includes(lower)).map(taskRow) : []
+  draw.pending = true
   draw(section(t('nav.bots', 'Bots'), bots), section(t('search.tasks', 'Tasks'), tasks))
+  draw.pending = false
   try {
     const [hits, runs] = await Promise.all([
-      wants('messages') ? api.get(`/bots/search?q=${encodeURIComponent(query)}`) : [],
+      wants('messages') ? api.get(`/bots/search?q=${encodeURIComponent(query)}`).catch(() => []) : [],
       wants('tasks') ? api.get(`/search?q=${encodeURIComponent(query)}`).catch(() => []) : [],
     ])
     if (id !== seq) return
