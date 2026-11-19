@@ -17,7 +17,7 @@ import { forceClose, listThreads } from '../db/threads.ts'
 import { hybridSearch } from '../team/search.ts'
 import { setOwner } from '../team/owner.ts'
 import { ROSTER } from '../team/roster.ts'
-import { isTeamPaused, pauseTeam, requestBotCancel, resumeTeam, teamPauseReason } from '../team/hub.ts'
+import { budgetState, isTeamPaused, pauseTeam, requestBotCancel, resumeTeam, teamPauseReason } from '../team/hub.ts'
 import { teamChanged } from '../wake.ts'
 import { intParam } from './params.ts'
 import { TASK_TITLE_SQL } from '../db/tasks.ts'
@@ -55,6 +55,7 @@ export function registerBotsRoutes(api: Hono, { db, config, bots }: ApiDeps): vo
     return c.json({
       paused: isTeamPaused(db),
       pause_reason: teamPauseReason(db),
+      budget: budgetState(db, config),
       agents: listAgents(db).map(({ instructions: _instructions, memory: _memory, ...agent }) => ({
         ...agent, busy: busy.has(agent.name), last_message: lastMessage(agent.name), unread: unreadFrom(agent.name),
         working_since: workingSince(agent.name), running_tasks: runningTasks(agent.name), queued: waiting.get(agent.name) ?? 0,

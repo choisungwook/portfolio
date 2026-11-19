@@ -35,6 +35,7 @@ export interface TurnResult {
   session_total_usd?: number // or the session's running total (Claude); the hub subtracts what the session had before
   auth_failed?: boolean     // the model provider login failed: a Claude bot pauses the team, another bot is turned off
   session_missing?: boolean // the resumed session no longer exists; the hub starts a new one next time
+  rejected?: boolean        // the provider refused the request as it is (a wrong model or setting): the same turn would fail again, so it is not retried
   tampered?: string         // a tool call reached taskq itself (data directory, config); the hub pauses the team
   model?: string            // the model that answered
   usage?: TokenUsage        // tokens of this turn

@@ -1,7 +1,7 @@
 import { test, describe } from 'node:test'
 import assert from 'node:assert/strict'
 import { USER, getAgent, listMessages, listTurns, postMessage, seedAgents, setAgentSession, updateAgent } from '../src/db/team.ts'
-import { createTeamHub, isTeamPaused, resumeTeam, teamPauseReason, type TeamHub } from '../src/team/hub.ts'
+import { budgetState, createTeamHub, isTeamPaused, resumeTeam, teamPauseReason, type TeamHub } from '../src/team/hub.ts'
 import type { TeamBackend, TurnRequest, TurnResult } from '../src/team/types.ts'
 import { teamChanged } from '../src/wake.ts'
 import { seedTestBots, setup, sleep, waitFor, TOKEN, type TestEnv } from './helpers.ts'
@@ -164,6 +164,19 @@ describe('team hub', () => {
     await waitFor(() => listTurns(db, 5).filter((t) => t.ended_at !== null).length === 2)
     await sleep(30)
     assert.equal(requests.length, 2)
+  })
+
+  test('[critical] a request the provider refused is not retried and costs nothing', async () => {
+    const { db, config } = env
+    const { backend, requests } = fakeBackend(() => ({ outcome: 'failed', error: '400 unsupported', cost_usd: 0, rejected: true }))
+    hub = createTeamHub({ db, config, backend, retryAfterSec: 0 })
+    await hub.start()
+    postMessage(db, { sender: USER, recipient: 'coder', body: 'do it' })
+    teamChanged.notify()
+    await waitFor(() => listTurns(db, 5).some((t) => t.ended_at !== null))
+    await sleep(30)
+    assert.equal(requests.length, 1)
+    assert.equal(budgetState(db, config).spent_usd, 0)
   })
 
   test('a missing session is dropped so the next turn starts a new one', async () => {

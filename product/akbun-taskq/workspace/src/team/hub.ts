@@ -100,6 +100,13 @@ function localMidnight(): number {
   return Math.floor(new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime() / 1000)
 }
 
+// What the team spent against the daily budget, over the period the guard counts (since local midnight, or since the
+// last resume when that is later). The guard also reserves a turn budget for each running turn and the next one, so
+// the team can pause below 100% here. The UI warns from 80%.
+export function budgetState(db: Db, config: Config): { spent_usd: number; limit_usd: number } {
+  return { spent_usd: spentSince(db, Math.max(localMidnight(), resumedAt(db))), limit_usd: limits(db, config).daily_budget_usd }
+}
+
 // Delivers mail to resident agents. An agent with deliverable messages and no open turn gets one turn that resumes its
 // session; the turn sees every message that arrived since its last turn. At most maxConcurrentTurns run at once.
 export function createTeamHub({ db, config, backend: claude, backends = {}, retryAfterSec = RETRY_AFTER_SEC }: HubOptions): TeamHub {
@@ -219,9 +226,9 @@ export function createTeamHub({ db, config, backend: claude, backends = {}, retr
     const cost = turnCost(name, session, result) ?? (outcome === 'done' ? 0 : limits(db, config).turn_budget_usd)
     const end = endTurn(db, turnId, {
       outcome, error: result.error, turns: result.turns, cost_usd: cost, session_id: result.session_id,
-    }, config.bots.maxAttempts)
+    }, result.rejected ? 1 : config.bots.maxAttempts)
     recordUsage(db, turnId, name, result)
-    reportSetAside(name, end, result.error)
+    reportSetAside(name, end, result.error, result.rejected)
     if (result.tampered) pauseTeam(db, `${name} tried to reach taskq itself: ${result.tampered}`, 'security_finding')
     if (result.auth_failed) signedOut(name)
     // Work on a task happens inside one turn. A task still running when the turn ends goes back to ready, and the bot is
@@ -274,12 +281,13 @@ export function createTeamHub({ db, config, backend: claude, backends = {}, retr
     raiseAlert(db, { task_id: null, kind: 'auth_required', message: `${name} was turned off: its ${runtime} login failed. Sign in, then turn the bot on again.` })
   }
 
-  function reportSetAside(name: string, end: TurnEnd, error: string | undefined): void {
+  function reportSetAside(name: string, end: TurnEnd, error: string | undefined, rejected = false): void {
     if (end.setAside.length === 0) return
     const ids = end.setAside.map((m) => `#${m.id}`).join(', ')
     const why = end.reason === 'writes'
       ? 'the turn failed after it had already sent messages or created tasks, so it is not retried (a retry would repeat them)'
-      : `${config.bots.maxAttempts} turns failed on them`
+      : rejected ? 'the model provider refused the request, so it is not retried; fix the bot\'s model or settings'
+        : `${config.bots.maxAttempts} turns failed on them`
     raiseAlert(db, {
       task_id: end.setAside[0].task_id, kind: 'team_message',
       message: `Messages ${ids} to ${name} were set aside: ${why}. Last error: ${error ?? 'interrupted'}. Check taskq bots log and resend if needed.`,
