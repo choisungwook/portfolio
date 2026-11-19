@@ -195,7 +195,6 @@ export function agentsWithMail(db: Db, now: number, retryAfterSec: number): stri
   return db.prepare(`SELECT a.name FROM team_agents a
     JOIN team_messages m ON m.recipient = a.name AND ${DELIVERABLE}
     WHERE a.enabled = 1 AND NOT EXISTS (SELECT 1 FROM team_turns t WHERE t.agent = a.name AND t.ended_at IS NULL)
-      AND NOT EXISTS (SELECT 1 FROM bot_logins l WHERE l.bot = a.name AND l.done_at IS NULL)
       AND NOT EXISTS (SELECT 1 FROM team_turns t WHERE t.id = (SELECT max(id) FROM team_turns WHERE agent = a.name)
         AND t.outcome = 'failed' AND t.ended_at > ?)
     GROUP BY a.name ORDER BY min(m.id)`).all(now, now - retryAfterSec).map((row) => String(row.name))

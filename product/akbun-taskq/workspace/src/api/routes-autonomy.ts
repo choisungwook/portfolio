@@ -1,5 +1,5 @@
 import type { Hono } from 'hono'
-import { decideApprovalRequest, finishLogin, openApprovals, openLogins } from '../db/bot-requests.ts'
+import { decideApprovalRequest, openApprovals } from '../db/bot-requests.ts'
 import { createRoutine, deleteRoutine, fireWebhookRoutine, getRoutine, listRoutines, setRoutineEnabled, type Trigger } from '../db/routines.ts'
 import { closeGoal, createGoal, getGoal, listGoals } from '../db/goals.ts'
 import { getAgent, USER } from '../db/team.ts'
@@ -8,7 +8,7 @@ import { workflowFromTask } from '../team/workflow-from-task.ts'
 import { teamChanged } from '../wake.ts'
 import { HttpError, optionalJson, type ApiDeps } from './http.ts'
 
-// What bots wait on the user for (approvals, logins), routines, goals, the weekly review, and saving a finished task
+// What bots wait on the user for (approvals), routines, goals, the weekly review, and saving a finished task
 // as a workflow. Paths stay out of /bots/:name so a bot cannot be named after them.
 export function registerAutonomyRoutes(api: Hono, { db }: ApiDeps): void {
   const idOf = (value: string) => {
@@ -24,16 +24,6 @@ export function registerAutonomyRoutes(api: Hono, { db }: ApiDeps): void {
     if (typeof body.approve !== 'boolean') throw new HttpError(400, 'approve must be true or false')
     const done = decideApprovalRequest(db, idOf(c.req.param('id')), body.approve)
     if (!done) throw new HttpError(409, 'that request is not waiting any more')
-    return c.json(done)
-  })
-
-  api.get('/bot-logins', (c) => c.json(openLogins(db)))
-  // { signed_in: true|false }: the bot gets turns again and is told whether to continue.
-  api.post('/bot-logins/:id', async (c) => {
-    const body = await optionalJson(c)
-    if (typeof body.signed_in !== 'boolean') throw new HttpError(400, 'signed_in must be true or false')
-    const done = finishLogin(db, idOf(c.req.param('id')), body.signed_in)
-    if (!done) throw new HttpError(409, 'that login request is closed')
     return c.json(done)
   })
 

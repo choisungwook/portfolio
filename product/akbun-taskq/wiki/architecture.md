@@ -375,7 +375,6 @@ user --bot chat / taskq bots say--> team_messages --hub--> bot turn (resumed Cla
 | `run_workflow` | starts a run of a workflow that the bot itself executes, without a task |
 | `workflow_status` | the steps of a run with their state (ready, running, succeeded, failed, skipped), the run status, and whether the workflow was deleted |
 | `schedule_routine`, `list_routines`, `cancel_routine` | routines on a cron schedule or a trigger; a coordinator may manage another bot's |
-| `request_login` | stops at a login wall: records what and how, and the bot gets no turns until the user answers |
 | `close_goal` | the orchestrator closes a goal as done or dropped with a summary; the user is told |
 | `review_task` | a reviewer approves (done) or rejects (back to its owner) a task that needed a second check; never the owner |
 | `workflow_step` | reports one step: `running`, then `succeeded` (a `check` step needs `evidence`; an `approval` step only the user can approve), `failed` or `skipped` (with the reason). A failed step fails the run; the run succeeds when every step is done |
@@ -422,12 +421,11 @@ A bot's `sdk` is `claude`, `openai` or `kiro`; an OpenAI bot also has a `provide
 
 `taskq mcp --bot <name>` serves one bot's team tools over stdio with the same checks as in-process tools; the backend passes the turn id as `TASKQ_TURN_ID` in that server's environment (Codex `mcp_servers.taskq.env`, the Kiro agent file), so writes count for the turn and a failed turn that already wrote is not retried. The Kiro prompt goes in on stdin. Bedrock and Kiro sessions get an id per session (`local:<bot>:<ms>`, `kiro:<ms>` when Kiro names none). Changing a bot's `sdk` or `provider` clears its session, context and session cost, since no runtime resumes another's session. A failed login turns off only that bot (alert `auth_required`) for OpenAI and Kiro; a Claude login failure pauses the team, since Claude bots share it. The Codex and Kiro backends spawn the CLI themselves with an injectable spawner, so tests run without either installed. Kiro signs in with the user's IAM Identity Center session: Settings saves the start URL and region (`meta.kiro_*`) and runs the device-flow login, showing the verification URL and code; `kiro-cli whoami` reports the state. taskq stores no ChatGPT, SSO or Bedrock token.
 
-### Bots on their own: ask first, logins, routines, goals, second checks
+### Bots on their own: ask first, routines, goals, second checks
 
 Bots finish reversible work alone and stop where the user has to decide or act (`src/db/bot-requests.ts`, `src/db/routines.ts`, `src/db/goals.ts`, `src/team/tools-autonomy.ts`, migration 010).
 
 - Ask first: `botGate` checks a call against the bot's `ask_first` rules (Bash patterns, or `tool:<name pattern>` for MCP tools) and, unless the bot runs in bypassPermissions, the built-in list of irreversible commands (`DEFAULT_ASK_FIRST`: push, publish, release, `terraform apply`/`destroy`, `kubectl apply`/`delete`, helm, `docker push`, `aws … delete-`/`terminate-`). A match is denied with a request id: `bot_approvals` gets a pending row (one per bot and call) and Must check an `approval_required` alert with `ref: bot-approval:<id>`. Approve once or Deny answers it; the bot gets a message, and an approved call passes the gate exactly once (`used`). The hub hands each turn an `ApprovalBroker` over the database. Codex and Kiro run their own tools outside this gate.
-- Logins: `request_login` writes `bot_logins` and an `auth_required` alert (`ref: bot-login:<id>`). `agentsWithMail` skips a bot with an open login, so its messages wait. "I signed in" or "Not now" closes it and tells the bot whether to continue.
 - Routines: `bot_routines` rows have a 5-field cron in local time (`src/util/cron.ts`) or a trigger (`task_failed`, `task_created`, `webhook`). The hub's tick delivers due ones as messages from `routine` tagged with `team_messages.routine_id`, then computes the next run (missed runs come once); it also wakes for the next routine. Triggers read failed `finished` events and new tasks since cursors in `meta`, so old history does not fire them. A webhook routine fires on `POST /routines/:id/fire` with the API token.
 - Charter: `charter_owns`, `charter_good`, `charter_never` go into the standing orders as "Your charter".
 - Goals: `POST /goals` stores the objective and done-when and messages taskq, whose orders say to split it into owned tasks and to `close_goal` with evidence.
@@ -671,7 +669,6 @@ Writes (any non-GET under `/api`) must send `Content-Type: application/json`, op
 | `POST /bot-mcp-servers` `DELETE /bot-mcp-servers/:name` | register `{ name, command, args, description }` (name `team` is reserved) or remove an MCP server for bots of both SDKs; removing takes it off every bot. `GET /settings` lists them as `bot_mcp_servers` |
 | `GET /kiro/status` `POST /kiro/login` | Kiro sign-in: the saved AWS SSO start URL and region, a login in progress (verification URL and code), and `kiro-cli whoami`; login `{ start_url, region }` saves them and runs `kiro-cli login --identity-provider <url> --region <region> --use-device-flow`, answering once the URL and code appear |
 | `GET /bot-approvals` `POST /bot-approvals/:id` | open ask-first requests; decide `{ approve }` (409 when no longer pending); the bot is told and an approved call runs once |
-| `GET /bot-logins` `POST /bot-logins/:id` | bots stopped at a login wall; answer `{ signed_in }` (409 when closed) |
 | `GET /routines` `POST /routines` | `?bot=`; create `{ bot, name, prompt, schedule \| trigger }` (400 for a bad cron) |
 | `POST /routines/:id` `DELETE /routines/:id` | `{ enabled }`; delete |
 | `POST /routines/:id/fire` | fires a webhook routine; `{ text }` comes along (404 unless it is an enabled webhook routine) |

@@ -119,8 +119,6 @@ export const OPERATIONS: Operation[] = [
   op('bot_connection', 'GET', '/bots/:name/connection', 'One bot\'s connection, its last turn, waiting messages, and the first reason it would not answer. Fields: name, refresh.'),
   op('bot_approvals', 'GET', '/bot-approvals', 'Calls bots are waiting to run until the user approves them (ask-first rules and irreversible commands).'),
   op('bot_approval_decide', 'POST', '/bot-approvals/:id', 'Approve or deny a bot\'s waiting call; an approved call runs once. Fields: id, approve (true|false).'),
-  op('bot_logins', 'GET', '/bot-logins', 'Bots stopped at a login wall, with what to sign in to and how.'),
-  op('bot_login_done', 'POST', '/bot-logins/:id', 'Tell a bot the user signed in (it continues) or will not (it reports). Fields: id, signed_in (true|false).'),
   op('routines', 'GET', '/routines', 'Routines: work bots do on a schedule (cron) or a trigger (task_failed, task_created, webhook). Fields: bot.'),
   op('routine_create', 'POST', '/routines', 'Create a routine. Fields: bot, name, prompt, schedule (5-field cron, local time) or trigger (task_failed|task_created|webhook).'),
   op('routine_enable', 'POST', '/routines/:id', 'Turn a routine on or off. Fields: id, enabled.'),

@@ -1,7 +1,6 @@
 import { z } from 'zod'
 import { getAgent, postMessage, SYSTEM, ORCHESTRATOR } from '../db/team.ts'
 import { createRoutine, deleteRoutine, getRoutine, listRoutines, TRIGGERS, type Trigger } from '../db/routines.ts'
-import { requestLogin } from '../db/bot-requests.ts'
 import { closeGoal, getGoal } from '../db/goals.ts'
 import { getTask } from '../db/tasks.ts'
 import { insertEvent } from '../db/events.ts'
@@ -10,8 +9,8 @@ import { nowSec } from '../time.ts'
 import { queueChanged, teamChanged } from '../wake.ts'
 import { ToolError, type ScopedTools, type TeamTool } from './tools.ts'
 
-// Tools for work that runs without the user in the loop each time: routines on a schedule or an event, stopping at a
-// login wall, closing a goal, and reviewing another bot's result.
+// Tools for work that runs without the user in the loop each time: routines on a schedule or an event, closing a goal,
+// and reviewing another bot's result.
 
 const COORDINATORS = new Set(['orchestrator', 'planner'])
 const TASK_ID = z.string().regex(/^[0-9a-f]{8}$/)
@@ -78,17 +77,6 @@ export function autonomyTools(scope: ScopedTools): TeamTool[] {
         deleteRoutine(db, routine.id)
         wrote()
         return { deleted: routine.id }
-      },
-    },
-    {
-      name: 'request_login',
-      description: 'Stop at a login wall and hand it to the user: say what needs signing in (an AWS SSO session, a website, a CLI) and how (the command to run or the page to open). Never ask for a password or token in a message. After this call, end your turn: you get no turns until the user says they signed in, and then you continue where you stopped.',
-      input: { what: z.string().min(1).max(300), how: z.string().min(1).max(1000) },
-      readOnly: false,
-      handler(args) {
-        const login = requestLogin(db, agent, String(args.what), String(args.how))
-        wrote()
-        return { request: login.id, next: 'end your turn now; you will get a message when the user has signed in' }
       },
     },
     {

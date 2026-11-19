@@ -1,7 +1,7 @@
 import { test, describe } from 'node:test'
 import assert from 'node:assert/strict'
 import { createApp } from '../src/api/server.ts'
-import { agentsWithMail, getAgent, listAgents, listMessages, postMessage, USER } from '../src/db/team.ts'
+import { getAgent, listAgents, listMessages, USER } from '../src/db/team.ts'
 import { botGate, type ApprovalBroker } from '../src/team/bot-gate.ts'
 import { consumeApproval, requestApproval } from '../src/db/bot-requests.ts'
 import { createRoutine, runDueRoutines, runTriggeredRoutines } from '../src/db/routines.ts'
@@ -60,18 +60,6 @@ describe('bot autonomy', () => {
     assert.equal(botGate(env.config, own, env.home, 'Bash', { command: 'git commit -m x' }, broker('coder')).action, 'deny', 'but not the bot\'s own rules')
     assert.equal(botGate(env.config, own, env.home, 'mcp__gmail__send_mail', { to: 'a' }, broker('coder')).action, 'deny')
     assert.equal(botGate(env.config, own, env.home, 'mcp__gmail__read', {}, broker('coder')).action, 'allow')
-  })
-
-  test('[critical] a bot at a login wall gets no turns until the user signs in, then continues', async () => {
-    postMessage(env.db, { sender: USER, recipient: 'coder', body: 'check the bucket' })
-    assert.ok(agentsWithMail(env.db, nowSec(), 0).includes('coder'))
-    const made = tool('coder', 'request_login').handler({ what: 'AWS SSO for the prod account', how: 'aws sso login --profile prod' }) as { request: number }
-    assert.ok(!agentsWithMail(env.db, nowSec(), 0).includes('coder'), 'waiting for the login')
-    const login = env.db.prepare(`SELECT ref FROM alerts WHERE kind = 'auth_required'`).get()
-    assert.equal(login?.ref, `bot-login:${made.request}`)
-    assert.equal((await call('POST', `/bot-logins/${made.request}`, { signed_in: true })).status, 200)
-    assert.ok(agentsWithMail(env.db, nowSec(), 0).includes('coder'))
-    assert.match(inbox('coder').at(-1) ?? '', /signed in \(AWS SSO for the prod account\)\. Continue/)
   })
 
   test('[critical] routines: cron in local time, due runs delivered once and tagged, triggers on new failures, webhooks', async () => {

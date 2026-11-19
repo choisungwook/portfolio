@@ -20,18 +20,6 @@ CREATE TABLE bot_approvals (
 );
 CREATE INDEX bot_approvals_open ON bot_approvals(bot, status);
 
--- A bot stopped at a login wall. Until the user says they signed in, the bot gets no turns.
-CREATE TABLE bot_logins (
-  id INTEGER PRIMARY KEY,
-  bot TEXT NOT NULL,
-  what TEXT NOT NULL,
-  how TEXT NOT NULL,
-  created_at INTEGER NOT NULL,
-  done_at INTEGER,
-  cancelled INTEGER NOT NULL DEFAULT 0
-);
-CREATE INDEX bot_logins_open ON bot_logins(bot) WHERE done_at IS NULL;
-
 -- Work a bot does on a schedule (5-field cron, local time) or on an event, delivered as a message.
 CREATE TABLE bot_routines (
   id INTEGER PRIMARY KEY,
