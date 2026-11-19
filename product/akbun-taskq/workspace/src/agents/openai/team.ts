@@ -127,7 +127,7 @@ async function runAgent(runner: Runner, args: OpenAIRunArgs, servers: MCPServerS
     name: 'taskq-bot',
     instructions: args.instructions,
     model: args.model,
-    ...(args.effort ? { modelSettings: { reasoning: { effort: args.effort as 'low' | 'medium' | 'high' } } } : {}),
+    ...(args.effort ? { modelSettings: { reasoning: { effort: args.effort as 'none' | 'low' | 'medium' | 'high' } } } : {}),
     tools: args.tools.map((t) => tool({
       name: t.name, description: t.description, strict: false,
       parameters: t.parameters as never,
@@ -221,6 +221,10 @@ export function createOpenAITeamBackend(runFn?: OpenAIRunFn, fetcher: typeof fet
       return []
     }
   }
+  // Bedrock's Chat Completions endpoint refuses function tools together with reasoning for some models (gpt-6.x), and
+  // a bot always has tools. Such a model is called with reasoning_effort none; it is remembered so later turns do not
+  // fail once first. Leaving the effort empty is not enough: the model's own default still reasons.
+  const noReasoning = new Set<string>()
   return {
     sdk: 'openai',
     supportsLiveInput: false,
@@ -259,7 +263,7 @@ export function createOpenAITeamBackend(runFn?: OpenAIRunFn, fetcher: typeof fet
       ]
       const cost = (r: OpenAIRunResult) => (r.inputTokens * config.bots.openaiInputPerMTok + r.outputTokens * config.bots.openaiOutputPerMTok) / 1_000_000
       try {
-        const result = await run({
+        const call = (effort: string | null) => run({
           mcpServers: request.mcpServers ?? [],
           cwd: request.cwd,
           model: modelId,
@@ -267,10 +271,16 @@ export function createOpenAITeamBackend(runFn?: OpenAIRunFn, fetcher: typeof fet
           tools,
           input: request.prompt,
           maxTurns: request.maxTurns,
-          effort: request.agent.effort,
+          effort,
           previousResponseId: provider === 'api' ? request.resume ?? undefined : undefined,
           history, provider, region: config.bots.bedrockRegion,
           signal: abort.signal,
+        })
+        const result = await call(noReasoning.has(modelId) ? 'none' : request.agent.effort).catch((error: unknown) => {
+          // The 400 comes back on the first model call, before any tool ran, so the turn is safe to run again.
+          if (provider !== 'bedrock' || noReasoning.has(modelId) || !/reasoning_effort/i.test(String((error as Error)?.message))) throw error
+          noReasoning.add(modelId)
+          return call('none')
         })
         const model = modelId
         if (result.history) saveHistory(config, request, result.history)
@@ -291,6 +301,11 @@ export function createOpenAITeamBackend(runFn?: OpenAIRunFn, fetcher: typeof fet
         if (statusOf(error) === 401) return { outcome: 'failed', error: 'OpenAI rejected the API key', auth_failed: true }
         if (/previous_response_not_found|Previous response .* not found/i.test(message)) return { outcome: 'failed', error: 'the previous conversation is gone; the next turn starts a new one', session_missing: true }
         if (request.signal.aborted) return { outcome: 'failed', error: 'stopped' }
+        // A 4xx other than a timeout, a rate limit or a denied sign-in (403: an expired AWS session, which a new login
+        // fixes) is the provider refusing the request itself (a model id it does not serve, a setting it does not take). Nothing was generated, so it costs nothing, and trying again changes nothing.
+        // ponytail: a 4xx after earlier model calls of the same turn loses their cost; carry usage on the error if it matters.
+        const status = statusOf(error) ?? 0
+        if (status >= 400 && status < 500 && status !== 403 && status !== 408 && status !== 429) return { outcome: 'failed', cost_usd: 0, error: message.slice(0, 300), rejected: true }
         return { outcome: 'failed', error: message.slice(0, 300) }
       } finally {
         request.signal.removeEventListener('abort', onAbort)

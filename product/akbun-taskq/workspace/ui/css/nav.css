@@ -46,7 +46,7 @@
 .bots-state { display: flex; align-items: center; gap: 4px; }
 .bots-state-label { font-size: var(--text-small); color: var(--muted); }
 .bots-state-label[data-state="running"] { color: var(--done); }
-.bots-state-label[data-state="paused"] { color: var(--needs-approval); }
+.bots-state-label[data-state="paused"], .bots-state-label[data-state="warn"] { color: var(--needs-approval); }
 .bots-state button { min-height: 28px; padding: 0 8px; font-size: var(--text-small); }
 /* Many bots scroll inside their own list, so the menu items below stay in reach. */
 .side-bots { margin-bottom: 8px; max-height: min(46vh, 520px); overflow-y: auto; overscroll-behavior: contain; scrollbar-width: thin; }

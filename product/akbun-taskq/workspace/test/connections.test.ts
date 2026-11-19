@@ -1,8 +1,10 @@
 import { test, describe } from 'node:test'
 import assert from 'node:assert/strict'
+import { writeFileSync } from 'node:fs'
+import { join } from 'node:path'
 import { endTurn, getAgent, postMessage, startTurn, updateAgent, USER } from '../src/db/team.ts'
 import { pauseTeam } from '../src/team/hub.ts'
-import { botConnection, clearConnectionCache, listConnections, type Checks } from '../src/team/connections.ts'
+import { botConnection, clearConnectionCache, codexModelProvider, listConnections, type Checks } from '../src/team/connections.ts'
 import { createApp } from '../src/api/server.ts'
 import { seedTestBots, setup, TOKEN, type TestEnv } from './helpers.ts'
 
@@ -89,5 +91,13 @@ describe('connections', () => {
     const errors = (await (await get('/bots/coder/turn-errors')).json()) as { outcome: string; error: string }[]
     assert.deepEqual(errors.map((e) => [e.outcome, e.error]), [['failed', 'ANTHROPIC_API_KEY is not set']])
     assert.equal((await get('/bots/nobody/turn-errors')).status, 404)
+  })
+
+  test('the model provider of Codex is read from the top of its config.toml', () => {
+    assert.equal(codexModelProvider(env.home), null, 'no config.toml')
+    writeFileSync(join(env.home, 'config.toml'), 'model = "openai.gpt"\nmodel_provider = "amazon-bedrock"\n\n[model_providers.x]\nmodel_provider = "inner"\n')
+    assert.equal(codexModelProvider(env.home), 'amazon-bedrock')
+    writeFileSync(join(env.home, 'config.toml'), '[profiles.a]\nmodel_provider = "inner"\n')
+    assert.equal(codexModelProvider(env.home), null, 'a key inside a table is not the top-level one')
   })
 })

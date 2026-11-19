@@ -1,4 +1,7 @@
 import { execFile } from 'node:child_process'
+import { readFileSync } from 'node:fs'
+import { homedir } from 'node:os'
+import { join } from 'node:path'
 import type { Config } from '../config.ts'
 import type { Db } from '../db/open.ts'
 import { getAgent, listAgents, type TeamAgent } from '../db/team.ts'
@@ -47,6 +50,17 @@ export interface Checks {
 const ok: Check = { status: 'ok', reason: null }
 const fail = (reason: string): Check => ({ status: 'error', reason })
 
+// The model provider Codex is configured with (the top-level model_provider of config.toml), or null for its default.
+// With a provider other than openai (amazon-bedrock with an AWS profile) Codex needs no ChatGPT login.
+export function codexModelProvider(home = process.env.CODEX_HOME || join(homedir(), '.codex')): string | null {
+  try {
+    const top = readFileSync(join(home, 'config.toml'), 'utf8').split(/^\s*\[/m)[0]
+    return /^\s*model_provider\s*=\s*["']([^"']+)["']/m.exec(top)?.[1] ?? null
+  } catch {
+    return null
+  }
+}
+
 export const defaultChecks: Checks = {
   async claude(config) {
     const result = await preflight(config)
@@ -58,6 +72,7 @@ export const defaultChecks: Checks = {
         const text = `${stdout}${stderr}`.trim().slice(0, 300)
         // Only a fixed sentence reaches the UI: the CLI's own output can name the account.
         if (error && (error as { code?: unknown }).code === 'ENOENT') resolve(fail(`the Codex CLI was not found (${config.bots.codexPath})`))
+        else if (/not logged in/i.test(text) && (codexModelProvider() ?? 'openai') !== 'openai') resolve(ok)
         else if (/not logged in/i.test(text)) resolve(fail('Codex is not signed in: run codex login and choose Sign in with ChatGPT'))
         else if (error) resolve(fail(`codex login status failed (exit ${(error as { code?: unknown }).code ?? '?'})`))
         else resolve(ok)
@@ -93,7 +108,7 @@ function describe(config: Config, id: ConnectionId): { label: string; detail: st
         detail: config.bots.bedrockProfile ? `AWS profile ${config.bots.bedrockProfile}, region ${config.bots.bedrockRegion}` : `AWS_BEARER_TOKEN_BEDROCK, region ${config.bots.bedrockRegion}`,
       }
     case 'openai:chatgpt':
-      return { label: 'OpenAI · ChatGPT plan', detail: `Codex CLI (${config.bots.codexPath}) signed in with ChatGPT` }
+      return { label: 'OpenAI · Codex CLI', detail: `Codex CLI (${config.bots.codexPath}) signed in with ChatGPT, or with the model provider in its config.toml` }
     case 'kiro':
       return { label: 'Kiro (AWS)', detail: `kiro-cli (${config.bots.kiroPath}) signed in with AWS IAM Identity Center` }
   }

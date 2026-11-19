@@ -129,6 +129,31 @@ describe('openai team backend', () => {
     assert.deepEqual(seen[3].history, [], 'a session of another provider is not loaded as history')
   })
 
+  test('[critical] a Bedrock model that refuses tools with reasoning is called again with effort none, and stays so', async () => {
+    const efforts: (string | null)[] = []
+    const run: OpenAIRunFn = async (args) => {
+      efforts.push(args.effort)
+      if (args.effort !== 'none') throw new Error("400 Function tools with reasoning_effort are not supported for this model in /v1/chat/completions")
+      return { inputTokens: 1, outputTokens: 1, requests: 1, history: [] }
+    }
+    const backend = createOpenAITeamBackend(run)
+    const bedrock = { ...request, agent: { ...request.agent, provider: 'bedrock' as const, effort: null }, resume: null }
+    assert.equal((await backend.runTurn(env.config, bedrock)).outcome, 'done')
+    assert.equal((await backend.runTurn(env.config, bedrock)).outcome, 'done')
+    assert.deepEqual(efforts, [null, 'none', 'none'])
+    let calls = 0
+    const refuse = (status: number): OpenAIRunFn => async () => {
+      calls += 1
+      throw Object.assign(new Error('on-demand throughput is not supported'), { status })
+    }
+    const refused = await createOpenAITeamBackend(refuse(400)).runTurn(env.config, bedrock)
+    assert.equal(calls, 1, 'another 400 is not called again')
+    assert.deepEqual([refused.outcome, refused.rejected, refused.cost_usd], ['failed', true, 0])
+    for (const status of [403, 429, 500]) {
+      assert.equal((await createOpenAITeamBackend(refuse(status)).runTurn(env.config, bedrock)).rejected, undefined, `${status} keeps the retry`)
+    }
+  })
+
   test('a Bedrock turn longer than the history limit keeps itself whole from its user message', async () => {
     const long = [{ role: 'user', content: 'old' }, { role: 'assistant', content: 'a' },
       { role: 'user', content: 'task' }, ...Array.from({ length: 250 }, (_, i) => ({ type: 'function_call_result', callId: String(i) }))]

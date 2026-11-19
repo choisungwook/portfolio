@@ -4,7 +4,7 @@
 const KO = {
   'nav.calendar': '캘린더', 'nav.board': 'task 상태보드',
   'nav.bots': 'Bots', 'nav.wiki': '위키', 'nav.shared': '공용 폴더', 'nav.search': '검색',
-  'bots.add': 'bot 추가', 'bots.paused': '멈춤', 'bots.running': '동작 중', 'bots.pause': '멈추기', 'bots.resume': '다시 켜기',
+  'bots.add': 'bot 추가', 'bots.paused': '멈춤', 'bots.budget': '예산', 'bots.running': '동작 중', 'bots.pause': '멈추기', 'bots.resume': '다시 켜기',
   'bots.working': '작업 중', 'bots.disabled': '꺼진 bot', 'bots.settings': '설정',
   'chat.message': '메시지', 'chat.send': '보내기', 'chat.attach': '추가', 'chat.working': '작업 중', 'chat.esc': 'esc로 중단',
   'chat.stop': '중단', 'chat.find': '대화에서 찾기', 'chat.drop': '여기에 놓으면 첨부됩니다', 'chat.empty': '아직 대화가 없습니다.',
