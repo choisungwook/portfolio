@@ -4,6 +4,7 @@
 
 ## 목록
 
+* [OpenAI on Bedrock calls inference profiles, listed with a hand-written SigV4 request](2026-11-bedrock-inference-profiles.md) - The model list comes from ListInferenceProfiles and openai.* ids become the region's us./global. profile.
 * [Store tasks in SQLite, not in markdown, JSON or YAML files](2026-11-storage-sqlite.md) - One SQLite file in WAL mode holds every table; plain files were rejected because of locking.
 * [Run TypeScript by type stripping and ship the UI as static modules](2026-11-no-build-typescript-static-ui.md) - No bundler and no UI framework; the first idea was React with Vite and a calendar library.
 * [Three inference providers selected by config](2026-11-inference-providers.md) - bedrock, api_key and subscription differ only in the child environment taskq builds.
