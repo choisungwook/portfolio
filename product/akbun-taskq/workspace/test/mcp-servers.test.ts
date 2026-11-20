@@ -66,7 +66,7 @@ describe('MCP servers and skills across SDKs', () => {
     mkdirSync(cwd, { recursive: true })
     await createClaudeTeamBackend(query).runTurn(env.config, {
       agent: getAgent(env.db, 'coder')!, system: '', prompt: 'x', tools: [], cwd, plugins: [], sharedDir: join(env.home, 'shared'),
-      maxTurns: 5, budgetUsd: 1, resume: null, signal: new AbortController().signal,
+      maxTurns: 5, resume: null, signal: new AbortController().signal,
       mcpServers: [{ name: 'github', command: 'npx', args: ['-y', 'server-github'], description: '' }],
     })
     const servers = calls[0].mcpServers as Record<string, { type: string; command?: string; args?: string[] }>
@@ -89,7 +89,7 @@ describe('MCP servers and skills across SDKs', () => {
       return { inputTokens: 0, outputTokens: 0, requests: 1 }
     }).runTurn(env.config, {
       agent: { ...getAgent(env.db, 'coder')!, sdk: 'openai', permission_mode: 'plan' }, system: '', prompt: 'x', tools: [], cwd, plugins: [],
-      sharedDir: join(env.home, 'shared'), maxTurns: 5, budgetUsd: 1, resume: null, signal: new AbortController().signal,
+      sharedDir: join(env.home, 'shared'), maxTurns: 5, resume: null, signal: new AbortController().signal,
       skills: [{ name: 'release-notes', description: 'notes for AI', path: skill }],
       mcpServers: [{ name: 'github', command: 'npx', args: [], description: '' }],
     })

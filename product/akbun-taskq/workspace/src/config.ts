@@ -11,20 +11,18 @@ export interface SandboxConfig {
   allowWrite: string[]
 }
 
-// The resident bots (the code calls them the team). They always run with taskq; the budget, the loop guards and Pause
+// The resident bots (the code calls them the team). They always run with taskq; the loop guards and Pause
 // in the menu are what stop them. An old config's bots.enabled is ignored.
 export interface BotsConfig {
   maxConcurrentTurns: number   // agent turns running at once, separate from maxConcurrent for tasks
   turnMaxTurns: number         // model turns inside one agent turn
-  turnBudgetUsd: number        // cost limit of one agent turn
-  dailyBudgetUsd: number       // all agent turns since local midnight; the team pauses when it is spent
   hourlyTurnsPerAgent: number  // stops two agents from messaging each other in a loop
   maxOpenTasks: number         // tasks created by agents that are not done or failed
   maxAttempts: number          // a message whose turn failed this many times is set aside
   readRoots: string[]          // absolute directories agents may Read besides their own folder and outputs/
   personaSkill?: string        // absolute path of a skill folder that speaks for the user when a choice is the user's
   // OpenAI bots: the API answers in tokens, not dollars, so a turn's cost is estimated from these prices (USD per
-  // million tokens) for the daily budget. Set them to your model's price list.
+  // million tokens) for the Usage page. Set them to your model's price list.
   openaiInputPerMTok: number
   openaiOutputPerMTok: number
   bedrockRegion: string        // OpenAI bots on Amazon Bedrock: the region of the OpenAI-compatible endpoint
@@ -75,7 +73,7 @@ export const DEFAULTS: Omit<Config, 'home'> = {
   trustedRepos: [],
   retrospect: true,
   bots: {
-    maxConcurrentTurns: 2, turnMaxTurns: 30, turnBudgetUsd: 1, dailyBudgetUsd: 10,
+    maxConcurrentTurns: 2, turnMaxTurns: 30,
     hourlyTurnsPerAgent: 20, maxOpenTasks: 10, maxAttempts: 3, readRoots: [],
     openaiInputPerMTok: 1.25, openaiOutputPerMTok: 10, bedrockRegion: 'us-west-2', bedrockProfile: '', codexPath: 'codex', kiroPath: 'kiro-cli',
   },

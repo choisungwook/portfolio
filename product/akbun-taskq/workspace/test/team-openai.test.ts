@@ -27,7 +27,7 @@ describe('openai team backend', () => {
     mkdirSync(cwd, { recursive: true })
     const agent = getAgent(env.db, 'coder')!
     request = {
-      agent, system: 'orders', prompt: '1 new message', cwd, plugins: [], sharedDir: join(env.home, 'shared'), maxTurns: 30, budgetUsd: 1,
+      agent, system: 'orders', prompt: '1 new message', cwd, plugins: [], sharedDir: join(env.home, 'shared'), maxTurns: 30,
       tools: teamTools({ db: env.db, config: env.config, agent: 'coder', search: hybridSearch(env.db) }), resume: 'resp-0', signal: new AbortController().signal,
     }
     mkdirSync(request.sharedDir, { recursive: true })

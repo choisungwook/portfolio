@@ -135,7 +135,6 @@ function optionsFor(config: Config, request: TurnRequest, abort: AbortController
     } : undefined,
     effort: agent.effort ?? undefined,
     maxTurns: request.maxTurns,
-    maxBudgetUsd: request.budgetUsd,
     // The shared folder, and the task worktrees a bot works in when it starts a code task.
     additionalDirectories: [request.sharedDir, worktreesDir(config)],
     resume: request.resume ?? undefined,

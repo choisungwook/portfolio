@@ -14,7 +14,7 @@ const TASKQ_CLI = /(^|[\s;&|(`'"/])taskq(\s|$|['"`;&|)])/
 //    checked by resolved path (tamperOf). Bash is checked by its text: a command that names taskq's data directory,
 //    its database or its config file stops the turn, and one that names the user's ~/.claude is refused. A text check
 //    can be fooled (a variable, a script written first); the sandbox is the boundary that cannot. With the sandbox off,
-//    the default, this layer is what stands between a bot and its own budget.
+//    the default, this layer is what stands between a bot and its own limits.
 // 2. Per bot, empty by default: Bash commands containing one of the bot's blocked_commands patterns are refused. It
 //    prevents accidents; it is not a boundary, since a command can be spelled another way.
 
@@ -103,7 +103,7 @@ export function botGate(config: Config, agent: TeamAgent, cwd: string, tool: str
     if (names.deny.some((name) => String(input.command).includes(name))) {
       return { action: 'deny', reason: 'Commands that touch the user\'s Claude Code settings (~/.claude) are not allowed for bots.' }
     }
-    // The taskq CLI could change a bot's own permissions, the budget or approvals. Bots use their team tools instead.
+    // The taskq CLI could change a bot's own permissions, the limits or approvals. Bots use their team tools instead.
     if (TASKQ_CLI.test(String(input.command))) return { action: 'deny', reason: 'Bots do not run the taskq command; use your team tools.' }
     const pattern = blockedBy(input.command, agent.blocked_commands)
     if (pattern !== null) return { action: 'deny', reason: `This bot's settings block commands containing "${pattern}".` }

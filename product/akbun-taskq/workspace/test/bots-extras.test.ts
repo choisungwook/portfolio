@@ -79,8 +79,8 @@ describe('files, search, memory, limits and settings', () => {
   })
 
   test('[critical] limits, appearance, bots and memory survive closing and reopening the database', async () => {
-    assert.equal((await call('POST', '/settings/limits', { daily_budget_usd: 3, bot_turns_per_hour: 7 })).status, 200)
-    assert.equal((await call('POST', '/settings/limits', { daily_budget_usd: -1 })).status, 400)
+    assert.equal((await call('POST', '/settings/limits', { max_concurrent_turns: 3, bot_turns_per_hour: 7 })).status, 200)
+    assert.equal((await call('POST', '/settings/limits', { max_concurrent_turns: 0 })).status, 400)
     assert.equal((await call('POST', '/settings/appearance', { language: 'en', theme: 'dark' })).status, 200)
     assert.equal((await call('POST', '/settings/appearance', { theme: 'blue' })).status, 400)
     await call('PUT', '/bots/coder', { sandbox: true, hourly_turns: 3 })
@@ -88,7 +88,7 @@ describe('files, search, memory, limits and settings', () => {
     // A second connection to the same file is what a restarted (or upgraded) taskq sees.
     const reopened = openDb(env.home)
     try {
-      assert.equal(limits(reopened, env.config).daily_budget_usd, 3)
+      assert.equal(limits(reopened, env.config).max_concurrent_turns, 3)
       assert.equal(limits(reopened, env.config).bot_turns_per_hour, 7)
       assert.deepEqual({ ...appearance(reopened) }, { font_family: 'system', font_size: 15, language: 'en', theme: 'dark' })
       const coder = getAgent(reopened, 'coder')!

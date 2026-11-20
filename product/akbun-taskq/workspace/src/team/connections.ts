@@ -4,11 +4,13 @@ import { homedir } from 'node:os'
 import { join } from 'node:path'
 import type { Config } from '../config.ts'
 import type { Db } from '../db/open.ts'
-import { getAgent, listAgents, type TeamAgent } from '../db/team.ts'
+import { getMeta } from '../db/meta.ts'
+import { getAgent, listAgents, setAgentEnabled, type TeamAgent } from '../db/team.ts'
 import { preflight } from '../agents/claude/auth.ts'
 import { whoami } from '../agents/kiro/login.ts'
 import { makeBedrockToken, profileFailure, type TokenMaker } from '../aws/profiles.ts'
-import { isTeamPaused, teamPauseReason } from './hub.ts'
+import { teamChanged } from '../wake.ts'
+import { LOGIN_FAILED, isTeamPaused, resumeTeam, signedOutKey, teamPauseReason } from './hub.ts'
 
 // How each bot reaches its model, whether that connection works, and why a bot is not answering. Every bot uses one
 // connection: Claude bots share the provider in taskq.config.json; an OpenAI bot uses its own sign-in; Kiro bots share
@@ -165,6 +167,21 @@ async function cachedCheck(config: Config, id: ConnectionId, checks: Checks, ref
   return { ...result, checked_at: Math.floor(at / 1000) }
 }
 
+// A check the user reran that passes undoes what the failed login did (signedOut in hub.ts): bots it turned off are
+// on again, and bots paused for the Claude login resume. Only a rerun does this, not the cached check the UI polls: a
+// bot whose key is set but wrong would otherwise be turned on again every minute.
+function restore(db: Db, connection: Connection): void {
+  if (connection.status !== 'ok') return
+  let changed = false
+  for (const name of connection.bots) {
+    if (getMeta(db, signedOutKey(name)) !== '1') continue
+    setAgentEnabled(db, name, true)
+    changed = true
+  }
+  if (connection.id === 'claude' && teamPauseReason(db)?.startsWith(LOGIN_FAILED)) resumeTeam(db)
+  else if (changed) teamChanged.notify()
+}
+
 export function teamState(db: Db, config: Config) {
   return { paused: isTeamPaused(db), pause_reason: teamPauseReason(db) ?? null }
 }
@@ -178,6 +195,7 @@ export async function listConnections(db: Db, config: Config, options: { refresh
     id, ...describe(config, id), ...(await cachedCheck(config, id, checks, options.refresh ?? false)),
     bots: agents.filter((a) => connectionOf(a) === id).map((a) => a.name), ...lastTurns(db, id),
   })))
+  if (options.refresh) for (const connection of connections) restore(db, connection)
   return { team: teamState(db, config), connections }
 }
 
@@ -193,13 +211,15 @@ export async function botConnection(db: Db, config: Config, name: string, option
     id, ...describe(config, id), ...(await cachedCheck(config, id, checks, options.refresh ?? false)),
     bots: listAgents(db).filter((a) => connectionOf(a) === id).map((a) => a.name), ...lastTurns(db, id),
   }
+  if (options.refresh) restore(db, connection)
+  const enabled = options.refresh ? getAgent(db, name)?.enabled : agent.enabled
   const team = teamState(db, config)
   const row = db.prepare('SELECT outcome, error, ended_at FROM team_turns WHERE agent = ? AND ended_at IS NOT NULL ORDER BY id DESC LIMIT 1').get(name)
   const last = row ? { outcome: String(row.outcome), error: row.error === null ? null : String(row.error), at: Number(row.ended_at) } : null
   const working = Boolean(db.prepare('SELECT 1 FROM team_turns WHERE agent = ? AND ended_at IS NULL').get(name))
   const waiting = Number(db.prepare(`SELECT count(*) AS n FROM team_messages WHERE recipient = ? AND read_at IS NULL AND failed_at IS NULL`).get(name)?.n ?? 0)
   const blocker = team.paused ? `Bots are paused: ${team.pause_reason ?? 'no reason given'}. Resume them next to Bots in the menu.`
-      : !agent.enabled ? 'This bot is turned off. Turn it on in its settings.'
+      : !enabled ? 'This bot is turned off. Turn it on in its settings.'
         : working ? null
           : connection.status === 'error' ? `Its connection fails: ${connection.reason}`
             : last?.outcome === 'failed' ? `Its last turn failed: ${last.error ?? 'no reason given'}`

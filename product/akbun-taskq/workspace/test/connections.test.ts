@@ -2,8 +2,9 @@ import { test, describe } from 'node:test'
 import assert from 'node:assert/strict'
 import { writeFileSync } from 'node:fs'
 import { join } from 'node:path'
-import { endTurn, getAgent, postMessage, startTurn, updateAgent, USER } from '../src/db/team.ts'
-import { pauseTeam } from '../src/team/hub.ts'
+import { endTurn, getAgent, postMessage, setAgentEnabled, startTurn, updateAgent, USER } from '../src/db/team.ts'
+import { createTeamHub, isTeamPaused, pauseTeam } from '../src/team/hub.ts'
+import { teamChanged } from '../src/wake.ts'
 import { botConnection, clearConnectionCache, codexModelProvider, listConnections, type Checks } from '../src/team/connections.ts'
 import { createApp } from '../src/api/server.ts'
 import { seedTestBots, setup, TOKEN, type TestEnv } from './helpers.ts'
@@ -45,6 +46,36 @@ describe('connections', () => {
     assert.deepEqual([by['openai:chatgpt'].status, by['openai:chatgpt'].reason], ['error', 'Not logged in'])
     assert.deepEqual([by.kiro.last?.agent, by.kiro.last?.outcome, by.kiro.last?.error], ['coder', 'failed', 'Kiro is not signed in'])
     assert.equal(by.kiro.last_ok_at, null)
+  })
+
+  test('[critical] a recheck that passes turns a bot back on after its login failed, and resumes bots paused for the Claude login', async () => {
+    updateAgent(env.db, 'coder', { ...getAgent(env.db, 'coder')!, sdk: 'kiro', provider: null })
+    const hub = createTeamHub({ db: env.db, config: env.config, backend: { runTurn: async () => ({ outcome: 'failed', error: 'signed out', auth_failed: true }) },
+      backends: { kiro: { runTurn: async () => ({ outcome: 'failed', error: 'signed out', auth_failed: true }) } }, retryAfterSec: 0 })
+    await hub.start()
+    try {
+      postMessage(env.db, { sender: USER, recipient: 'coder', body: 'hi' })
+      postMessage(env.db, { sender: USER, recipient: 'taskq', body: 'hi' })
+      teamChanged.notify()
+      const until = Date.now() + 3000
+      while (!(getAgent(env.db, 'coder')?.enabled === false && isTeamPaused(env.db)) && Date.now() < until) await new Promise((r) => setTimeout(r, 10))
+    } finally {
+      await hub.stop()
+    }
+    assert.equal(getAgent(env.db, 'coder')?.enabled, false)
+    assert.equal(isTeamPaused(env.db), true)
+    // Saving another setting while the bot is off (how a login is usually fixed) keeps it restorable.
+    updateAgent(env.db, 'coder', { ...getAgent(env.db, 'coder')!, effort: 'low' })
+    // The cached check the UI polls changes nothing; the rerun does.
+    await listConnections(env.db, env.config, { checks: passing })
+    assert.equal(getAgent(env.db, 'coder')?.enabled, false)
+    await listConnections(env.db, env.config, { checks: passing, refresh: true })
+    assert.equal(getAgent(env.db, 'coder')?.enabled, true)
+    assert.equal(isTeamPaused(env.db), false)
+    // A bot the user turned off stays off.
+    setAgentEnabled(env.db, 'coder', false)
+    await listConnections(env.db, env.config, { checks: passing, refresh: true })
+    assert.equal(getAgent(env.db, 'coder')?.enabled, false)
   })
 
   test('[critical] a silent bot says why, in the order a message meets the reasons', async () => {

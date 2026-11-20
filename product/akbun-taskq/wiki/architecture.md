@@ -382,7 +382,7 @@ user --bot chat / taskq bots say--> team_messages --hub--> bot turn (resumed Cla
 
 ### Messages to a working bot
 
-A message never waits for the bot to answer the sender. It lands in `team_messages`; if the bot has no open turn, the hub starts one. If a Claude bot is working, the hub's next tick takes the new messages into the running turn (`joinTurn`, at most 20 at once and 10 times per turn) and pushes them into the session's input stream, the way Claude Code takes a message typed mid-turn. Past 10 joins the messages wait for the next turn, which goes through the budget and loop guards again. An OpenAI bot has no streaming input, so its messages wait for the next turn. `GET /bots` reports `queued` per bot: deliverable messages no turn has taken; the conversation and the sidebar show it.
+A message never waits for the bot to answer the sender. It lands in `team_messages`; if the bot has no open turn, the hub starts one. If a Claude bot is working, the hub's next tick takes the new messages into the running turn (`joinTurn`, at most 20 at once and 10 times per turn) and pushes them into the session's input stream, the way Claude Code takes a message typed mid-turn. Past 10 joins the messages wait for the next turn, which goes through the loop guards again. An OpenAI bot has no streaming input, so its messages wait for the next turn. `GET /bots` reports `queued` per bot: deliverable messages no turn has taken; the conversation and the sidebar show it.
 
 ### Compose bar and slash commands
 
@@ -488,14 +488,12 @@ The runner claims only ready tasks with no owner (`nextEligible`), and only whil
 
 | Guard | Effect |
 |---|---|
-| Daily budget | Agent turns plus runs of agent-owned tasks started after the agent took them, since local midnight (or since the last resume, whichever is later), plus `turnBudgetUsd` reserved for each running turn. A new turn that would pass `dailyBudgetUsd` does not start; with nothing running the team pauses |
 | Hourly turns | An agent with `hourlyTurnsPerAgent` turns in the last hour (or since the last resume) pauses the team |
 | Retry | A failed turn with no effect returns its messages; after `maxAttempts` they are set aside with an alert. A turn the provider refused (`rejected`: HTTP 4xx other than 403, 408 and 429 on the OpenAI Agents SDK path) is set aside at once and costs 0. A turn that failed after an effect (message, task, wiki write) is not retried, because a retry would repeat it; its messages are set aside with an alert. The same holds for a turn open at a crash. A failed turn costs 60 s before the agent's next turn |
-| Unknown cost | A turn that ends without a cost figure is charged `turnBudgetUsd` |
 | Tamper | A call that reaches taskq's data directory or config ends the turn and pauses the bots with a `security_finding` alert, whatever the bot's settings |
-| Login | A model login failure pauses the team |
+| Login | A failed Claude login pauses the bots; a failed OpenAI or Kiro login turns that bot off. Rerunning the checks in Settings > Connections undoes both when the check passes |
 
-Every pause raises one alert and only the user resumes. Pausing the bots stops bot turns. A task a bot started stays running until the bot finishes it or taskq restarts. A message to oneself needs `deliver_at` at least 10 minutes ahead, and a `deliver_at` in the past is refused, so an agent cannot wake itself in a loop. Resuming restarts the budget and loop windows from that moment. A resumed session that no longer exists is dropped and the next turn starts a new one; a reset made while a turn runs is not overwritten when it ends.
+Every pause raises one alert and only the user resumes. Pausing the bots stops bot turns. A task a bot started stays running until the bot finishes it or taskq restarts. A message to oneself needs `deliver_at` at least 10 minutes ahead, and a `deliver_at` in the past is refused, so an agent cannot wake itself in a loop. Resuming restarts the loop windows from that moment. A resumed session that no longer exists is dropped and the next turn starts a new one; a reset made while a turn runs is not overwritten when it ends.
 
 `bots.personaSkill`, when set, is named in the prompts. The orchestrator is told to read it before deciding something on the user's behalf, and the reviewers before reviewing, and both are told not to copy its text anywhere. Its judgement is never an approval.
 
@@ -648,7 +646,7 @@ Writes (any non-GET under `/api`) must send `Content-Type: application/json`, op
 | `POST /tasks/:id/retry` | retry a failed task. Body `{ "draft": true }` and `{ "resume": true }`, both optional. 200 with the task; 409 in other statuses |
 | `GET /settings` | `{ config, home, db_path, access_skills, desktop_notifications, queue_autorun, appearance, font_families, bot_skills, bot_plugins }`. `db_path` is the absolute path of the SQLite file, shown read-only in Settings. `config` is the read-only list of keys in `CONFIG_KEYS` (`src/skills/registry.ts`). Each access skill is `{ name, path, description, ok }`; `ok` is false when `SKILL.md` is gone |
 | `POST /settings/desktop-notifications` | persist the desktop notification preference with `{"enabled":true}` or `{"enabled":false}` |
-| `POST /settings/limits` | any of `daily_budget_usd`, `turns_per_hour_total`, `max_concurrent_turns`, `bot_turns_per_hour`, `turn_budget_usd`, `turn_max_turns`, `session_max_tokens`; all are checked before any is saved |
+| `POST /settings/limits` | any of `turns_per_hour_total`, `max_concurrent_turns`, `bot_turns_per_hour`, `turn_max_turns`, `session_max_tokens`; all are checked before any is saved |
 | `POST /files` | upload `{ "name", "data": base64 }` up to 20 MB; saved under `shared/attachments/<day>/<id>-<name>`; returns `{ path }` relative to the shared folder |
 | `GET /shared?dir=` `GET /shared/file?path=` | list a folder of the shared folder (up to 500 entries, symlinks left out); download a file. A path outside the shared folder is 400 |
 | `POST /shared/preview` | `{ "path" }` for an HTML file of the shared folder returns `{ "url": "/preview/<ticket>/<name>" }`. The ticket lasts 10 minutes and serves that file and the files in its folder, outside `/api` and without the token, with `content-security-policy: sandbox allow-scripts; …; frame-ancestors <taskq>` so the page runs in an opaque origin. 404 for anything else |

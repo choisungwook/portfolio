@@ -48,6 +48,11 @@ async function loadConnections(refresh = false) {
     // Connections a bot uses come first.
     const sorted = [...report.connections].sort((a, b) => Number(b.bots.length > 0) - Number(a.bots.length > 0))
     fill(box, teamBanner(report.team), el('div', { class: 'conn-cards' }, ...sorted.map(card)))
+    // A rerun can turn a bot back on and resume the bots; the bot list and the open conversation read it now.
+    if (refresh) {
+      emit('bots-changed')
+      emit('connections-changed')
+    }
   } catch (error) {
     fill(box, el('p', { class: 'error', text: error.message }))
   }
@@ -107,7 +112,6 @@ export function initConnections() {
     const body = Object.fromEntries(new FormData(form).entries())
     if (await mutate(() => api.put('/connection-settings', body), t('connections.saved', 'Sign-in saved; it applies from the next turn'))) {
       loadConnections(true)
-      emit('bots-changed')
     }
   })
   area('connections-refresh').addEventListener('click', () => loadConnections(true))

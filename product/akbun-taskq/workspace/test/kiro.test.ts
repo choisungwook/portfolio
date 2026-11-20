@@ -28,7 +28,7 @@ describe('kiro bots', () => {
     mkdirSync(cwd, { recursive: true })
     request = {
       agent: getAgent(env.db, 'coder')!, system: 'You are coder.', prompt: '1 new message', tools: [], cwd, plugins: [],
-      sharedDir: join(env.home, 'shared'), maxTurns: 10, budgetUsd: 1, resume: null, signal: new AbortController().signal,
+      sharedDir: join(env.home, 'shared'), maxTurns: 10, resume: null, signal: new AbortController().signal,
       skills: [{ name: 'notes', description: 'd', path: '/skills/notes' }], mcpServers: [{ name: 'github', command: 'npx', args: ['gh'], description: '' }],
     }
   })

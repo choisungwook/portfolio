@@ -3,7 +3,7 @@ type: Decision
 title: ChatGPT-plan and Kiro bots run their own CLIs per turn, with taskq's tools served over MCP
 description: OpenAI bots pick API key, Bedrock or the ChatGPT plan (codex exec); Kiro bots run kiro-cli headless with the user's AWS SSO session; both get the bot's team tools from `taskq mcp --bot`.
 tags: [bots, openai, codex, kiro, aws]
-generated: { by: claude-code/claude-opus-5-5, at: 2026-11-19T03:00:00Z }
+generated: { by: claude-code/claude-fable-5-2, at: 2026-11-20T00:00:00Z }
 ---
 
 ## 결정
@@ -15,6 +15,7 @@ generated: { by: claude-code/claude-opus-5-5, at: 2026-11-19T03:00:00Z }
 - Bedrock은 Chat Completions endpoint를 쓰고 대화를 bot 폴더에 보관한다.
 - turn마다 모델과 토큰을 기록해 Usage 화면과 context 원을 만든다. ChatGPT 구독은 비용 0, Kiro는 credit으로 센다.
 - OpenAI와 Kiro bot의 로그인 실패는 그 bot만 끈다. Claude 로그인 실패만 팀을 멈춘다.
+- 로그인 실패로 꺼진 bot과 멈춘 팀은 사용자가 설정 > 연결에서 다시 확인한 검사가 통과할 때 되돌린다. hub가 끈 bot은 `team_signed_out:<bot>` meta로 표시하고, 사용자가 직접 켜거나 끄면 표시를 지운다. 다른 설정만 저장하면 표시가 남는다. 로그인 방식을 바꾸는 것이 로그인 실패를 고치는 흔한 방법이기 때문이다. UI가 1분마다 읽는 캐시된 검사로는 되돌리지 않는다. `OPENAI_API_KEY`처럼 값이 있는지만 보는 검사는 틀린 키에도 통과하므로, 자동으로 되돌리면 bot이 매분 켜졌다 꺼지기 때문이다.
 - SDK나 로그인 방식을 바꾸면 세션, context, 세션 비용을 비운다.
 
 ## 이유
