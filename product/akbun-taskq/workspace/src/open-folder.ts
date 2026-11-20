@@ -23,6 +23,27 @@ export function sessionFolder(cwd: string, env: NodeJS.ProcessEnv = process.env)
   return join(claudeProjectsDir(env), cwd.replace(/[^a-zA-Z0-9]/g, '-'))
 }
 
+// Each bot runtime keeps its conversations in its own place, and only a Claude session lands in ~/.claude/projects.
+// An OpenAI API-key bot has no local transcript: the Responses API keeps the conversation (previousResponseId).
+export type SessionRuntime = 'claude' | 'codex' | 'kiro'
+export const SESSION_RUNTIMES: SessionRuntime[] = ['claude', 'codex', 'kiro']
+
+export function sessionsDir(runtime: SessionRuntime, env: NodeJS.ProcessEnv = process.env): string {
+  if (runtime === 'claude') return claudeProjectsDir(env)
+  if (runtime === 'codex') return join(env.CODEX_HOME || join(homedir(), '.codex'), 'sessions')
+  // kiro-cli keeps every conversation in data.sqlite3 in its data directory.
+  return process.platform === 'darwin'
+    ? join(homedir(), 'Library', 'Application Support', 'kiro-cli')
+    : join(env.XDG_DATA_HOME || join(homedir(), '.local', 'share'), 'kiro-cli')
+}
+
+export function sessionPaths(env: NodeJS.ProcessEnv = process.env): Record<SessionRuntime, { path: string; exists: boolean }> {
+  return Object.fromEntries(SESSION_RUNTIMES.map((runtime) => {
+    const path = sessionsDir(runtime, env)
+    return [runtime, { path, exists: existsSync(path) }]
+  })) as Record<SessionRuntime, { path: string; exists: boolean }>
+}
+
 export function existing(path: string): string | null {
   return existsSync(path) ? path : null
 }

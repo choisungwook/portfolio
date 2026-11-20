@@ -11,7 +11,7 @@ import {
 import { botsUsing, listEntries, registerEntry, removeEntry, updateEntry, type RegistryKind } from '../db/bot-registry.ts'
 import { LIMIT_RANGES, limits, setLimits } from '../db/settings.ts'
 import { sharedDir } from '../team/shared.ts'
-import { claudeProjectsDir } from '../open-folder.ts'
+import { sessionPaths } from '../open-folder.ts'
 import { noteReload, reload } from '../team/bot-plugin.ts'
 import { officialCatalog } from '../team/plugin-catalog.ts'
 
@@ -27,7 +27,7 @@ export function registerSettingsRoutes(api: Hono, { db, config }: ApiDeps): void
     appearance: appearance(db),
     limits: limits(db, config),
     limit_ranges: LIMIT_RANGES,
-    paths: { home: config.home, shared: sharedDir(config), sessions: claudeProjectsDir() },
+    paths: { home: config.home, shared: sharedDir(config), sessions: sessionPaths() },
     font_families: FONT_FAMILIES,
     bot_skills: listEntries(db, 'skill'),
     bot_plugins: listEntries(db, 'plugin'),

@@ -9,7 +9,13 @@ const LIMIT_FIELDS = [
   ['bot_turns_per_hour', 'Turns per hour per bot (default)'], ['turn_max_turns', 'Model turns per turn (default)'],
   ['session_max_tokens', 'Conversation size before a new session (tokens)'],
 ]
-const FOLDERS = [['shared', 'settings.folder.shared', 'Shared folder'], ['sessions', 'settings.folder.sessions', 'Session transcripts'], ['home', 'settings.folder.home', 'taskq data folder']]
+const FOLDERS = [['shared', 'settings.folder.shared', 'Shared folder'], ['home', 'settings.folder.home', 'taskq data folder']]
+// Each bot runtime keeps its conversations in its own place, so the transcripts are listed per runtime, with who uses it.
+const SESSION_RUNTIMES = [
+  ['claude', 'Claude Code', 'settings.sessions.claude', 'Tasks and Claude bots. The same folder as your own Claude Code; taskq sessions get their own subfolders, named after the folder they ran in.'],
+  ['codex', 'Codex', 'settings.sessions.codex', 'OpenAI bots signed in with the ChatGPT plan.'],
+  ['kiro', 'Kiro', 'settings.sessions.kiro', 'Kiro bots. kiro-cli keeps every conversation in data.sqlite3 here.'],
+]
 
 // Font choices. A face that is not installed falls back to the system font.
 const FONTS = {
@@ -94,7 +100,19 @@ function renderLimits(values, ranges) {
 }
 
 function renderFolders(paths) {
-  clear(nodes.folders).append(...FOLDERS.map(([target, key, english]) => el('li', { class: 'folder-row' },
-    el('div', {}, el('strong', { text: t(key, english) }), el('code', { class: 'skill-path', text: paths[target] })),
-    el('button', { type: 'button', text: t('settings.open', 'Open'), onclick: () => mutate(() => api.post('/open-folder', { target })) }))))
+  const row = (title, path, open, note) => el('li', { class: 'folder-row' },
+    el('div', {}, el('strong', { text: title }), note ? el('span', { class: 'meta', text: note }) : null, el('code', { class: 'skill-path', text: path })),
+    open
+      ? el('button', { type: 'button', text: t('settings.open', 'Open'), onclick: () => mutate(() => api.post('/open-folder', open)) })
+      : el('span', { class: 'meta', text: t('settings.sessions.none', 'Not created yet') }))
+  clear(nodes.folders).append(
+    ...FOLDERS.map(([target, key, english]) => row(t(key, english), paths[target], { target })),
+    el('li', { class: 'folder-group' },
+      el('strong', { text: t('settings.folder.sessions', 'Session transcripts') }),
+      el('p', { class: 'meta', text: t('settings.sessions.intro', "Each bot runtime keeps its conversations in its own place. To open one bot's, use Open session folder in its menu.") })),
+    ...SESSION_RUNTIMES.map(([runtime, name, key, english]) => {
+      const { path, exists } = paths.sessions[runtime]
+      return row(name, path, exists && { target: 'sessions', runtime }, t(key, english))
+    }),
+    el('li', { class: 'folder-group' }, el('p', { class: 'meta', text: t('settings.sessions.openai', "OpenAI bots with an API key keep no local transcript; OpenAI keeps the conversation. With Bedrock, each bot's conversation is .openai-history.json in its folder under team/ in the taskq data folder.") })))
 }

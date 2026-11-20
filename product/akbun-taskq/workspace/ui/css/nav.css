@@ -45,7 +45,6 @@
 .side-heading h2 { margin: 0; font-size: 0.87em; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); }
 .bots-state { display: flex; align-items: center; gap: 4px; }
 .bots-state-label { font-size: var(--text-small); color: var(--muted); }
-.bots-state-label[data-state="running"] { color: var(--done); }
 .bots-state-label[data-state="paused"] { color: var(--needs-approval); }
 .bots-state button { min-height: 28px; padding: 0 8px; font-size: var(--text-small); }
 /* Many bots scroll inside their own list, so the menu items below stay in reach. */
