@@ -10,7 +10,7 @@ generated: { by: claude-code/claude-fable-5-2, at: 2026-11-20T00:00:00Z }
 
 - backend가 `TurnResult.rejected`를 돌려주면 hub는 그 turn의 메시지를 `maxAttempts`와 무관하게 바로 따로 두고 알림에 원문 오류를 남긴다.
 - OpenAI Agents SDK 경로(API key, Bedrock)는 HTTP 4xx 중 403, 408, 429를 뺀 응답을 `rejected`로 본다. 401은 `auth_failed`다. 403은 만료된 AWS 세션일 수 있어 다시 로그인하면 풀리므로 재시도한다.
-- 0.20.0에서 bot의 예산(하루 예산, turn당 예산, 80% 표시)을 없앴다. 비용 값 없이 끝난 turn은 0으로 기록한다. bot을 묶는 것은 시간당 turn, turn당 모델 턴, `maxAttempts`, `session_max_tokens`다.
+- 0.20.0에서 bot의 예산(하루 예산, turn당 예산, 80% 표시)을 없앴다. 비용 값 없이 끝난 turn은 0으로 기록한다. bot을 묶는 것은 turn당 모델 턴, `maxAttempts`, 새 세션으로 넘기는 대화 크기다. 시간당 turn 상한은 0.26.0에서 없앴다([사용량 제한을 없앤 결정](2026-11-no-usage-limits.md)).
 - 큐가 실행하는 작업의 `maxBudgetUsd`는 남겼다. bot이 아니라 한 번 도는 작업의 상한이라 아래 문제가 없다.
 
 ## 이유

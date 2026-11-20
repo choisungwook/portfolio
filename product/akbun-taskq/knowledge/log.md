@@ -4,6 +4,8 @@ concept를 추가·수정·삭제할 때마다 오늘 날짜 섹션을 맨 위�
 
 ## 2026-11-20
 
+* **Creation**: [no usage limits](decisions/2026-11-no-usage-limits.md) - 시간당 turn 상한과 설정의 사용량 제한 페이지를 없앤 결정.
+* **Update**: [resident agent team](decisions/2026-11-resident-agent-team.md), [rejected turns](decisions/2026-11-rejected-turns.md), [bot workspace](decisions/2026-11-bot-workspace.md), [session handover](decisions/2026-11-session-handover.md)에서 시간당 turn 상한과 SQLite에 저장하던 제한 값을 지움.
 * **Creation**: [marketplace plugin install](decisions/2026-11-marketplace-plugin-install.md) - 공식 marketplace에서 고정 commit으로 설치하는 결정.
 * **Creation**: [session transcript locations](decisions/2026-11-session-transcript-locations.md) - 세션 기록을 옮기지 않고 런타임별로 보이는 결정.
 * **Update**: [inference providers](decisions/2026-11-inference-providers.md)에 설정에서 저장하는 Anthropic API key(평문, 0600, DB 밖)와 암호화하지 않은 이유를 추가.

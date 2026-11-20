@@ -4,11 +4,10 @@ import type { Config } from '../config.ts'
 import type { Db } from '../db/open.ts'
 import {
   SYSTEM, agentsWithMail, endTurn, getAgent, joinTurn, leaveTurn, postMessage, listAgents, nextDelivery, recoverTurns, replaceAgentSession, resetAgentSession, seedAgents, setAgentEnabled,
-  startTurn, turnsSince, type BotSdk, type TeamMessage, type TurnEnd,
+  startTurn, type BotSdk, type TeamMessage, type TurnEnd,
 } from '../db/team.ts'
 import { closeUnconcluded, passStalled, skipDisabledSpeakers } from '../db/threads.ts'
 import { getMeta, setMeta } from '../db/meta.ts'
-import { limits } from '../db/settings.ts'
 import { raiseAlert } from '../alerts/rules.ts'
 import { consumeApproval, requestApproval } from '../db/bot-requests.ts'
 import { applyConnectionSettings } from './connection-settings.ts'
@@ -47,9 +46,10 @@ export interface TeamHub {
 
 const BATCH = 20                // messages handed to one turn; the rest wait for the next turn
 const STOP_GRACE_MS = 3000      // same grace the task runner gives its runs on shutdown
+const SESSION_MAX_TOKENS = 100_000 // a conversation larger than this is handed over to a new session
 const RETRY_AFTER_SEC = 60      // wait after a failed turn, so an outage does not use up every attempt at once
-// Messages sent into a running turn. Past this the turn is left to end, and the rest start a new turn that goes through
-// the loop guards again; otherwise two bots answering each other could keep one turn open forever.
+// Messages sent into a running turn. Past this the turn is left to end, and the rest start a new turn that waits for a
+// free slot like any other; otherwise two bots answering each other could keep one turn open forever.
 const MAX_JOINS = 10
 
 interface ActiveTurn {
@@ -80,11 +80,8 @@ export function pauseTeam(db: Db, reason: string, kind: 'team_paused' | 'securit
   raiseAlert(db, { task_id: null, kind, message: `Bots paused: ${reason}` })
 }
 
-// Resuming is the user's decision to accept what tripped the guard, so the loop windows restart from now.
-// Without that, a resumed team would pause again on its next turn for the same reason.
 export function resumeTeam(db: Db): void {
   setMeta(db, 'team_paused', '0')
-  setMeta(db, 'team_resumed_at', String(nowSec()))
   teamChanged.notify()
 }
 
@@ -93,10 +90,6 @@ const cancelKey = (name: string) => `bot_cancel:${name}`
 export function requestBotCancel(db: Db, name: string, turnId: number): void {
   setMeta(db, cancelKey(name), String(turnId))
   teamChanged.notify()
-}
-
-function resumedAt(db: Db): number {
-  return Number(getMeta(db, 'team_resumed_at') ?? 0)
 }
 
 // Delivers mail to resident agents. An agent with deliverable messages and no open turn gets one turn that resumes its
@@ -110,28 +103,8 @@ export function createTeamHub({ db, config, backend: claude, backends = {}, retr
   const search = hybridSearch(db)
   let running = false
 
-  // Loop guards stop the whole team rather than one agent: a loop involves at least two agents, and the user should
-  // see one alert, not one per agent. There is no spend limit: turns per hour, model turns per turn and the retry
-  // limit are what bound a runaway bot.
-  // Limits come from Settings (stored in SQLite) with taskq.config.json as the starting values; a bot's own limits
-  // override the per-bot defaults.
-  function guardsHold(name: string): boolean {
-    const t = limits(db, config)
-    const bot = getAgent(db, name)
-    const hourAgo = Math.max(nowSec() - 3600, resumedAt(db))
-    const total = Number(db.prepare('SELECT count(*) AS n FROM team_turns WHERE started_at >= ?').get(hourAgo)?.n ?? 0)
-    if (total >= t.turns_per_hour_total) {
-      pauseTeam(db, `the bots took ${total} turns in the last hour (limit ${t.turns_per_hour_total})`)
-      return false
-    }
-    const recent = turnsSince(db, name, hourAgo)
-    const own = bot?.hourly_turns ?? t.bot_turns_per_hour
-    if (recent >= own) {
-      pauseTeam(db, `${name} took ${recent} turns in the last hour (limit ${own}); bots may be messaging each other in a loop`)
-      return false
-    }
-    return true
-  }
+  // There is no usage limit (removed in 0.26.0): model turns per turn and the retry limit bound one turn, and the
+  // user stops a runaway team with Pause.
 
   // The user stops a bot mid-turn. Its messages count as handled, its running task becomes cancelled.
   function cancel(name: string): boolean {
@@ -163,7 +136,6 @@ export function createTeamHub({ db, config, backend: claude, backends = {}, retr
         console.error(`taskq: could not load skills and plugins for ${name}: ${String(error)}`)
       }
       const shared = sharedDir(config)
-      const t = limits(db, config)
       const live = backend.supportsLiveInput ? new LiveInput() : undefined
       const messages = [...started.messages]
       const done = backend.runTurn(config, {
@@ -176,8 +148,8 @@ export function createTeamHub({ db, config, backend: claude, backends = {}, retr
         mcpServers: mcpServersFor(db, agent.mcp_servers ?? []),
         skills: skillsFor(db, config, agent),
         sharedDir: shared,
-        maxTurns: agent.turn_max_turns ?? t.turn_max_turns,
-        sessionMaxTokens: t.session_max_tokens,
+        maxTurns: agent.turn_max_turns ?? config.bots.turnMaxTurns,
+        sessionMaxTokens: SESSION_MAX_TOKENS,
         resume: agent.session_id,
         signal: controller.signal,
         turnId: started.turn.id,
@@ -269,7 +241,7 @@ export function createTeamHub({ db, config, backend: claude, backends = {}, retr
   }
 
   // A resumed conversation is sent, or billed, again with every turn, so a bot that talks for weeks pays for its whole
-  // past each time. When the context a turn ended with passes session_max_tokens (or 80% of the model's window), the bot
+  // past each time. When the context a turn ended with passes SESSION_MAX_TOKENS (or 80% of the model's window), the bot
   // is asked once to write itself a handover note (write_handover). The turn that reads the request is the session's
   // last: it handles its other messages as usual, and when it ends the session is dropped and the note is the first
   // message of the new one. The bot summarizes itself because only its own session holds the conversation; a bot that
@@ -313,7 +285,7 @@ export function createTeamHub({ db, config, backend: claude, backends = {}, retr
     if (!bot || bot.session_id === null || bot.tokens === null || (bot.sdk === 'openai' && bot.provider === 'chatgpt')) return
     const tokens = Number(bot.tokens)
     const window = bot.window === null ? null : Number(bot.window)
-    const max = limits(db, config).session_max_tokens
+    const max = SESSION_MAX_TOKENS
     // Kiro reports a percentage (window 100), not tokens.
     const over = window === 100 ? tokens >= 80 : tokens >= Math.min(max, window ? window * 0.8 : max)
     if (!over) return
@@ -367,7 +339,7 @@ export function createTeamHub({ db, config, backend: claude, backends = {}, retr
     if (isTeamPaused(db)) return
     // A sign-in changed from the CLI or MCP (another process) reaches this one here; the UI applies it at once.
     applyConnectionSettings(db, config)
-    // Routines come due as messages; the turn that follows is an ordinary one, under the same guards.
+    // Routines come due as messages; the turn that follows is an ordinary one.
     runDueRoutines(db)
     runTriggeredRoutines(db)
     joinRunning()
@@ -375,9 +347,8 @@ export function createTeamHub({ db, config, backend: claude, backends = {}, retr
       raiseAlert(db, { task_id: null, kind: 'team_message', message: `Discussion #${id} was closed without a conclusion: its moderator is disabled.` })
     }
     for (const name of agentsWithMail(db, nowSec(), retryAfterSec)) {
-      if (active.size >= limits(db, config).max_concurrent_turns) return
+      if (active.size >= config.bots.maxConcurrentTurns) return
       if (active.has(name)) continue
-      if (!guardsHold(name)) return
       launch(name)
     }
   }

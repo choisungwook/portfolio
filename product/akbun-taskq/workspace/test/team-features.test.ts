@@ -15,7 +15,7 @@ import { teamTools } from '../src/team/tools.ts'
 import { similarity } from '../src/team/tools-tasks.ts'
 import { escapeTags, promptFor } from '../src/team/prompt.ts'
 import { reviewOwner } from '../src/team/report.ts'
-import { createTeamHub, isTeamPaused, resumeTeam, type TeamHub } from '../src/team/hub.ts'
+import { createTeamHub, isTeamPaused, type TeamHub } from '../src/team/hub.ts'
 import type { TeamBackend, TurnRequest, TurnResult } from '../src/team/types.ts'
 import { teamChanged } from '../src/wake.ts'
 import { nowSec } from '../src/time.ts'
@@ -260,23 +260,6 @@ describe('turn safety', () => {
       assert.deepEqual(agentsWithMail(env.db, nowSec(), 0), [])
       assert.ok(listAlerts(env.db, false).some((a) => /stopped during the turn/.test(a.message)))
     })
-  })
-
-  test('resume restarts the loop window instead of pausing again on the next turn', async () => {
-    env.config.bots.hourlyTurnsPerAgent = 1
-    const { backend, requests } = fakeBackend(() => ({ outcome: 'done', cost_usd: 0 }))
-    hub = createTeamHub({ db: env.db, config: env.config, backend, retryAfterSec: 0 })
-    await hub.start()
-    postMessage(env.db, { sender: USER, recipient: 'taskq', body: 'one' })
-    teamChanged.notify()
-    await waitFor(() => listTurns(env.db, 5).some((t) => t.ended_at !== null))
-    postMessage(env.db, { sender: USER, recipient: 'taskq', body: 'two' })
-    teamChanged.notify()
-    await waitFor(() => isTeamPaused(env.db))
-    await sleep(1100)
-    resumeTeam(env.db)
-    await waitFor(() => requests.length === 2)
-    assert.equal(isTeamPaused(env.db), false)
   })
 
   test('giving the task of the user to a bot tells the user', () => {
