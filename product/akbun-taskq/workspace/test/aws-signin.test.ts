@@ -97,7 +97,7 @@ describe('AWS profile sign-in', () => {
     assert.ok(!(leaky.error ?? '').includes('abc123'), 'the SDK message (a credential_process command line) is not kept')
     assert.match(leaky.error ?? '', /keys-only gave no credentials: check its keys or role/)
     env.config.bots.bedrockProfile = 'example-sso'
-    assert.equal(expired.auth_failed, undefined, 'the bot stays on; the user signs in by hand and it works again')
+    assert.equal(expired.auth_failed, true, 'no credentials is a lost login: the bot is turned off and a passing check turns it on again')
   })
 
   test('[critical] SigV4 matches the AWS examples; openai.* becomes the region\'s inference profile', () => {

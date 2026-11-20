@@ -3,7 +3,7 @@ import { mkdirSync, readdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { agentDir } from '../../team/prompt.ts'
 import type { BotProvider } from '../../db/team.ts'
 import { runCodexTurn, spawnCodex, type CodexSpawn } from './codex.ts'
-import { bedrockModelId, listInferenceProfiles, makeBedrockToken, profileFailure, type InferenceProfileLister, type TokenMaker } from '../../aws/profiles.ts'
+import { bedrockModelId, forgetBedrockTokens, listInferenceProfiles, makeBedrockToken, profileFailure, type InferenceProfileLister, type TokenMaker } from '../../aws/profiles.ts'
 import { join } from 'node:path'
 import { OpenAIProvider } from '@openai/agents-openai'
 import { z } from 'zod'
@@ -238,7 +238,8 @@ export function createOpenAITeamBackend(runFn?: OpenAIRunFn, fetcher: typeof fet
           bedrockToken = await bedrockKey(config)
         } catch {
           // The SDK's message can carry a credential_process command line or its output, so only a fixed sentence is kept.
-          return { outcome: 'failed', cost_usd: 0, error: profileFailure(config.bots.bedrockProfile) }
+          // The profile gives no credentials (an SSO session that expired): a retry cannot fix it, a new login does.
+          return { outcome: 'failed', cost_usd: 0, error: profileFailure(config.bots.bedrockProfile), auth_failed: true }
         }
         if (!runFn && !bedrockToken) return { outcome: 'failed', error: 'no Bedrock sign-in: choose an AWS profile in Settings > Connections, or set AWS_BEARER_TOKEN_BEDROCK (a Bedrock API key)' }
       }
@@ -298,13 +299,24 @@ export function createOpenAITeamBackend(runFn?: OpenAIRunFn, fetcher: typeof fet
         if (tampered) return { outcome: 'failed', error: tampered, tampered }
         if (error instanceof MaxTurnsExceededError) return { outcome: 'failed', error: `stopped after ${request.maxTurns} model turns` }
         const message = error instanceof Error ? error.message : String(error)
-        if (statusOf(error) === 401) return { outcome: 'failed', error: 'OpenAI rejected the API key', auth_failed: true }
         if (/previous_response_not_found|Previous response .* not found/i.test(message)) return { outcome: 'failed', error: 'the previous conversation is gone; the next turn starts a new one', session_missing: true }
         if (request.signal.aborted) return { outcome: 'failed', error: 'stopped' }
         // A 4xx other than a timeout, a rate limit or a denied sign-in (403: an expired AWS session, which a new login
         // fixes) is the provider refusing the request itself (a model id it does not serve, a setting it does not take). Nothing was generated, so it costs nothing, and trying again changes nothing.
         // ponytail: a 4xx after earlier model calls of the same turn loses their cost; carry usage on the error if it matters.
         const status = statusOf(error) ?? 0
+        // Bedrock refuses (401, 403) a token signed with credentials that have since expired; the token is kept for 10
+        // minutes, so it can outlive them. Drop it and ask the profile again: no credentials means the SSO session is
+        // over, which only a new login fixes. Credentials that still work leave it a plain retry: the sign-in is
+        // sound, so the bot is not turned off.
+        if ((status === 401 || status === 403) && provider === 'bedrock' && config.bots.bedrockProfile) {
+          forgetBedrockTokens()
+          try {
+            await bedrockKey(config)
+          } catch {
+            return { outcome: 'failed', cost_usd: 0, error: profileFailure(config.bots.bedrockProfile), auth_failed: true }
+          }
+        } else if (status === 401) return { outcome: 'failed', error: 'OpenAI rejected the API key', auth_failed: true }
         if (status >= 400 && status < 500 && status !== 403 && status !== 408 && status !== 429) return { outcome: 'failed', cost_usd: 0, error: message.slice(0, 300), rejected: true }
         return { outcome: 'failed', error: message.slice(0, 300) }
       } finally {

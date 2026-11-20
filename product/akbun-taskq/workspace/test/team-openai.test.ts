@@ -154,6 +154,29 @@ describe('openai team backend', () => {
     }
   })
 
+  test('[critical] a Bedrock 403 from an AWS profile that gives no credentials any more is a lost login, not a retry', async () => {
+    env.config.bots.bedrockProfile = 'example-sso'
+    const denied: OpenAIRunFn = async () => {
+      throw Object.assign(new Error('403 The security token included in the request is expired'), { status: 403 })
+    }
+    const bedrock = { ...request, agent: { ...request.agent, provider: 'bedrock' as const }, resume: null }
+    let made = 0
+    // The first token is the cached one from before the SSO session ended; asking again fails.
+    const expired = await createOpenAITeamBackend(denied, undefined, undefined, async () => {
+      made += 1
+      if (made > 1) throw new Error('The SSO session associated with this profile has expired')
+      return 'token'
+    }, async () => []).runTurn(env.config, bedrock)
+    assert.deepEqual([expired.auth_failed, expired.cost_usd], [true, 0])
+    assert.match(expired.error ?? '', /aws sso login --profile example-sso|no such profile/)
+    // Credentials that still work: the 403 is something else and keeps the retry.
+    const working = await createOpenAITeamBackend(denied, undefined, undefined, async () => 'token', async () => []).runTurn(env.config, bedrock)
+    assert.deepEqual([working.auth_failed, working.rejected], [undefined, undefined])
+    // No credentials at the start of a turn is the same lost login.
+    const none = await createOpenAITeamBackend(denied, undefined, undefined, async () => { throw new Error('expired') }, async () => []).runTurn(env.config, bedrock)
+    assert.equal(none.auth_failed, true)
+  })
+
   test('a Bedrock turn longer than the history limit keeps itself whole from its user message', async () => {
     const long = [{ role: 'user', content: 'old' }, { role: 'assistant', content: 'a' },
       { role: 'user', content: 'task' }, ...Array.from({ length: 250 }, (_, i) => ({ type: 'function_call_result', callId: String(i) }))]
