@@ -51,6 +51,7 @@
 
 - 배포, 설치 패키지, updater 산출물, 서명 명령 실행
 - master로 merge, force push, branch 삭제. 각 command가 그 명시적 지시에 해당한다.
+  - PR을 생성했거나 merge할 때는 걸려 있는 CI check가 모두 통과했는지 확인한다. 아직 도는 중이면 끝날 때까지 기다린다.
 - 클라우드 리소스 생성과 삭제(`terraform apply`, `terraform destroy`). 과금 리소스가 생기거나 사라진다. 검증하려고 destroy하라는 지시는 그 뒤에 다시 apply하는 것까지 허락하지 않는다.
 
 ## 리뷰
