@@ -1,7 +1,8 @@
 name: verify-akbun-taskq
 
 # This job proves the code still type checks and passes its tests on pull requests.
-# It does not run on master: the PR already proved the merged code, and release-akbun-taskq.yml releases it.
+# It does not run on master, where only release-akbun-taskq.yml runs. Pull requests run the [critical] tests; the
+# full suite runs locally (npm test) and through a manual dispatch of this workflow.
 on:
   pull_request:
     paths:
@@ -91,6 +92,7 @@ jobs:
         env:
           TASKQ_NO_NOTIFY: '1'
 
+      # Only a manual dispatch reaches this step: the workflow has no push trigger.
       - name: Run all tests
         if: github.event_name != 'pull_request'
         run: node --test --test-shard=${{ matrix.shard }}/2 "test/**/*.test.ts"
