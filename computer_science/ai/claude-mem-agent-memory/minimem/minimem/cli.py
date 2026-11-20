@@ -16,7 +16,7 @@ def show_events(args: argparse.Namespace) -> None:
   rows = db.connect().execute("SELECT * FROM events WHERE project = ? ORDER BY id", (args.project,)).fetchall()
   for r in rows:
     size = len(r["tool_input"]) + len(r["tool_output"])
-    print(f"{r['id']}\t{r['tool_name']}\t{size} chars\tprocessed={r['processed']}\t{r['tool_input'][:60]}")
+    print(f"{r['id']}  {r['tool_name']}  {size} chars  processed={r['processed']}  {r['tool_input'][:60]}")
 
 
 def show_observations(args: argparse.Namespace) -> None:

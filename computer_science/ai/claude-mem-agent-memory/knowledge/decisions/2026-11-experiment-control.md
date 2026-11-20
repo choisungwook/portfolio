@@ -6,8 +6,6 @@ tags: [claude-code, experiment]
 generated: { by: claude-code/claude-opus-5-5, at: 2026-11-18T12:00:00Z }
 ---
 
-# 메모리 비교 실험은 저장소 밖 프로젝트와 transcript 비활성화로 통제한다
-
 ## 결정
 
 - `make up`은 실습 프로젝트를 `~/minimem-workspace/shop`에 만든다.

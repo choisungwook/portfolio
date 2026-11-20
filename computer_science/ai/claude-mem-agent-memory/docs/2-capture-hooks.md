@@ -96,11 +96,11 @@ uv run --project minimem minimem events shop
 ```
 
 ```text
-1	Bash	379 chars	processed=1	{"command": "ls -R . | head -50 && python -m pytest tests/te
-2	Read	392 chars	processed=1	{"file_path": "/root/minimem-workspace/shop/shop/discount.py
-3	Read	686 chars	processed=1	{"file_path": "/root/minimem-workspace/shop/tests/test_disco
-4	Edit	894 chars	processed=1	{"file_path": "/root/minimem-workspace/shop/shop/discount.py
-5	Bash	266 chars	processed=1	{"command": "python -m unittest tests.test_discount 2>&1 | t
+1  Bash  379 chars  processed=1  {"command": "ls -R . | head -50 && python -m pytest tests/te
+2  Read  392 chars  processed=1  {"file_path": "/root/minimem-workspace/shop/shop/discount.py
+3  Read  686 chars  processed=1  {"file_path": "/root/minimem-workspace/shop/tests/test_disco
+4  Edit  894 chars  processed=1  {"file_path": "/root/minimem-workspace/shop/shop/discount.py
+5  Bash  266 chars  processed=1  {"command": "python -m unittest tests.test_discount 2>&1 | t
 ```
 
 `run_session.py`가 보고한 세션 A의 도구 호출 5개(`Bash` 2, `Read` 2, `Edit` 1)가 모두 행으로 남았습니다. 1번 이벤트의 출력에는 `No module named pytest`가 들어 있고, 이것이 시나리오 3에서 관찰 `#2`가 됩니다.

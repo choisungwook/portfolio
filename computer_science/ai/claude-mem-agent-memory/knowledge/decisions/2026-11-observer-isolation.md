@@ -10,8 +10,6 @@ sources:
     title: claude-mem hardened-options.ts
 ---
 
-# observer는 임시 디렉터리에서 도구와 설정을 끈 claude -p로 실행한다
-
 ## 결정
 
 - `call_llm()`은 `tempfile.TemporaryDirectory()`를 `cwd`로 쓰고 `--tools=`, `--setting-sources=`, `--strict-mcp-config`, `--no-session-persistence`, `--system-prompt`를 붙인다.

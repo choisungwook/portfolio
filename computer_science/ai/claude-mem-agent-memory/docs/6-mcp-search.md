@@ -175,14 +175,14 @@ uv run --project minimem minimem events shop
 ```
 
 ```text
-1	Bash	379 chars	processed=1	{"command": "ls -R . | head -50 && python -m pytest tests/te
-2	Read	392 chars	processed=1	{"file_path": "/root/minimem-workspace/shop/shop/discount.py
-3	Read	686 chars	processed=1	{"file_path": "/root/minimem-workspace/shop/tests/test_disco
-4	Edit	894 chars	processed=1	{"file_path": "/root/minimem-workspace/shop/shop/discount.py
-5	Bash	266 chars	processed=1	{"command": "python -m unittest tests.test_discount 2>&1 | t
-6	Write	1321 chars	processed=1	{"file_path": "/root/minimem-workspace/shop/shop/coupon.py",
-7	Write	2301 chars	processed=1	{"file_path": "/root/minimem-workspace/shop/tests/test_coupo
-8	Bash	274 chars	processed=1	{"command": "python -m unittest discover -s tests -t . 2>&1 
+1  Bash  379 chars  processed=1  {"command": "ls -R . | head -50 && python -m pytest tests/te
+2  Read  392 chars  processed=1  {"file_path": "/root/minimem-workspace/shop/shop/discount.py
+3  Read  686 chars  processed=1  {"file_path": "/root/minimem-workspace/shop/tests/test_disco
+4  Edit  894 chars  processed=1  {"file_path": "/root/minimem-workspace/shop/shop/discount.py
+5  Bash  266 chars  processed=1  {"command": "python -m unittest tests.test_discount 2>&1 | t
+6  Write  1321 chars  processed=1  {"file_path": "/root/minimem-workspace/shop/shop/coupon.py",
+7  Write  2301 chars  processed=1  {"file_path": "/root/minimem-workspace/shop/tests/test_coupo
+8  Bash  274 chars  processed=1  {"command": "python -m unittest discover -s tests -t . 2>&1 
 ```
 
 1~5번은 세션 A, 6~8번은 세션 C의 이벤트입니다. 세션 C의 `Bash` 3회 중 첫 번째는 아직 없는 `shop/coupon.py`를 `cat`하다 exit 1로 실패했고, 두 번째(heredoc으로 파일 쓰기)는 Claude Code가 승인 필요로 거부했습니다. 실패한 호출은 `PostToolUse`가 아니라 `PostToolUseFailure`로 가므로 기록되지 않았습니다. 세션 D의 메모리 조회는 기록되지 않았고, `minimem context shop`의 "지난 세션 요약"은 세션 C의 쿠폰 작업 내용을 유지합니다.

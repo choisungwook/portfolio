@@ -6,8 +6,6 @@ tags: [sqlite, fts5, search, korean]
 generated: { by: claude-code/claude-opus-5-5, at: 2026-11-18T12:00:00Z }
 ---
 
-# 관찰 검색은 trigram FTS5와 LIKE를 조합하고 OR로 묶는다
-
 ## 결정
 
 - `observations_fts`는 `tokenize='trigram'`으로 만든다.
