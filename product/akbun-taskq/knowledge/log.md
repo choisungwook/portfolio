@@ -4,6 +4,7 @@ concept를 추가·수정·삭제할 때마다 오늘 날짜 섹션을 맨 위�
 
 ## 2026-11-20
 
+* **Update**: [bun binary release](decisions/2026-11-release-bun-binary.md)에 0.22.2부터 Linux 바이너리를 만들지 않는 결정과 이유를 추가.
 * **Update**: [desktop app shell](decisions/2026-11-desktop-app-shell.md)에 `TASKQ_HOME`이 없을 때 앱이 `~/.taskq`를 home으로 쓰는 결정과 이유(Finder의 현재 디렉터리 `/`)를 추가.
 * **Update**: [bot runtimes](decisions/2026-11-bot-runtimes-beyond-sdks.md)에 로그인 실패를 확실할 때만 판정하는 기준(Kiro는 whoami, Bedrock은 프로파일의 자격 증명)과 Kiro 로그인을 터미널 아래에서 실행하는 결정을 추가.
 * **Add**: [The macOS desktop app is a Tauri window around the released executable](decisions/2026-11-desktop-app-shell.md)

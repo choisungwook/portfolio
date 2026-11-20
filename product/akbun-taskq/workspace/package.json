@@ -1,6 +1,6 @@
 {
   "name": "akbun-taskq",
-  "version": "0.22.1",
+  "version": "0.22.2",
   "private": true,
   "type": "module",
   "description": "Personal agent task queue",

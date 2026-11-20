@@ -29,7 +29,7 @@ npm run demo
 - 모델에 접근할 방법 하나: Amazon Bedrock, Anthropic API 키, Claude 구독 로그인 중 하나.
 - macOS, Linux 또는 Windows의 WSL2. 세션은 Claude Code 샌드박스 안에서 돌고, 샌드박스를 쓸 수 없으면 시작하지 않는다.
 
-바이너리는 GitHub Release의 `akbun-taskq-v<버전>`에 있다. Apple silicon은 `taskq-darwin-arm64.tar.gz`, linux x86_64는 `taskq-linux-x64.tar.gz`다. 화면, DB 스키마, 버전이 맞는 Claude Code가 파일 하나에 들어 있다. 압축을 풀어 PATH에 두고, macOS에서 브라우저로 받았으면 한 번 격리 속성을 지운다.
+바이너리는 GitHub Release의 `akbun-taskq-v<버전>`에 있다. Apple silicon용 `taskq-darwin-arm64.tar.gz`만 있다. Linux와 Windows용 바이너리는 만들지 않는다. 화면, DB 스키마, 버전이 맞는 Claude Code가 파일 하나에 들어 있다. 압축을 풀어 PATH에 두고, macOS에서 브라우저로 받았으면 한 번 격리 속성을 지운다.
 
 ```bash
 tar -xzf taskq-darwin-arm64.tar.gz
