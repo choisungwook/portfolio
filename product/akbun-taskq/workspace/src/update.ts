@@ -29,10 +29,9 @@ export function newer(a: string, b: string): boolean {
   return false
 }
 
-// The release asset built for this machine (the release workflow builds these two).
+// The release asset built for this machine. The release workflow builds only darwin-arm64.
 export function assetName(platform = process.platform, arch = process.arch): string | null {
   if (platform === 'darwin' && arch === 'arm64') return 'taskq-darwin-arm64.tar.gz'
-  if (platform === 'linux' && arch === 'x64') return 'taskq-linux-x64.tar.gz'
   return null
 }
 

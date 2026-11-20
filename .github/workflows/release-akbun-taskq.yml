@@ -72,7 +72,7 @@ jobs:
         run: tar -czf "taskq-${{ matrix.target }}.tar.gz" -C dist taskq
 
       # The desktop app is a window around the executable built above: tauri bundles it next to the app's own binary.
-      # macOS only, so it never runs on a pull request. Unsigned, like the executable.
+      # Releases only, not pull requests: the bundle adds minutes and a PR proves the executable. Unsigned, like the executable.
       - uses: dtolnay/rust-toolchain@stable
         if: github.event_name != 'pull_request' && matrix.target == 'darwin-arm64'
 

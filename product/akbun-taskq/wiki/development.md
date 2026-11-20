@@ -71,7 +71,7 @@ Seed runs, events and alerts through the functions in `src/db` and `src/runner`,
 
 ## Build the binary
 
-`node scripts/build-binary.ts` writes `dist/taskq` with bun on PATH. It generates `dist/binary-entry.ts`, which embeds every file under `ui/` and `src/db/schema/` plus the Claude Code binary of the installed SDK, registers them in `src/resources.ts`, and then imports `src/cli/main.ts`. Code that reads a file at run time goes through `resourcePath()`, not `import.meta.url`, or the binary will not find it. The Claude Code binary comes from the platform package npm installed, so build on the target OS. `release-akbun-taskq.yml` builds darwin-arm64 and linux-x64 and releases them as `akbun-taskq-v<version>` from `package.json`; bump the version with any change under `src/`, `ui/` or the package files.
+`node scripts/build-binary.ts` writes `dist/taskq` with bun on PATH. It generates `dist/binary-entry.ts`, which embeds every file under `ui/` and `src/db/schema/` plus the Claude Code binary of the installed SDK, registers them in `src/resources.ts`, and then imports `src/cli/main.ts`. Code that reads a file at run time goes through `resourcePath()`, not `import.meta.url`, or the binary will not find it. The Claude Code binary comes from the platform package npm installed, so build on the target OS. `release-akbun-taskq.yml` builds darwin-arm64 and releases it as `akbun-taskq-v<version>` from `package.json`; bump the version with any change under `src/`, `ui/` or the package files.
 
 ## Build the desktop app
 
