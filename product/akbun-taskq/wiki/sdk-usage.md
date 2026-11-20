@@ -45,7 +45,7 @@ taskq calls the SDK from three places. All three run the Claude Code executable 
 | `additionalDirectories` | per task type | `TASKQ_HOME/shared`, the folder every bot shares, and `TASKQ_HOME/worktrees`, where code tasks have their worktrees | not set |
 | `sandbox` | on, per profile | only when the bot turns it on: writes to workdir and shared folder, reads of taskq data denied, network to `allowed_domains` | not set |
 | `effort` | not set | the bot's effort (`low` to `max`), else the model default | not set |
-| `maxTurns`, `maxBudgetUsd` | task or config limits | `maxTurns` from the bot's limit, else the default in Settings; no `maxBudgetUsd` | `maxTurns` 3 |
+| `maxTurns`, `maxBudgetUsd` | task or config limits | `maxTurns` from the bot's limit, else `bots.turnMaxTurns` in taskq.config.json; no `maxBudgetUsd` | `maxTurns` 3 |
 | `resume` | a resumed task run's session | the bot's session id | not set |
 | `abortController` | cancel, tamper, expired login | cancel (Stop, Esc), tamper, shutdown | not set |
 | `systemPrompt` | `claude_code` preset with the task rules appended | `claude_code` preset with the bot's role, roster, rules and memory appended | not set |

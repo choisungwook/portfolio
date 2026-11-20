@@ -338,9 +338,8 @@
     </fieldset>
     <fieldset data-edit-only>
       <legend>Limits</legend>
-      <p class="meta">Empty uses the default in Settings.</p>
+      <p class="meta">Empty uses turnMaxTurns in taskq.config.json.</p>
       <div class="bot-form-grid">
-        <label>Turns per hour <input name="hourly_turns" type="number" min="1" max="1000" step="1"></label>
         <label>Model turns per turn <input name="turn_max_turns" type="number" min="1" max="500" step="1"></label>
       </div>
       <button type="button" data-area="bot-session-folder">Open session folder</button>
@@ -379,7 +378,6 @@
       <h2 id="settings-title" data-i18n="settings.title">Settings</h2>
       <button type="button" data-page="appearance" data-i18n="settings.appearance">Appearance</button>
       <button type="button" data-page="connections" data-i18n="settings.connections">Connections</button>
-      <button type="button" data-page="limits" data-i18n="settings.limits">Rate limits</button>
       <button type="button" data-page="usage" data-i18n="settings.usage">Usage</button>
       <button type="button" data-page="review" data-i18n="settings.review">Weekly review</button>
       <button type="button" data-page="folders" data-i18n="settings.folders">Folders</button>
@@ -429,11 +427,6 @@
         <div data-area="kiro-login"></div>
       </form>
       <datalist id="aws-profile-list" data-area="aws-profile-list"></datalist>
-    </section>
-    <section class="settings-section" data-settings-page="limits" aria-labelledby="limits-title" hidden>
-      <h1 class="page-title" id="limits-title" data-i18n="settings.limits">Rate limits</h1>
-      <p class="meta" data-i18n="settings.limits.hint">Limits for all bots together, and the defaults each bot uses unless its own settings say otherwise.</p>
-      <form class="limits-form" data-area="limits-form"></form>
     </section>
     <section class="settings-section" data-settings-page="usage" aria-labelledby="usage-title" hidden>
       <div class="plugins-head">

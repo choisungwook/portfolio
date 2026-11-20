@@ -21,7 +21,6 @@
   "bots": {
     "maxConcurrentTurns": 2,
     "turnMaxTurns": 30,
-    "hourlyTurnsPerAgent": 20,
     "maxOpenTasks": 10,
     "maxAttempts": 3,
     "readRoots": []

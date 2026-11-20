@@ -65,14 +65,6 @@ gh auth status
 - squash merge commit 제목 끝에는 `(#<PR 번호>)`를 붙여 commit에서 PR을 추적할 수 있게 한다.
 - Issue body, PR body, commit message에 claude session 링크를 넣지 않는다.
 
-## Issue와 PR 문체
-
-- 한글 개조식으로 쓴다. 서술형 종결어미(-다, -한다, -했다, -된다)를 쓰지 않고 명사나 -음, -함으로 끝낸다.
-  - 서술형: `PR body가 길어서 읽지 않게 되는 문제를 없앤다.`
-  - 개조식: `길어서 읽지 않게 되는 PR body 축소`
-- 명령, 파일 경로, 식별자는 backtick으로 감싼다. Issue와 PR의 독자가 agent이고, agent는 그 값을 그대로 실행하거나 검색한다. 강조에는 쓰지 않는다.
-- label은 작업 유형(예: `feat`, `docs`, `fix`)과 기술 태그(예: `kubernetes`, `aws`, `terraform`)를 함께 붙인다.
-
 ## 작업 기록
 
 PR 본문에 작업 목적, 범위, 완료 조건, 중요한 결정과 그 근거를 남긴다. 구현 전에 별도의 작업 항목을 기록할 때는 Issue 템플릿을 사용한다.

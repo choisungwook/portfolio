@@ -1,14 +1,14 @@
 ---
 type: Decision
 title: A conversation over a token limit is handed over to a new session by the bot itself
-description: Past session_max_tokens the hub asks the bot once for a handover note, resets the session after that turn, and delivers the note as the first message; Codex compacts itself at the same limit.
+description: Past 100,000 tokens the hub asks the bot once for a handover note, resets the session after that turn, and delivers the note as the first message; Codex compacts itself at the same limit.
 tags: [bots, sessions, tokens, cost]
-generated: { by: claude-code/claude-fable-5-2, at: 2026-11-20T00:00:00Z }
+generated: { by: claude-code/claude-opus-5-5, at: 2026-11-20T00:00:00Z }
 ---
 
 ## 결정
 
-- turn이 끝났을 때의 context 크기(`context_tokens`)가 `session_max_tokens`(기본 100,000, 설정에서 변경)나 모델 window의 80%를 넘으면 hub가 그 bot에게 인수인계 메모를 한 번 요청한다.
+- turn이 끝났을 때의 context 크기(`context_tokens`)가 `SESSION_MAX_TOKENS`(100,000, 0.26.0부터 고정)나 모델 window의 80%를 넘으면 hub가 그 bot에게 인수인계 메모를 한 번 요청한다.
 - 그 요청을 읽은 turn이 `done`으로 끝나면 세션을 비우고, bot이 `write_handover`로 남긴 메모를 새 세션의 첫 메시지로 넣는다.
 - 요청을 읽은 turn은 함께 온 다른 메시지를 평소대로 처리하고 메모를 마지막에 쓴다. 요청은 따로 배달하지 않는다.
 - 세션의 첫 turn에는 요청하지 않는다. 요청 표시(`team_handover:<bot>`)에는 요청한 세션 id를 함께 적고, turn을 시작하기 전에 그 세션이 아니거나 요청 메시지가 inbox에 없으면 요청과 메모를 거둔다.

@@ -6,7 +6,6 @@ import { join } from 'node:path'
 import { createApp } from '../src/api/server.ts'
 import { openDb } from '../src/db/open.ts'
 import { getAgent, listMessages, postMessage, updateAgent } from '../src/db/team.ts'
-import { limits } from '../src/db/settings.ts'
 import { appearance } from '../src/db/meta.ts'
 import { createTeamHub } from '../src/team/hub.ts'
 import type { TeamBackend } from '../src/team/types.ts'
@@ -15,7 +14,7 @@ import { getTask, insertTask } from '../src/db/tasks.ts'
 import { startBotTask } from '../src/team/bot-work.ts'
 import { seedTestBots, setup, waitFor, TOKEN, type TestEnv } from './helpers.ts'
 
-describe('files, search, memory, limits and settings', () => {
+describe('files, search, memory and settings', () => {
   let env: TestEnv
   const opened: string[] = []
   test.beforeEach(async () => {
@@ -78,22 +77,18 @@ describe('files, search, memory, limits and settings', () => {
     assert.deepEqual(await (await call('GET', '/bots/coder/memory')).json(), { memory: 'prefers pnpm', limit: 16000 })
   })
 
-  test('[critical] limits, appearance, bots and memory survive closing and reopening the database', async () => {
-    assert.equal((await call('POST', '/settings/limits', { max_concurrent_turns: 3, bot_turns_per_hour: 7 })).status, 200)
-    assert.equal((await call('POST', '/settings/limits', { max_concurrent_turns: 0 })).status, 400)
+  test('[critical] appearance, bots and memory survive closing and reopening the database', async () => {
     assert.equal((await call('POST', '/settings/appearance', { language: 'en', theme: 'dark' })).status, 200)
     assert.equal((await call('POST', '/settings/appearance', { theme: 'blue' })).status, 400)
-    await call('PUT', '/bots/coder', { sandbox: true, hourly_turns: 3 })
+    await call('PUT', '/bots/coder', { sandbox: true, turn_max_turns: 3 })
     await call('PUT', '/bots/coder/memory', { memory: 'remember me' })
     // A second connection to the same file is what a restarted (or upgraded) taskq sees.
     const reopened = openDb(env.home)
     try {
-      assert.equal(limits(reopened, env.config).max_concurrent_turns, 3)
-      assert.equal(limits(reopened, env.config).bot_turns_per_hour, 7)
       assert.deepEqual({ ...appearance(reopened) }, { font_family: 'system', font_size: 15, language: 'en', theme: 'dark' })
       const coder = getAgent(reopened, 'coder')!
       assert.equal(coder.sandbox, true)
-      assert.equal(coder.hourly_turns, 3)
+      assert.equal(coder.turn_max_turns, 3)
       assert.equal(coder.memory, 'remember me')
     } finally {
       reopened.close()

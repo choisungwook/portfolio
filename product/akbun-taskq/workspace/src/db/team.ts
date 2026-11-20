@@ -40,7 +40,6 @@ export interface BotSettings {
   effort: BotEffort | null    // reasoning effort; null leaves it to the model
   sdk: BotSdk                 // which agent SDK runs the bot
   provider: BotProvider | null   // how it signs in (PROVIDERS_BY_SDK); null is api for OpenAI, the Connections choice for Claude
-  hourly_turns: number | null    // per-bot rate limit; null uses the global default
   turn_max_turns: number | null  // per-turn model turns; null uses the global default
   charter_owns: string           // charter: what this bot is responsible for
   charter_good: string           // charter: what a good result looks like
@@ -105,13 +104,13 @@ function toAgent(row: Record<string, unknown>, all: ReturnType<typeof shared>): 
 
 export function createAgent(db: Db, name: string, settings: BotSettings, system = false): void {
   db.prepare(`INSERT INTO team_agents (name, role, description, instructions, may_message_user, enabled, system,
-    permission_mode, sandbox, allowed_domains, blocked_commands, workdir, skills, plugins, model, sdk, hourly_turns,
+    permission_mode, sandbox, allowed_domains, blocked_commands, workdir, skills, plugins, model, sdk,
     turn_max_turns, effort, mcp_servers, provider, charter_owns, charter_good, charter_never, ask_first, created_at)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`).run(
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`).run(
     name, settings.role, settings.description, settings.instructions, settings.may_message_user ? 1 : 0, settings.enabled ? 1 : 0,
     system ? 1 : 0, settings.permission_mode, settings.sandbox ? 1 : 0, JSON.stringify(settings.allowed_domains),
     JSON.stringify(settings.blocked_commands), settings.workdir, JSON.stringify(settings.skills), JSON.stringify(settings.plugins),
-    settings.model, settings.sdk, settings.hourly_turns, settings.turn_max_turns, settings.effort,
+    settings.model, settings.sdk, settings.turn_max_turns, settings.effort,
     JSON.stringify(settings.mcp_servers ?? []), settings.provider ?? null, settings.charter_owns ?? '', settings.charter_good ?? '',
     settings.charter_never ?? '', JSON.stringify(settings.ask_first ?? []), nowSec())
 }
@@ -125,13 +124,13 @@ export function updateAgent(db: Db, name: string, settings: BotSettings): boolea
     WHERE name = ? AND (sdk IS NOT ? OR coalesce(provider, 'api') IS NOT coalesce(?, 'api'))`).run(name, settings.sdk, settings.provider ?? null)
   return db.prepare(`UPDATE team_agents SET role = ?, description = ?, instructions = ?, may_message_user = ?, enabled = ?,
     permission_mode = ?, sandbox = ?, allowed_domains = ?, blocked_commands = ?, workdir = ?, skills = ?, plugins = ?, model = ?,
-    sdk = ?, hourly_turns = ?, turn_max_turns = ?, effort = ?, mcp_servers = ?, provider = ?,
+    sdk = ?, turn_max_turns = ?, effort = ?, mcp_servers = ?, provider = ?,
     charter_owns = ?, charter_good = ?, charter_never = ?, ask_first = ?
     WHERE name = ?`).run(
     settings.role, settings.description, settings.instructions, settings.may_message_user ? 1 : 0, settings.enabled ? 1 : 0,
     settings.permission_mode, settings.sandbox ? 1 : 0, JSON.stringify(settings.allowed_domains), JSON.stringify(settings.blocked_commands),
     settings.workdir, JSON.stringify(settings.skills), JSON.stringify(settings.plugins), settings.model, settings.sdk,
-    settings.hourly_turns, settings.turn_max_turns, settings.effort, JSON.stringify(settings.mcp_servers ?? []), settings.provider ?? null,
+    settings.turn_max_turns, settings.effort, JSON.stringify(settings.mcp_servers ?? []), settings.provider ?? null,
     settings.charter_owns ?? '', settings.charter_good ?? '', settings.charter_never ?? '', JSON.stringify(settings.ask_first ?? []), name).changes === 1
 }
 
@@ -333,10 +332,6 @@ export function recoverTurns(db: Db): { agent: string; turn: number; end: TurnEn
       return { agent: String(row.agent), turn: id, end: releaseMessages(db, id, true, Number.MAX_SAFE_INTEGER) }
     })
   })
-}
-
-export function turnsSince(db: Db, agent: string, since: number): number {
-  return Number(db.prepare('SELECT count(*) AS n FROM team_turns WHERE agent = ? AND started_at >= ?').get(agent, since)?.n ?? 0)
 }
 
 export function listMessages(db: Db, filter: { agent?: string; recipient?: string; unread?: boolean; limit: number }): TeamMessage[] {

@@ -1,7 +1,7 @@
 import { test, describe } from 'node:test'
 import assert from 'node:assert/strict'
 import { USER, getAgent, listMessages, listTurns, postMessage, seedAgents, setAgentSession, updateAgent } from '../src/db/team.ts'
-import { createTeamHub, isTeamPaused, resumeTeam, teamPauseReason, type TeamHub } from '../src/team/hub.ts'
+import { createTeamHub, isTeamPaused, resumeTeam, type TeamHub } from '../src/team/hub.ts'
 import type { TeamBackend, TurnRequest, TurnResult } from '../src/team/types.ts'
 import { teamChanged } from '../src/wake.ts'
 import { seedTestBots, setup, sleep, waitFor, TOKEN, type TestEnv } from './helpers.ts'
@@ -116,24 +116,6 @@ describe('team hub', () => {
     await waitFor(() => listTurns(db, 5).filter((t) => t.ended_at !== null).length === 2)
     const costs = listTurns(db, 5).map((t) => Math.round((t.cost_usd ?? 0) * 100) / 100).sort()
     assert.deepEqual(costs, [0.3, 0.5])
-  })
-
-  test('two agents messaging each other in a loop pause the team', async () => {
-    const { db, config } = env
-    config.bots.hourlyTurnsPerAgent = 3
-    const { backend } = fakeBackend((request, call) => {
-      call('send_message', { to: request.agent.name === 'taskq' ? 'planner' : 'taskq', body: 'your turn' })
-      return { outcome: 'done', cost_usd: 0 }
-    })
-    hub = createTeamHub({ db, config, backend, retryAfterSec: 0 })
-    await hub.start()
-    postMessage(db, { sender: USER, recipient: 'taskq', body: 'go' })
-    teamChanged.notify()
-    await waitFor(() => isTeamPaused(db))
-    assert.match(teamPauseReason(db) ?? '', /loop/)
-    const turns = listTurns(db, 50).length
-    await sleep(50)
-    assert.equal(listTurns(db, 50).length, turns)
   })
 
   test('a message is retried after a failed turn and set aside after maxAttempts', async () => {

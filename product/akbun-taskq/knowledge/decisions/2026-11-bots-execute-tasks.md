@@ -13,7 +13,7 @@ generated: { by: claude-code/claude-opus-5-5, at: 2026-11-20T23:50:00Z }
 - 큐는 owner가 있는 task를 자동 실행하지 않는다. owner가 없는 ready task의 자동 실행은 글로벌 설정 `queue_autorun`으로 켜고 끈다. 기본은 켬이다.
 - bot마다 권한 모드, 샌드박스, 차단 명령 목록을 설정한다. 기본값은 auto 모드, 샌드박스 없음, 차단 명령 없음이다.
 - 설정과 관계없이 모든 bot에서 taskq 자신을 건드리는 호출(데이터 디렉터리, 설정 파일, Claude Code 설정 쓰기, 샌드박스 끄기)은 그 turn을 끝내고 bot 전체를 멈춘다.
-- bot은 사용자의 Claude 설정을 읽지 않는다. skill과 plugin은 Plugins 메뉴에 등록하면 모든 bot이 타입에 맞게 쓰고(0.26.0 전에는 bot마다 골랐다, [결정](2026-11-shared-registry-and-signin.md)), bot 폴더 밖에 복사한 사본으로 불러온다. 우클릭 메뉴의 Reload가 사본을 다시 만든다.
+- bot은 사용자의 Claude 설정을 읽지 않는다. skill과 plugin은 Plugins 메뉴에 등록하면 모든 bot이 타입에 맞게 쓰고(0.27.0 전에는 bot마다 골랐다, [결정](2026-11-shared-registry-and-signin.md)), bot 폴더 밖에 복사한 사본으로 불러온다. 우클릭 메뉴의 Reload가 사본을 다시 만든다.
 - 처음에는 오케스트레이터 `taskq` 하나만 있다. 지울 수도 끌 수도 없고 목록 맨 위에 고정된다. 다른 bot은 사용자가 프리셋이나 빈 상태에서 만든다.
 
 ## 이유

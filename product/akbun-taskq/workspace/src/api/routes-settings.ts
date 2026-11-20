@@ -9,7 +9,6 @@ import {
   FONT_FAMILIES, FONT_SIZES, appearance, desktopNotificationsEnabled, queueAutorun, setAppearance, setDesktopNotifications, setQueueAutorun,
 } from '../db/meta.ts'
 import { botsUsing, listEntries, registerEntry, removeEntry, updateEntry, type RegistryKind } from '../db/bot-registry.ts'
-import { LIMIT_RANGES, limits, setLimits } from '../db/settings.ts'
 import { sharedDir } from '../team/shared.ts'
 import { sessionPaths } from '../open-folder.ts'
 import { noteReload, reload } from '../team/bot-plugin.ts'
@@ -26,8 +25,6 @@ export function registerSettingsRoutes(api: Hono, { db, config }: ApiDeps): void
     desktop_notifications: desktopNotificationsEnabled(db),
     queue_autorun: queueAutorun(db),
     appearance: appearance(db),
-    limits: limits(db, config),
-    limit_ranges: LIMIT_RANGES,
     paths: { home: config.home, shared: sharedDir(config), sessions: sessionPaths() },
     font_families: FONT_FAMILIES,
     bot_skills: listEntries(db, 'skill'),
@@ -59,14 +56,6 @@ export function registerSettingsRoutes(api: Hono, { db, config }: ApiDeps): void
     if (typeof body?.enabled !== 'boolean') throw new HttpError(400, 'enabled must be a boolean')
     setQueueAutorun(db, body.enabled)
     return c.json({ enabled: body.enabled })
-  })
-
-  api.post('/settings/limits', async (c) => {
-    const body = await readJson(c)
-    if (typeof body !== 'object' || body === null || Array.isArray(body)) throw new HttpError(400, 'body must be a JSON object')
-    const error = setLimits(db, body as Record<string, unknown>)
-    if (error) throw new HttpError(400, error)
-    return c.json(limits(db, config))
   })
 
   // Every field is optional; a missing one keeps its saved value.

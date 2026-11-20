@@ -62,7 +62,7 @@ export async function openBotSettings(name) {
     claudeDefault = CLAUDE_FROM_CONN[conn.claude_provider] ?? 'bedrock'
     const value = bot ?? { role: 'custom', description: '', instructions: '', model: null, workdir: null, permission_mode: 'auto',
       sandbox: false, allowed_domains: [], blocked_commands: [], skills: [], plugins: [], enabled: true, may_message_user: false,
-      hourly_turns: null, turn_max_turns: null }
+      turn_max_turns: null }
     area('bot-settings-title').textContent = name ? `${name} settings` : 'New bot'
     area('bot-name-row').hidden = Boolean(name)
     for (const node of form.querySelectorAll('[data-edit-only]')) node.hidden = !name
@@ -84,7 +84,6 @@ export async function openBotSettings(name) {
     f.enabled.checked = value.enabled
     f.enabled.disabled = Boolean(bot?.system)
     f.may_message_user.checked = value.may_message_user
-    f.hourly_turns.value = value.hourly_turns ?? ''
     f.turn_max_turns.value = value.turn_max_turns ?? ''
     f.charter_owns.value = value.charter_owns ?? ''
     f.charter_good.value = value.charter_good ?? ''
@@ -108,7 +107,6 @@ async function save(event) {
     provider: shown && f.sdk.value === shown.sdk && f.provider.value === shown.provider ? shown.stored : f.provider.value || null,
     allowed_domains: lines(f.allowed_domains.value), blocked_commands: lines(f.blocked_commands.value),
     enabled: f.enabled.checked, may_message_user: f.may_message_user.checked,
-    hourly_turns: f.hourly_turns.value === '' ? null : Number(f.hourly_turns.value),
     turn_max_turns: f.turn_max_turns.value === '' ? null : Number(f.turn_max_turns.value),
     charter_owns: f.charter_owns.value, charter_good: f.charter_good.value, charter_never: f.charter_never.value,
     ask_first: lines(f.ask_first.value),

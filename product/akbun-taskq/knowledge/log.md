@@ -4,6 +4,8 @@ concept를 추가·수정·삭제할 때마다 오늘 날짜 섹션을 맨 위�
 
 ## 2026-11-20
 
+* **Creation**: [no usage limits](decisions/2026-11-no-usage-limits.md) - 시간당 turn 상한과 설정의 사용량 제한 페이지를 없앤 결정.
+* **Update**: [resident agent team](decisions/2026-11-resident-agent-team.md), [rejected turns](decisions/2026-11-rejected-turns.md), [bot workspace](decisions/2026-11-bot-workspace.md), [session handover](decisions/2026-11-session-handover.md)에서 시간당 turn 상한과 SQLite에 저장하던 제한 값을 지움.
 * **Creation**: [shared registry and sign-in](decisions/2026-11-shared-registry-and-signin.md) - registry를 타입별로 공유하고, Claude bot도 인증 방식을 고르고, 연결을 방식별 5초 테스트로 바꾸고, routine을 없앤 결정.
 * **Update**: [marketplace plugin install](decisions/2026-11-marketplace-plugin-install.md)의 "설치와 사용이 분리된다"를 설치가 곧 모든 Claude bot의 사용이라는 내용으로 고침.
 * **Update**: [bots execute tasks](decisions/2026-11-bots-execute-tasks.md)에서 skill·plugin을 bot마다 고른다는 내용을 공유로 고침.

@@ -4,11 +4,6 @@ import { api, mutate, notify } from '../core/api.js'
 import { area, clear, el } from '../core/dom.js'
 import { applyLanguage, t } from '../core/i18n.js'
 
-const LIMIT_FIELDS = [
-  ['turns_per_hour_total', 'Turns per hour, all bots'], ['max_concurrent_turns', 'Bots working at once'],
-  ['bot_turns_per_hour', 'Turns per hour per bot (default)'], ['turn_max_turns', 'Model turns per turn (default)'],
-  ['session_max_tokens', 'Conversation size before a new session (tokens)'],
-]
 const FOLDERS = [['shared', 'settings.folder.shared', 'Shared folder'], ['home', 'settings.folder.home', 'taskq data folder']]
 // Each bot runtime keeps its conversations in its own place, so the transcripts are listed per runtime, with who uses it.
 const SESSION_RUNTIMES = [
@@ -43,7 +38,7 @@ export function applyAppearance({ font_family, font_size, language, theme }) {
 export function initGlobalSettings() {
   nodes = {
     family: area('font-family'), size: area('font-size'), sizeValue: area('font-size-value'), autorun: area('queue-autorun'),
-    language: area('ui-language'), theme: area('ui-theme'), limits: area('limits-form'), folders: area('folder-list'),
+    language: area('ui-language'), theme: area('ui-theme'), folders: area('folder-list'),
   }
   clear(nodes.family).append(...Object.entries(FONTS).map(([value, [text]]) => el('option', { value, text })))
   const saveAppearance = () => {
@@ -56,11 +51,6 @@ export function initGlobalSettings() {
   nodes.family.addEventListener('change', saveAppearance)
   nodes.language.addEventListener('change', saveAppearance)
   nodes.theme.addEventListener('change', saveAppearance)
-  nodes.limits.addEventListener('submit', async (event) => {
-    event.preventDefault()
-    const patch = Object.fromEntries(LIMIT_FIELDS.map(([key]) => [key, Number(nodes.limits.elements[key].value)]))
-    await mutate(() => api.post('/settings/limits', patch), t('settings.save', 'Saved'))
-  })
   nodes.size.addEventListener('input', () => {
     edits += 1
     nodes.sizeValue.textContent = `${nodes.size.value}px`
@@ -78,7 +68,6 @@ export async function loadGlobalSettings() {
     const settings = await api.get('/settings')
     nodes.autorun.checked = settings.queue_autorun
     if (seen !== edits) return
-    renderLimits(settings.limits, settings.limit_ranges)
     renderFolders(settings.paths)
     nodes.family.value = settings.appearance.font_family
     nodes.language.value = settings.appearance.language
@@ -89,14 +78,6 @@ export async function loadGlobalSettings() {
   } catch {
     // Without a token nothing loads; the token notice already says so.
   }
-}
-
-function renderLimits(values, ranges) {
-  clear(nodes.limits).append(
-    ...LIMIT_FIELDS.map(([key, english]) => el('label', {},
-      t(`limit.${key}`, english),
-      el('input', { type: 'number', name: key, value: String(values[key]), min: String(ranges[key].min), max: String(ranges[key].max), step: ranges[key].integer ? '1' : '0.01', required: true }))),
-    el('button', { type: 'submit', text: t('settings.save', 'Save') }))
 }
 
 function renderFolders(paths) {
