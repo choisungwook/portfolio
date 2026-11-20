@@ -13,7 +13,7 @@ generated: { by: claude-code/claude-fable-5-2, at: 2026-11-20T00:00:00Z }
 - 대화는 Responses API가 서버에 둔다. 마지막 response id를 bot의 `session_id`로 저장하고 다음 turn에 `previousResponseId`로 넘긴다.
 - OpenAI Agents SDK에는 권한 모드와 auto 모드가 없다. taskq가 파일·셸 도구를 직접 만들고 권한 모드로 준다. plan은 읽기, accept edits는 bot 폴더와 공용 폴더 쓰기, bypass는 셸까지다. 샌드박스를 켠 bot에게는 셸을 주지 않는다. 모든 호출은 `botGate`를 거친다.
 - 실행 중 메시지 추가(live input)는 하지 않는다. 메시지는 다음 turn까지 큐에 쌓인다.
-- 비용은 토큰 수에 설정 단가(`bots.openaiInputPerMTok`, `openaiOutputPerMTok`)를 곱해 추정하고 Usage 화면에만 쓴다. bot을 멈추는 데는 쓰지 않는다.
+- 비용은 토큰 수에 설정 단가(`bots.openaiInputPerMTok`, `openaiOutputPerMTok`)를 곱해 추정하고 Usage 화면과 turn 기록에 보여 준다. bot을 멈추는 데는 쓰지 않는다.
 - skill은 Claude bot과 같은 등록을 쓴다. OpenAI SDK에는 skill 로더가 없어 `read_skill` 도구가 이름과 설명을 보이고 부르면 SKILL.md를 돌려준다. Claude Code plugin 형식은 OpenAI bot에 쓰지 않고, MCP server 등록을 두 SDK가 같이 쓴다(OpenAI는 `MCPServerStdio`).
 
 ## 이유
