@@ -1,0 +1,5 @@
+k6-sse
+artifacts/
+benchmarks/output/
+*.svg
+*.mmd
