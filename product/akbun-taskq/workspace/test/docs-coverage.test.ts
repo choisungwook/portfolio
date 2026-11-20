@@ -65,8 +65,8 @@ describe('docs cover the code', () => {
     assert.ok(start >= 0, `CHANGELOG.md has no "## ${pkg.version}" entry`)
     const next = changelog.indexOf('\n## ', start + 1)
     const entry = changelog.slice(start, next < 0 ? undefined : next)
-    // A release that only moves dependencies has nothing Added; it still says what Changed.
-    assert.match(entry, /### (Added|Changed)/)
+    // Any of the four kinds wiki/development.md lists counts; a dependency-only release still says what Changed.
+    assert.match(entry, /### (Added|Changed|Fixed|Removed)/)
     assert.match(entry, /### SDK/, 'say which Agent SDK features this version uses and how')
   })
 })
