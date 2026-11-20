@@ -17,6 +17,12 @@ export function readApiKey(config: Pick<Config, 'home'>): string | undefined {
   }
 }
 
+export function apiKeyProblem(key: string): string | null {
+  const value = key.trim()
+  if (/\s/.test(value)) return 'claude_api_key must be one token without spaces'
+  return value.length > 512 ? 'claude_api_key is longer than 512 characters' : null
+}
+
 // An empty key removes the file, so ANTHROPIC_API_KEY from the environment applies again.
 export function saveApiKey(config: Pick<Config, 'home'>, key: string): string | null {
   const value = key.trim()
@@ -25,7 +31,8 @@ export function saveApiKey(config: Pick<Config, 'home'>, key: string): string | 
     rmSync(path, { force: true })
     return null
   }
-  if (/\s/.test(value) || value.length > 512) return 'claude_api_key must be one token without spaces'
+  const problem = apiKeyProblem(value)
+  if (problem) return problem
   mkdirSync(dirname(path), { recursive: true })
   writeFileSync(path, `${value}\n`, { mode: 0o600 })
   chmodSync(path, 0o600) // mode applies only when the file is created

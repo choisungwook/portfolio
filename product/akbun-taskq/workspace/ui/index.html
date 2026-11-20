@@ -411,7 +411,8 @@
         <fieldset>
           <legend>Claude</legend>
           <label>Provider <select name="claude_provider"><option value="bedrock">Amazon Bedrock (AWS profile)</option><option value="api_key">Anthropic API key</option><option value="subscription">Claude subscription (signed-in Claude Code)</option></select></label>
-          <label data-area="conn-claude-key" hidden>API key <input name="claude_api_key" type="password" maxlength="512" autocomplete="off" spellcheck="false"></label>
+          <label data-area="conn-claude-key" hidden>API key <input name="claude_api_key" type="password" maxlength="512" autocomplete="new-password" spellcheck="false"></label>
+          <button type="button" data-area="conn-claude-key-remove" hidden data-i18n="connections.key_remove">Remove saved key</button>
           <label data-area="conn-claude-aws">AWS profile <input name="claude_profile" type="text" list="aws-profile-list" maxlength="64" autocomplete="off" spellcheck="false"></label>
           <label data-area="conn-claude-region">Region <input name="claude_region" type="text" maxlength="30" autocomplete="off" spellcheck="false" placeholder="us-east-1"></label>
         </fieldset>

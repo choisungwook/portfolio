@@ -4,7 +4,7 @@ import { PERIODS, usageReport, type Period } from '../db/usage.ts'
 import { botConnection, clearConnectionCache, listConnections } from '../team/connections.ts'
 import { connectionSettings, saveConnectionSettings } from '../team/connection-settings.ts'
 import { listProfiles } from '../aws/profiles.ts'
-import { readApiKey, saveApiKey } from '../agents/claude/api-key.ts'
+import { apiKeyProblem, readApiKey, saveApiKey } from '../agents/claude/api-key.ts'
 import { HttpError, optionalJson, type ApiDeps } from './http.ts'
 
 // Connections (how bots reach their models and whether that works), sign-in for the SDKs that keep their own session
@@ -36,12 +36,12 @@ export function registerProviderRoutes(api: Hono, { db, config }: ApiDeps): void
   api.put('/connection-settings', async (c) => {
     const body = await optionalJson(c)
     const key = body.claude_api_key
-    if (key === null || (typeof key === 'string' && key.trim())) {
-      const problem = saveApiKey(config, key ?? '')
-      if (problem) throw new HttpError(400, problem)
-    }
+    const changeKey = key === null || (typeof key === 'string' && key.trim() !== '')
+    const problem = typeof key === 'string' && changeKey ? apiKeyProblem(key) : null
+    if (problem) throw new HttpError(400, problem)
     const saved = saveConnectionSettings(db, config, body)
     if (typeof saved === 'string') throw new HttpError(400, saved)
+    if (changeKey) saveApiKey(config, typeof key === 'string' ? key : '')
     clearConnectionCache()
     return c.json(withKey(saved))
   })
