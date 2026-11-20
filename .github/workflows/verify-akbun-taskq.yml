@@ -57,6 +57,10 @@ jobs:
       - name: Build
         run: npm run build
 
+      # The desktop app's pure crate; it has no Tauri dependency, so this compiles nothing else.
+      - name: Test the desktop launch crate
+        run: cargo test --manifest-path desktop/src-tauri/Cargo.toml -p taskq-launch
+
       # Docs an agent relies on must cover the code: every API route, every Agent SDK option and every bot tool, plus a
       # changelog entry with an SDK section for the version being built, and every route reachable from the CLI and MCP.
       - name: Check docs and operations cover routes, SDK options and the changelog

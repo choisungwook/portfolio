@@ -19,6 +19,8 @@ browser UI --HTTP + SSE--> taskq process (127.0.0.1)
 CLI (taskq add/list/...) ---- opens the same SQLite file directly
 ```
 
+The macOS desktop app (`workspace/desktop/`, Tauri) is a window around that same process, not a second implementation. It starts the bundled `taskq` executable through the user's login shell (`$SHELL -ilc 'exec taskq run'`, so bots get the terminal's PATH), reads its output for the `taskq running at http://127.0.0.1:…` line, and moves its window to that address. Until then the bundled start page (`desktop/src/`) is shown; if taskq ends without printing the address, that page shows taskq's last 20 lines. Closing the app sends taskq SIGTERM and kills it after 5 seconds. The taskq page is a remote origin for the app and has no access to the app's commands. A link that opens a new window goes to the default browser and a download is saved to `~/Downloads` (`open_window` in `desktop/src-tauri/src/lib.rs`); the UI asks yes/no questions through `ui/js/core/ask.js` because a webview shows nothing for `confirm` and `prompt`. The pure parts (the ready line, the shell choice) live in the `taskq-launch` crate so they test without Tauri.
+
 ## Stack
 
 | Part | Choice | Why |
@@ -39,6 +41,7 @@ Type stripping rules: import with the `.ts` extension, no `enum`, no parameter p
 workspace/
   package.json  tsconfig.json  taskq.config.example.json  .gitignore
   bin/taskq                 # #!/usr/bin/env node, imports src/cli/main.ts
+  desktop/                  # macOS app (Tauri): src/ start page, src-tauri/ shell, src-tauri/crates/launch pure crate
   src/
     config.ts               # load taskq.config.json + env, defaults
     types.ts                # shared types (below)

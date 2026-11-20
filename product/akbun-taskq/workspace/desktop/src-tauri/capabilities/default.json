@@ -1,0 +1,7 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "default",
+  "description": "Only the bundled start page calls the app. The taskq page is a remote origin (http://127.0.0.1) and gets no capability.",
+  "windows": ["main"],
+  "permissions": ["core:default"]
+}

@@ -1,7 +1,8 @@
 name: release-akbun-taskq
 
 # Builds a single taskq executable per platform with bun. It embeds the UI, the schema and the Claude Code binary of
-# the locked SDK, so it runs without Node or a checkout. Pull requests build and smoke test; master releases.
+# the locked SDK, so it runs without Node or a checkout. The macOS job also wraps that executable in a desktop app
+# (workspace/desktop) and releases it as a dmg. Pull requests build and smoke test; master releases.
 on:
   pull_request:
     paths:
@@ -17,6 +18,7 @@ on:
       - 'product/akbun-taskq/workspace/package.json'
       - 'product/akbun-taskq/workspace/package-lock.json'
       - 'product/akbun-taskq/workspace/scripts/build-binary.ts'
+      - 'product/akbun-taskq/workspace/desktop/**'
       - '.github/workflows/release-akbun-taskq.yml'
   workflow_dispatch:
 
@@ -68,11 +70,33 @@ jobs:
         if: github.event_name != 'pull_request'
         run: tar -czf "taskq-${{ matrix.target }}.tar.gz" -C dist taskq
 
+      # The desktop app is a window around the executable built above: tauri bundles it next to the app's own binary.
+      # macOS only, so it never runs on a pull request. Unsigned, like the executable.
+      - uses: dtolnay/rust-toolchain@stable
+        if: github.event_name != 'pull_request' && matrix.target == 'darwin-arm64'
+
+      - uses: swatinem/rust-cache@v2
+        if: github.event_name != 'pull_request' && matrix.target == 'darwin-arm64'
+        with:
+          workspaces: product/akbun-taskq/workspace/desktop/src-tauri
+
+      - name: Build desktop app
+        if: github.event_name != 'pull_request' && matrix.target == 'darwin-arm64'
+        working-directory: product/akbun-taskq/workspace/desktop
+        run: |
+          mkdir -p src-tauri/binaries
+          cp ../dist/taskq src-tauri/binaries/taskq-aarch64-apple-darwin
+          npm ci
+          npx tauri build --bundles dmg
+          cp src-tauri/target/release/bundle/dmg/*.dmg ../taskq-desktop-darwin-arm64.dmg
+
       - uses: actions/upload-artifact@v7
         if: github.event_name != 'pull_request'
         with:
           name: taskq-${{ matrix.target }}
-          path: product/akbun-taskq/workspace/taskq-${{ matrix.target }}.tar.gz
+          path: |
+            product/akbun-taskq/workspace/taskq-${{ matrix.target }}.tar.gz
+            product/akbun-taskq/workspace/taskq-desktop-${{ matrix.target }}.dmg
           retention-days: 1
 
   # Every platform must build before the tag exists, and the tag must exist before the release.
@@ -113,7 +137,8 @@ jobs:
 
           ## Install
 
-          - \`taskq-darwin-arm64.tar.gz\` for Apple silicon, \`taskq-linux-x64.tar.gz\` for Linux x86_64.
+          - \`taskq-desktop-darwin-arm64.dmg\` is the macOS app for Apple silicon: taskq in its own window. Copy it to Applications and run \`xattr -cr /Applications/akbun-taskq.app\` once; the build is unsigned.
+          - \`taskq-darwin-arm64.tar.gz\` for Apple silicon, \`taskq-linux-x64.tar.gz\` for Linux x86_64 are the command line executable.
           - Extract and put \`taskq\` on PATH. On macOS, run \`xattr -d com.apple.quarantine taskq\` once after a browser download.
           - See the [taskq manual](${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/blob/$TAG/product/akbun-taskq/workspace/manual.md) for configuration.
           EOF
@@ -129,4 +154,4 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           TAG: ${{ steps.version.outputs.tag }}
-        run: gh release create "$TAG" --verify-tag --title "$TAG" --notes-file release-notes.md dist/*.tar.gz
+        run: gh release create "$TAG" --verify-tag --title "$TAG" --notes-file release-notes.md dist/*.tar.gz dist/*.dmg

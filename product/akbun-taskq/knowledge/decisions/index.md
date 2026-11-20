@@ -4,6 +4,7 @@
 
 ## 목록
 
+* [The macOS desktop app is a Tauri window around the released executable](2026-11-desktop-app-shell.md) - The app starts the bundled taskq through the login shell and shows its page; it has no updater of its own.
 * [OpenAI on Bedrock calls inference profiles, listed with a hand-written SigV4 request](2026-11-bedrock-inference-profiles.md) - The model list comes from ListInferenceProfiles and openai.* ids become the region's us./global. profile.
 * [A conversation over a token limit is handed over to a new session by the bot itself](2026-11-session-handover.md) - Past session_max_tokens the hub asks the bot for a handover note and resets the session; Codex compacts itself at the same limit.
 * [A turn the provider refused is not retried, and bots have no spend limit](2026-11-rejected-turns.md) - A 4xx on the OpenAI Agents SDK path sets the messages aside at once; the daily and per-turn budgets were removed in 0.20.0.

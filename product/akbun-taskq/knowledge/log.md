@@ -4,6 +4,7 @@ concept를 추가·수정·삭제할 때마다 오늘 날짜 섹션을 맨 위�
 
 ## 2026-11-20
 
+* **Add**: [The macOS desktop app is a Tauri window around the released executable](decisions/2026-11-desktop-app-shell.md)
 * **Update**: [bot runtimes](decisions/2026-11-bot-runtimes-beyond-sdks.md)에 로그인 실패로 꺼진 bot을 통과한 재확인에서 되돌리는 결정을 추가.
 * **Update**: [rejected turns](decisions/2026-11-rejected-turns.md)에 bot 예산(하루, turn당, 80% 표시)을 없앤 결정과 이유를 반영.
 * **Creation**: [session handover](decisions/2026-11-session-handover.md) 결정 기록. 토큰 한도를 넘은 대화를 bot의 인수인계 메모와 함께 새 세션으로 넘김.

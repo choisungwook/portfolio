@@ -3,6 +3,7 @@
 // link, and buttons to open the folder in VS Code or the file manager.
 import { api, mutate, notify } from '../core/api.js'
 import { el, fill } from '../core/dom.js'
+import { askConfirm } from '../core/ask.js'
 import { t } from '../core/i18n.js'
 
 const STATUS_MARK = { added: 'A', modified: 'M', deleted: 'D', untracked: 'U', renamed: 'R' }
@@ -64,12 +65,12 @@ async function load(task, aside, onChange) {
       ws.kind === 'worktree' && !ws.removed && task.status !== 'running' ? el('button', {
         type: 'button', class: 'danger-quiet', text: t('ws.remove', 'Remove worktree'),
         onclick: async () => {
-          if (!confirm(t('ws.remove_confirm', 'Remove the worktree folder? The branch keeps its commits.'))) return
+          if (!(await askConfirm(t('ws.remove_confirm', 'Remove the worktree folder? The branch keeps its commits.')))) return
           try {
             await api.post(`/tasks/${task.id}/workspace/remove`)
           } catch (error) {
             if (error.status !== 409 || !/uncommitted/.test(error.message)) return notify(error.message, true)
-            if (!confirm(t('ws.discard_confirm', 'The worktree has uncommitted changes. Removing it deletes them for good. Remove anyway?'))) return
+            if (!(await askConfirm(t('ws.discard_confirm', 'The worktree has uncommitted changes. Removing it deletes them for good. Remove anyway?')))) return
             if (!(await mutate(() => api.post(`/tasks/${task.id}/workspace/remove`, { discard: true })))) return
           }
           notify(t('ws.removed', 'removed'))

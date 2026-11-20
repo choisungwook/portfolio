@@ -3,6 +3,7 @@
 // surprise.
 import { api, mutate, notify } from '../core/api.js'
 import { area, clear, el, fill } from '../core/dom.js'
+import { askConfirm } from '../core/ask.js'
 import { on } from '../core/bus.js'
 import { t } from '../core/i18n.js'
 
@@ -135,7 +136,7 @@ function renderMcp(entries, users) {
         entry.description ? el('p', { class: 'meta', text: entry.description }) : null,
         el('p', { class: 'meta', text: usedBy.length ? `${t('plugins.used_by', 'Used by')} ${usedBy.join(', ')}` : t('plugins.unused', 'No bot uses it') })),
       el('button', { type: 'button', class: 'danger-quiet', text: t('plugins.remove', 'Remove'), onclick: async () => {
-        if (!confirm(`${entry.name}: ${usedBy.length ? usedBy.join(', ') : ''}`)) return
+        if (!(await askConfirm(`${t('plugins.remove', 'Remove')} ${entry.name}${usedBy.length ? ` (${usedBy.join(', ')})` : ''}?`))) return
         if (await mutate(() => api.del(`/bot-mcp-servers/${entry.name}`), 'Removed')) load()
       } }))
   }))
