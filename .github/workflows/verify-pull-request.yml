@@ -170,7 +170,7 @@ jobs:
           # 웹 UI에서 쓴 body는 줄 끝이 CRLF라 먼저 CR을 지운다.
           body=$(printf '%s\n' "$PR_BODY" | tr -d '\r')
           fail=0
-          for header in '# 작업 목적' '# 방식' '# 검증' '# 리스크'; do
+          for header in '# 작업 목적' '# 방식' '# 검증'; do
             if ! printf '%s\n' "$body" | grep -qx "$header"; then
               echo "::error::PR body에 '$header' 절이 없음. .github/pull_request_template.md를 따를 것"
               fail=1
@@ -189,6 +189,6 @@ jobs:
           # 코드블록은 줄 수에서 뺀다.
           lines=$(printf '%s\n' "$body" | awk '/^```/{fence=!fence; next} !fence && NF{n++} END{print n+0}')
           if [ "$lines" -gt 30 ]; then
-            echo "::warning::PR body가 ${lines}줄로 30줄을 넘음. 리스크의 근거부터 줄일 것"
+            echo "::warning::PR body가 ${lines}줄로 30줄을 넘음. 방식 절부터 줄일 것"
           fi
           exit $fail

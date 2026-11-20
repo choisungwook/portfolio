@@ -24,11 +24,10 @@ The work specification and any progress comments in the supplied PR or Issue. Re
 
 PR이 열려 있으면 PR body도 채점한다. 섹션 형식은 [.github/pull_request_template.md](../../.github/pull_request_template.md), 문체는 [.claude/rule-details/github-tools.md](../rule-details/github-tools.md)의 "Issue와 PR 문체"이 기준이다.
 
-- 섹션 구성: 작업 목적, 방식, 검증, 리스크 순서로 네 절이 모두 있는가? body가 30줄 이내인가?
+- 섹션 구성: 작업 목적, 방식, 검증 순서로 세 절이 모두 있는가? body가 30줄 이내인가?
 - 작업 목적: 2줄 이내이고 구현 방식이 아니라 목적인가? `.claude/rule-details/code-review.md`의 "깊이 보는 경로"를 건드렸으면 사람 확인 줄이 있는가?
 - 방식: 작업 범위와 결정 근거가 드러나고 diff와 맞는가?
 - 검증: 표인가? 완료 조건마다 행이 있는가? 실행 열에 명령이나 CI job, 결과 열에 본 것이 있는가? 실행하지 않은 조건을 검증하지 않음으로 적었는가?
-- 리스크: 절이 있는가? 어느 검사가 못 잡는지와 어떻게 알아채는지, 되돌리는 방법이 있는가? 없음이면 근거가 있는가?
 - 항목 형식: 절마다 템플릿 주석의 항목 수 상한을 지켰는가? 표형 절(검증)은 요약 없이 표 하나이고 행 하나에 확인 하나인가? 개조식이고 명령, 파일 경로, 식별자가 backtick으로 감싸여 있는가? (github-tools.md의 Issue와 PR 문체)
 - 작업 기록: PR 본문만으로 목적, 범위, 결정 근거와 검증 결과를 이해할 수 있는가?
 - 메타데이터: target branch가 `master`인가? 작업 유형 label과 기술 태그 label이 함께 붙어 있는가?
@@ -61,7 +60,6 @@ PR이 열려 있으면 PR body도 채점한다. 섹션 형식은 [.github/pull_r
 - 작업 목적: [PASS/NEEDS_WORK/FAIL] — (근거)
 - 방식: [PASS/NEEDS_WORK/FAIL] — (근거)
 - 검증: [PASS/NEEDS_WORK/FAIL] — (근거)
-- 리스크: [PASS/NEEDS_WORK/FAIL] — (근거)
 - 항목 형식: [PASS/NEEDS_WORK/FAIL] — (근거)
 - 작업 기록: [PASS/NEEDS_WORK/FAIL] — (근거)
 - target branch / label: [PASS/NEEDS_WORK/FAIL] — (근거)
