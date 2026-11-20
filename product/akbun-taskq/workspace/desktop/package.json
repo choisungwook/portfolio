@@ -1,0 +1,13 @@
+{
+  "name": "akbun-taskq-desktop",
+  "private": true,
+  "description": "The macOS window around the taskq binary. The version is ../package.json's.",
+  "scripts": {
+    "start": "tauri dev",
+    "dist": "tauri build",
+    "test": "cargo test --manifest-path src-tauri/Cargo.toml -p taskq-launch"
+  },
+  "devDependencies": {
+    "@tauri-apps/cli": "^2.12.6"
+  }
+}

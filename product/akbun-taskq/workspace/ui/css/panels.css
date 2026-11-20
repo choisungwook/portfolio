@@ -40,6 +40,9 @@ dialog::backdrop { background: rgba(22, 22, 22, 0.5); }
 .dialog-foot { display: flex; justify-content: flex-end; gap: 1px; padding: 0; border-top: 1px solid var(--border); }
 .dialog-foot button { min-height: 48px; min-width: 140px; justify-content: flex-start; }
 dialog h2 { margin-top: 0; }
+.ask-dialog { max-width: 460px; }
+.ask-dialog p { margin: 0 0 12px; white-space: pre-wrap; }
+.ask-dialog input { width: 100%; margin-bottom: 12px; }
 .status { margin: 8px 0; }
 
 .events { list-style: none; padding: 0; margin: 0; font-size: 12px; }

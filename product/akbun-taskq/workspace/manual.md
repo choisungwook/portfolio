@@ -36,6 +36,14 @@ tar -xzf taskq-darwin-arm64.tar.gz
 xattr -d com.apple.quarantine taskq
 ```
 
+macOS(Apple silicon)에서는 같은 Release의 `taskq-desktop-darwin-arm64.dmg`로 데스크톱 앱을 쓸 수 있다. 앱 안에 위 바이너리가 들어 있어 따로 받을 것이 없다. dmg를 열어 앱을 Applications로 옮기고, 서명이 없는 빌드라 한 번 격리 속성을 지운다.
+
+```bash
+xattr -cr /Applications/akbun-taskq.app
+```
+
+앱을 열면 taskq가 시작되고 그 화면이 앱 창에 뜬다. 4절의 `taskq run`과 주소를 여는 과정을 앱이 대신한다. 창을 닫으면 taskq도 끝난다. 설정 파일과 `TASKQ_HOME`은 같고, CLI 명령은 앱 안의 실행 파일 `/Applications/akbun-taskq.app/Contents/MacOS/taskq`로 쓴다. 터미널에서 `taskq run`이 이미 돌고 있으면 포트가 겹쳐 앱이 시작하지 못하고 그 오류를 창에 보여 준다.
+
 바이너리를 쓰면 이 문서의 `node bin/taskq`를 `taskq`로 바꿔 읽는다. `taskq version`이 taskq와 들어 있는 Claude Code의 버전을 출력한다. 설정 파일과 `TASKQ_HOME`은 같다. 들어 있는 Claude Code는 첫 세션 때 임시 디렉터리에 한 번 풀린다.
 
 ## 3. 설정 파일 만들기
@@ -349,6 +357,7 @@ bot과 대화할 때 쓰는 기능은 아래와 같다.
 
 | 증상 | 원인과 해결 |
 |---|---|
+| 데스크톱 앱 창에 "taskq did not start."가 뜬다 | 아래에 taskq가 남긴 마지막 출력이 보인다. 포트가 쓰이는 중이면 터미널의 `taskq run`을 끝내고 앱을 다시 연다. 앱이 강제 종료된 뒤라면 남은 taskq 프로세스를 `pkill -f 'MacOS/taskq run'`으로 끝낸다. 설정 파일 오류면 고친 뒤 다시 연다 |
 | 화면에 "Open the URL that taskq run printed"가 뜬다 | 토큰이 없거나 서버가 다시 시작됐다. 터미널에 출력된 주소로 다시 연다 |
 | Must check에 "Queue paused"가 떠 있다 | 모델 인증 확인에 실패했거나 내가 멈췄다. 이유가 함께 표시된다. 인증을 고치면 스스로 풀리고, 내가 멈춘 것은 Resume queue로 푼다 |
 | 태스크가 계속 "Login needed"다 | 대상 계정 로그인이 만료됐다. 터미널에서 로그인한 뒤 Resume |

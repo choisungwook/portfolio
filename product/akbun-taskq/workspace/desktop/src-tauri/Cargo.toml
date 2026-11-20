@@ -1,0 +1,23 @@
+[workspace]
+members = ["crates/launch"]
+
+[package]
+name = "akbun-taskq-desktop"
+version = "0.1.0"
+description = "The macOS window around the taskq binary"
+authors = ["akbun"]
+license = "MIT"
+edition = "2021"
+
+# The version that ships is workspace/package.json's, which tauri.conf.json points at. cargo requires the one above.
+
+[lib]
+name = "akbun_taskq_desktop_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+taskq-launch = { path = "crates/launch" }
+tauri = { version = "2", features = [] }

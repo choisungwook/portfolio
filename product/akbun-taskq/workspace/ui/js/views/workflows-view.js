@@ -5,6 +5,7 @@
 //   deleted since; a run opens as its graph colored by step status, with outputs, evidence and approval buttons.
 import { api, mutate, notify, qs } from '../core/api.js'
 import { area, el, fill } from '../core/dom.js'
+import { askConfirm, askText } from '../core/ask.js'
 import { emit, on } from '../core/bus.js'
 import { show } from '../core/nav.js'
 import { t } from '../core/i18n.js'
@@ -117,7 +118,7 @@ function runButton(w) {
 }
 
 async function remove(w) {
-  if (!confirm(`${t('wf.delete_confirm', 'Delete workflow')} "${w.name}"? ${t('wf.delete_note', 'Runs stay in the history marked deleted; a bot running it is told.')}`)) return
+  if (!(await askConfirm(`${t('wf.delete_confirm', 'Delete workflow')} "${w.name}"? ${t('wf.delete_note', 'Runs stay in the history marked deleted; a bot running it is told.')}`))) return
   const result = await mutate(() => api.del(`/workflows/${w.id}`), t('wf.deleted', 'Deleted'))
   if (result?.told?.length) notify(`${t('wf.told', 'Told')}: ${result.told.join(', ')}`)
   render()
@@ -139,8 +140,8 @@ let dirty = false
 let editorForm = null
 
 // Leaving the editor asks first when there are unsaved changes; the header tabs and Cancel both come through here.
-function leave(next) {
-  if (screen === 'edit' && dirty && !confirm(t('wf.discard', 'Discard the changes?'))) return
+async function leave(next) {
+  if (screen === 'edit' && dirty && !(await askConfirm(t('wf.discard', 'Discard the changes?')))) return
   dirty = false
   go(next)
 }
@@ -320,6 +321,7 @@ async function renderRun() {
 }
 
 async function answer(runId, stepId, approved) {
-  const note = prompt(approved ? t('wf.approve_note', 'Note for the bot (optional)') : t('wf.reject_note', 'Why reject? (sent to the bot)')) ?? ''
+  const note = await askText(approved ? t('wf.approve_note', 'Note for the bot (optional)') : t('wf.reject_note', 'Why reject? (sent to the bot)'))
+  if (note === null) return
   if (await mutate(() => api.post(`/workflow-runs/${runId}/steps/${stepId}/approve`, { approved, note }))) render()
 }

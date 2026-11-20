@@ -73,6 +73,10 @@ Seed runs, events and alerts through the functions in `src/db` and `src/runner`,
 
 `node scripts/build-binary.ts` writes `dist/taskq` with bun on PATH. It generates `dist/binary-entry.ts`, which embeds every file under `ui/` and `src/db/schema/` plus the Claude Code binary of the installed SDK, registers them in `src/resources.ts`, and then imports `src/cli/main.ts`. Code that reads a file at run time goes through `resourcePath()`, not `import.meta.url`, or the binary will not find it. The Claude Code binary comes from the platform package npm installed, so build on the target OS. `release-akbun-taskq.yml` builds darwin-arm64 and linux-x64 and releases them as `akbun-taskq-v<version>` from `package.json`; bump the version with any change under `src/`, `ui/` or the package files.
 
+## Build the desktop app
+
+`workspace/desktop/` is a Tauri shell around the executable. Its version is `workspace/package.json`'s. To build it locally, put an executable at `desktop/src-tauri/binaries/taskq-aarch64-apple-darwin` (the real `dist/taskq`, or a script that runs `node scripts/demo.ts` and rewrites its `taskq demo: ` line to `taskq running at `, which opens the demo data without a model call), then run `npm ci` and `npx tauri build --bundles app` in `desktop/`. `npm test` there runs the `taskq-launch` crate's tests; `verify-akbun-taskq.yml` runs the same on pull requests. The release workflow builds the dmg only on the macOS job of a master push, so a pull request does not prove the bundle builds: check the release run after merging. The app has no Tauri updater; taskq's own update replaces the executable inside the bundle ([decision](../knowledge/decisions/2026-11-desktop-app-shell.md)).
+
 ## Maintain the changelog
 
 Add a `## <version>` section to [CHANGELOG.md](../CHANGELOG.md) for the version in `workspace/package.json`. Use `### Added`, `### Changed`, `### Fixed` or `### Removed` and describe each feature or behavior in a bullet. Commit the entry with the corresponding code. GitHub Actions uses that section for the release notes.

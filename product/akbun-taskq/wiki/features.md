@@ -4,6 +4,8 @@
 
 | 이름 | data-area | API | 하는 일 |
 |---|---|---|---|
+| 데스크톱 시작 화면 | `#status`, `#error` (`workspace/desktop/src/index.html`) | 없음 | macOS 데스크톱 앱만. 앱을 열고 taskq가 주소를 출력할 때까지 "Starting taskq…"를 보이고, 주소가 나오면 창이 taskq 화면으로 넘어간다. taskq가 주소 없이 끝나면 "taskq did not start."와 마지막 출력 20줄을 보인다 |
+| 확인 dialog | `.ask-dialog` (`ui/js/core/ask.js`) | 없음 | 삭제 확인(workflow, worktree, MCP server), workflow 편집을 버릴지, workflow 승인·거절 메모를 묻는 작은 창. 취소·확인 버튼, Esc는 취소 |
 | 토큰 안내 | `token-notice` | 없음 | 토큰이 없거나 서버가 401을 돌려주면 전체 너비로 보인다. `taskq run`이 출력한 URL을 열라고 안내하고, 그 뒤로 폴링과 요청을 멈춘다 |
 | 검색 dialog | `search-dialog`, `msg-query`, `search-tabs`, `msg-hits`, `.sd-item` | `GET /api/bots/search`, `GET /api/search`, `GET /api/bots` | 화면 위에 뜨는 검색 창이다. 입력, 전체·작업·Bots 탭(Bots는 bot 이름과 그 대화 내용을 함께 찾는다), 결과 절. 입력 전에는 주의 필요(읽지 않은 bot, needs_approval·needs_auth 작업), 최근 항목(마지막 메시지 순 bot), 작업 메뉴(새 작업, bot 추가). 입력하면 bot 이름·설명, 열린 작업 제목, 대화(trigram FTS, 누르면 그 메시지로 이동), 지난 실행(누르면 run dialog)을 보인다. 위아래 화살표, Enter, Esc, 바깥 클릭으로 닫기 |
 | 알림 | `notice` | 모든 변경 요청 | 저장 성공과 서버 오류 메시지를 화면 오른쪽 위의 Carbon toast(색 띠, 아이콘, 글, 닫기 버튼)로 보여준다. 타이머로 사라지지 않고, 닫기 버튼을 누르거나 다음 메시지가 올 때까지 남는다. 닫으면 포커스는 알림을 일으킨 컨트롤로 돌아간다 |
