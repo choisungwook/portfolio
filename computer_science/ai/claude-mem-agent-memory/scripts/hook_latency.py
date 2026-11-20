@@ -16,13 +16,19 @@ import time
 from pathlib import Path
 
 MINIMEM = Path(__file__).resolve().parent.parent / "minimem"
-EVENT = {"session_id": "bench", "cwd": "/tmp/bench/shop", "tool_name": "Bash", "tool_input": {"command": "ls"}, "tool_response": {"stdout": "a b c"}}
+EVENT = {
+  "session_id": "bench",
+  "cwd": "/tmp/bench/park",
+  "tool_name": "Write",
+  "tool_input": {"file_path": "attendance.txt", "content": "137\n"},
+  "tool_response": "파일을 만들었습니다.",
+}
 
 
 def elapsed_ms(args: list[str], env: dict, event: dict) -> float:
   """명령 1회 실행 시간을 밀리초로 반환한다."""
   start = time.perf_counter()
-  subprocess.run(args, input=json.dumps(event), text=True, capture_output=True, env=env)
+  subprocess.run(args, input=json.dumps(event), text=True, stdout=subprocess.DEVNULL, env=env, check=True)
   return (time.perf_counter() - start) * 1000
 
 
@@ -33,15 +39,12 @@ def measure(name: str, args: list[str], env: dict, event: dict = EVENT, runs: in
 
 
 def main() -> None:
-  """uv run 경유와 venv 직접 실행의 PostToolUse hook, 그리고 Stop hook을 측정한다."""
+  """uv run 경유와 venv 직접 실행의 PostToolUse hook을 측정한다."""
   with tempfile.TemporaryDirectory() as home:
-    env = {**os.environ, "MINIMEM_HOME": home}
+    env = {**os.environ, "MINIMEM_HOME": home, "UV_PROJECT_ENVIRONMENT": ".venv"}
     venv_hook = str(MINIMEM / ".venv" / "bin" / "minimem-hook")
     measure("PostToolUse, uv run 경유", ["uv", "run", "--quiet", "--project", str(MINIMEM), "minimem-hook", "tool"], env)
     measure("PostToolUse, venv 직접 실행", [venv_hook, "tool"], env)
-    # 이벤트가 없는 세션으로 Stop을 보내 observer가 claude를 호출하지 않고 바로 끝나게 한다.
-    measure("Stop, observer 분리 실행", [venv_hook, "stop"], env, {**EVENT, "session_id": "bench-stop"}, runs=3)
-    time.sleep(3)
 
 
 if __name__ == "__main__":

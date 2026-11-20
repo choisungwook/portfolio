@@ -7,7 +7,7 @@
 ## 변경 범위
 
 - `minimem/`은 실습 대상 코드다. 바꾸면 `make test`와 문서의 실습 출력을 함께 갱신한다.
-- `lab-template/`은 `make up`이 복사하는 원본이다. 실습 중 바뀐 파일은 `~/minimem-workspace/shop`에만 있다.
+- `lab-template/`은 `make up`이 `$LAB_DIR/park`에 복사하는 원본이다. 방문객 수는 그 복사본에 기록한다.
 
 ## knowledge
 

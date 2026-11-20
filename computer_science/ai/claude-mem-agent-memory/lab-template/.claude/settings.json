@@ -5,7 +5,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "uv run --quiet --project \"__MINIMEM__\" minimem-hook session-start"
+            "command": "\"__MINIMEM__/.venv/bin/minimem-hook\" session-start"
           }
         ]
       }
@@ -15,7 +15,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "uv run --quiet --project \"__MINIMEM__\" minimem-hook prompt"
+            "command": "\"__MINIMEM__/.venv/bin/minimem-hook\" prompt"
           }
         ]
       }
@@ -26,7 +26,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "uv run --quiet --project \"__MINIMEM__\" minimem-hook tool"
+            "command": "\"__MINIMEM__/.venv/bin/minimem-hook\" tool"
           }
         ]
       }
@@ -36,7 +36,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "uv run --quiet --project \"__MINIMEM__\" minimem-hook stop"
+            "command": "\"__MINIMEM__/.venv/bin/minimem-hook\" stop"
           }
         ]
       }

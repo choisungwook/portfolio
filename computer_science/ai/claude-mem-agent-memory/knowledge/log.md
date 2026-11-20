@@ -2,6 +2,10 @@
 
 concept를 추가·수정·삭제할 때마다 오늘 날짜 섹션을 맨 위에 만들고 한 줄 남긴다. 구분은 `**Creation**`, `**Update**`, `**Deletion**`이다.
 
+## 2026-11-21
+
+* **Update**: [실험 통제](decisions/2026-11-experiment-control.md)에 방문객 집계 실습 경로와 두 질문 세션의 도구 차단 조건을 반영했다.
+
 ## 2026-11-18
 
 * **Creation**: [observer 격리](decisions/2026-11-observer-isolation.md) 결정 기록. 재귀 기록과 조회 세션의 요약 덮어쓰기를 겪고 남긴다.

@@ -139,7 +139,7 @@ src/cli/handlers/observation.ts:28:const SERVER_OBSERVATION_TIMEOUT_MS = 2_000;
 | 상수 | minimem 시나리오와의 대응 |
 | --- | --- |
 | `CONTEXT_OUTPUT_LIMIT = 10_000` | 시나리오 5에서 `additionalContext`가 10,100자일 때 모델에 전달되지 않았던 바로 그 10,000자 한도 |
-| `MEMORY_FTS_TOKENIZER = 'unicode61'` | 시나리오 4에서 한국어 조사("할인율을", "pytest가")를 놓쳤던 기본 토크나이저 (`claude-mem`은 Chroma로 보완) |
+| `MEMORY_FTS_TOKENIZER = 'unicode61'` | 시나리오 4에서 한국어 조사("방문객을", "직원은")를 놓쳤던 기본 토크나이저 (`claude-mem`은 Chroma로 보완) |
 | `SERVER_OBSERVATION_TIMEOUT_MS = 2_000` | 시나리오 2에서 측정한 hook 지연 제약과 같은 문제의식 |
 | `FILE_READ_GATE_DENY_MIN_BYTES = 32 * 1024` | `minimem`에는 없는 기능. 소스 주석은 19KB 파일에서는 Opus 토큰이 오히려 20% 늘었고 49KB에서는 32% 줄었다는 내부 평가 결과를 근거로 제시 |
 
