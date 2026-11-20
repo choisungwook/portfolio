@@ -165,3 +165,24 @@ describe('preflight with a fake aws CLI', () => {
     }
   })
 })
+
+describe('saved Anthropic API key', () => {
+  test('a saved key wins over the environment, is mode 0600, and an empty save falls back', async () => {
+    const { saveApiKey, apiKeyPath } = await import('../src/agents/claude/api-key.ts')
+    const { statSync } = await import('node:fs')
+    const home = mkdtempSync(join(tmpdir(), 'taskq-key-'))
+    try {
+      const config = resolveConfig(home, { provider: 'api_key' })
+      assert.equal(saveApiKey(config, '  placeholder-saved-key \n'), null)
+      assert.equal(statSync(apiKeyPath(config)).mode & 0o777, 0o600)
+      assert.equal(buildEnv(config, base).ANTHROPIC_API_KEY, 'placeholder-saved-key')
+      assert.deepEqual(await preflight(config, { PATH: '/usr/bin' }), { ok: true })
+      assert.match(String(saveApiKey(config, 'two words')), /without spaces/)
+      saveApiKey(config, '')
+      assert.equal(buildEnv(config, base).ANTHROPIC_API_KEY, 'placeholder-api-key')
+      assert.equal((await preflight(config, { PATH: '/usr/bin' })).ok, false)
+    } finally {
+      rmSync(home, { recursive: true, force: true })
+    }
+  })
+})

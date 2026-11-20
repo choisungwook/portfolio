@@ -2,6 +2,7 @@ import { execFile } from 'node:child_process'
 import { promisify } from 'node:util'
 import type { Config } from '../../config.ts'
 import type { PreflightResult } from '../types.ts'
+import { readApiKey } from './api-key.ts'
 
 const run = promisify(execFile)
 // The child environment is built from an allow-list. Nothing else of the parent reaches the session or its tools.
@@ -25,7 +26,7 @@ export function buildEnv(config: Config, base: NodeJS.ProcessEnv = process.env):
     env.AWS_REGION = config.awsRegion
     env.AWS_PROFILE = config.inferenceProfile
   } else if (config.provider === 'api_key') {
-    env.ANTHROPIC_API_KEY = base.ANTHROPIC_API_KEY
+    env.ANTHROPIC_API_KEY = readApiKey(config) ?? base.ANTHROPIC_API_KEY
   } else if (base.CLAUDE_CODE_OAUTH_TOKEN !== undefined) {
     env.CLAUDE_CODE_OAUTH_TOKEN = base.CLAUDE_CODE_OAUTH_TOKEN
   }
@@ -41,7 +42,7 @@ export function caBundleEnv(config: Config): Record<string, string> {
 export async function preflight(config: Config, base: NodeJS.ProcessEnv = process.env): Promise<PreflightResult> {
   if (config.provider === 'subscription') return { ok: true }
   if (config.provider === 'api_key') {
-    return base.ANTHROPIC_API_KEY ? { ok: true } : { ok: false, reason: 'ANTHROPIC_API_KEY is not set' }
+    return readApiKey(config) ?? base.ANTHROPIC_API_KEY ? { ok: true } : { ok: false, reason: 'no API key saved in Settings > Connections and ANTHROPIC_API_KEY is not set' }
   }
   try {
     const env = { ...base, ...caBundleEnv(config) }

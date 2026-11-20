@@ -4,6 +4,7 @@ import { PERIODS, usageReport, type Period } from '../db/usage.ts'
 import { botConnection, clearConnectionCache, listConnections } from '../team/connections.ts'
 import { connectionSettings, saveConnectionSettings } from '../team/connection-settings.ts'
 import { listProfiles } from '../aws/profiles.ts'
+import { readApiKey, saveApiKey } from '../agents/claude/api-key.ts'
 import { HttpError, optionalJson, type ApiDeps } from './http.ts'
 
 // Connections (how bots reach their models and whether that works), sign-in for the SDKs that keep their own session
@@ -29,12 +30,20 @@ export function registerProviderRoutes(api: Hono, { db, config }: ApiDeps): void
   api.get('/connections', async (c) => c.json(await listConnections(db, config, { refresh: c.req.query('refresh') === '1' })))
 
   // How Claude and OpenAI-on-Bedrock sign in: provider, region and AWS profile. Saving applies at once and reruns checks.
-  api.get('/connection-settings', (c) => c.json(connectionSettings(config)))
+  // The API key is write-only: answers say only whether one is saved. Omitted or "" in a PUT keeps it; null removes it.
+  const withKey = <T extends object>(s: T) => ({ ...s, claude_api_key_set: readApiKey(config) !== undefined })
+  api.get('/connection-settings', (c) => c.json(withKey(connectionSettings(config))))
   api.put('/connection-settings', async (c) => {
-    const saved = saveConnectionSettings(db, config, await optionalJson(c))
+    const body = await optionalJson(c)
+    const key = body.claude_api_key
+    if (key === null || (typeof key === 'string' && key.trim())) {
+      const problem = saveApiKey(config, key ?? '')
+      if (problem) throw new HttpError(400, problem)
+    }
+    const saved = saveConnectionSettings(db, config, body)
     if (typeof saved === 'string') throw new HttpError(400, saved)
     clearConnectionCache()
-    return c.json(saved)
+    return c.json(withKey(saved))
   })
   // The AWS profiles on this machine (names, how each signs in, region); never keys.
   api.get('/aws/profiles', (c) => c.json(listProfiles()))
