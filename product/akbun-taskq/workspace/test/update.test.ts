@@ -9,7 +9,7 @@ import pkg from '../package.json' with { type: 'json' }
 
 // Settings > Update against a fake GitHub: no network call runs here.
 
-function fakeGitHub(version: string, archive: Buffer | null, asset = assetName() ?? 'taskq-linux-x64.tar.gz'): typeof fetch {
+function fakeGitHub(version: string, archive: Buffer | null, asset = assetName() ?? 'taskq-darwin-arm64.tar.gz'): typeof fetch {
   return (async (input: string | URL) => {
     const url = String(input)
     if (url.startsWith('https://api.github.com/')) {

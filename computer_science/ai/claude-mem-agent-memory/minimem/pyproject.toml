@@ -1,0 +1,15 @@
+[project]
+name = "minimem"
+version = "0.1.0"
+description = "claude-mem 원리를 재현한 최소 구현: hook 캡처, observer 압축, SQLite FTS5 검색, SessionStart 주입, MCP 검색"
+requires-python = ">=3.11"
+dependencies = ["mcp==2.3.0"]
+
+[project.scripts]
+minimem = "minimem.cli:main"
+minimem-hook = "minimem.hook:main"
+minimem-mcp = "minimem.mcp_server:main"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"

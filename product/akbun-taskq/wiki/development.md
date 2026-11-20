@@ -18,7 +18,7 @@ npm test
 
 Tests use a fake worker and a fake SDK `query`, so they need no credentials and make no model call.
 
-Pull requests run only the tests whose name carries `[critical]`: the invariants whose failure is an incident (approval, gating, API auth, masking, claim, path confinement, child environment). `wiki/architecture.md` lists them. Tag a test that way only when breaking it would be an incident, and keep timing-dependent tests out.
+Pull requests run only the tests whose name carries `[critical]`: the invariants whose failure is an incident (approval, gating, API auth, masking, claim, path confinement, child environment). `wiki/architecture.md` lists them. The full suite runs only locally (`npm test`) and through a manual dispatch of `verify-akbun-taskq.yml`; a master push runs only the release workflow, so run `npm test` before opening a pull request. Tag a test that way only when breaking it would be an incident, and keep timing-dependent tests out.
 
 ```bash
 npm run test:critical
@@ -65,13 +65,13 @@ Seed runs, events and alerts through the functions in `src/db` and `src/runner`,
 
 ## Where things go
 
-- `TASKQ_HOME` (default: the current directory) holds `taskq.config.json`, `data/`, `outputs/` and `memory/`.
+- `TASKQ_HOME` (default: the current directory; `~/.taskq` for the desktop app) holds `taskq.config.json`, `data/`, `outputs/` and `memory/`.
 - `data/` is created with mode 0700 and the database with 0600.
 - Sessions for research, review and ops tasks run with `outputs/` as their working directory, so the config and the database are not in a writable working directory.
 
 ## Build the binary
 
-`node scripts/build-binary.ts` writes `dist/taskq` with bun on PATH. It generates `dist/binary-entry.ts`, which embeds every file under `ui/` and `src/db/schema/` plus the Claude Code binary of the installed SDK, registers them in `src/resources.ts`, and then imports `src/cli/main.ts`. Code that reads a file at run time goes through `resourcePath()`, not `import.meta.url`, or the binary will not find it. The Claude Code binary comes from the platform package npm installed, so build on the target OS. `release-akbun-taskq.yml` builds darwin-arm64 and linux-x64 and releases them as `akbun-taskq-v<version>` from `package.json`; bump the version with any change under `src/`, `ui/` or the package files.
+`node scripts/build-binary.ts` writes `dist/taskq` with bun on PATH. It generates `dist/binary-entry.ts`, which embeds every file under `ui/` and `src/db/schema/` plus the Claude Code binary of the installed SDK, registers them in `src/resources.ts`, and then imports `src/cli/main.ts`. Code that reads a file at run time goes through `resourcePath()`, not `import.meta.url`, or the binary will not find it. The Claude Code binary comes from the platform package npm installed, so build on the target OS. `release-akbun-taskq.yml` builds darwin-arm64 and releases it as `akbun-taskq-v<version>` from `package.json`; bump the version with any change under `src/`, `ui/` or the package files.
 
 ## Build the desktop app
 

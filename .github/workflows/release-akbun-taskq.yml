@@ -31,12 +31,13 @@ defaults:
 
 jobs:
   # The Claude Code binary comes from the platform package npm installs, so each target builds on its own OS.
-  # A pull request builds Linux only: it proves the bundle compiles, and a macOS runner can queue for many minutes.
-  # master builds both targets for the release.
+  # Only macOS on Apple silicon is released; nobody runs taskq on Linux or Windows. A pull request builds the same target.
   build:
     strategy:
       matrix:
-        include: ${{ fromJSON(github.event_name == 'pull_request' && '[{"runner":"ubuntu-latest","target":"linux-x64"}]' || '[{"runner":"macos-latest","target":"darwin-arm64"},{"runner":"ubuntu-latest","target":"linux-x64"}]') }}
+        include:
+          - runner: macos-latest
+            target: darwin-arm64
     runs-on: ${{ matrix.runner }}
     steps:
       - uses: actions/checkout@v7
@@ -71,7 +72,7 @@ jobs:
         run: tar -czf "taskq-${{ matrix.target }}.tar.gz" -C dist taskq
 
       # The desktop app is a window around the executable built above: tauri bundles it next to the app's own binary.
-      # macOS only, so it never runs on a pull request. Unsigned, like the executable.
+      # Releases only, not pull requests: the bundle adds minutes and a PR proves the executable. Unsigned, like the executable.
       - uses: dtolnay/rust-toolchain@stable
         if: github.event_name != 'pull_request' && matrix.target == 'darwin-arm64'
 
@@ -138,7 +139,7 @@ jobs:
           ## Install
 
           - \`taskq-desktop-darwin-arm64.dmg\` is the macOS app for Apple silicon: taskq in its own window. Copy it to Applications and run \`xattr -cr /Applications/akbun-taskq.app\` once; the build is unsigned.
-          - \`taskq-darwin-arm64.tar.gz\` for Apple silicon, \`taskq-linux-x64.tar.gz\` for Linux x86_64 are the command line executable.
+          - \`taskq-darwin-arm64.tar.gz\` is the command line executable for Apple silicon.
           - Extract and put \`taskq\` on PATH. On macOS, run \`xattr -d com.apple.quarantine taskq\` once after a browser download.
           - See the [taskq manual](${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/blob/$TAG/product/akbun-taskq/workspace/manual.md) for configuration.
           EOF

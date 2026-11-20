@@ -29,7 +29,7 @@ npm run demo
 - 모델에 접근할 방법 하나: Amazon Bedrock, Anthropic API 키, Claude 구독 로그인 중 하나.
 - macOS, Linux 또는 Windows의 WSL2. 세션은 Claude Code 샌드박스 안에서 돌고, 샌드박스를 쓸 수 없으면 시작하지 않는다.
 
-바이너리는 GitHub Release의 `akbun-taskq-v<버전>`에 있다. Apple silicon은 `taskq-darwin-arm64.tar.gz`, linux x86_64는 `taskq-linux-x64.tar.gz`다. 화면, DB 스키마, 버전이 맞는 Claude Code가 파일 하나에 들어 있다. 압축을 풀어 PATH에 두고, macOS에서 브라우저로 받았으면 한 번 격리 속성을 지운다.
+바이너리는 GitHub Release의 `akbun-taskq-v<버전>`에 있다. Apple silicon용 `taskq-darwin-arm64.tar.gz`만 있다. Linux와 Windows용 바이너리는 만들지 않는다. 화면, DB 스키마, 버전이 맞는 Claude Code가 파일 하나에 들어 있다. 압축을 풀어 PATH에 두고, macOS에서 브라우저로 받았으면 한 번 격리 속성을 지운다.
 
 ```bash
 tar -xzf taskq-darwin-arm64.tar.gz
@@ -42,7 +42,7 @@ macOS(Apple silicon)에서는 같은 Release의 `taskq-desktop-darwin-arm64.dmg`
 xattr -cr /Applications/akbun-taskq.app
 ```
 
-앱을 열면 taskq가 시작되고 그 화면이 앱 창에 뜬다. 4절의 `taskq run`과 주소를 여는 과정을 앱이 대신한다. 창을 닫으면 taskq도 끝난다. 설정 파일과 `TASKQ_HOME`은 같고, CLI 명령은 앱 안의 실행 파일 `/Applications/akbun-taskq.app/Contents/MacOS/taskq`로 쓴다. 터미널에서 `taskq run`이 이미 돌고 있으면 포트가 겹쳐 앱이 시작하지 못하고 그 오류를 창에 보여 준다.
+앱을 열면 taskq가 시작되고 그 화면이 앱 창에 뜬다. 4절의 `taskq run`과 주소를 여는 과정을 앱이 대신한다. 창을 닫으면 taskq도 끝난다. 셸 프로필에 `TASKQ_HOME`이 있으면 그 폴더를, 없으면 `~/.taskq`를 home으로 쓴다(설정 파일 `~/.taskq/taskq.config.json`). 앱과 같은 데이터를 CLI로 다루려면 `TASKQ_HOME=~/.taskq`를 지정한다. CLI 명령은 앱 안의 실행 파일 `/Applications/akbun-taskq.app/Contents/MacOS/taskq`로 쓴다. 터미널에서 `taskq run`이 이미 돌고 있으면 포트가 겹쳐 앱이 시작하지 못하고 그 오류를 창에 보여 준다.
 
 바이너리를 쓰면 이 문서의 `node bin/taskq`를 `taskq`로 바꿔 읽는다. `taskq version`이 taskq와 들어 있는 Claude Code의 버전을 출력한다. 설정 파일과 `TASKQ_HOME`은 같다. 들어 있는 Claude Code는 첫 세션 때 임시 디렉터리에 한 번 풀린다.
 
