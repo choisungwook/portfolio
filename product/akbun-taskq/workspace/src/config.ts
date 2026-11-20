@@ -16,7 +16,6 @@ export interface SandboxConfig {
 export interface BotsConfig {
   maxConcurrentTurns: number   // agent turns running at once, separate from maxConcurrent for tasks
   turnMaxTurns: number         // model turns inside one agent turn
-  hourlyTurnsPerAgent: number  // stops two agents from messaging each other in a loop
   maxOpenTasks: number         // tasks created by agents that are not done or failed
   maxAttempts: number          // a message whose turn failed this many times is set aside
   readRoots: string[]          // absolute directories agents may Read besides their own folder and outputs/
@@ -74,7 +73,7 @@ export const DEFAULTS: Omit<Config, 'home'> = {
   retrospect: true,
   bots: {
     maxConcurrentTurns: 2, turnMaxTurns: 30,
-    hourlyTurnsPerAgent: 20, maxOpenTasks: 10, maxAttempts: 3, readRoots: [],
+    maxOpenTasks: 10, maxAttempts: 3, readRoots: [],
     openaiInputPerMTok: 1.25, openaiOutputPerMTok: 10, bedrockRegion: 'us-west-2', bedrockProfile: '', codexPath: 'codex', kiroPath: 'kiro-cli',
   },
 }

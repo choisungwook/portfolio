@@ -57,7 +57,8 @@ button:has(> .icon:only-child) { display: inline-flex; align-items: center; just
 .layout {
   display: grid; grid-template-columns: 300px minmax(0, 1fr); gap: 16px; padding: 12px 16px; align-items: start;
 }
-.main { min-width: 0; }
+/* The page breathes on its right edge too, not only beside the sidebar. */
+.main { min-width: 0; padding: 8px 40px 32px 16px; }
 .main:focus { outline: none; }
 /* Must check opens over the page from the bell at the bottom of the sidebar, like the macOS notification list. */
 .alerts-button { position: relative; }
@@ -76,6 +77,7 @@ button:has(> .icon:only-child) { display: inline-flex; align-items: center; just
 }
 @media (max-width: 800px) {
   .layout { grid-template-columns: 1fr; }
+  .main { padding: 0; }
 }
 
 

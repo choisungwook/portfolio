@@ -469,7 +469,7 @@ A code task whose `repo` is a git repository gets its own worktree when it is cr
 
 ### Settings that persist
 
-Everything the user changes in the app is in the SQLite file under `TASKQ_HOME`: bots and their settings and memory (`team_agents`), the skill and plugin registry, limits (`meta.limit_*`), appearance (`ui_font_family`, `ui_font_size`, `ui_language` with `ko` as the default, `ui_theme`), `queue_autorun` and desktop notifications. A restart or a new release binary opens the same file, so nothing is lost; `taskq.config.json` only supplies starting values for the limits. `test/bots-extras.test.ts` checks this with a second connection to the file.
+Everything the user changes in the app is in the SQLite file under `TASKQ_HOME`: bots and their settings and memory (`team_agents`), the skill and plugin registry, appearance (`ui_font_family`, `ui_font_size`, `ui_language` with `ko` as the default, `ui_theme`), `queue_autorun` and desktop notifications. A restart or a new release binary opens the same file, so nothing is lost; `taskq.config.json` only supplies starting values for the limits. `test/bots-extras.test.ts` checks this with a second connection to the file.
 
 ### Queue and run button
 
@@ -493,7 +493,6 @@ The runner claims only ready tasks with no owner (`nextEligible`), and only whil
 
 | Guard | Effect |
 |---|---|
-| Hourly turns | An agent with `hourlyTurnsPerAgent` turns in the last hour (or since the last resume) pauses the team |
 | Retry | A failed turn with no effect returns its messages; after `maxAttempts` they are set aside with an alert. A turn the provider refused (`rejected`: HTTP 4xx other than 403, 408 and 429 on the OpenAI Agents SDK path) is set aside at once and costs 0. A turn that failed after an effect (message, task, wiki write) is not retried, because a retry would repeat it; its messages are set aside with an alert. The same holds for a turn open at a crash. A failed turn costs 60 s before the agent's next turn |
 | Tamper | A call that reaches taskq's data directory or config ends the turn and pauses the bots with a `security_finding` alert, whatever the bot's settings |
 | Login | A failed Claude login pauses the bots; a failed OpenAI or Kiro login turns that bot off. Rerunning the checks in Settings > Connections undoes both when the check passes |
@@ -651,7 +650,6 @@ Writes (any non-GET under `/api`) must send `Content-Type: application/json`, op
 | `POST /tasks/:id/retry` | retry a failed task. Body `{ "draft": true }` and `{ "resume": true }`, both optional. 200 with the task; 409 in other statuses |
 | `GET /settings` | `{ config, home, db_path, access_skills, desktop_notifications, queue_autorun, appearance, font_families, bot_skills, bot_plugins, paths }`. `paths` is `{ home, shared, sessions }`, and `sessions` is `{ claude, codex, kiro }`, each `{ path, exists }`: where that runtime keeps its transcripts. `db_path` is the absolute path of the SQLite file, shown read-only in Settings. `config` is the read-only list of keys in `CONFIG_KEYS` (`src/skills/registry.ts`). Each access skill is `{ name, path, description, ok }`; `ok` is false when `SKILL.md` is gone |
 | `POST /settings/desktop-notifications` | persist the desktop notification preference with `{"enabled":true}` or `{"enabled":false}` |
-| `POST /settings/limits` | any of `turns_per_hour_total`, `max_concurrent_turns`, `bot_turns_per_hour`, `turn_max_turns`, `session_max_tokens`; all are checked before any is saved |
 | `POST /files` | upload `{ "name", "data": base64 }` up to 20 MB; saved under `shared/attachments/<day>/<id>-<name>`; returns `{ path }` relative to the shared folder |
 | `GET /shared?dir=` `GET /shared/file?path=` | list a folder of the shared folder (up to 500 entries, symlinks left out); download a file. A path outside the shared folder is 400 |
 | `POST /shared/preview` | `{ "path" }` for an HTML file of the shared folder returns `{ "url": "/preview/<ticket>/<name>" }`. The ticket lasts 10 minutes and serves that file and the files in its folder, outside `/api` and without the token, with `content-security-policy: sandbox allow-scripts; …; frame-ancestors <taskq>` so the page runs in an opaque origin. 404 for anything else |

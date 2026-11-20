@@ -1,4 +1,4 @@
-// Settings dialog: a menu on the left and one page on the right (appearance, connections, limits, usage, ...). This file
+// Settings dialog: a menu on the left and one page on the right (appearance, connections, usage, ...). This file
 // switches the pages and owns the read-only configuration; other views fill their own page and listen for
 // 'settings-page'. Closing it emits 'settings-closed'.
 import { api, mutate, notify } from '../core/api.js'
