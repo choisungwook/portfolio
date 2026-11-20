@@ -68,4 +68,3 @@
 
 - 작업 상태 파일과 workspace 초기화는 [.claude/rules/workflow.md](./.claude/rules/workflow.md)를 따른다.
 - Issue, PR, GitHub Actions 작성 규칙과 환경별 GitHub 도구는 [.claude/rule-details/github-tools.md](./.claude/rule-details/github-tools.md)에 있다.
-- 작업이 끝난 branch를 master에 넣는 전체 흐름은 [.claude/commands/repo-pr-ship.md](./.claude/commands/repo-pr-ship.md) 하나로 돈다. merge까지 가는 지시를 받았으면 gh 명령을 나열해 이 흐름을 흉내 내지 않는다. 축약된 지시는 실행 동사를 승인한 것이지 PR 직전 리뷰와 CI 확인 같은 중간 단계를 뺀 것이 아니다.
