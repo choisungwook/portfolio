@@ -1,7 +1,7 @@
 name: verify-akbun-taskq
 
-# This job proves the code still type checks and passes its tests.
-# release-akbun-taskq.yml builds and releases the binary.
+# This job proves the code still type checks and passes its tests on pull requests.
+# It does not run on master: the PR already proved the merged code, and release-akbun-taskq.yml releases it.
 on:
   pull_request:
     paths:
@@ -9,11 +9,6 @@ on:
       - '.github/workflows/verify-akbun-taskq.yml'
       - '.github/workflows/release-akbun-taskq.yml'
       - '.github/scripts/taskq-changelog.mjs'
-  push:
-    branches:
-      - master
-    paths:
-      - 'product/akbun-taskq/workspace/**'
   workflow_dispatch:
 
 permissions:
