@@ -7,7 +7,6 @@
 .settings-button svg { display: block; flex: none; }
 
 .settings-section { margin-top: 16px; }
-.settings-section h3 { margin: 0; }
 .settings-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; min-height: 28px; }
 .add-button { min-width: 28px; font-size: 18px; line-height: 1; font-weight: 600; color: var(--link); }
 .settings-section > .meta { margin-bottom: 0; }
@@ -65,9 +64,8 @@ button[type="submit"].quiet:hover:not(:disabled) { background: var(--secondary-h
 .bot-form input[type="text"], .bot-form select, .bot-form textarea { width: 100%; color: var(--fg); font-size: var(--text-small); }
 .bot-form textarea { resize: vertical; font-family: var(--font-sans); }
 .bot-form fieldset { border: 0; border-radius: var(--radius); background: var(--panel-soft); padding: 12px 14px; margin: 0; display: grid; gap: 10px; }
-.bot-form legend { float: left; width: 100%; padding: 0; font-weight: 700; color: var(--fg); }
-.bot-picks { display: flex; flex-wrap: wrap; gap: 6px 16px; }
-.pick-title { width: 100%; margin: 0; font-weight: 600; font-size: var(--text-small); }
+.bot-form legend { float: left; width: 100%; padding: 0; font-size: 1.15em; font-weight: 700; color: var(--fg); }
+.bot-form > .page-title { margin-bottom: 4px; }
 .dialog-actions { display: flex; align-items: center; gap: 8px; }
 .dialog-actions .spacer { flex: 1; }
 .appearance-row { display: flex; flex-wrap: wrap; gap: 16px; align-items: center; }
@@ -85,9 +83,11 @@ button[type="submit"].quiet:hover:not(:disabled) { background: var(--secondary-h
    entries are rows divided by hairlines, each with an initial, its text and its actions on the right. */
 [data-view-panel="plugins"]:not([hidden]) { display: grid; gap: 16px; align-content: start; max-width: 1040px; margin: 0 auto; padding: 8px 8px 48px; }
 [data-view-panel="plugins"] > .view-title, [data-view-panel="plugins"] > .meta { margin: 0; }
-.plugins-section:not([hidden]) { display: grid; gap: 10px; margin-top: 20px; }
+.plugins-section:not([hidden]) { display: grid; gap: 10px; }
+.plugins-section > .section-title { margin-bottom: 0; }
+.plugins-section > .plugins-head { margin-top: 28px; padding-bottom: 6px; border-bottom: 1px solid var(--border); }
+.plugins-head > .section-title { margin: 0; padding: 0; border: 0; }
 .plugins-section > .meta { margin: 0; }
-.plugins-heading { margin: 0; font-size: 1.15em; }
 .plugins-head { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; }
 .plugins-head input[type="search"] { margin-left: auto; min-height: 32px; border-radius: 16px; padding: 0 14px; min-width: 220px; }
 [data-view-panel="plugins"] .skill-list { gap: 0; margin: 0; }
@@ -123,8 +123,6 @@ button[type="submit"].quiet:hover:not(:disabled) { background: var(--secondary-h
 .usage-table th, .usage-table td { text-align: left; padding: 6px 8px; border-bottom: 1px solid var(--border); white-space: nowrap; }
 .usage-table .mono { font-family: var(--font-mono); }
 .usage-bot > span { display: inline-flex; gap: 6px; align-items: center; }
-.kiro-form { display: flex; gap: 8px; flex-wrap: wrap; align-items: end; }
-.kiro-form label { display: grid; gap: 4px; flex: 1 1 200px; }
 [data-area="usage-report"] { overflow-x: auto; }
 /* Settings nearly fills the window, leaving a margin around it; the menu stays put and only the page scrolls. */
 dialog[data-area="settings-dialog"][open] {
@@ -145,8 +143,9 @@ dialog[data-area="settings-dialog"][open] {
 .settings-pages > .settings-section:not([hidden]) { display: grid; gap: 20px; align-content: start; max-width: 820px; margin: 0 auto; line-height: 1.6; }
 .settings-pages > .settings-section > * { margin-top: 0; margin-bottom: 0; }
 .settings-pages > .settings-section > button, .settings-pages > .settings-section > label.check { justify-self: start; }
-.settings-pages > .settings-section > h3, .settings-pages > .settings-section > :is(.settings-head, .plugins-head) > h3 { font-size: 1.6em; font-weight: 600; line-height: 1.25; }
-.settings-pages > .settings-section > h3 + .meta { margin-top: -10px; }
+.settings-pages > .settings-section > .page-title + .meta { margin-top: -10px; }
+/* A section heading (H2) gets room above it on top of the page's gap; the first one sits below the title and hint. */
+.settings-pages > .settings-section > .section-title { margin-top: 12px; }
 /* A borderless button that starts a row lines its text up with the text above it; its hover box still shows. */
 .settings-section .actions > :is(a.button, button:not(.primary):not([type="submit"])):first-child { margin-left: -12px; }
 @media (max-width: 700px) {
@@ -157,27 +156,10 @@ dialog[data-area="settings-dialog"][open] {
   .settings-nav h2 { width: 100%; }
 }
 
-/* Connections: one card per way bots reach a model. */
-.conn-cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 10px; margin: 10px 0 18px; }
-.conn-card { border-radius: var(--radius); background: var(--panel-soft); padding: 12px 14px; display: grid; gap: 6px; align-content: start; }
-.conn-card p { margin: 0; overflow-wrap: anywhere; }
-.conn-card[data-used="false"] { opacity: 0.75; }
 .conn-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
 .conn-error { color: var(--danger); }
-.conn-banner { margin: 10px 0 0; padding: 10px 12px; border-radius: var(--radius); background: var(--warning-soft); color: var(--fg); }
-.conn-why { padding: 8px 10px; border-radius: var(--radius); background: var(--warning-soft); }
-.conn-why p { margin: 4px 0 0; }
-.conn-ok { color: var(--muted); }
-.conn-actions { display: flex; flex-wrap: wrap; gap: 6px; }
-.conn-head .wf-status { flex: none; white-space: nowrap; }
 
 /* Routines in a bot's settings. */
-.routine-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
-.routine-list li { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: 4px 8px; align-items: center; }
-.routine-list li > p { grid-column: 1 / -1; margin: 0; }
-.routine-add { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; }
-.routine-add textarea { grid-column: 1 / -1; }
-.routine-add button { justify-self: start; }
 
 /* Weekly review. */
 .review-prune, .review-spot { list-style: none; margin: 8px 0 14px; padding: 0; display: grid; gap: 8px; }
@@ -186,9 +168,20 @@ dialog[data-area="settings-dialog"][open] {
 .review-spot p { margin: 0; overflow-wrap: anywhere; }
 
 /* How bots sign in, on the Connections page. */
-.conn-settings { display: grid; gap: 10px; margin: 8px 0 18px; }
-.conn-settings fieldset { border: 0; border-radius: var(--radius); background: var(--panel-soft); padding: 10px 12px; margin: 0; display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 8px 12px; }
-.conn-settings legend { float: left; width: 100%; padding: 0; font-weight: 700; }
-.conn-settings label { display: grid; gap: 4px; font-size: var(--text-small); color: var(--muted); }
-.conn-settings button { justify-self: start; }
 .official-item .skill-path { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; word-break: normal; }
+
+/* Connections: one section (H2) per agent type with its sign-in method, the fields that method needs, and Connection
+   test, Save and Clear. The test result is a green check or a red cross with the reason. */
+.conn-runtime { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 10px 14px; align-items: end; }
+.conn-runtime > :is(.section-title, .meta, .conn-buttons, [data-area="kiro-login"]) { grid-column: 1 / -1; }
+.conn-runtime > .section-title { margin: 12px 0 0; }
+.conn-runtime > .meta { margin: 0; }
+.conn-runtime label { display: grid; gap: 4px; font-size: var(--text-small); color: var(--muted); }
+.conn-runtime select:disabled { opacity: 1; color: var(--fg); }
+.conn-buttons { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.conn-result { display: inline-flex; align-items: center; gap: 6px; min-height: 28px; }
+.conn-icon { display: inline-flex; align-items: center; justify-content: center; width: 22px; height: 22px; border-radius: 50%; color: #ffffff; }
+.conn-icon[data-status="ok"] { background: #2e9e5b; }
+.conn-icon[data-status="error"] { background: var(--danger-fill); }
+.conn-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.conn-error { color: var(--danger); }

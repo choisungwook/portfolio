@@ -249,7 +249,9 @@ bot 설정에서 정하는 것은 아래와 같다.
 | 샌드박스 | 끔 | 켜면 명령이 샌드박스에서 돌고, 쓰기는 작업 디렉터리로, 네트워크는 허용 호스트로 제한된다 |
 | 차단 명령 | 없음 | 줄마다 패턴 하나. `*`만 와일드카드다. `git push*`를 넣으면 `cd app && git push`도 막힌다. 변수나 스크립트 파일로 우회할 수 있으니 꼭 막아야 할 것은 샌드박스로 막는다 |
 | 작업 디렉터리 | bot 폴더 | bot이 일하는 곳. 저장소에서 일할 bot은 저장소 경로를 넣는다 |
-| skill, plugin | 없음 | 설정에 등록된 것 중에서 고른다 |
+| Agent type, 인증 방식 | Claude, 연결 화면의 Claude 방식 | Claude, OpenAI, Kiro 중 하나와 SDK(API key), 구독, AWS Bedrock 중 하나(Kiro는 AWS IAM Identity Center뿐). 값은 설정 > 연결에서 채운다 |
+
+skill, plugin, MCP server는 bot마다 고르지 않는다. 왼쪽 메뉴의 플러그인에 등록한 것을 모든 bot이 타입에 맞게 쓴다(plugin은 Claude bot만).
 
 설정과 관계없이 모든 bot은 taskq의 데이터와 설정 파일을 건드릴 수 없다. 건드리려 하면 그 turn이 멈추고 bot 전체가 멈추며 보안 알림이 뜬다.
 
@@ -261,7 +263,7 @@ bot은 계속 떠 있는 프로세스가 아니다. 메시지가 올 때마다 �
 
 bot이 할 수 있는 일은 bot 설정의 권한 모드, 샌드박스, 차단 명령이 정한다. bot이 만든 계정 조회·변경 태스크는 항상 초안으로 들어가므로, task 상태보드에서 내가 보고 Queued로 바꿔야 실행된다.
 
-OpenAI bot은 bot 설정의 Agent SDK에서 고른다. taskq를 실행하는 환경에 `OPENAI_API_KEY`가 있어야 한다. OpenAI Agents SDK에는 auto 모드가 없어서 권한 모드가 bot이 받는 도구를 정한다. Plan은 파일 읽기만, Accept edits는 bot 폴더와 공용 폴더에 쓰기까지, Bypass는 셸 명령까지(샌드박스를 켜면 셸은 빠진다). 비용은 토큰 수에 설정 파일의 `bots.openaiInputPerMTok`, `bots.openaiOutputPerMTok` 단가를 곱한 추정치로 사용량에 표시된다.
+OpenAI bot은 bot의 Agent type에서 고른다. SDK 인증 방식이면 설정 > 연결의 OpenAI 절에 API key를 저장하거나 taskq를 실행하는 환경에 `OPENAI_API_KEY`가 있어야 한다. OpenAI Agents SDK에는 auto 모드가 없어서 권한 모드가 bot이 받는 도구를 정한다. Plan은 파일 읽기만, Accept edits는 bot 폴더와 공용 폴더에 쓰기까지, Bypass는 셸 명령까지(샌드박스를 켜면 셸은 빠진다). 비용은 토큰 수에 설정 파일의 `bots.openaiInputPerMTok`, `bots.openaiOutputPerMTok` 단가를 곱한 추정치로 사용량에 표시된다.
 
 정해진 순서로 일을 시키려면 Workflows를 쓴다. 왼쪽 메뉴의 Workflows에서 단계(실행, 검증, 다른 bot에 넘김, 사용자 승인)와 순서를 그래프로 만들고, 새 작업 창에서 Bot과 Workflow를 고르거나 작업 상세의 Workflow 행에서 지정한다. 그 bot이 작업을 시작하면 단계마다 결과를 보고한다. 검증 단계는 실행한 명령과 출력을 증거로 남겨야 성공하고, 승인 단계는 내가 실행 기록 화면에서 승인해야 넘어간다. 성공은 bot의 말이 아니라 모든 단계가 끝났는지로 taskq가 판정한다. 실행 기록에는 어느 bot이 언제 실행했는지와, 지운 workflow면 "삭제됨"이 남는다. bot 없이 workflow만 지정한 작업은 큐가 실행하지 않는다.
 
@@ -306,7 +308,7 @@ taskq bots export
 
 - Appearance: 글꼴과 글자 크기. 바꾸는 즉시 앱 전체에 적용된다.
 - Queue: 맡은 bot이 없는 태스크를 큐가 스스로 실행할지. 끄면 시작 버튼을 눌러야만 실행된다.
-- 왼쪽 메뉴의 Plugins: bot이 쓸 skill 폴더와 plugin 폴더를 등록하고 보고 업데이트하고 지운다. Anthropic 공식 plugin 목록도 보이지만 설치하지는 않는다. 각 bot은 자기 설정에서 고른다. bot은 고른 것을 복사해 두고 쓰므로, skill 파일을 고친 뒤에는 bot의 오른쪽 버튼 메뉴에서 Reload skills를 눌러야 반영된다.
+- 왼쪽 메뉴의 Plugins: bot이 쓸 skill 폴더, plugin 폴더, MCP server를 등록하고 보고 업데이트하고 지운다. Anthropic 공식 marketplace에서 설치할 수도 있다. 등록한 것은 모든 bot이 타입에 맞게 쓴다(Claude·OpenAI·Kiro 탭). bot은 복사본을 쓰므로, 등록 경로의 skill 파일을 고친 뒤에는 업데이트나 bot의 오른쪽 버튼 메뉴의 Reload skills를 눌러야 반영된다.
 
 bot은 내 Claude Code 설정(~/.claude의 권한 규칙, hook, skill)을 읽지 않는다. bot 설정 화면에 보이는 것만으로 동작한다.
 
@@ -330,8 +332,8 @@ bot과 대화할 때 쓰는 기능은 아래와 같다.
 | 저장소에서 안전하게 일 시키기 | 새 작업에서 저장소를 고르고 "새 git worktree에서 작업"을 켠 채 둔다(기본). 작업은 `TASKQ_HOME/worktrees/`의 자기 폴더와 `taskq/<작업 id>` 브랜치에서 일하고 내 checkout은 그대로다. 작업 상세 오른쪽에서 바뀐 파일과 diff, PR 링크를 보고 VS Code로 연다 |
 | 문서를 bot이 쓰게 넣기 | Wiki에서 가져오기로 zip, 파일, 폴더를 넣는다. 문서가 절 단위 페이지와 링크로 바뀌고 색인 페이지가 생긴다. 멈추면 "마지막 단계부터 다시" |
 | wiki 백업 | Wiki에서 zip으로 내보내기. 공용 폴더의 `exports/`에 생기고, 다른 taskq에서 가져오기로 그대로 복원된다 |
-| OpenAI bot을 다른 방식으로 쓰기 | bot 설정에서 Agent SDK를 OpenAI로 두고 Sign in with를 고른다. API 키는 `OPENAI_API_KEY`, Bedrock은 설정 > 연결의 "bot 로그인 방식"에서 AWS 프로파일(SSO 프로파일이면 `aws sso login` 뒤의 단기 자격증명)과 region을 고르거나(`bots.bedrockProfile`, `bots.bedrockRegion`), 프로파일을 비우고 `AWS_BEARER_TOKEN_BEDROCK`(Bedrock API 키)를 쓴다. Claude도 같은 곳에서 provider bedrock과 AWS 프로파일을 고른다. ChatGPT 구독은 Codex CLI를 설치하고 `codex login`에서 Sign in with ChatGPT |
-| Kiro bot 쓰기 | kiro-cli를 설치하고 설정의 연결 페이지에서 IAM Identity Center start URL과 region을 넣어 AWS SSO로 로그인한다(화면의 URL에서 코드 입력, 15분 안에 끝낸다). 로그인이 풀리면 그 bot이 꺼지고, 다시 로그인한 뒤 연결의 다시 확인을 누르면 켜진다. 모델은 대화 입력창 아래 메뉴에서 kiro-cli가 알려 주는 목록 중에 고른다. 그다음 bot 설정에서 Agent SDK를 Kiro로 고른다 |
+| bot의 인증 방식 바꾸기 | bot 설정에서 Agent type과 인증 방식(SDK, 구독, AWS Bedrock)을 고른다. 필요한 값은 설정 > 연결의 그 타입 절에서 채우고 저장한다(저장하면 연결 테스트가 돈다). SDK는 API key(비우면 `ANTHROPIC_API_KEY`나 `OPENAI_API_KEY`), AWS Bedrock은 AWS 프로파일(SSO 프로파일이면 `aws sso login` 뒤의 단기 자격증명)과 region이고, OpenAI는 프로파일을 비우면 `AWS_BEARER_TOKEN_BEDROCK`(Bedrock API 키)를 쓴다. 구독은 Claude는 로그인한 Claude Code, OpenAI는 Codex CLI의 `codex login`(Sign in with ChatGPT)이다 |
+| Kiro bot 쓰기 | kiro-cli를 설치하고 설정의 연결 페이지에서 IAM Identity Center start URL과 region을 넣어 AWS SSO로 로그인한다(화면의 URL에서 코드 입력, 15분 안에 끝낸다). 로그인이 풀리면 그 bot이 꺼지고, 다시 로그인한 뒤 연결의 Kiro 절에서 연결 테스트를 누르면 켜진다. 모델은 대화 입력창 아래 메뉴에서 kiro-cli가 알려 주는 목록 중에 고른다. 그다음 bot을 만들 때 Agent type을 Kiro로 고른다 |
 | 얼마나 썼는지 보기 | 설정의 사용량. SDK별 합계와 bot 세션별 토큰·비용이 보인다 |
 | context가 얼마나 찼는지 보기 | 입력창 아래 원과 %, 왼쪽 bot 이름 옆 작은 원. 85%를 넘으면 빨갛게 보이니 bot 메뉴의 새 세션으로 비운다 |
 | bot에게 MCP server 주기 | Plugins 메뉴에서 MCP server를 등록하고 bot 설정에서 고른다. Claude와 OpenAI bot 모두 쓴다 |
@@ -363,8 +365,7 @@ bot과 대화할 때 쓰는 기능은 아래와 같다.
 | 태스크가 "Interrupted"로 남는다 | 실행 중에 프로세스가 죽었다. 다음 실행에서 이전 세션을 이어받는다 |
 | OpenAI나 Kiro bot이 꺼져 있고 Must check에 "login failed"가 있다 | 그 bot의 로그인(API 키, `codex login`, 설정 > 연결의 Kiro 로그인)이 실패해 그 bot만 꺼졌다. 다시 로그인한 뒤 bot을 켠다 |
 | bot이 "승인을 기다린다"고 한다 | 되돌릴 수 없는 명령(push, 배포, 클라우드 자원 삭제 등)이나 bot 설정의 "먼저 묻기"에 걸렸다. Must check에서 명령을 보고 "한 번 승인"이나 "거부"를 누른다 |
-| 매일 같은 일을 시키고 싶다 | bot에게 "매일 7시에 …"라고 말하거나 bot 설정의 Routines에서 cron 일정이나 트리거로 추가한다. 설정의 주간 점검에서 돌았는지 본다 |
-| bot이 대답하지 않는다 | 왼쪽 bot 목록에서 이름 옆 점이 빨간색이면 연결이 실패한 것이다. 내가 보낸 메시지 아래에 "아직 대답할 수 없음"과 이유가 나온다. 흔한 원인은 bot이 일시정지됐거나, Claude `provider`가 기본값 bedrock인데 AWS 프로파일이 없거나, 그 bot의 로그인(API 키, Codex, Kiro)이 실패한 경우다. 설정의 연결 페이지에서 연결마다 상태를 보고 다시 확인한다 |
+| bot이 대답하지 않는다 | 왼쪽 bot 목록에서 이름 옆 점이 빨간색이면 연결이 실패한 것이다. 내가 보낸 메시지 아래에 "아직 대답할 수 없음"과 이유가 나온다. 흔한 원인은 bot이 일시정지됐거나, Claude `provider`가 기본값 bedrock인데 AWS 프로파일이 없거나, 그 bot의 로그인(API 키, Codex, Kiro)이 실패한 경우다. 설정의 연결 페이지에서 그 타입의 연결 테스트를 누른다 |
 | Must check에 "Bots paused"가 떠 있다 | Claude 모델 로그인이 실패했거나, bot이 taskq 데이터를 읽으려 했다. `taskq bots log`로 원인을 보고 `taskq bots resume`이나 메뉴 Bots 옆의 Resume all(전체 다시 켜기)로 다시 켠다 |
 | 고친 화면이 안 보인다 | 브라우저를 새로 고친다 |
 | 회사 네트워크에서 `certificate verify failed`나 `self-signed certificate in certificate chain`이 뜬다 | TLS 검사 장비가 인증서를 자기 CA로 다시 서명한다. 그 CA를 넣은 PEM 파일을 `caBundle`에 적고 다시 시작한다 |

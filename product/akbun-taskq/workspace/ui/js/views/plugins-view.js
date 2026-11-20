@@ -1,6 +1,6 @@
-// The Plugins view: the skills and plugins registered for bots (view, update, remove, register by path) and the
-// official marketplace, installed from with one button. Which bots use an entry is shown next to it, so removing one
-// is not a surprise.
+// The Plugins view: the skills, plugins and MCP servers every bot shares (view, update, remove, register by path) and
+// the official marketplace, installed from with one button. The bots that load an entry are shown next to it, so
+// removing one is not a surprise.
 import { api, mutate, notify } from '../core/api.js'
 import { area, clear, el, fill } from '../core/dom.js'
 import { askConfirm } from '../core/ask.js'
@@ -43,7 +43,7 @@ async function load() {
   try {
     const [settings, bots] = await Promise.all([api.get('/settings'), api.get('/bots')])
     const listOf = { skill: 'skills', plugin: 'plugins', mcp: 'mcp_servers' }
-    const users = (kind, name) => bots.agents.filter((a) => (a[listOf[kind]] ?? []).includes(name)).map((a) => `${a.name}${a.sdk === 'openai' ? ' ◎' : ''}`)
+    const users = (kind, name) => bots.agents.filter((a) => (a[listOf[kind]] ?? []).includes(name)).map((a) => `${a.name}${a.sdk === 'openai' ? ' ◎' : a.sdk === 'kiro' ? ' K' : ''}`)
     renderRegistry('skill', settings.bot_skills, users)
     renderRegistry('plugin', settings.bot_plugins, users)
     installed = new Set(settings.bot_plugins.map((p) => p.name))
@@ -127,7 +127,7 @@ function installButton(plugin) {
       const button = event.currentTarget
       button.disabled = true
       button.textContent = t('plugins.installing', 'Installing…')
-      const done = await mutate(() => api.post('/plugins/install', { name: plugin.name }), `${plugin.name} ${t('plugins.installed_toast', 'installed. Pick it in a bot\'s settings to use it.')}`)
+      const done = await mutate(() => api.post('/plugins/install', { name: plugin.name }), `${plugin.name} ${t('plugins.installed_toast', 'installed. Every Claude bot uses it from its next turn.')}`)
       if (done) load()
       else {
         button.disabled = false
@@ -137,7 +137,7 @@ function installButton(plugin) {
   })
 }
 
-// Claude shows skills, plugins, MCP servers and the official marketplace; OpenAI shows what its bots can use.
+// Claude shows skills, plugins, MCP servers and the official marketplace; OpenAI and Kiro show what their bots use.
 function showSdk(sdk) {
   for (const tab of document.querySelectorAll('[data-sdk-tab]')) tab.setAttribute('aria-selected', String(tab.dataset.sdkTab === sdk))
   for (const section of document.querySelectorAll('[data-view-panel="plugins"] [data-sdk]')) {

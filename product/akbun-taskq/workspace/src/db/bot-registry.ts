@@ -90,10 +90,9 @@ export function knownNames(db: Db): { skills: Set<string>; plugins: Set<string>;
 
 const run = promisify(execFile)
 
-export function botsUsing(db: Db, kind: RegistryKind, name: string): string[] {
-  const column = kind === 'skill' ? 'skills' : 'plugins'
-  return db.prepare(`SELECT name, ${column} AS list FROM team_agents`).all()
-    .filter((row) => (JSON.parse(String(row.list)) as string[]).includes(name)).map((row) => String(row.name))
+// Every bot loads every registered entry its SDK can use (plugins only Claude bots).
+export function botsUsing(db: Db, kind: RegistryKind, _name?: string): string[] {
+  return db.prepare(`SELECT name FROM team_agents ${kind === 'plugin' ? "WHERE sdk = 'claude'" : ''}`).all().map((row) => String(row.name))
 }
 
 // A git checkout is pulled (fast-forward only, so local changes are never merged or overwritten). Anything else has no

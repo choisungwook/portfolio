@@ -46,7 +46,7 @@ export const STATIC_MODELS: Record<BotSdk, Catalog['models']> = {
 }
 
 // An OpenAI bot's models depend on how it signs in.
-export const PROVIDER_MODELS: Record<BotProvider, Catalog['models']> = {
+export const PROVIDER_MODELS: Record<Exclude<BotProvider, 'subscription'>, Catalog['models']> = {
   api: STATIC_MODELS.openai,
   bedrock: [
     { id: 'openai.gpt-oss-120b-1:0', name: 'gpt-oss-120b (Bedrock)', description: 'Open-weight, on Amazon Bedrock', efforts: ['low', 'medium', 'high'] },
@@ -56,7 +56,7 @@ export const PROVIDER_MODELS: Record<BotProvider, Catalog['models']> = {
 }
 
 export function staticModels(agent: { sdk: BotSdk; provider?: BotProvider | null }): Catalog['models'] {
-  return agent.sdk === 'openai' ? PROVIDER_MODELS[agent.provider ?? 'api'] : STATIC_MODELS[agent.sdk]
+  return agent.sdk === 'openai' ? PROVIDER_MODELS[(agent.provider ?? 'api') as keyof typeof PROVIDER_MODELS] : STATIC_MODELS[agent.sdk]
 }
 
 // The bot's registered skills, named the way the SDK names a plugin's skill. Shown even when the SDK did not answer.

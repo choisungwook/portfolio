@@ -142,7 +142,7 @@ describe('files, search, memory and settings', () => {
     await hub.stop()
   })
 
-  test('updating a git-backed skill pulls it and reloads every bot that uses it', async () => {
+  test('updating a git-backed skill pulls it and reloads every bot, since every bot shares it', async () => {
     const origin = join(env.home, 'origin-skill')
     mkdirSync(origin, { recursive: true })
     writeFileSync(join(origin, 'SKILL.md'), '---\nname: notes\ndescription: v1\n---\nv1\n')
@@ -154,12 +154,11 @@ describe('files, search, memory and settings', () => {
     mkdirSync(join(env.home, 'skills'), { recursive: true })
     execFileSync('git', ['clone', '-q', origin, clone])
     assert.equal((await call('POST', '/bot-skills', { path: clone })).status, 201)
-    await call('PUT', '/bots/coder', { skills: ['notes'] })
     writeFileSync(join(origin, 'SKILL.md'), '---\nname: notes\ndescription: v2\n---\nv2\n')
     git(origin, 'commit', '-qam', 'v2')
     const result = await (await call('POST', '/bot-skills/notes/update')).json() as { method: string; reloaded: string[] }
     assert.equal(result.method, 'git')
-    assert.deepEqual(result.reloaded, ['coder'])
+    assert.deepEqual(result.reloaded.sort(), ['coder', 'doc-reviewer', 'planner', 'reviewer', 'taskq'])
     const copy = join(env.home, 'bot-plugins', 'coder', 'skills-plugin', 'skills', 'notes', 'SKILL.md')
     assert.match(readFileSync(copy, 'utf8'), /v2/)
     assert.ok(existsSync(copy))

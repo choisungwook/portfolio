@@ -70,7 +70,7 @@ function go(next) {
 
 function header(title, ...actions) {
   return el('div', { class: 'wf-head' },
-    el('h2', { class: 'view-title', text: title }),
+    el('h1', { class: 'view-title', text: title }),
     el('div', { class: 'wf-tabs', role: 'tablist' },
       el('button', { type: 'button', role: 'tab', 'aria-selected': String(screen === 'list' || screen === 'edit'), text: t('wf.list', 'Workflows'), onclick: () => leave('list') }),
       el('button', { type: 'button', role: 'tab', 'aria-selected': String(screen === 'runs' || screen === 'run'), text: t('wf.runs', 'Run history'), onclick: () => leave('runs') })),

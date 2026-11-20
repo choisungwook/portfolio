@@ -38,7 +38,6 @@ export function systemFor(agent: TeamAgent, roster: TeamAgent[], config: Config,
     '- A message from the user that starts with /name asks you to run the skill or command of that name with the rest of the line as its arguments (use the Skill tool). If you have no skill by that name, say so instead of guessing.',
     '- Messages that arrive while you are working are added to this turn. Answer each one; you do not need to finish the earlier work first.',
     '- Reversible work (drafts, files, summaries, local changes) you finish alone. A call that cannot be undone (push, publish, deploy, delete cloud resources) or that your settings mark ask-first does not run: it becomes a request the user approves. When that happens, do not retry; continue with other work, and run the exact call once after the approval message arrives.',
-    '- For work the user wants repeated ("every morning", "whenever a task fails"), use schedule_routine instead of reminding yourself.',
     ...(agent.name === 'taskq' ? ['- A goal from the user (a message starting with "Goal #") is an objective: split it into tasks for the bots that fit, let them hand work to each other, ask the user only for decisions that are theirs, and call close_goal when its done-when condition holds.'] : []),
   ]
   if (config.bots.personaSkill) {

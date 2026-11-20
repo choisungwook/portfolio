@@ -1,6 +1,6 @@
 import { existsSync, statSync } from 'node:fs'
 import { isAbsolute } from 'node:path'
-import { EFFORTS, PERMISSION_MODES, type BotEffort, type BotPermissionMode, type BotProvider, type BotSdk, type BotSettings, PROVIDERS } from '../db/team.ts'
+import { EFFORTS, PERMISSION_MODES, type BotEffort, type BotPermissionMode, type BotProvider, type BotSdk, type BotSettings, PROVIDERS, PROVIDERS_BY_SDK } from '../db/team.ts'
 import { BOT_DEFAULTS } from './roster.ts'
 import { PERMISSIONS_BY_SDK } from './catalog.ts'
 
@@ -96,7 +96,11 @@ export function parseBotSettings(body: unknown, known: { skills: Set<string>; pl
       ask_first: has('ask_first') ? list(o.ask_first, 'ask_first', (c) => c.length <= 200) : from.ask_first ?? [],
     }
     if (!value.description) throw new Error('description is required: other bots delegate by it')
-    if (value.sdk !== 'openai') value.provider = null
+    // A provider the new SDK does not have (switching runtime keeps the old one) falls back to its default.
+    if (!PROVIDERS_BY_SDK[value.sdk].includes(value.provider as BotProvider)) {
+      if (has('provider') && value.provider !== null && !has('sdk')) throw new Error(`a ${value.sdk} bot's provider must be one of ${PROVIDERS_BY_SDK[value.sdk].join(', ') || 'none'}`)
+      value.provider = null
+    }
     // The OpenAI Agents SDK has no auto mode or permission modes; taskq builds an OpenAI bot's tools from plan,
     // acceptEdits or bypassPermissions. A bot switched to OpenAI without a mode given gets acceptEdits.
     if (!PERMISSIONS_BY_SDK[value.sdk].includes(value.permission_mode)) {

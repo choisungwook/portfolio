@@ -11,7 +11,6 @@ import { getMeta, setMeta } from '../db/meta.ts'
 import { raiseAlert } from '../alerts/rules.ts'
 import { consumeApproval, requestApproval } from '../db/bot-requests.ts'
 import { applyConnectionSettings } from './connection-settings.ts'
-import { runDueRoutines, runTriggeredRoutines, nextRoutineAt } from '../db/routines.ts'
 import { nowSec } from '../time.ts'
 import { teamChanged } from '../wake.ts'
 import { ROSTER } from './roster.ts'
@@ -19,7 +18,7 @@ import { agentDir, promptFor, systemFor } from './prompt.ts'
 import { hybridSearch } from './search.ts'
 import { teamTools } from './tools.ts'
 import { wikiDir } from './wiki-files.ts'
-import { pluginPaths, skillsFor } from './bot-plugin.ts'
+import { pluginPaths, reloadAll, skillsFor } from './bot-plugin.ts'
 import { mcpServersFor } from '../db/mcp-registry.ts'
 import { recoverBotTasks, releaseBotTasks } from './bot-work.ts'
 import { botWorkdir, sharedDir } from './shared.ts'
@@ -226,7 +225,8 @@ export function createTeamHub({ db, config, backend: claude, backends = {}, retr
     return result.session_total_usd >= before ? result.session_total_usd - before : result.session_total_usd
   }
 
-  // Claude bots share one login, so a failed Claude login pauses the team. An OpenAI or Kiro login belongs to that bot's
+  // A failed Claude login pauses the team (the orchestrator is a Claude bot and cannot be turned off); the reason names
+  // the bot, so only a passing check of that bot's own Claude sign-in resumes it (restore in connections.ts). An OpenAI or Kiro login belongs to that bot's
   // runtime (an API key, Codex, kiro-cli): only that bot is turned off until the user signs in and turns it back on.
   function signedOut(name: string): void {
     const agent = getAgent(db, name)
@@ -339,9 +339,6 @@ export function createTeamHub({ db, config, backend: claude, backends = {}, retr
     if (isTeamPaused(db)) return
     // A sign-in changed from the CLI or MCP (another process) reaches this one here; the UI applies it at once.
     applyConnectionSettings(db, config)
-    // Routines come due as messages; the turn that follows is an ordinary one.
-    runDueRoutines(db)
-    runTriggeredRoutines(db)
     joinRunning()
     for (const id of skipDisabledSpeakers(db).closed) {
       raiseAlert(db, { task_id: null, kind: 'team_message', message: `Discussion #${id} was closed without a conclusion: its moderator is disabled.` })
@@ -357,7 +354,7 @@ export function createTeamHub({ db, config, backend: claude, backends = {}, retr
   async function loop(seen: number): Promise<void> {
     while (running) {
       const now = nowSec()
-      const due = Math.min(nextDelivery(db, now) ?? Infinity, nextRoutineAt(db) ?? Infinity)
+      const due = nextDelivery(db, now) ?? Infinity
       const untilDue = due === Infinity ? Infinity : Math.max(0, (due - now) * 1000)
       await teamChanged.wait(Math.min(config.pollSec * 1000, untilDue + 50), stopped.signal, seen)
       if (!running) return
@@ -373,6 +370,14 @@ export function createTeamHub({ db, config, backend: claude, backends = {}, retr
   return {
     async start() {
       seedAgents(db, ROSTER)
+      // Every bot shares the registry; rebuild each snapshot once so one copied from an older per-bot choice catches up.
+      for (const agent of listAgents(db)) {
+        try {
+          reloadAll(db, config, agent.name)
+        } catch (error) {
+          console.error(`taskq: could not load skills and plugins for ${agent.name}: ${String(error)}`)
+        }
+      }
       for (const { agent, end } of recoverTurns(db)) reportSetAside(agent, end, 'taskq stopped during the turn')
       recoverBotTasks(db)
       running = true

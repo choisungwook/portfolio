@@ -2,6 +2,7 @@ import { Agent, MCPServerStdio, MaxTurnsExceededError, Runner, tool, user, type 
 import { mkdirSync, readdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { agentDir } from '../../team/prompt.ts'
 import type { BotProvider } from '../../db/team.ts'
+import { readOpenaiKey } from '../claude/api-key.ts'
 import { runCodexTurn, spawnCodex, type CodexSpawn } from './codex.ts'
 import { bedrockModelId, forgetBedrockTokens, listInferenceProfiles, makeBedrockToken, profileFailure, type InferenceProfileLister, type TokenMaker } from '../../aws/profiles.ts'
 import { join } from 'node:path'
@@ -199,7 +200,8 @@ function statusOf(error: unknown): number | undefined {
 }
 
 export function createOpenAITeamBackend(runFn?: OpenAIRunFn, fetcher: typeof fetch = fetch, codex: CodexSpawn = spawnCodex, makeToken: TokenMaker = makeBedrockToken, listProfiles: InferenceProfileLister = listInferenceProfiles): TeamBackend {
-  const apiKey = () => process.env.OPENAI_API_KEY ?? ''
+  // The key saved in Settings > Connections wins over OPENAI_API_KEY.
+  const apiKey = (config: Config) => readOpenaiKey(config) ?? process.env.OPENAI_API_KEY ?? ''
   // Bedrock signs in with an AWS profile when bots.bedrockProfile names one (a short-term token from its credentials),
   // otherwise with a Bedrock API key in AWS_BEARER_TOKEN_BEDROCK.
   const bedrockKey = async (config: Config): Promise<string> => (config.bots.bedrockProfile
@@ -231,7 +233,7 @@ export function createOpenAITeamBackend(runFn?: OpenAIRunFn, fetcher: typeof fet
     async runTurn(config: Config, request: TurnRequest): Promise<TurnResult> {
       const provider = request.agent.provider ?? 'api'
       if (provider === 'chatgpt') return runCodexTurn(config, request, codex)
-      if (!runFn && provider === 'api' && !apiKey()) return { outcome: 'failed', error: 'OPENAI_API_KEY is not set in the environment taskq runs in' }
+      if (!runFn && provider === 'api' && !apiKey(config)) return { outcome: 'failed', error: 'no OpenAI API key: save one in Settings > Connections or set OPENAI_API_KEY' }
       let bedrockToken = ''
       if (provider === 'bedrock') {
         try {
@@ -243,7 +245,7 @@ export function createOpenAITeamBackend(runFn?: OpenAIRunFn, fetcher: typeof fet
         }
         if (!runFn && !bedrockToken) return { outcome: 'failed', error: 'no Bedrock sign-in: choose an AWS profile in Settings > Connections, or set AWS_BEARER_TOKEN_BEDROCK (a Bedrock API key)' }
       }
-      const run = runFn ?? sdkRun(apiKey(), bedrockToken)
+      const run = runFn ?? sdkRun(apiKey(config), bedrockToken)
       // Newer OpenAI models on Bedrock answer only through an inference profile: openai.<model> becomes us.openai.<model>
       // (or the region's geography, else global.) when the region lists one.
       const typed = request.agent.model ?? (provider === 'bedrock' ? BEDROCK_DEFAULT_MODEL : DEFAULT_OPENAI_MODEL)
@@ -331,8 +333,8 @@ export function createOpenAITeamBackend(runFn?: OpenAIRunFn, fetcher: typeof fet
         const profiles = (await profilesFor(config)).filter((p) => p.id.includes('openai.'))
         return { models: profiles.map((p) => ({ id: p.id, name: p.name, description: p.id, efforts: ['low', 'medium', 'high'] })), commands: [] }
       }
-      if (!apiKey()) return { models: [], commands: [] }
-      const res = await fetcher('https://api.openai.com/v1/models', { headers: { authorization: `Bearer ${apiKey()}` } })
+      if (!apiKey(config)) return { models: [], commands: [] }
+      const res = await fetcher('https://api.openai.com/v1/models', { headers: { authorization: `Bearer ${apiKey(config)}` } })
       if (!res.ok) throw new Error(`OpenAI models list: HTTP ${res.status}`)
       const body = await res.json() as { data?: { id: string }[] }
       const known = new Map(STATIC_MODELS.openai.map((m) => [m.id, m]))

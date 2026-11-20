@@ -6,9 +6,10 @@ import type { Config } from '../config.ts'
 import type { Db } from '../db/open.ts'
 import { getMeta } from '../db/meta.ts'
 import { getAgent, listAgents, setAgentEnabled, type TeamAgent } from '../db/team.ts'
-import { preflight } from '../agents/claude/auth.ts'
+import { configForBot, preflight } from '../agents/claude/auth.ts'
 import { whoami } from '../agents/kiro/login.ts'
 import { makeBedrockToken, profileFailure, type TokenMaker } from '../aws/profiles.ts'
+import { readOpenaiKey } from '../agents/claude/api-key.ts'
 import { teamChanged } from '../wake.ts'
 import { LOGIN_FAILED, isTeamPaused, resumeTeam, signedOutKey, teamPauseReason } from './hub.ts'
 
@@ -16,7 +17,7 @@ import { LOGIN_FAILED, isTeamPaused, resumeTeam, signedOutKey, teamPauseReason }
 // connection: Claude bots share the provider in taskq.config.json; an OpenAI bot uses its own sign-in; Kiro bots share
 // the kiro-cli login. The checks are the ones a turn would hit first, so a failed check is the likely reason for silence.
 
-export type ConnectionId = 'claude' | 'openai:api' | 'openai:bedrock' | 'openai:chatgpt' | 'kiro'
+export type ConnectionId = 'claude:api' | 'claude:subscription' | 'claude:bedrock' | 'openai:api' | 'openai:bedrock' | 'openai:chatgpt' | 'kiro'
 export type Status = 'ok' | 'error'
 
 export interface Check {
@@ -51,6 +52,7 @@ export interface Checks {
 
 const ok: Check = { status: 'ok', reason: null }
 const fail = (reason: string): Check => ({ status: 'error', reason })
+const openaiKey = (config: Config, env: NodeJS.ProcessEnv) => readOpenaiKey(config) ?? env.OPENAI_API_KEY
 
 // The model provider Codex is configured with (the top-level model_provider of config.toml), or null for its default.
 // With a provider other than openai (amazon-bedrock with an AWS profile) Codex needs no ChatGPT login.
@@ -88,22 +90,26 @@ export const defaultChecks: Checks = {
   env: process.env,
 }
 
-export function connectionOf(agent: Pick<TeamAgent, 'sdk' | 'provider'>): ConnectionId {
-  if (agent.sdk === 'openai') return `openai:${agent.provider ?? 'api'}`
-  return agent.sdk === 'kiro' ? 'kiro' : 'claude'
+// A Claude bot without its own sign-in uses the one chosen in Settings > Connections.
+const CLAUDE_METHOD = { api_key: 'api', subscription: 'subscription', bedrock: 'bedrock' } as const
+export function connectionOf(agent: Pick<TeamAgent, 'sdk' | 'provider'>, config: Config): ConnectionId {
+  if (agent.sdk === 'openai') return `openai:${agent.provider ?? 'api'}` as ConnectionId
+  if (agent.sdk === 'kiro') return 'kiro'
+  return `claude:${agent.provider ?? CLAUDE_METHOD[config.provider]}` as ConnectionId
 }
+
+const claudeConfig = (config: Config, id: ConnectionId) => configForBot(config, { provider: id.slice('claude:'.length) })
 
 function describe(config: Config, id: ConnectionId): { label: string; detail: string } {
   switch (id) {
-    case 'claude':
-      return {
-        label: `Claude · ${{ bedrock: 'Amazon Bedrock', api_key: 'Anthropic API key', subscription: 'Claude subscription' }[config.provider]}`,
-        detail: config.provider === 'bedrock' ? `provider bedrock, region ${config.awsRegion}, AWS profile ${config.inferenceProfile}`
-          : config.provider === 'api_key' ? 'provider api_key, the key saved in Settings or ANTHROPIC_API_KEY in the environment taskq runs in'
-            : 'provider subscription, the signed-in Claude Code',
-      }
+    case 'claude:bedrock':
+      return { label: 'Claude · Amazon Bedrock', detail: `region ${config.awsRegion}, AWS profile ${config.inferenceProfile}` }
+    case 'claude:api':
+      return { label: 'Claude · API key', detail: 'the key saved in Settings or ANTHROPIC_API_KEY in the environment taskq runs in' }
+    case 'claude:subscription':
+      return { label: 'Claude · subscription', detail: 'the signed-in Claude Code' }
     case 'openai:api':
-      return { label: 'OpenAI · API key', detail: 'OPENAI_API_KEY in the environment taskq runs in' }
+      return { label: 'OpenAI · API key', detail: 'the key saved in Settings or OPENAI_API_KEY in the environment taskq runs in' }
     case 'openai:bedrock':
       return {
         label: 'OpenAI · Amazon Bedrock',
@@ -118,10 +124,12 @@ function describe(config: Config, id: ConnectionId): { label: string; detail: st
 
 async function check(config: Config, id: ConnectionId, checks: Checks): Promise<Check> {
   switch (id) {
-    case 'claude':
-      return checks.claude(config)
+    case 'claude:api':
+    case 'claude:subscription':
+    case 'claude:bedrock':
+      return checks.claude(claudeConfig(config, id))
     case 'openai:api':
-      return checks.env.OPENAI_API_KEY ? ok : fail('OPENAI_API_KEY is not set in the environment taskq runs in')
+      return openaiKey(config, checks.env) ? ok : fail('no OpenAI API key: save one here, or set OPENAI_API_KEY in the environment taskq runs in')
     case 'openai:bedrock':
       if (config.bots.bedrockProfile) {
         // The profile's credentials sign a token; an SSO profile fails here when its session expired. Only a fixed
@@ -144,7 +152,8 @@ async function check(config: Config, id: ConnectionId, checks: Checks): Promise<
 // The newest finished turn of a connection, and the newest that ended done. Turns from before migration 009 have no
 // sdk and count as Claude.
 function lastTurns(db: Db, id: ConnectionId): { last: LastTurn | null; last_ok_at: number | null } {
-  const [sdk, provider] = id.includes(':') ? id.split(':') : [id, null]
+  // Claude turns do not record how they signed in, so every Claude method shares them.
+  const [sdk, provider] = id.startsWith('claude:') ? ['claude', null] : id.includes(':') ? id.split(':') : [id, null]
   const where = `ended_at IS NOT NULL AND coalesce(sdk, 'claude') = ? AND coalesce(provider, '') = ?`
   const row = db.prepare(`SELECT agent, outcome, error, ended_at FROM team_turns WHERE ${where} ORDER BY id DESC LIMIT 1`).get(sdk, provider ?? '')
   const done = db.prepare(`SELECT max(ended_at) AS at FROM team_turns WHERE ${where} AND outcome = 'done'`).get(sdk, provider ?? '')
@@ -154,7 +163,7 @@ function lastTurns(db: Db, id: ConnectionId): { last: LastTurn | null; last_ok_a
   }
 }
 
-const IDS: ConnectionId[] = ['claude', 'openai:api', 'openai:bedrock', 'openai:chatgpt', 'kiro']
+export const IDS: ConnectionId[] = ['claude:api', 'claude:subscription', 'claude:bedrock', 'openai:api', 'openai:bedrock', 'openai:chatgpt', 'kiro']
 const CACHE_MS = 60_000
 const cache = new Map<ConnectionId, { at: number; check: Check }>()
 
@@ -173,7 +182,7 @@ async function cachedCheck(config: Config, id: ConnectionId, checks: Checks, ref
 // exception (selfHeals): its check and its failure are the same question, whether the profile gives credentials, so
 // the polled check restores too and `aws sso login` alone brings the bot back.
 const selfHeals = (config: Config, id: ConnectionId) => id === 'openai:bedrock' && Boolean(config.bots.bedrockProfile)
-function restore(db: Db, connection: Connection): void {
+function restore(db: Db, config: Config, connection: Connection): void {
   if (connection.status !== 'ok') return
   let changed = false
   for (const name of connection.bots) {
@@ -181,7 +190,10 @@ function restore(db: Db, connection: Connection): void {
     setAgentEnabled(db, name, true)
     changed = true
   }
-  if (connection.id === 'claude' && teamPauseReason(db)?.startsWith(LOGIN_FAILED)) resumeTeam(db)
+  // The pause names the bot whose Claude login failed; another Claude method passing does not fix that bot.
+  const reason = teamPauseReason(db)
+  const failed = reason?.startsWith(LOGIN_FAILED) ? getAgent(db, reason.slice(`${LOGIN_FAILED} for `.length)) : undefined
+  if (reason?.startsWith(LOGIN_FAILED) && (!failed || connectionOf(failed, config) === connection.id)) resumeTeam(db)
   else if (changed) teamChanged.notify()
 }
 
@@ -196,9 +208,9 @@ export async function listConnections(db: Db, config: Config, options: { refresh
   const checks = options.checks ?? defaultChecks
   const connections: Connection[] = await Promise.all(IDS.map(async (id) => ({
     id, ...describe(config, id), ...(await cachedCheck(config, id, checks, options.refresh ?? false)),
-    bots: agents.filter((a) => connectionOf(a) === id).map((a) => a.name), ...lastTurns(db, id),
+    bots: agents.filter((a) => connectionOf(a, config) === id).map((a) => a.name), ...lastTurns(db, id),
   })))
-  for (const connection of connections) if (options.refresh || selfHeals(config, connection.id)) restore(db, connection)
+  for (const connection of connections) if (options.refresh || selfHeals(config, connection.id)) restore(db, config, connection)
   return { team: teamState(db, config), connections }
 }
 
@@ -208,13 +220,13 @@ export async function listConnections(db: Db, config: Config, options: { refresh
 export async function botConnection(db: Db, config: Config, name: string, options: { refresh?: boolean; checks?: Checks } = {}) {
   const agent = getAgent(db, name)
   if (!agent) return undefined
-  const id = connectionOf(agent)
+  const id = connectionOf(agent, config)
   const checks = options.checks ?? defaultChecks
   const connection: Connection = {
     id, ...describe(config, id), ...(await cachedCheck(config, id, checks, options.refresh ?? false)),
-    bots: listAgents(db).filter((a) => connectionOf(a) === id).map((a) => a.name), ...lastTurns(db, id),
+    bots: listAgents(db).filter((a) => connectionOf(a, config) === id).map((a) => a.name), ...lastTurns(db, id),
   }
-  if (options.refresh || selfHeals(config, id)) restore(db, connection)
+  if (options.refresh || selfHeals(config, id)) restore(db, config, connection)
   const enabled = options.refresh ? getAgent(db, name)?.enabled : agent.enabled
   const team = teamState(db, config)
   const row = db.prepare('SELECT outcome, error, ended_at FROM team_turns WHERE agent = ? AND ended_at IS NOT NULL ORDER BY id DESC LIMIT 1').get(name)
@@ -228,6 +240,21 @@ export async function botConnection(db: Db, config: Config, name: string, option
             : last?.outcome === 'failed' ? `Its last turn failed: ${last.error ?? 'no reason given'}`
               : null
   return { bot: name, connection, team, last_turn: last, waiting, working, blocker }
+}
+
+// The Connection test button: one check, rerun now, given 5 seconds. A pass restores what a failed login turned off,
+// like a rerun of every check does.
+export const TEST_TIMEOUT_MS = 5000
+export async function testConnection(db: Db, config: Config, id: ConnectionId, checks: Checks = defaultChecks, timeoutMs = TEST_TIMEOUT_MS): Promise<Check & { checked_at: number }> {
+  let timer: NodeJS.Timeout | undefined
+  const late = new Promise<Check>((resolve) => { timer = setTimeout(() => resolve(fail(`no answer in ${timeoutMs / 1000} seconds`)), timeoutMs) })
+  const result = await Promise.race([check(config, id, checks).catch((error: unknown) => fail(error instanceof Error ? error.message : String(error))), late])
+  clearTimeout(timer)
+  const at = Date.now()
+  cache.set(id, { at, check: result })
+  const bots = listAgents(db).filter((a) => connectionOf(a, config) === id).map((a) => a.name)
+  restore(db, config, { id, ...describe(config, id), ...result, bots, last: null, last_ok_at: null, checked_at: Math.floor(at / 1000) })
+  return { ...result, checked_at: Math.floor(at / 1000) }
 }
 
 // Tests start from an empty cache; a sign-in drops the cached check of its connection.

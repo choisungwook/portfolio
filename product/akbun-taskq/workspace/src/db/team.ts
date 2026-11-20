@@ -11,9 +11,11 @@ export const ORCHESTRATOR = 'taskq'
 export type BotEffort = 'low' | 'medium' | 'high' | 'xhigh' | 'max'
 export const EFFORTS: BotEffort[] = ['low', 'medium', 'high', 'xhigh', 'max']
 export type BotSdk = 'claude' | 'openai' | 'kiro'
-// How an OpenAI bot signs in: an API key, Amazon Bedrock, or the user's ChatGPT plan through Codex.
-export type BotProvider = 'api' | 'bedrock' | 'chatgpt'
-export const PROVIDERS: BotProvider[] = ['api', 'bedrock', 'chatgpt']
+// How a bot signs in. OpenAI: an API key, Amazon Bedrock, or the user's ChatGPT plan through Codex (chatgpt). Claude: an
+// API key, the signed-in Claude Code (subscription) or Amazon Bedrock; null follows Settings > Connections. Kiro: none.
+export type BotProvider = 'api' | 'bedrock' | 'chatgpt' | 'subscription'
+export const PROVIDERS: BotProvider[] = ['api', 'bedrock', 'chatgpt', 'subscription']
+export const PROVIDERS_BY_SDK: Record<BotSdk, BotProvider[]> = { claude: ['api', 'subscription', 'bedrock'], openai: ['api', 'chatgpt', 'bedrock'], kiro: [] }
 
 export type BotPermissionMode = 'auto' | 'acceptEdits' | 'default' | 'dontAsk' | 'plan' | 'bypassPermissions'
 export const PERMISSION_MODES: BotPermissionMode[] = ['auto', 'acceptEdits', 'default', 'dontAsk', 'plan', 'bypassPermissions']
@@ -37,7 +39,7 @@ export interface BotSettings {
   model: string | null        // null uses the config model
   effort: BotEffort | null    // reasoning effort; null leaves it to the model
   sdk: BotSdk                 // which agent SDK runs the bot
-  provider: BotProvider | null   // OpenAI bots: how they sign in; null is api
+  provider: BotProvider | null   // how it signs in (PROVIDERS_BY_SDK); null is api for OpenAI, the Connections choice for Claude
   turn_max_turns: number | null  // per-turn model turns; null uses the global default
   charter_owns: string           // charter: what this bot is responsible for
   charter_good: string           // charter: what a good result looks like
@@ -82,10 +84,20 @@ const BODY_LIMIT = 8000
 const JSON_FIELDS = ['allowed_domains', 'blocked_commands', 'skills', 'plugins', 'mcp_servers', 'ask_first'] as const
 const BOOL_FIELDS = ['may_message_user', 'enabled', 'sandbox', 'system'] as const
 
-function toAgent(row: Record<string, unknown>): TeamAgent {
+// Registered skills, plugins and MCP servers are shared: every bot loads all that its SDK can use (plugins only
+// Claude), so the stored per-bot lists are not read. The Plugins menu is the one place to change them.
+function shared(db: Db): { skills: string[]; plugins: string[]; mcp_servers: string[] } {
+  const names = (table: string) => db.prepare(`SELECT name FROM ${table} ORDER BY name`).all().map((row) => String(row.name))
+  return { skills: names('bot_skills'), plugins: names('bot_plugins'), mcp_servers: names('bot_mcp_servers') }
+}
+
+function toAgent(row: Record<string, unknown>, all: ReturnType<typeof shared>): TeamAgent {
   const agent = { ...row } as Record<string, unknown>
   for (const key of JSON_FIELDS) agent[key] = JSON.parse(String(row[key] ?? '[]'))
   for (const key of BOOL_FIELDS) agent[key] = row[key] === 1
+  agent.skills = all.skills
+  agent.plugins = row.sdk === 'claude' ? all.plugins : []
+  agent.mcp_servers = all.mcp_servers
   delete agent.created_at
   return agent as unknown as TeamAgent
 }
@@ -130,8 +142,7 @@ export function deleteAgent(db: Db, name: string): boolean {
     db.prepare(`UPDATE tasks SET owner = NULL, owner_since = NULL, status = CASE WHEN status = 'ready' THEN 'draft' ELSE status END
       WHERE owner = ? AND status NOT IN ('done', 'failed', 'cancelled', 'running')`).run(name)
     db.prepare(`UPDATE team_messages SET failed_at = ? WHERE recipient = ? AND read_at IS NULL AND failed_at IS NULL`).run(nowSec(), name)
-    // Its routines go, and approvals it never used are denied, so a new bot of the same name inherits neither.
-    db.prepare('DELETE FROM bot_routines WHERE bot = ?').run(name)
+    // Approvals it never used are denied, so a new bot of the same name does not inherit them.
     db.prepare(`UPDATE alerts SET acked_at = ? WHERE acked_at IS NULL AND ref IN (SELECT 'bot-approval:' || id FROM bot_approvals WHERE bot = ? AND status = 'pending')`).run(nowSec(), name)
     db.prepare(`UPDATE bot_approvals SET status = 'denied', decided_at = ? WHERE bot = ? AND status IN ('pending', 'approved')`).run(nowSec(), name)
     db.prepare('DELETE FROM team_agents WHERE name = ?').run(name)
@@ -147,12 +158,13 @@ export function seedAgents(db: Db, roster: (BotSettings & { name: string; system
 }
 
 export function listAgents(db: Db): TeamAgent[] {
-  return db.prepare('SELECT * FROM team_agents ORDER BY system DESC, rowid').all().map((row) => toAgent(row))
+  const all = shared(db)
+  return db.prepare('SELECT * FROM team_agents ORDER BY system DESC, rowid').all().map((row) => toAgent(row, all))
 }
 
 export function getAgent(db: Db, name: string): TeamAgent | undefined {
   const row = db.prepare('SELECT * FROM team_agents WHERE name = ?').get(name)
-  return row ? toAgent(row) : undefined
+  return row ? toAgent(row, shared(db)) : undefined
 }
 
 export function setAgentSession(db: Db, name: string, sessionId: string | null): void {

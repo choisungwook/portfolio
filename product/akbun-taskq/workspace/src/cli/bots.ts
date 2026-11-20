@@ -21,7 +21,7 @@ const USAGE = `usage: taskq bots <action>
   list                         bots, roles and whether each has a session
   new NAME [--preset P] [--description TEXT]   presets: planner, coder, reviewer, doc-reviewer
   delete NAME                  delete a bot (not taskq); its open tasks go back to you
-  reload NAME [skill|plugin]   copy the bot's selected skills or plugins again
+  reload NAME [skill|plugin]   copy the registered skills or plugins into the bot again
   say [--to NAME] TEXT...      message a bot (default: taskq, the orchestrator)
   inbox [--all]                messages the team sent you; marks them read unless --all
   log [--agent NAME] [--limit N]

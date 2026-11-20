@@ -17,6 +17,12 @@ h1, h2, h3, h4 { line-height: 1.3; font-weight: 600; letter-spacing: 0; }
 h1 { font-size: 16px; margin: 0; }
 h2 { font-size: 20px; font-weight: 400; margin: 6px 0; }
 h3 { font-size: 14px; margin: 16px 0 8px; }
+/* Heading levels by meaning, whatever the tag's default: H1 names the menu or dialog (.view-title, .page-title), H2 a
+   section of it (.section-title, with a hairline under it and room above, so sections read apart), H3 a part of a
+   section (.sub-title). */
+.view-title, .page-title { font-size: 1.6em; font-weight: 700; line-height: 1.25; margin: 4px 0 12px; }
+.section-title { font-size: 1.2em; font-weight: 700; line-height: 1.3; margin: 28px 0 8px; padding-bottom: 6px; border-bottom: 1px solid var(--border); }
+.sub-title { font-size: 1em; font-weight: 600; margin: 16px 0 6px; }
 
 /* Browser surfaces carry the theme too: selection, caret, native controls, scrollbars and the numerals in data. */
 :root { caret-color: var(--focus); accent-color: var(--accent); scrollbar-color: var(--border-strong) transparent; }
