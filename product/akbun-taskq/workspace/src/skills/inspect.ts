@@ -13,9 +13,9 @@ export interface SkillInfo { name: string; path: string; description: string }
 
 // A failure with the HTTP status the API should answer with. The CLI prints the message.
 export class SkillError extends Error {
-  readonly status: 400 | 404 | 409
+  readonly status: 400 | 404 | 409 | 500 | 502
 
-  constructor(status: 400 | 404 | 409, message: string) {
+  constructor(status: 400 | 404 | 409 | 500 | 502, message: string) {
     super(message)
     this.status = status
   }

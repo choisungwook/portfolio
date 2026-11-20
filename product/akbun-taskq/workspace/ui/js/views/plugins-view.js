@@ -1,6 +1,6 @@
 // The Plugins view: the skills and plugins registered for bots (view, update, remove, register by path) and the
-// official marketplace listed for reference. Which bots use an entry is shown next to it, so removing one is not a
-// surprise.
+// official marketplace, installed from with one button. Which bots use an entry is shown next to it, so removing one
+// is not a surprise.
 import { api, mutate, notify } from '../core/api.js'
 import { area, clear, el, fill } from '../core/dom.js'
 import { askConfirm } from '../core/ask.js'
@@ -8,6 +8,7 @@ import { on } from '../core/bus.js'
 import { t } from '../core/i18n.js'
 
 let catalog = null
+let installed = new Set()   // plugin names already registered, so the marketplace says Installed
 
 export function initPluginsView() {
   for (const kind of ['skill', 'plugin']) {
@@ -45,6 +46,7 @@ async function load() {
     const users = (kind, name) => bots.agents.filter((a) => (a[listOf[kind]] ?? []).includes(name)).map((a) => `${a.name}${a.sdk === 'openai' ? ' ◎' : ''}`)
     renderRegistry('skill', settings.bot_skills, users)
     renderRegistry('plugin', settings.bot_plugins, users)
+    installed = new Set(settings.bot_plugins.map((p) => p.name))
     renderMcp(settings.bot_mcp_servers ?? [], users)
   } catch (error) {
     notify(error.message, true)
@@ -70,11 +72,12 @@ function renderRegistry(kind, entries, users) {
   fill(list, ...entries.map((entry) => {
     const usedBy = users(kind, entry.name)
     return el('li', { class: 'skill-row' },
-      el('div', {},
-        el('strong', { text: entry.name }), entry.ok ? null : el('span', { class: 'badge', text: 'missing' }),
+      el('span', { class: 'entry-icon', 'aria-hidden': 'true', text: entry.name[0].toUpperCase() }),
+      el('div', { class: 'entry-text' },
+        el('div', { class: 'entry-name' }, el('strong', { text: entry.name }), entry.ok ? null : el('span', { class: 'badge', text: 'missing' })),
         entry.description ? el('p', { class: 'meta', text: entry.description }) : null,
-        el('code', { class: 'skill-path', text: entry.path }),
-        el('p', { class: 'meta', text: usedBy.length ? `Used by ${usedBy.join(', ')}` : 'No bot uses it' })),
+        el('p', { class: 'meta', text: usedBy.length ? `${t('plugins.used_by', 'Used by')} ${usedBy.join(', ')}` : t('plugins.unused', 'No bot uses it') }),
+        el('code', { class: 'skill-path', text: entry.path })),
       el('div', { class: 'row-actions' },
         el('button', {
           type: 'button', text: t('settings.update', 'Update'), title: 'git pull when it is a git checkout, then reload every bot that uses it',
@@ -104,13 +107,34 @@ function renderCatalog() {
   const anthropicOnly = area('official-anthropic').checked
   const filter = area('official-filter').value.trim().toLowerCase()
   const shown = catalog.filter((p) => (!anthropicOnly || p.anthropic) && (!filter || `${p.name} ${p.description}`.toLowerCase().includes(filter)))
-  clear(area('official-list')).append(
-    el('li', { class: 'meta', text: `${shown.length} / ${catalog.length}` }),
-    ...shown.map((p) => el('li', { class: 'official-item' },
-      el('div', {},
-        el('strong', { text: p.name }), p.anthropic ? el('span', { class: 'badge owner', text: 'Anthropic' }) : null,
-        el('p', { class: 'meta', text: p.description })),
-      el('code', { class: 'skill-path', text: p.source }))))
+  area('official-count').textContent = `${shown.length} / ${catalog.length}`
+  clear(area('official-list')).append(...shown.map((p) => el('li', { class: 'official-item' },
+    el('span', { class: 'entry-icon', 'aria-hidden': 'true', text: p.name[0].toUpperCase() }),
+    el('div', { class: 'entry-text' },
+      el('div', { class: 'entry-name' }, el('strong', { text: p.name }), p.anthropic ? el('span', { class: 'badge owner', text: 'Anthropic' }) : null),
+      el('p', { class: 'meta clamp', text: p.description, title: p.description }),
+      el('code', { class: 'skill-path', text: p.source })),
+    installButton(p))))
+}
+
+// Installed shows as a label; an entry without a git source taskq can fetch says so instead of offering a button.
+function installButton(plugin) {
+  if (installed.has(plugin.name)) return el('span', { class: 'meta installed', text: t('plugins.installed', 'Installed') })
+  if (!plugin.install) return el('span', { class: 'meta', title: plugin.source, text: t('plugins.no_source', 'Not installable') })
+  return el('button', {
+    type: 'button', class: 'install', text: t('plugins.install', 'Install'),
+    onclick: async (event) => {
+      const button = event.currentTarget
+      button.disabled = true
+      button.textContent = t('plugins.installing', 'Installing…')
+      const done = await mutate(() => api.post('/plugins/install', { name: plugin.name }), `${plugin.name} ${t('plugins.installed_toast', 'installed. Pick it in a bot\'s settings to use it.')}`)
+      if (done) load()
+      else {
+        button.disabled = false
+        button.textContent = t('plugins.install', 'Install')
+      }
+    },
+  })
 }
 
 // Claude shows skills, plugins, MCP servers and the official marketplace; OpenAI shows what its bots can use.
@@ -130,7 +154,8 @@ function renderMcp(entries, users) {
   fill(list, ...entries.map((entry) => {
     const usedBy = users('mcp', entry.name)
     return el('li', { class: 'skill-row' },
-      el('div', {},
+      el('span', { class: 'entry-icon', 'aria-hidden': 'true', text: entry.name[0].toUpperCase() }),
+      el('div', { class: 'entry-text' },
         el('strong', { text: entry.name }),
         el('p', { class: 'meta mono', text: [entry.command, ...entry.args].join(' ') }),
         entry.description ? el('p', { class: 'meta', text: entry.description }) : null,

@@ -14,6 +14,7 @@ import { sharedDir } from '../team/shared.ts'
 import { sessionPaths } from '../open-folder.ts'
 import { noteReload, reload } from '../team/bot-plugin.ts'
 import { officialCatalog } from '../team/plugin-catalog.ts'
+import { deleteInstalled, installedByTaskq, installPlugin } from '../team/plugin-install.ts'
 
 // Runtime config is read-only. The desktop notification preference is stored separately in SQLite.
 export function registerSettingsRoutes(api: Hono, { db, config }: ApiDeps): void {
@@ -88,13 +89,30 @@ export function registerSettingsRoutes(api: Hono, { db, config }: ApiDeps): void
     return c.json(appearance(db))
   })
 
-  // The official marketplace, to browse. Nothing is installed from it.
-  api.get('/plugins/catalog', async (c) => {
+  // The official marketplace. Each entry says whether taskq can install it (install is null otherwise).
+  const catalog = async () => {
     try {
-      return c.json(await officialCatalog())
+      return await officialCatalog()
     } catch (error) {
       throw new HttpError(502, `the official plugin list could not be loaded: ${error instanceof Error ? error.message : String(error)}`)
     }
+  }
+  api.get('/plugins/catalog', async (c) => c.json(await catalog()))
+
+  // Installs one marketplace plugin at the commit the marketplace lists, and registers it for bots to pick. Installing
+  // an installed plugin again replaces it with the marketplace's current commit and reloads the bots that use it.
+  const install = async (name: string) => {
+    const plugin = (await catalog()).plugins.find((p) => p.name === name)
+    if (!plugin) throw new HttpError(404, `${name} is not in the official marketplace`)
+    const entry = await asHttpAsync(() => installPlugin(db, config.home, plugin))
+    const reloaded = entry.replaced ? botsUsing(db, 'plugin', name) : []
+    for (const bot of reloaded) noteReload(db, bot, [reload(db, config, bot, 'plugin')])
+    return { ...entry, reloaded }
+  }
+  api.post('/plugins/install', async (c) => {
+    const body = await readJson(c) as { name?: unknown } | null
+    if (typeof body?.name !== 'string' || body.name === '') throw new HttpError(400, 'name is required')
+    return c.json(await install(body.name), 201)
   })
 
   // The global skill and plugin registry the bots pick from.
@@ -108,14 +126,22 @@ export function registerSettingsRoutes(api: Hono, { db, config }: ApiDeps): void
     // Updates a registered folder from its source: `git pull --ff-only` when it is a git checkout. Then every bot that
     // uses it reloads its copy, so the update reaches the bots' next turns.
     api.post(`/bot-${kind}s/:name/update`, async (c) => {
+      const row = listEntries(db, kind).find((e) => e.name === c.req.param('name'))
+      if (kind === 'plugin' && row && installedByTaskq(config.home, row.path)) {
+        const entry = await install(row.name)
+        return c.json({ method: 'marketplace', output: `reinstalled from the official marketplace`, reloaded: entry.reloaded })
+      }
       const result = await updateEntry(db, kind, c.req.param('name'))
       if (!result) throw new HttpError(404, `no ${kind} named ${c.req.param('name')}`)
       const reloaded = botsUsing(db, kind, c.req.param('name'))
       for (const bot of reloaded) noteReload(db, bot, [reload(db, config, bot, kind)])
       return c.json({ ...result, reloaded })
     })
+    // A plugin taskq installed is deleted with its row; a folder registered by path stays where it is.
     api.delete(`/bot-${kind}s/:name`, (c) => {
+      const row = listEntries(db, kind).find((e) => e.name === c.req.param('name'))
       if (!removeEntry(db, kind, c.req.param('name'))) throw new HttpError(404, `no ${kind} named ${c.req.param('name')}`)
+      if (kind === 'plugin' && row) deleteInstalled(config.home, row.name, row.path)
       return c.body(null, 204)
     })
   }
@@ -140,6 +166,15 @@ export function registerSettingsRoutes(api: Hono, { db, config }: ApiDeps): void
     asHttp(() => removeSkill(db, c.req.param('name')))
     return c.body(null, 204)
   })
+}
+
+async function asHttpAsync<T>(fn: () => Promise<T>): Promise<T> {
+  try {
+    return await fn()
+  } catch (error) {
+    if (error instanceof SkillError) throw new HttpError(error.status, error.message)
+    throw error
+  }
 }
 
 function asHttp<T>(fn: () => T): T {
