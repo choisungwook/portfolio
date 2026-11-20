@@ -18,7 +18,7 @@ npm test
 
 Tests use a fake worker and a fake SDK `query`, so they need no credentials and make no model call.
 
-Pull requests run only the tests whose name carries `[critical]`: the invariants whose failure is an incident (approval, gating, API auth, masking, claim, path confinement, child environment). `wiki/architecture.md` lists them. Tag a test that way only when breaking it would be an incident, and keep timing-dependent tests out.
+Pull requests run only the tests whose name carries `[critical]`: the invariants whose failure is an incident (approval, gating, API auth, masking, claim, path confinement, child environment). `wiki/architecture.md` lists them. The full suite runs only locally (`npm test`) and through a manual dispatch of `verify-akbun-taskq.yml`; a master push runs only the release workflow, so run `npm test` before opening a pull request. Tag a test that way only when breaking it would be an incident, and keep timing-dependent tests out.
 
 ```bash
 npm run test:critical
