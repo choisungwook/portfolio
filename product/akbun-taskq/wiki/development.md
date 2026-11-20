@@ -65,7 +65,7 @@ Seed runs, events and alerts through the functions in `src/db` and `src/runner`,
 
 ## Where things go
 
-- `TASKQ_HOME` (default: the current directory) holds `taskq.config.json`, `data/`, `outputs/` and `memory/`.
+- `TASKQ_HOME` (default: the current directory; `~/.taskq` for the desktop app) holds `taskq.config.json`, `data/`, `outputs/` and `memory/`.
 - `data/` is created with mode 0700 and the database with 0600.
 - Sessions for research, review and ops tasks run with `outputs/` as their working directory, so the config and the database are not in a writable working directory.
 

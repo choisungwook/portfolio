@@ -25,9 +25,10 @@ pub fn login_shell(shell: Option<&str>) -> &str {
 
 /// Run by the login shell with the taskq path as `$0`. stderr joins stdout so a failed start can be shown.
 /// An app opened from Finder runs in `/`, and taskq's home defaults to the current directory, so without a
-/// `TASKQ_HOME` from the profile it would try to write `/data`. The app uses `~/.taskq` instead.
+/// `TASKQ_HOME` from the profile it would try to write `/data`. The app uses `~/.taskq` instead, and makes a
+/// relative `TASKQ_HOME` absolute so taskq does not resolve it again from inside that folder.
 pub const SCRIPT: &str =
-    "export TASKQ_HOME=\"${TASKQ_HOME:-$HOME/.taskq}\"; mkdir -p \"$TASKQ_HOME\" && cd \"$TASKQ_HOME\" && exec \"$0\" run 2>&1";
+    "export TASKQ_HOME=\"${TASKQ_HOME:-$HOME/.taskq}\"; mkdir -p \"$TASKQ_HOME\" && cd \"$TASKQ_HOME\" && export TASKQ_HOME=\"$PWD\" && exec \"$0\" run 2>&1";
 
 #[cfg(test)]
 mod tests {
