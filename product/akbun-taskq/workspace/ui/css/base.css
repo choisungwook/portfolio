@@ -103,17 +103,26 @@ button.primary:hover:not(:disabled) { background: var(--accent-hover); }
 button.link { padding: 0; min-height: 0; color: var(--link); text-align: left; }
 button.link:hover:not(:disabled) { background: transparent; text-decoration: underline; }
 
-/* Text inputs (Carbon): field fill with a bottom rule that thickens on focus. */
-input, select, textarea {
+/* Text inputs (Carbon): field fill with a bottom rule that thickens on focus. Checkboxes, radios and sliders are not text
+   fields; with the field box they grew to 32px and sat above their label. */
+input:not([type="checkbox"]):not([type="radio"]):not([type="range"]), select, textarea {
   background: var(--field); border-radius: var(--radius-s); padding: 0 12px; min-height: 32px;
   box-shadow: inset 0 -1px 0 var(--border-strong);
 }
 .must-check input, .dialog-body input, .dialog-body select, .dialog-body textarea, .main input, .main select { background: var(--panel-soft); }
+input[type="checkbox"], input[type="radio"] { width: 16px; height: 16px; margin: 0; flex: none; accent-color: var(--accent); }
+label.check { display: inline-flex; align-items: center; gap: 8px; }
 input:focus-visible, select:focus-visible, textarea:focus-visible { outline: 2px solid var(--focus); outline-offset: -2px; }
 textarea { width: 100%; padding: 8px 12px; }
 
 .btn-group { margin-right: 4px; }
-.actions { display: flex; flex-wrap: wrap; gap: 6px; margin: 8px 0; }
+.actions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: 8px 0; }
+/* A link that sits among buttons takes a button's box, so the row keeps one height and even gaps. */
+.actions > a.button { display: inline-flex; align-items: center; min-height: 32px; padding: 0 12px; border-radius: var(--radius); color: var(--link); text-decoration: none; }
+.actions > a.button:hover { background: var(--hover); }
+/* Text blocks stacked with even spacing; their own margins would otherwise collapse into uneven gaps. */
+.stack { display: grid; gap: 4px; }
+.stack > * { margin: 0; }
 .meta { color: var(--muted); font-size: var(--text-small); margin: 2px 0; }
 .pre { white-space: pre-wrap; word-break: break-word; margin: 4px 0; }
 /* Empty state (Carbon): plain secondary text that says what is missing, never italic. */

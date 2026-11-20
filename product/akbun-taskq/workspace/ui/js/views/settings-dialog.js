@@ -1,12 +1,9 @@
 // Settings dialog: a menu on the left and one page on the right (appearance, connections, limits, usage, ...). This file
-// switches the pages and owns the access skill registry and the read-only configuration; other views fill their own
-// page and listen for 'settings-page'. Skill changes arrive on the bus and reload the dialog; closing it tells the task
-// form to refresh its access skill list.
-import { api, mutate } from '../core/api.js'
+// switches the pages and owns the read-only configuration; other views fill their own page and listen for
+// 'settings-page'. Closing it emits 'settings-closed'.
+import { api, mutate, notify } from '../core/api.js'
 import { area, clear, el } from '../core/dom.js'
 import { emit, on } from '../core/bus.js'
-import { initAccessSkillPicker, resetPicker } from './access-skill-picker.js'
-import { renderSkillList, showSkillListError } from './access-skills.js'
 import { initDbPath, showDbPath } from './db-path.js'
 
 let dialog
@@ -68,13 +65,10 @@ export function initSettings() {
   })
   dialog.querySelector('[data-close]').addEventListener('click', () => dialog.close())
   dialog.addEventListener('close', () => {
-    resetPicker()
     ;(opener?.isConnected ? opener : gear).focus()
     opener = null
     emit('settings-closed')
   })
-  on('skills-changed', load)
-  initAccessSkillPicker()
   initDbPath()
 }
 
@@ -86,7 +80,6 @@ async function load() {
   try {
     const settings = await api.get('/settings')
     if (id !== loadId) return
-    renderSkillList(settings.access_skills)
     showDbPath(settings.db_path)
     renderConfig(settings)
     if (canLoadNotification && !savingNotification) {
@@ -94,7 +87,7 @@ async function load() {
       notificationToggle.disabled = false
     }
   } catch (error) {
-    showSkillListError(error.message)
+    notify(error.message, true)
   }
 }
 

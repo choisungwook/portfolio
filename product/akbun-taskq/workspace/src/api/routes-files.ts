@@ -5,9 +5,11 @@ import { basename, dirname, extname, join } from 'node:path'
 import { Readable } from 'node:stream'
 import { HttpError, readJson, type ApiDeps } from './http.ts'
 import { botWorkdir, listShared, resolveShared, saveAttachment, sharedDir, sharedRelative, UPLOAD_LIMIT } from '../team/shared.ts'
-import { getAgent } from '../db/team.ts'
+import { getAgent, type TeamAgent } from '../db/team.ts'
+import { agentDir } from '../team/prompt.ts'
+import type { Config } from '../config.ts'
 import { getTask } from '../db/tasks.ts'
-import { claudeProjectsDir, existing, openWithSystem, sessionFolder, type Opener } from '../open-folder.ts'
+import { existing, openWithSystem, SESSION_RUNTIMES, sessionFolder, sessionsDir, type Opener, type SessionRuntime } from '../open-folder.ts'
 
 // Document kinds "Open" hands to the system app. Scripts and executables are left out on purpose.
 const OPENABLE = new Set([
@@ -67,19 +69,24 @@ export function registerFileRoutes(api: Hono, { config, db }: ApiDeps, open: Ope
     return c.json({ path: full })
   })
 
-  // Opens one of taskq's own folders on this machine: the shared folder, TASKQ_HOME, the Claude session transcripts,
-  // or one bot's session folder. Returns the path either way, so the UI can show and copy it.
+  // Opens one of taskq's own folders on this machine: the shared folder, TASKQ_HOME, one runtime's session transcripts
+  // (runtime: claude, codex or kiro; claude when left out), or the folder where one bot's conversation is kept. Returns the path either way, so the UI can show and copy it.
   api.post('/open-folder', async (c) => {
-    const body = await readJson(c) as { target?: unknown; bot?: unknown; task_id?: unknown } | null
+    const body = await readJson(c) as { target?: unknown; bot?: unknown; task_id?: unknown; runtime?: unknown } | null
     let path: string | null
     switch (body?.target) {
       case 'shared': path = sharedDir(config); break
       case 'home': path = config.home; break
-      case 'sessions': path = existing(claudeProjectsDir()); break
+      case 'sessions': {
+        const runtime = body.runtime ?? 'claude'
+        if (!SESSION_RUNTIMES.includes(runtime as SessionRuntime)) throw new HttpError(400, 'runtime must be claude, codex or kiro')
+        path = existing(sessionsDir(runtime as SessionRuntime))
+        break
+      }
       case 'bot': {
         const bot = typeof body.bot === 'string' ? getAgent(db, body.bot) : undefined
         if (!bot) throw new HttpError(404, 'no such bot')
-        path = existing(sessionFolder(botWorkdir(config, bot)))
+        path = existing(botSessionFolder(config, bot))
         break
       }
       case 'task': {
@@ -94,4 +101,16 @@ export function registerFileRoutes(api: Hono, { config, db }: ApiDeps, open: Ope
     open(path)
     return c.json({ path })
   })
+}
+
+// Where one bot's conversation is kept, by its runtime. Codex and kiro-cli keep all conversations in one place, not one
+// folder per working directory, so their bots open that place.
+function botSessionFolder(config: Config, bot: TeamAgent): string {
+  if (bot.sdk === 'kiro') return sessionsDir('kiro')
+  if (bot.sdk === 'openai') {
+    if (bot.provider === 'chatgpt') return sessionsDir('codex')
+    if (bot.provider === 'bedrock') return agentDir(config, bot.name)
+    throw new HttpError(404, 'an OpenAI API key bot keeps no local transcript; the Responses API keeps its conversation at OpenAI')
+  }
+  return sessionFolder(botWorkdir(config, bot))
 }

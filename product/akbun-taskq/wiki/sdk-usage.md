@@ -57,7 +57,7 @@ taskq calls the SDK from three places. All three run the Claude Code executable 
 |---|---|
 | Subagents (`agents`) | A bot is its own resumed session; work between bots goes through taskq's mailbox, which survives restarts and is visible in the UI |
 | SDK memory files (`memory` on agent definitions, CLAUDE.md) | They load from Claude settings, which bots do not read. taskq keeps each bot's memory in SQLite and appends it to the system prompt |
-| Session stores | Sessions stay in Claude Code's own transcript folder (`~/.claude/projects/`); Settings opens it |
+| Session stores | Sessions stay in Claude Code's own transcript folder (`~/.claude/projects/`). Moving them needs a different `CLAUDE_CONFIG_DIR`, which also moves the subscription login and the user settings tasks read, so taskq keeps the default and Settings > Folders lists each runtime's store instead |
 
 ## Claude usage and context
 

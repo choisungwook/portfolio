@@ -383,7 +383,6 @@
       <button type="button" data-page="folders" data-i18n="settings.folders">Folders</button>
       <button type="button" data-page="queue" data-i18n="settings.queue">Queue</button>
       <button type="button" data-page="notifications">Notifications</button>
-      <button type="button" data-page="access-skills">Access skills</button>
       <button type="button" data-page="database">Database</button>
       <button type="button" data-page="configuration">Configuration</button>
       <button type="button" data-page="update" data-i18n="settings.update">Update</button>
@@ -473,30 +472,13 @@
     </section>
     <section class="settings-section" data-settings-page="update" aria-labelledby="update-title" hidden>
       <h3 id="update-title" data-i18n="settings.update">Update</h3>
-      <div data-area="update-status"></div>
-      <button type="button" class="quiet" data-area="update-check" data-i18n="update.check">Check again</button>
+      <div class="stack" data-area="update-status"></div>
+      <div class="actions" data-area="update-actions"><button type="button" class="quiet" data-area="update-check" data-i18n="update.check">Check again</button></div>
     </section>
     <section class="settings-section" data-settings-page="notifications" aria-labelledby="notifications-title" hidden>
       <h3 id="notifications-title">Notifications</h3>
       <label class="check"><input type="checkbox" data-area="desktop-notifications" disabled> Desktop notifications</label>
       <p class="meta">Show system notifications for handoffs and critical alerts.</p>
-    </section>
-    <section class="settings-section" data-settings-page="access-skills" aria-labelledby="access-skills-title" hidden>
-      <div class="settings-head">
-        <h3 id="access-skills-title">Access skills</h3>
-        <button type="button" class="add-button" data-area="access-skill-add" aria-label="Add access skill" aria-expanded="false" aria-controls="access-skill-picker" data-icon="plus" data-icon-size="16"></button>
-      </div>
-      <p class="meta">An access skill is one of your Claude Code skills that signs in to the account a task works on. taskq stores only its path.</p>
-      <ul class="skill-list" data-area="access-skills"></ul>
-      <section class="skill-picker" id="access-skill-picker" data-area="access-skill-picker" aria-label="Add an access skill" hidden>
-        <h4>Skills found on this machine</h4>
-        <ul class="skill-list" data-area="access-skill-found"></ul>
-        <form class="skill-path-form" data-area="access-skill-path-form">
-          <label>Path to a skill folder <input name="path" type="text" maxlength="500" autocomplete="off" spellcheck="false" placeholder="/absolute/path/to/skill"></label>
-          <button type="submit">Add</button>
-        </form>
-        <p class="error" data-area="access-skill-error" role="alert"></p>
-      </section>
     </section>
     <section class="settings-section" data-settings-page="database" aria-labelledby="db-title" hidden>
       <h3 id="db-title">Database</h3>

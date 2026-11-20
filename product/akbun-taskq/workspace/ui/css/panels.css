@@ -75,7 +75,6 @@ dialog h2 { margin-top: 0; }
 @media (max-width: 560px) { .task-form { grid-template-columns: 1fr; } }
 .task-form label { display: grid; gap: 4px; font-size: 12px; color: var(--muted); }
 .task-form label.check { display: flex; align-items: center; gap: 6px; }
-.task-form input[type="checkbox"] { min-height: 0; padding: 0; width: 14px; height: 14px; accent-color: var(--accent); }
 
 /* Approval panel on the task detail. The input is shown whole; a long one scrolls inside its own box. */
 /* An actionable notification (Carbon): it holds the one decision on this task. */
@@ -92,7 +91,6 @@ dialog h2 { margin-top: 0; }
   background: var(--error-soft); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--failed) 55%, transparent);
 }
 .approval-read { display: flex; align-items: center; gap: 6px; margin-top: 8px; font-size: 12px; color: var(--muted); }
-.approval-read input { min-height: 0; width: 14px; height: 14px; padding: 0; accent-color: var(--accent); }
 .hidden-char {
   padding: 0 2px; font-weight: 600; color: var(--on-danger); background: var(--danger-fill);
 }

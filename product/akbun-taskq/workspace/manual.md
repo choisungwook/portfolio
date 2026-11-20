@@ -106,8 +106,7 @@ taskq bots assign TASK AGENT|user | pause | resume | enable NAME | disable NAME 
 
 계정에 어떻게 접근하는지는 내 Claude Code skill이 정한다. taskq에는 그 skill의 위치만 등록한다. 여러 개를 등록할 수 있다.
 
-- 화면: 오른쪽 위 Settings → Access skills의 `+`를 누르면 `~/.claude/skills`에서 찾은 skill이 나온다. Add로 추가하고, 다른 위치에 있으면 절대 경로를 입력한다. `−`로 등록을 해제한다. skill 파일은 지우지 않는다.
-- 명령: 아래처럼 한다.
+등록과 해제는 명령으로 한다. 화면의 새 작업 창에서는 access skill을 고를 수 없으므로 설정 화면에도 등록 메뉴를 두지 않는다. skill 파일은 해제해도 지우지 않는다.
 
 ```text
 taskq skills discover          찾을 수 있는 skill 보기
@@ -126,7 +125,7 @@ skill은 `SKILL.md`가 들어 있는 폴더다. 조회 전용 태스크에서는
 - Intent: 무엇을 할지, 무엇을 조심할지.
 - Save as draft: 켜 두면 초안으로 저장되고 실행되지 않는다. 끄면 바로 대기열에 들어간다.
 
-Task를 고르면 Access skill을 선택할 수 있다. 나머지는 More options에 있다.
+나머지는 More options에 있다. access skill이 필요한 작업은 `taskq add --access-skill <이름>`으로 만든다.
 
 | Type | 세션이 할 수 있는 일 |
 |---|---|
@@ -266,7 +265,7 @@ OpenAI bot은 bot 설정의 Agent SDK에서 고른다. taskq를 실행하는 환
 
 정해진 순서로 일을 시키려면 Workflows를 쓴다. 왼쪽 메뉴의 Workflows에서 단계(실행, 검증, 다른 bot에 넘김, 사용자 승인)와 순서를 그래프로 만들고, 새 작업 창에서 Bot과 Workflow를 고르거나 작업 상세의 Workflow 행에서 지정한다. 그 bot이 작업을 시작하면 단계마다 결과를 보고한다. 검증 단계는 실행한 명령과 출력을 증거로 남겨야 성공하고, 승인 단계는 내가 실행 기록 화면에서 승인해야 넘어간다. 성공은 bot의 말이 아니라 모든 단계가 끝났는지로 taskq가 판정한다. 실행 기록에는 어느 bot이 언제 실행했는지와, 지운 workflow면 "삭제됨"이 남는다. bot 없이 workflow만 지정한 작업은 큐가 실행하지 않는다.
 
-bot은 taskq와 함께 항상 돈다. 멈추려면 메뉴 Bots 옆의 Pause를 누르거나 `taskq bots pause`를 실행한다. 한도와 범위는 설정 파일의 `bots`에서 정한다.
+bot은 taskq와 함께 항상 돈다. 멈추려면 메뉴 Bots 옆의 Pause all(전체 멈추기)을 누르거나 `taskq bots pause`를 실행한다. 한도와 범위는 설정 파일의 `bots`에서 정한다.
 
 ```json
 "bots": {
@@ -367,7 +366,7 @@ bot과 대화할 때 쓰는 기능은 아래와 같다.
 | bot이 "승인을 기다린다"고 한다 | 되돌릴 수 없는 명령(push, 배포, 클라우드 자원 삭제 등)이나 bot 설정의 "먼저 묻기"에 걸렸다. Must check에서 명령을 보고 "한 번 승인"이나 "거부"를 누른다 |
 | 매일 같은 일을 시키고 싶다 | bot에게 "매일 7시에 …"라고 말하거나 bot 설정의 Routines에서 cron 일정이나 트리거로 추가한다. 설정의 주간 점검에서 돌았는지 본다 |
 | bot이 대답하지 않는다 | 왼쪽 bot 목록에서 이름 옆 점이 빨간색이면 연결이 실패한 것이다. 내가 보낸 메시지 아래에 "아직 대답할 수 없음"과 이유가 나온다. 흔한 원인은 bot이 일시정지됐거나, Claude `provider`가 기본값 bedrock인데 AWS 프로파일이 없거나, 그 bot의 로그인(API 키, Codex, Kiro)이 실패한 경우다. 설정의 연결 페이지에서 연결마다 상태를 보고 다시 확인한다 |
-| Must check에 "Bots paused"가 떠 있다 | bot 하나가 1시간 턴 상한을 넘었거나(메시지 루프 의심), Claude 모델 로그인이 실패했거나, bot이 taskq 데이터를 읽으려 했다. `taskq bots log`로 원인을 보고 `taskq bots resume`이나 메뉴 Bots 옆의 Resume으로 다시 켠다 |
+| Must check에 "Bots paused"가 떠 있다 | bot 하나가 1시간 턴 상한을 넘었거나(메시지 루프 의심), Claude 모델 로그인이 실패했거나, bot이 taskq 데이터를 읽으려 했다. `taskq bots log`로 원인을 보고 `taskq bots resume`이나 메뉴 Bots 옆의 Resume all(전체 다시 켜기)로 다시 켠다 |
 | 고친 화면이 안 보인다 | 브라우저를 새로 고친다 |
 | 회사 네트워크에서 `certificate verify failed`나 `self-signed certificate in certificate chain`이 뜬다 | TLS 검사 장비가 인증서를 자기 CA로 다시 서명한다. 그 CA를 넣은 PEM 파일을 `caBundle`에 적고 다시 시작한다 |
 

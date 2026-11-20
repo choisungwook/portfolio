@@ -44,7 +44,6 @@
 .wf-needs { border: 0; padding: 0; margin: 0; display: flex; gap: 6px 14px; flex-wrap: wrap; font-size: 0.85em; }
 .wf-needs legend { color: var(--muted); padding: 0; margin-bottom: 4px; }
 .wf-step .wf-needs label { display: inline-flex; align-items: center; gap: 6px; color: var(--fg); }
-.wf-needs input[type="checkbox"] { width: 16px; height: 16px; min-height: 0; margin: 0; padding: 0; flex: none; box-shadow: none; accent-color: var(--accent); }
 .wf-actions { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
 .wf-runs { width: 100%; border-collapse: collapse; font-size: 0.9em; }
 .wf-runs th, .wf-runs td { text-align: left; padding: 8px 10px; border-bottom: 1px solid var(--border); }

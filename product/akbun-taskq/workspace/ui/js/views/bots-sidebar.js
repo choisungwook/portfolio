@@ -86,16 +86,12 @@ function render(team) {
   if (key === drawn) return
   drawn = key
   const scroll = list.scrollTop
-  const label = team.paused ? t('bots.paused', 'Paused') : t('bots.running', 'Running')
-  const mode = team.paused ? 'paused' : 'running'
+  // Running is the normal state and says nothing; only Paused is shown, with its reason on hover.
   const toggle = team.paused
-    ? el('button', { type: 'button', class: 'quiet', text: t('bots.resume', 'Resume'), onclick: () => mutate(() => api.post('/bots/resume'), 'Bots resumed').then(load) })
-    : el('button', { type: 'button', class: 'quiet', text: t('bots.pause', 'Pause'), onclick: () => mutate(() => api.post('/bots/pause'), 'Bots paused').then(load) })
-  clear(state).append(el('span', {
-    class: 'bots-state-label', dataset: { state: mode },
-    title: team.pause_reason ?? '',
-    text: label,
-  }), ...(toggle ? [toggle] : []))
+    ? el('button', { type: 'button', class: 'quiet', text: t('bots.resume', 'Resume all'), onclick: () => mutate(() => api.post('/bots/resume'), 'Bots resumed').then(load) })
+    : el('button', { type: 'button', class: 'quiet', text: t('bots.pause', 'Pause all'), onclick: () => mutate(() => api.post('/bots/pause'), 'Bots paused').then(load) })
+  const label = el('span', { class: 'bots-state-label', dataset: { state: 'paused' }, title: team.pause_reason ?? '', text: t('bots.paused', 'Paused') })
+  clear(state).append(...(team.paused ? [label, toggle] : [toggle]))
   const selected = currentView().view === 'bot' ? currentView().bot : null
   // The orchestrator sits at the top of the sidebar as one large avatar with its name, like the account of a chat app;
   // the other bots are the list.

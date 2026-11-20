@@ -4,6 +4,7 @@ concept를 추가·수정·삭제할 때마다 오늘 날짜 섹션을 맨 위�
 
 ## 2026-11-20
 
+* **Creation**: [session transcript locations](decisions/2026-11-session-transcript-locations.md) - 세션 기록을 옮기지 않고 런타임별로 보이는 결정.
 * **Update**: [inference providers](decisions/2026-11-inference-providers.md)에 설정에서 저장하는 Anthropic API key(평문, 0600, DB 밖)와 암호화하지 않은 이유를 추가.
 * **Update**: [bun binary release](decisions/2026-11-release-bun-binary.md)에 0.22.2부터 Linux 바이너리를 만들지 않는 결정과 이유를 추가.
 * **Update**: [desktop app shell](decisions/2026-11-desktop-app-shell.md)에 `TASKQ_HOME`이 없을 때 앱이 `~/.taskq`를 home으로 쓰는 결정과 이유(Finder의 현재 디렉터리 `/`)를 추가.

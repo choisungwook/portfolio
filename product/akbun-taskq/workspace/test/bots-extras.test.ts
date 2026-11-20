@@ -5,7 +5,7 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { createApp } from '../src/api/server.ts'
 import { openDb } from '../src/db/open.ts'
-import { getAgent, listMessages, postMessage } from '../src/db/team.ts'
+import { getAgent, listMessages, postMessage, updateAgent } from '../src/db/team.ts'
 import { limits } from '../src/db/settings.ts'
 import { appearance } from '../src/db/meta.ts'
 import { createTeamHub } from '../src/team/hub.ts'
@@ -105,6 +105,21 @@ describe('files, search, memory, limits and settings', () => {
     assert.equal(res.status, 200)
     assert.deepEqual(opened, [join(env.home, 'shared')])
     assert.equal((await call('POST', '/open-folder', { target: '/etc' })).status, 400)
+  })
+
+  test('session transcripts are named per runtime, and a bot opens where its own runtime keeps them', async () => {
+    const settings = await (await call('GET', '/settings')).json() as { paths: { sessions: Record<string, { path: string; exists: boolean }> } }
+    assert.deepEqual(Object.keys(settings.paths.sessions), ['claude', 'codex', 'kiro'])
+    assert.match(settings.paths.sessions.codex.path, /sessions$/)
+    assert.equal((await call('POST', '/open-folder', { target: 'sessions', runtime: 'gemini' })).status, 400)
+    updateAgent(env.db, 'coder', { ...getAgent(env.db, 'coder')!, sdk: 'openai', provider: 'bedrock' })
+    mkdirSync(join(env.home, 'team', 'coder'), { recursive: true })
+    assert.equal((await call('POST', '/open-folder', { target: 'bot', bot: 'coder' })).status, 200)
+    assert.deepEqual(opened, [join(env.home, 'team', 'coder')])
+    updateAgent(env.db, 'coder', { ...getAgent(env.db, 'coder')!, provider: 'api' })
+    const res = await call('POST', '/open-folder', { target: 'bot', bot: 'coder' })
+    assert.equal(res.status, 404)
+    assert.match(((await res.json()) as { error: string }).error, /no local transcript/)
   })
 
   test('cancel stops a working bot; its running task becomes cancelled and the turn shows as cancelled', async () => {
