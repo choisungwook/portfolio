@@ -3,7 +3,7 @@ type: Decision
 title: Bots work on their own tasks with per-bot permissions; the run button stays a one-off run
 description: Tasks are notes a bot takes and closes in its own session; each bot sets its permission mode (auto), sandbox (off) and blocked commands (none), while taskq's own data is always off limits.
 tags: [bots, agents, permissions]
-generated: { by: claude-code/claude-opus-5-5, at: 2026-11-18T17:00:00Z }
+generated: { by: claude-code/claude-fable-5-2, at: 2026-11-20T00:00:00Z }
 ---
 
 ## 결정
@@ -18,9 +18,9 @@ generated: { by: claude-code/claude-opus-5-5, at: 2026-11-18T17:00:00Z }
 
 ## 이유
 
-- 사용자가 모델을 다시 정했다. 처음 설계는 bot이 읽기만 하고 실제 일은 큐 작업으로 보내는 것이었다([상주 bot 결정](2026-11-resident-agent-team.md)). 권한 경계를 기존 작업 프로필에 맡기려는 선택이었다. 사용자는 task를 bot이 가져가 상태를 바꾸는 노트로 보고, 권한은 bot마다 정하기를 원했다.
+- 사용자는 task를 bot이 가져가 상태를 바꾸는 노트로 보고, 권한은 bot마다 정하기를 원했다. bot이 읽기만 하고 실제 일을 큐 작업으로 보내던 첫 설계는 권한 경계를 작업 유형별 프로필에 맡겼는데, 그 경계는 이제 bot 설정과 끌 수 없는 tamper 검사가 맡는다. 세션과 mailbox는 [상주 bot 결정](2026-11-resident-agent-team.md)에 있다.
 - 기본값을 auto와 샌드박스 없음으로 둔 것은 사용자의 지정이다. auto 모드는 위험한 호출을 모델 쪽 판단으로 거절하므로 아무 검사가 없는 상태는 아니다. 더 좁히는 것은 bot 설정에서 한다.
-- taskq 자신을 지키는 검사만은 끌 수 없게 했다. bot이 데이터베이스를 고치면 자기 예산, 승인, 다른 bot의 상태를 바꿀 수 있어서, 다른 설정이 모두 의미가 없어진다. 작업 실행에서 같은 이유로 둔 [tamper 결정](2026-11-tamper-stops-run.md)과 같다.
+- taskq 자신을 지키는 검사만은 끌 수 없게 했다. bot이 데이터베이스를 고치면 자기 한도, 승인, 다른 bot의 상태를 바꿀 수 있어서, 다른 설정이 모두 의미가 없어진다. 작업 실행에서 같은 이유로 둔 [tamper 결정](2026-11-tamper-stops-run.md)과 같다.
 - 지켜보는 사람이 없는 turn에서 승인을 기다리면 멈춘 채 남는다. 그래서 default 모드에서 승인이 필요한 호출은 기다리지 않고 거절한다. 승인이 필요한 일은 task로 남겨 사용자가 시작 버튼으로 돌리면 기존 승인 화면을 거친다.
 - 사용자 Claude 설정을 읽지 않는 이유는 bot이 설정 화면에 보이는 것만으로 동작해야 하기 때문이다. 사용자 설정의 allow 규칙이나 hook이 섞이면 bot 설정만 보고 동작을 예측할 수 없다.
 - skill을 사본으로 불러오는 이유는 일하는 중간에 skill이 바뀌지 않게 하고, Reload를 바뀐 내용이 적용되는 시점으로 만들기 위해서다.

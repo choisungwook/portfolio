@@ -1,14 +1,14 @@
 ---
 type: Decision
-title: Permission profiles follow how the SDK evaluates a tool call
-description: What the SDK documentation changed in the original permission plan.
+title: Task permission profiles follow how the SDK evaluates a tool call
+description: Profiles per task type for runs the queue or the run button starts; bots use their own per-bot permission mode.
 tags: [agent-sdk, permissions, sandbox]
-generated: { by: claude-code/claude-haiku-5-5, at: 2026-11-15T05:17:48Z }
+generated: { by: claude-code/claude-fable-5-2, at: 2026-11-20T00:00:00Z }
 ---
 
 ## 결정
 
-Read-only account tasks use `dontAsk` with `Bash(aws *)` allowed and a `PreToolUse` hook that denies every verb outside describe, list and get. Change tasks use `default` with `canUseTool` and no bare `Bash` allow rule.
+Read-only account tasks use `dontAsk` with `Bash(aws *)` allowed and a `PreToolUse` hook that denies every verb outside describe, list and get. Change tasks use `default` with `canUseTool` and no bare `Bash` allow rule. These profiles apply to runs the queue or the run button starts. A bot's turn does not use them: each bot has its own permission mode, sandbox and blocked commands, see [bots execute tasks](2026-11-bots-execute-tasks.md).
 
 ## 이유
 

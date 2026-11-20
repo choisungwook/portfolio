@@ -5,6 +5,14 @@ concept를 추가·수정·삭제할 때마다 오늘 날짜 섹션을 맨 위�
 ## 2026-11-20
 
 * **Add**: [The macOS desktop app is a Tauri window around the released executable](decisions/2026-11-desktop-app-shell.md)
+* **Update**: 결정 기록을 정리해 서로 어긋나던 부분을 마지막 결정으로 맞춤. 지운 파일과 합친 파일은 없고, 뒤집힌 부분만 다시 썼다.
+* **Update**: [resident bots](decisions/2026-11-resident-agent-team.md)를 다시 씀. 고정 역할 agent, 읽기 전용 bot, 기본 꺼짐, 하루·turn당 예산과 그 근거, 세션 교체 정책 없음을 빼고 지금의 turn 한도와 Pause만 남김.
+* **Update**: [token contract and Carbon patterns](decisions/2026-11-carbon-design-system.md)를 다시 씀. Carbon이 기본 테마라는 서술을 빼고 토큰 계약과 남은 패턴만 남김.
+* **Update**: [sidebar and Bots](decisions/2026-11-soft-theme-sidebar.md)를 다시 씀. soft가 기본 테마라는 서술을 빼고 사이드바 배치만 남겼으며, 상단 바 삭제(0.16.0)를 반영.
+* **Update**: [Astryx design tokens](decisions/2026-11-astryx-design-system.md)에 라이트 기본과 이전 테마 파일을 화면에서 고를 수 없다는 점을 더함.
+* **Update**: [OpenAI bot backend](decisions/2026-11-openai-bot-backend.md), [workflows](decisions/2026-11-workflows-run-by-bots.md), [bots execute tasks](decisions/2026-11-bots-execute-tasks.md)에서 없어진 bot 예산을 가리키던 문장을 고침.
+* **Update**: [task ownership and discussions](decisions/2026-11-task-ownership-and-discussions.md)에서 Team 탭과 lead를 지금의 bot 대화와 taskq로 고치고, 토론에 화면 메뉴가 없음을 반영.
+* **Update**: [task permission profiles](decisions/2026-11-permission-profiles.md)에 큐와 시작 버튼의 실행에만 적용되고 bot은 bot별 권한 모드를 쓴다는 범위를 더함.
 * **Update**: [bot runtimes](decisions/2026-11-bot-runtimes-beyond-sdks.md)에 로그인 실패로 꺼진 bot을 통과한 재확인에서 되돌리는 결정을 추가.
 * **Update**: [rejected turns](decisions/2026-11-rejected-turns.md)에 bot 예산(하루, turn당, 80% 표시)을 없앤 결정과 이유를 반영.
 * **Creation**: [session handover](decisions/2026-11-session-handover.md) 결정 기록. 토큰 한도를 넘은 대화를 bot의 인수인계 메모와 함께 새 세션으로 넘김.
