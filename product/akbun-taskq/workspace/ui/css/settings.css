@@ -84,15 +84,36 @@ button[type="submit"].quiet:hover:not(:disabled) { background: var(--secondary-h
 .folder-row div { display: grid; gap: 2px; min-width: 0; }
 .folder-row .meta, .folder-group .meta { margin: 0; }
 .folder-group { margin-top: 12px; display: grid; gap: 4px; }
-.plugins-section { background: var(--panel); border-radius: var(--radius-l); padding: 14px 18px; margin-top: 12px; }
-.plugins-heading { margin: 0 0 6px; font-size: 1.1em; }
+/* Plugins view: one centred column like a document. Sections are separated by space and a heading, not by cards;
+   entries are rows divided by hairlines, each with an initial, its text and its actions on the right. */
+[data-view-panel="plugins"]:not([hidden]) { display: grid; gap: 16px; align-content: start; max-width: 1040px; margin: 0 auto; padding: 8px 8px 48px; }
+[data-view-panel="plugins"] > .view-title, [data-view-panel="plugins"] > .meta { margin: 0; }
+.plugins-section:not([hidden]) { display: grid; gap: 10px; margin-top: 20px; }
+.plugins-section > .meta { margin: 0; }
+.plugins-heading { margin: 0; font-size: 1.15em; }
 .plugins-head { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; }
-.plugins-head input[type="search"] { margin-left: auto; min-height: 32px; border-radius: 16px; padding: 0 12px; }
+.plugins-head input[type="search"] { margin-left: auto; min-height: 32px; border-radius: 16px; padding: 0 14px; min-width: 220px; }
+[data-view-panel="plugins"] .skill-list { gap: 0; margin: 0; }
+[data-view-panel="plugins"] .skill-row, .official-item {
+  display: grid; grid-template-columns: 36px minmax(0, 1fr) auto; align-items: center; gap: 14px;
+  padding: 14px 4px; background: none; border-bottom: 1px solid var(--border);
+}
+[data-view-panel="plugins"] .skill-row > .meta:only-child { grid-column: 1 / -1; }
+[data-view-panel="plugins"] .skill-list > li.meta { padding: 8px 4px; }
+.entry-icon {
+  width: 36px; height: 36px; border-radius: var(--radius); display: grid; place-items: center;
+  background: var(--panel-soft); box-shadow: inset 0 0 0 1px var(--border); font-weight: 600; color: var(--muted);
+}
+.entry-text { display: grid; gap: 3px; min-width: 0; }
+.entry-text p, .entry-text code { margin: 0; }
+.entry-name { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.clamp { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
 .row-actions { display: flex; gap: 6px; flex: none; }
-.official-list { list-style: none; margin: 8px 0 0; padding: 0; display: grid; gap: 6px; max-height: 60vh; overflow: auto; }
-.official-item { display: grid; gap: 4px; padding: 8px 12px; border-radius: var(--radius); background: var(--panel-soft); }
-.official-item p { margin: 2px 0 0; }
-.official-item .badge { margin-left: 6px; }
+.official-list { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(360px, 1fr)); column-gap: 32px; }
+.official-item .installed { color: var(--done); }
+.official-item button.install { box-shadow: inset 0 0 0 1px var(--border-strong); color: var(--fg); }
+.add-by-path > summary { cursor: pointer; color: var(--link); padding: 6px 0; width: fit-content; }
+.add-by-path[open] > summary { margin-bottom: 8px; }
 
 /* Usage: a card per SDK and a table per bot session. */
 .usage-cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); gap: 8px; margin-bottom: 10px; }
@@ -173,3 +194,4 @@ dialog[data-area="settings-dialog"][open] {
 .conn-settings legend { float: left; width: 100%; padding: 0; font-weight: 700; }
 .conn-settings label { display: grid; gap: 4px; font-size: var(--text-small); color: var(--muted); }
 .conn-settings button { justify-self: start; }
+.official-item .skill-path { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; word-break: normal; }

@@ -77,6 +77,8 @@ const KO = {
   'settings.sessions.codex': 'ChatGPT 요금제로 로그인한 OpenAI bot.', 'settings.sessions.kiro': 'Kiro bot. kiro-cli가 모든 대화를 이 폴더의 data.sqlite3에 저장합니다.',
   'settings.sessions.openai': 'API key로 쓰는 OpenAI bot은 로컬 기록이 없고 OpenAI가 대화를 보관합니다. Bedrock으로 쓰는 OpenAI bot은 taskq 데이터 폴더의 team/<bot>/.openai-history.json에 저장합니다.',
   'settings.sessions.none': '아직 없음',
+  'plugins.used_by': '사용 중:', 'plugins.unused': '쓰는 bot 없음', 'plugins.install': '설치', 'plugins.installing': '설치 중…', 'plugins.installed': '설치됨', 'plugins.no_source': '설치할 수 없음',
+  'plugins.installed_toast': '설치됨. bot 설정에서 골라야 쓰입니다.', 'plugins.add_by_path': '경로로 추가', 'plugins.add_mcp': 'MCP server 추가',
   'settings.open': '열기', 'settings.skills': 'bot용 skill', 'settings.plugins': 'bot용 plugin', 'settings.add': '추가', 'settings.update': '업데이트',
   'menu.open': '대화 열기', 'menu.settings': '설정…', 'menu.memory': '메모리…', 'menu.reload_skills': 'skill 다시 불러오기',
   'menu.reload_plugins': 'plugin 다시 불러오기', 'menu.new_session': '새 세션 시작', 'menu.cancel': '진행 중인 작업 취소',
@@ -95,7 +97,7 @@ const KO = {
   'task.title': '제목', 'task.attach': '파일 첨부', 'task.drop': '파일을 끌어다 놓거나 붙여넣으세요',
   'nav.plugins': '플러그인', 'nav.workflows': '워크플로', 'plugins.hint': '여기 등록한 skill과 plugin을 bot 설정에서 bot마다 고릅니다. 업데이트는 git 저장소를 받아 오고 쓰는 bot을 모두 다시 불러옵니다.',
   'plugins.official': '공식 marketplace', 'plugins.anthropic_only': 'Anthropic 것만', 'plugins.filter': '거르기', 'plugins.remove': '삭제',
-  'plugins.official_hint': 'Anthropic 공식 marketplace의 plugin 목록입니다. 설치하지 않습니다. 쓰려면 받아서 위에 폴더를 등록하세요.',
+  'plugins.official_hint': '설치하면 marketplace가 적어 둔 commit의 plugin을 taskq 데이터 폴더에 받아 위 목록에 등록합니다. bot 설정에서 고르기 전에는 아무것도 실행되지 않습니다. 다시 설치하면 업데이트됩니다.',
   'wiki.search': '위키 검색', 'panel.must_check': '확인 필요', 'panel.queue_paused': '큐 멈춤', 'panel.pending': '승인 대기', 'wiki.title': '위키',
 }
 
