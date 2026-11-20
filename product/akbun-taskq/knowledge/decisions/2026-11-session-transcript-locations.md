@@ -6,8 +6,6 @@ tags: [sessions, claude-agent-sdk, codex, kiro, ui]
 generated: { by: claude-code/claude-opus-5-5, at: 2026-11-20T15:00:00Z }
 ---
 
-# Session transcripts stay where each runtime puts them, and Settings lists them per runtime
-
 ## 결정
 
 - Claude 세션 기록은 Claude Code 기본 위치(`CLAUDE_CONFIG_DIR`, 기본 `~/.claude/projects`)에 그대로 둔다.
