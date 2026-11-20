@@ -99,7 +99,7 @@ function describe(config: Config, id: ConnectionId): { label: string; detail: st
       return {
         label: `Claude · ${{ bedrock: 'Amazon Bedrock', api_key: 'Anthropic API key', subscription: 'Claude subscription' }[config.provider]}`,
         detail: config.provider === 'bedrock' ? `provider bedrock, region ${config.awsRegion}, AWS profile ${config.inferenceProfile}`
-          : config.provider === 'api_key' ? 'provider api_key, ANTHROPIC_API_KEY in the environment taskq runs in'
+          : config.provider === 'api_key' ? 'provider api_key, the key saved in Settings or ANTHROPIC_API_KEY in the environment taskq runs in'
             : 'provider subscription, the signed-in Claude Code',
       }
     case 'openai:api':

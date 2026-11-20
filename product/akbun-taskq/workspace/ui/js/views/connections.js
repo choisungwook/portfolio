@@ -75,6 +75,8 @@ export async function connectionByBot() {
   return out
 }
 
+let keySaved = false
+
 // The sign-in form: Claude's provider, region and AWS profile, and the AWS profile OpenAI-on-Bedrock bots use. The
 // profile fields suggest the profiles found in ~/.aws.
 async function loadSignIn() {
@@ -82,6 +84,12 @@ async function loadSignIn() {
   try {
     const [settings, profiles] = await Promise.all([api.get('/connection-settings'), api.get('/aws/profiles')])
     for (const [name, value] of Object.entries(settings)) if (form.elements[name]) form.elements[name].value = value ?? ''
+    // The key is never sent back; an empty field keeps the saved one.
+    form.elements.claude_api_key.value = ''
+    keySaved = settings.claude_api_key_set
+    form.elements.claude_api_key.placeholder = settings.claude_api_key_set
+      ? t('connections.key_saved', 'Saved. Leave empty to keep it')
+      : t('connections.key_env', 'Empty: ANTHROPIC_API_KEY from the environment')
     fill(area('aws-profile-list'), ...profiles.map((p) => el('option', { value: p.name, label: `${p.name} (${p.kind}${p.region ? `, ${p.region}` : ''})` })))
     area('aws-profile-note').textContent = profiles.length
       ? `${t('connections.profiles', 'Profiles on this machine')}: ${profiles.map((p) => `${p.name} (${p.kind})`).join(', ')}`
@@ -93,7 +101,10 @@ async function loadSignIn() {
 }
 
 function showClaudeFields() {
-  const bedrock = area('conn-settings-form').elements.claude_provider.value === 'bedrock'
+  const provider = area('conn-settings-form').elements.claude_provider.value
+  const bedrock = provider === 'bedrock'
+  area('conn-claude-key').hidden = provider !== 'api_key'
+  area('conn-claude-key-remove').hidden = provider !== 'api_key' || !keySaved
   area('conn-claude-aws').hidden = !bedrock
   area('conn-claude-region').hidden = !bedrock
 }
@@ -112,6 +123,14 @@ export function initConnections() {
     const body = Object.fromEntries(new FormData(form).entries())
     if (await mutate(() => api.put('/connection-settings', body), t('connections.saved', 'Sign-in saved; it applies from the next turn'))) {
       loadConnections(true)
+      loadSignIn()
+    }
+  })
+  // null removes the saved key, so ANTHROPIC_API_KEY from the environment applies again.
+  area('conn-claude-key-remove').addEventListener('click', async () => {
+    if (await mutate(() => api.put('/connection-settings', { claude_api_key: null }), t('connections.key_removed', 'Saved key removed'))) {
+      loadConnections(true)
+      loadSignIn()
     }
   })
   area('connections-refresh').addEventListener('click', () => loadConnections(true))

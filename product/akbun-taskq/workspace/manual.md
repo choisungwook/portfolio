@@ -59,7 +59,7 @@ cp taskq.config.example.json taskq.config.json
 | provider | 내가 할 일 |
 |---|---|
 | `bedrock` | `awsRegion`과 `inferenceProfile`(모델 호출에만 쓰는 AWS 프로파일)을 적는다 |
-| `api_key` | taskq를 실행하는 셸에 `ANTHROPIC_API_KEY`를 설정한다 |
+| `api_key` | 설정 > 연결에서 API key를 저장한다(`data/anthropic-api-key`, 권한 0600, 평문). 저장한 key가 없으면 taskq를 실행하는 셸의 `ANTHROPIC_API_KEY`를 쓴다 |
 | `subscription` | 할 일 없음. 이미 로그인된 Claude Code를 쓴다 |
 
 자주 손대는 값은 아래와 같다. 바꾼 뒤에는 taskq를 다시 시작한다.
