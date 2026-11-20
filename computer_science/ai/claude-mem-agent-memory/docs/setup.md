@@ -13,6 +13,8 @@
 
 아래 명령은 저장소 바깥에 새 실습 폴더와 메모리 경로를 만듭니다. 실습 프로젝트를 분리하면 상위 저장소의 Claude 규칙이 세션에 섞이는 것을 피할 수 있습니다. 다음 장도 같은 터미널에서 진행하세요.
 
+이전 할인 실습의 `LAB_DIR`에는 `shop`만 있습니다. 놀이공원 실습으로 넘어갈 때도 아래 블록 전체를 실행해 새 경로를 지정하세요.
+
 ```bash
 cd computer_science/ai/claude-mem-agent-memory
 LAB_ROOT="$(mktemp -d /tmp/minimem-park.XXXXXX)"

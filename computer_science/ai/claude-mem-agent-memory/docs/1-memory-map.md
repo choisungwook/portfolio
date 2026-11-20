@@ -22,8 +22,8 @@
 
 ```bash
 PA='놀이공원에 지금까지 방문객 137명이 왔어. Write로 attendance.txt를 만들어 숫자 137 한 줄만 적어 줘. 직원은 방문객 집계에서 제외하고, 오후 6시에 최종 인원을 확정할 거야. 기준과 시각은 파일에 적지 말고, 파일을 만들면 한 문장으로 답해 줘.'
-minimem/.venv/bin/python scripts/run_session.py --no-mcp --tools Write "$LAB_DIR/park" "$PA"
-cat "$LAB_DIR/park/attendance.txt"
+minimem/.venv/bin/python scripts/run_session.py --no-mcp --tools Write "$LAB_DIR/park" "$PA" &&
+  cat "$LAB_DIR/park/attendance.txt"
 ```
 
 파일에서 `137`을, 세션 출력의 `tool_calls`에서 `Write`를 확인합니다. 직원 제외와 확정 시각은 observer가 읽을 첫 요청에 남습니다.

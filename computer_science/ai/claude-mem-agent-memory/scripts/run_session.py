@@ -13,6 +13,7 @@ import os
 import subprocess
 import time
 from collections import Counter
+from pathlib import Path
 
 ALLOWED_TOOLS = "Read,Write,Edit,Glob,Grep,Bash(python *),Bash(python3 *),mcp__minimem__search,mcp__minimem__get_observations"
 CLAUDE_ARGS = [
@@ -86,11 +87,14 @@ def main() -> None:
   parser.add_argument("--no-memory", action="store_true", help="minimem hook과 MCP 서버를 비활성화합니다.")
   parser.add_argument("--no-mcp", action="store_true", help="minimem hook을 유지하고 MCP 서버만 건너뜁니다.")
   parser.add_argument("--tools", help='사용할 기본 도구 이름. 빈 문자열("")은 기본 도구를 모두 끕니다.')
-  parser.add_argument("lab_dir")
+  parser.add_argument("lab_dir", type=Path)
   parser.add_argument("prompt")
+  options = parser.parse_args()
+  if not options.lab_dir.is_dir():
+    raise SystemExit(f"실습 폴더가 없습니다: {options.lab_dir}. docs/setup.md의 환경 준비를 같은 터미널에서 실행하세요.")
   start = time.perf_counter()
   try:
-    events = run(parser.parse_args())
+    events = run(options)
   except subprocess.TimeoutExpired as err:
     raise SystemExit(f"Claude Code에서 {TIMEOUT_S}초 안에 응답을 받지 못했습니다.") from err
   report(events, time.perf_counter() - start)
