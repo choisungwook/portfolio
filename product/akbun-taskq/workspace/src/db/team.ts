@@ -39,7 +39,6 @@ export interface BotSettings {
   sdk: BotSdk                 // which agent SDK runs the bot
   provider: BotProvider | null   // OpenAI bots: how they sign in; null is api
   hourly_turns: number | null    // per-bot rate limit; null uses the global default
-  turn_budget_usd: number | null // per-turn spend limit; null uses the global default
   turn_max_turns: number | null  // per-turn model turns; null uses the global default
   charter_owns: string           // charter: what this bot is responsible for
   charter_good: string           // charter: what a good result looks like
@@ -95,29 +94,32 @@ function toAgent(row: Record<string, unknown>): TeamAgent {
 export function createAgent(db: Db, name: string, settings: BotSettings, system = false): void {
   db.prepare(`INSERT INTO team_agents (name, role, description, instructions, may_message_user, enabled, system,
     permission_mode, sandbox, allowed_domains, blocked_commands, workdir, skills, plugins, model, sdk, hourly_turns,
-    turn_budget_usd, turn_max_turns, effort, mcp_servers, provider, charter_owns, charter_good, charter_never, ask_first, created_at)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`).run(
+    turn_max_turns, effort, mcp_servers, provider, charter_owns, charter_good, charter_never, ask_first, created_at)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`).run(
     name, settings.role, settings.description, settings.instructions, settings.may_message_user ? 1 : 0, settings.enabled ? 1 : 0,
     system ? 1 : 0, settings.permission_mode, settings.sandbox ? 1 : 0, JSON.stringify(settings.allowed_domains),
     JSON.stringify(settings.blocked_commands), settings.workdir, JSON.stringify(settings.skills), JSON.stringify(settings.plugins),
-    settings.model, settings.sdk, settings.hourly_turns, settings.turn_budget_usd, settings.turn_max_turns, settings.effort,
+    settings.model, settings.sdk, settings.hourly_turns, settings.turn_max_turns, settings.effort,
     JSON.stringify(settings.mcp_servers ?? []), settings.provider ?? null, settings.charter_owns ?? '', settings.charter_good ?? '',
     settings.charter_never ?? '', JSON.stringify(settings.ask_first ?? []), nowSec())
 }
 
 export function updateAgent(db: Db, name: string, settings: BotSettings): boolean {
+  // Only turning the bot on or off by hand forgets the failed login; saving another setting keeps it restorable.
+  const was = db.prepare('SELECT enabled FROM team_agents WHERE name = ?').get(name)
+  if (was && Boolean(was.enabled) !== Boolean(settings.enabled)) forgetSignedOut(db, name)
   // A session of one runtime cannot be resumed by another: a new SDK or OpenAI provider starts a new session.
   db.prepare(`UPDATE team_agents SET session_id = NULL, session_cost_usd = 0, context_tokens = NULL, context_window = NULL
     WHERE name = ? AND (sdk IS NOT ? OR coalesce(provider, 'api') IS NOT coalesce(?, 'api'))`).run(name, settings.sdk, settings.provider ?? null)
   return db.prepare(`UPDATE team_agents SET role = ?, description = ?, instructions = ?, may_message_user = ?, enabled = ?,
     permission_mode = ?, sandbox = ?, allowed_domains = ?, blocked_commands = ?, workdir = ?, skills = ?, plugins = ?, model = ?,
-    sdk = ?, hourly_turns = ?, turn_budget_usd = ?, turn_max_turns = ?, effort = ?, mcp_servers = ?, provider = ?,
+    sdk = ?, hourly_turns = ?, turn_max_turns = ?, effort = ?, mcp_servers = ?, provider = ?,
     charter_owns = ?, charter_good = ?, charter_never = ?, ask_first = ?
     WHERE name = ?`).run(
     settings.role, settings.description, settings.instructions, settings.may_message_user ? 1 : 0, settings.enabled ? 1 : 0,
     settings.permission_mode, settings.sandbox ? 1 : 0, JSON.stringify(settings.allowed_domains), JSON.stringify(settings.blocked_commands),
     settings.workdir, JSON.stringify(settings.skills), JSON.stringify(settings.plugins), settings.model, settings.sdk,
-    settings.hourly_turns, settings.turn_budget_usd, settings.turn_max_turns, settings.effort, JSON.stringify(settings.mcp_servers ?? []), settings.provider ?? null,
+    settings.hourly_turns, settings.turn_max_turns, settings.effort, JSON.stringify(settings.mcp_servers ?? []), settings.provider ?? null,
     settings.charter_owns ?? '', settings.charter_good ?? '', settings.charter_never ?? '', JSON.stringify(settings.ask_first ?? []), name).changes === 1
 }
 
@@ -168,7 +170,13 @@ export function replaceAgentSession(db: Db, name: string, expected: string | nul
   db.prepare('UPDATE team_agents SET session_id = ? WHERE name = ? AND session_id IS ?').run(next, name, expected)
 }
 
+// A bot the user turns on or off by hand is no longer "turned off by a failed login" (signedOut in team/hub.ts).
+function forgetSignedOut(db: Db, name: string): void {
+  db.prepare('DELETE FROM meta WHERE key = ?').run(`team_signed_out:${name}`)
+}
+
 export function setAgentEnabled(db: Db, name: string, enabled: boolean): boolean {
+  forgetSignedOut(db, name)
   return db.prepare('UPDATE team_agents SET enabled = ? WHERE name = ?').run(enabled ? 1 : 0, name).changes === 1
 }
 
@@ -313,14 +321,6 @@ export function recoverTurns(db: Db): { agent: string; turn: number; end: TurnEn
       return { agent: String(row.agent), turn: id, end: releaseMessages(db, id, true, Number.MAX_SAFE_INTEGER) }
     })
   })
-}
-
-// Model spend of the team since a time: agent turns plus the runs of tasks agents own.
-export function spentSince(db: Db, since: number): number {
-  const turns = Number(db.prepare('SELECT COALESCE(sum(cost_usd), 0) AS cost FROM team_turns WHERE started_at >= ?').get(since)?.cost ?? 0)
-  const tasks = Number(db.prepare(`SELECT COALESCE(sum(json_extract(r.stats, '$.cost_usd')), 0) AS cost FROM runs r
-    JOIN tasks t ON t.id = r.task_id WHERE t.owner IS NOT NULL AND r.started_at >= ? AND r.started_at >= t.owner_since`).get(since)?.cost ?? 0)
-  return turns + tasks
 }
 
 export function turnsSince(db: Db, agent: string, since: number): number {

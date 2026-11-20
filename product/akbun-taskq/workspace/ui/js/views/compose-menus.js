@@ -5,7 +5,7 @@
 import { api, mutate, notify } from '../core/api.js'
 import { area, clear, el } from '../core/dom.js'
 import { emit } from '../core/bus.js'
-import { t } from '../core/i18n.js'
+import { currentLanguage, t } from '../core/i18n.js'
 import { contextLabel, contextRing } from './context-ring.js'
 import { icon } from '../core/icons.js'
 import { botsSnapshot } from './bots-sidebar.js'
@@ -59,9 +59,20 @@ function select(labelText, value, options, onchange) {
 async function save(change) {
   const ok = await mutate(() => api.put(`/bots/${bot}`, change), `${bot}: ${t('compose.saved', 'saved, applies from the next turn')}`)
   if (ok) emit('bots-changed')
+  else if (shown) {
+    // The select still shows the value that was not saved.
+    drawn = null
+    render(shown)
+  }
 }
 
+// The chat redraws its head on every poll (5 s). Rebuilding the row closes a menu the user has open, so it is rebuilt
+// only when what it shows changed.
+let drawn = null
 function render(agent) {
+  const key = JSON.stringify([currentLanguage(), agent.name, agent.model, agent.effort, agent.permission_mode, contextLabel(agent), catalog])
+  if (key === drawn) return
+  drawn = key
   const models = catalog?.models ?? []
   const current = models.find((m) => m.id === agent.model)
   const modelOptions = [['', t('compose.model_default', 'Default model')], ...models.map((m) => [m.id, m.name])]

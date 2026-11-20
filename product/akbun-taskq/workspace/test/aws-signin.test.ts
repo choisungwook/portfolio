@@ -73,7 +73,7 @@ describe('AWS profile sign-in', () => {
   test('[critical] an OpenAI bot on Bedrock signs a token from the chosen profile; an expired session is reported, not hidden', async () => {
     const agent = { ...getAgent(env.db, 'coder')!, sdk: 'openai' as const, provider: 'bedrock' as const }
     const request: TurnRequest = {
-      agent, system: 'orders', prompt: 'hi', cwd: env.home, plugins: [], sharedDir: env.home, maxTurns: 5, budgetUsd: 1, tools: [],
+      agent, system: 'orders', prompt: 'hi', cwd: env.home, plugins: [], sharedDir: env.home, maxTurns: 5, tools: [],
       resume: null, signal: new AbortController().signal,
     }
     env.config.bots.bedrockProfile = 'example-sso'
@@ -118,7 +118,7 @@ describe('AWS profile sign-in', () => {
   test('[critical] an OpenAI bot on Bedrock lists inference profiles as its models and runs openai.* through one', async () => {
     const agent = { ...getAgent(env.db, 'coder')!, sdk: 'openai' as const, provider: 'bedrock' as const, model: 'openai.gpt-5-v1:0' }
     const request: TurnRequest = {
-      agent, system: 'orders', prompt: 'hi', cwd: env.home, plugins: [], sharedDir: env.home, maxTurns: 5, budgetUsd: 1, tools: [],
+      agent, system: 'orders', prompt: 'hi', cwd: env.home, plugins: [], sharedDir: env.home, maxTurns: 5, tools: [],
       resume: null, signal: new AbortController().signal,
     }
     env.config.bots.bedrockProfile = 'example-sso'

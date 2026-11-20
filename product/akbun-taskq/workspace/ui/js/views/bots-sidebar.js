@@ -27,6 +27,7 @@ export function initBotsSidebar() {
   area('bot-add').addEventListener('click', () => openBotSettings(null))
   on('refresh', load)
   on('bots-changed', load)
+  on('connections-changed', loadConnections)
   load()
   setInterval(load, POLL_MS)
   loadConnections()
@@ -72,14 +73,8 @@ async function load() {
 // Rebuilding the list restarts the busy ring's spin and the pulse, and a long list loses its scroll position for a
 // frame, which made the list jump on every poll while a bot worked. So it is redrawn only when what it shows changes
 // (the elapsed time is ticked in place), and the scroll position is kept.
-// The share of the daily budget spent, in percent, once it reaches 80; the bots pause when it is spent.
-function budgetShare(team) {
-  const share = team.budget?.limit_usd > 0 ? Math.floor(team.budget.spent_usd / team.budget.limit_usd * 100) : 0
-  return share >= 80 ? share : null
-}
-
 function signature(team, selected) {
-  return JSON.stringify([team.paused, team.pause_reason, budgetShare(team), selected, connections, team.agents.map((a) => [
+  return JSON.stringify([team.paused, team.pause_reason, selected, connections, team.agents.map((a) => [
     a.name, a.system, a.enabled, a.busy, a.working_since, a.unread, a.sdk, a.role, a.context_tokens, a.context_window,
     a.last_message?.id, a.last_message?.created_at,
   ])])
@@ -91,15 +86,14 @@ function render(team) {
   if (key === drawn) return
   drawn = key
   const scroll = list.scrollTop
-  const share = team.paused ? null : budgetShare(team)
-  const label = team.paused ? t('bots.paused', 'Paused') : share ? `${t('bots.budget', 'Budget')} ${share}%` : t('bots.running', 'Running')
-  const mode = team.paused ? 'paused' : share ? 'warn' : 'running'
+  const label = team.paused ? t('bots.paused', 'Paused') : t('bots.running', 'Running')
+  const mode = team.paused ? 'paused' : 'running'
   const toggle = team.paused
     ? el('button', { type: 'button', class: 'quiet', text: t('bots.resume', 'Resume'), onclick: () => mutate(() => api.post('/bots/resume'), 'Bots resumed').then(load) })
     : el('button', { type: 'button', class: 'quiet', text: t('bots.pause', 'Pause'), onclick: () => mutate(() => api.post('/bots/pause'), 'Bots paused').then(load) })
   clear(state).append(el('span', {
     class: 'bots-state-label', dataset: { state: mode },
-    title: share ? `$${team.budget.spent_usd.toFixed(2)} / $${team.budget.limit_usd}` : team.pause_reason ?? '',
+    title: team.pause_reason ?? '',
     text: label,
   }), ...(toggle ? [toggle] : []))
   const selected = currentView().view === 'bot' ? currentView().bot : null

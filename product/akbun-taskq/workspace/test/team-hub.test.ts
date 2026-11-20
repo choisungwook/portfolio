@@ -1,7 +1,7 @@
 import { test, describe } from 'node:test'
 import assert from 'node:assert/strict'
 import { USER, getAgent, listMessages, listTurns, postMessage, seedAgents, setAgentSession, updateAgent } from '../src/db/team.ts'
-import { budgetState, createTeamHub, isTeamPaused, resumeTeam, teamPauseReason, type TeamHub } from '../src/team/hub.ts'
+import { createTeamHub, isTeamPaused, resumeTeam, teamPauseReason, type TeamHub } from '../src/team/hub.ts'
 import type { TeamBackend, TurnRequest, TurnResult } from '../src/team/types.ts'
 import { teamChanged } from '../src/wake.ts'
 import { seedTestBots, setup, sleep, waitFor, TOKEN, type TestEnv } from './helpers.ts'
@@ -118,23 +118,6 @@ describe('team hub', () => {
     assert.deepEqual(costs, [0.3, 0.5])
   })
 
-  test('the team pauses when the daily budget is spent', async () => {
-    const { db, config } = env
-    config.bots.dailyBudgetUsd = 0.1
-    config.bots.turnBudgetUsd = 0.05
-    const { backend, requests } = fakeBackend(() => ({ outcome: 'done', cost_usd: 0.06 }))
-    hub = createTeamHub({ db, config, backend, retryAfterSec: 0 })
-    await hub.start()
-    postMessage(db, { sender: USER, recipient: 'taskq', body: 'one' })
-    teamChanged.notify()
-    await waitFor(() => listTurns(db, 5).some((t) => t.ended_at !== null))
-    postMessage(db, { sender: USER, recipient: 'taskq', body: 'two' })
-    teamChanged.notify()
-    await waitFor(() => isTeamPaused(db))
-    assert.equal(requests.length, 1)
-    assert.match(teamPauseReason(db) ?? '', /daily budget/)
-  })
-
   test('two agents messaging each other in a loop pause the team', async () => {
     const { db, config } = env
     config.bots.hourlyTurnsPerAgent = 3
@@ -176,7 +159,7 @@ describe('team hub', () => {
     await waitFor(() => listTurns(db, 5).some((t) => t.ended_at !== null))
     await sleep(30)
     assert.equal(requests.length, 1)
-    assert.equal(budgetState(db, config).spent_usd, 0)
+    assert.equal(listTurns(db, 5)[0].cost_usd, 0)
   })
 
   test('[critical] a conversation over the token limit is handed over: the bot is asked for a note, then starts a new session', async () => {

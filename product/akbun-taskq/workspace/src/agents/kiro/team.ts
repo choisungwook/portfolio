@@ -147,7 +147,7 @@ export function createKiroTeamBackend(run: KiroSpawn = spawnKiro): TeamBackend {
         }
       } catch (error) {
         const message = error instanceof Error ? error.message : String(error)
-        // Kiro bills credits, not dollars: a failed turn costs 0 here, not the turn budget.
+        // Kiro bills credits, not dollars: a failed turn costs 0 here.
         const failed = { outcome: 'failed' as const, cost_usd: 0 }
         if (request.signal.aborted) return { ...failed, error: 'stopped' }
         if (/ENOENT/.test(message)) return { ...failed, error: `kiro-cli was not found (${config.bots.kiroPath}); install it and sign in under Settings > Connections` }

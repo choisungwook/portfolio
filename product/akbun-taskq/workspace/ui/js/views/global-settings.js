@@ -5,9 +5,8 @@ import { area, clear, el } from '../core/dom.js'
 import { applyLanguage, t } from '../core/i18n.js'
 
 const LIMIT_FIELDS = [
-  ['daily_budget_usd', 'Daily budget (USD)'], ['turns_per_hour_total', 'Turns per hour, all bots'],
-  ['max_concurrent_turns', 'Bots working at once'], ['bot_turns_per_hour', 'Turns per hour per bot (default)'],
-  ['turn_budget_usd', 'Budget per turn (default, USD)'], ['turn_max_turns', 'Model turns per turn (default)'],
+  ['turns_per_hour_total', 'Turns per hour, all bots'], ['max_concurrent_turns', 'Bots working at once'],
+  ['bot_turns_per_hour', 'Turns per hour per bot (default)'], ['turn_max_turns', 'Model turns per turn (default)'],
   ['session_max_tokens', 'Conversation size before a new session (tokens)'],
 ]
 const FOLDERS = [['shared', 'settings.folder.shared', 'Shared folder'], ['sessions', 'settings.folder.sessions', 'Session transcripts'], ['home', 'settings.folder.home', 'taskq data folder']]

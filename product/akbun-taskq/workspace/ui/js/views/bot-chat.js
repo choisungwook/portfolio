@@ -99,6 +99,7 @@ export function initBotChat() {
       if (Date.now() - connectionShownAt > 30_000) showConnection()
     }
   })
+  on('connections-changed', showConnection)
   // Search results open the conversation at a message; it is scrolled to and flashed once the log is drawn.
   on('focus-message', (id) => {
     pendingMessage = id

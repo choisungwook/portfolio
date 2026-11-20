@@ -3,7 +3,7 @@ import assert from 'node:assert/strict'
 import { existsSync, readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import {
-  USER, agentsWithMail, getAgent, listMessages, listTurns, postMessage, seedAgents, setAgentEnabled, setAgentSession, spentSince, startTurn,
+  USER, agentsWithMail, getAgent, listMessages, listTurns, postMessage, seedAgents, setAgentEnabled, setAgentSession, startTurn,
 } from '../src/db/team.ts'
 import { getThread } from '../src/db/threads.ts'
 import { getPage, writePage } from '../src/db/wiki.ts'
@@ -279,17 +279,14 @@ describe('turn safety', () => {
     assert.equal(isTeamPaused(env.db), false)
   })
 
-  test('the daily budget counts tasks the team owns, from the moment it took them', () => {
-    const since = nowSec() - 100
+  test('giving the task of the user to a bot tells the user', () => {
     const task = insertTask(env.db, { type: 'research', status: 'done', owner: 'planner', data: { intent: 'x' } })
     insertRun(env.db, { id: 'r1', task_id: task.id, session_id: null, started_at: nowSec() })
     env.db.prepare(`UPDATE runs SET stats = '{"cost_usd":2.5}' WHERE id = 'r1'`).run()
-    assert.equal(spentSince(env.db, since), 2.5)
     const userTask = insertTask(env.db, { type: 'research', status: 'ready', data: { intent: 'user survey' } })
     insertRun(env.db, { id: 'r2', task_id: userTask.id, session_id: null, started_at: nowSec() - 50 })
     env.db.prepare(`UPDATE runs SET stats = '{"cost_usd":4}' WHERE id = 'r2'`).run()
     tool(env, 'planner', 'assign_task')({ task_id: userTask.id, to: 'coder' })
-    assert.equal(spentSince(env.db, since), 2.5)
     assert.ok(listAlerts(env.db, false).some((a) => a.message.includes(`gave your task ${userTask.id} to coder`)))
   })
 

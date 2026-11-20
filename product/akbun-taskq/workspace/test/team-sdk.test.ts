@@ -47,7 +47,7 @@ describe('claude team backend', () => {
     mkdirSync(cwd, { recursive: true })
     request = {
       agent: getAgent(env.db, 'taskq')!, system: 'orders', prompt: '1 new message', tools: [], cwd,
-      plugins: [], sharedDir: join(env.home, 'shared'), maxTurns: 30, budgetUsd: 1, resume: 'sess-0', signal: new AbortController().signal,
+      plugins: [], sharedDir: join(env.home, 'shared'), maxTurns: 30, resume: 'sess-0', signal: new AbortController().signal,
     }
   })
   test.afterEach(() => env.cleanup())
@@ -117,7 +117,6 @@ describe('claude team backend', () => {
     assert.deepEqual(options.settingSources, [])
     assert.equal(options.strictMcpConfig, true)
     assert.deepEqual(Object.keys(options.mcpServers ?? {}), ['team'])
-    assert.equal(options.maxBudgetUsd, 1)
     assert.deepEqual(options.additionalDirectories, [join(env.home, 'shared'), join(env.home, 'worktrees')])
     assert.deepEqual(f.prompts, ['1 new message'])
   })

@@ -90,7 +90,6 @@ export function parseBotSettings(body: unknown, known: { skills: Set<string>; pl
       provider: has('provider') ? providerOf(o.provider) : from.provider ?? null,
       effort: has('effort') ? effortOf(o.effort) : from.effort,
       hourly_turns: has('hourly_turns') ? limit(o.hourly_turns, 'hourly_turns', 1, 1000, true) : from.hourly_turns,
-      turn_budget_usd: has('turn_budget_usd') ? limit(o.turn_budget_usd, 'turn_budget_usd', 0.01, 100, false) : from.turn_budget_usd,
       turn_max_turns: has('turn_max_turns') ? limit(o.turn_max_turns, 'turn_max_turns', 1, 500, true) : from.turn_max_turns,
       charter_owns: has('charter_owns') ? text(o.charter_owns, 'charter_owns', 2000) : from.charter_owns ?? '',
       charter_good: has('charter_good') ? text(o.charter_good, 'charter_good', 2000) : from.charter_good ?? '',
