@@ -24,7 +24,11 @@ pub fn login_shell(shell: Option<&str>) -> &str {
 }
 
 /// Run by the login shell with the taskq path as `$0`. stderr joins stdout so a failed start can be shown.
-pub const SCRIPT: &str = "exec \"$0\" run 2>&1";
+/// An app opened from Finder runs in `/`, and taskq's home defaults to the current directory, so without a
+/// `TASKQ_HOME` from the profile it would try to write `/data`. The app uses `~/.taskq` instead, and makes a
+/// relative `TASKQ_HOME` absolute so taskq does not resolve it again from inside that folder.
+pub const SCRIPT: &str =
+    "export TASKQ_HOME=\"${TASKQ_HOME:-$HOME/.taskq}\"; mkdir -p \"$TASKQ_HOME\" && cd \"$TASKQ_HOME\" && export TASKQ_HOME=\"$PWD\" && exec \"$0\" run 2>&1";
 
 #[cfg(test)]
 mod tests {
@@ -36,6 +40,29 @@ mod tests {
         assert_eq!(ready_url("taskq: config loaded"), None);
         assert_eq!(ready_url("taskq running at https://example.com/"), None);
         assert_eq!(ready_url("taskq running at http://127.0.0.1:@example.com/"), None);
+    }
+
+    #[test]
+    fn script_runs_taskq_in_a_writable_home() {
+        let tmp = std::env::temp_dir().join(format!("taskq-launch-{}", std::process::id()));
+        std::fs::create_dir_all(&tmp).unwrap();
+        let fake = tmp.join("taskq");
+        std::fs::write(&fake, "#!/bin/sh\necho \"$TASKQ_HOME|$(pwd -P)|$1\"\n").unwrap();
+        std::process::Command::new("chmod").arg("+x").arg(&fake).status().unwrap();
+        let run = |home: Option<&str>| {
+            let mut cmd = std::process::Command::new("/bin/sh");
+            cmd.args(["-c", SCRIPT]).arg(&fake).current_dir("/").env("HOME", &tmp).env_remove("TASKQ_HOME");
+            if let Some(home) = home {
+                cmd.env("TASKQ_HOME", home);
+            }
+            String::from_utf8(cmd.output().unwrap().stdout).unwrap()
+        };
+        let tmp_real = std::fs::canonicalize(&tmp).unwrap();
+        let default = tmp.join(".taskq");
+        assert_eq!(run(None).trim(), format!("{}|{}|run", default.display(), tmp_real.join(".taskq").display()));
+        let custom = tmp.join("custom");
+        assert_eq!(run(custom.to_str()).trim(), format!("{}|{}|run", custom.display(), tmp_real.join("custom").display()));
+        std::fs::remove_dir_all(&tmp).unwrap();
     }
 
     #[test]
