@@ -1,29 +1,27 @@
 ---
 type: Decision
-title: The UI uses a soft messenger theme and a left sidebar where bots read like chats
-description: Bots replace the Team tab as a chat list in a left sidebar; a new dark-first rounded theme implements the same token contract, and Carbon stays as a second theme.
-tags: [ui, design-system, bots]
-generated: { by: claude-code/claude-opus-5-5, at: 2026-11-19T15:00:00Z }
+title: Navigation is a left sidebar where bots read like chats, and the user-facing name is Bots
+description: A left sidebar holds the orchestrator, new task and search, every view and the bot chat list, with alerts and settings at its foot; there is no tab row or top bar, and Team is only the internal name.
+tags: [ui, navigation, bots]
+generated: { by: claude-code/claude-fable-5-2, at: 2026-11-20T00:00:00Z }
 ---
 
 ## 결정
 
-- 사용자에게 보이는 이름은 Team이 아니라 Bots다. UI, CLI(`taskq bots`), API(`/api/bots`), 설정 키(`bots`)를 바꿨다. 코드와 테이블 이름(`src/team/`, `team_*`)은 그대로 둔다.
-- 탭 줄을 없애고 왼쪽 사이드바로 옮긴다. 0.15.0부터 순서는 오케스트레이터 taskq(위 가운데 큰 아바타), 새 작업과 검색, 모든 화면 메뉴(Calendar, task 상태보드, 공용 폴더, Workflows, Plugins, Wiki), Bots 목록이다. 메뉴를 위에 모은 것은 bot이 늘어도 메뉴가 화면 밖으로 밀려나지 않게 하려는 것이고, taskq를 따로 둔 것은 사용자가 가장 먼저 말을 거는 상대라서다. Graph 화면은 0.15.0에서 지웠다.
-- Proposals, Goals, Discussions 메뉴는 2026-11-19에 사용자 요청으로 뺐다. 기능(API, CLI, bot 도구)은 남기고 화면만 없앴다.
-- 기본 테마는 2026-11-19부터 [Astryx](/decisions/2026-11-astryx-design-system.md)다. soft 테마는 두 번째 구현으로 남는다.
+- 사용자에게 보이는 이름은 Team이 아니라 Bots다. UI, CLI(`taskq bots`), API(`/api/bots`), 설정 키(`bots`)가 이 이름을 쓴다. 코드와 테이블 이름(`src/team/`, `team_*`)은 그대로 둔다.
+- 화면 전환은 왼쪽 사이드바 하나로 한다. 탭 줄과 상단 바는 없다. 위에서부터 오케스트레이터 taskq(가운데 큰 아바타), 새 작업과 검색, 모든 화면 메뉴(Calendar, task 상태보드, 공용 폴더, Workflows, Plugins, Wiki), Bots 목록이고, 맨 아래에 확인 필요(종)와 설정 아이콘이 있다.
 - Bots 목록은 채팅 목록처럼 bot마다 아바타, 이름, 최근 메시지, 시각, 읽지 않음 점을 보인다. bot을 누르면 그 bot과의 대화가 말풍선으로 열리고 거기서 메시지를 보낸다.
-- 기본 테마를 `soft.css`로 바꾼다. 다크 우선, 둥근 모서리, 굵은 글씨, bot마다 다른 색과 모양의 아바타다. 토큰 계약에 아바타 색 8개와 큰 모서리(`--radius-l`)를 더했다. `carbon.css`는 같은 계약의 두 번째 구현으로 남긴다.
+- Graph, Proposals, Goals, Discussions는 화면 메뉴가 없다. Graph를 뺀 나머지 기능은 API, CLI, bot 도구로 남아 있고 `/api/graph`도 남아 있다.
+- 색과 모양은 이 결정의 대상이 아니다. [Astryx 토큰 결정](2026-11-astryx-design-system.md)에 있다.
 
 ## 이유
 
-- 사용자가 참고로 준 화면은 bot마다 대화방이 하나인 메신저 목록이었다. bot이 상주하며 대화를 이어 간다는 모델과 맞고, 패널 하나에 모든 메시지를 섞어 보이던 Team 탭보다 누가 무슨 말을 했는지 찾기 쉽다.
-- 사이드바로 옮기면 화면 전환과 bot 선택이 한 메뉴에 모인다. 탭 다섯 개에 bot 다섯 개를 더하면 탭 줄이 넘친다.
-- 테마를 새 파일로 만든 이유는 [Carbon 결정](2026-11-carbon-design-system.md)에서 테마를 토큰 계약의 구현으로 분리해 두었기 때문이다. 컴포넌트 CSS를 고치지 않고 색, 모서리, 글꼴을 바꿀 수 있었고, 상태 표시와 알림처럼 Carbon에서 가져온 패턴은 그대로 쓴다.
+- 사용자가 참고로 준 화면은 bot마다 대화방이 하나인 메신저 목록이었다. bot이 상주하며 대화를 이어 간다는 모델과 맞고, 패널 하나에 모든 메시지를 섞어 보이는 것보다 누가 무슨 말을 했는지 찾기 쉽다.
+- 사이드바로 옮기면 화면 전환과 bot 선택이 한 메뉴에 모인다. 탭 줄에 bot까지 더하면 넘친다.
+- 메뉴를 위에 모은 것은 bot이 늘어도 메뉴가 화면 밖으로 밀려나지 않게 하려는 것이고, taskq를 따로 둔 것은 사용자가 가장 먼저 말을 거는 상대라서다.
+- 상단 바에 있던 것은 앱 이름, 지난 실행 검색, 종, 설정뿐이었다. 지난 실행은 검색 dialog의 작업 탭에서 찾으므로 종과 설정을 사이드바로 옮기고 바를 없앴다.
 - 이름을 사용자 표면에서만 바꾼 이유는 내부 이름까지 바꾸면 마이그레이션과 테스트를 모두 손대야 하는데 얻는 것이 없기 때문이다. 두 이름의 대응은 wiki architecture에 적었다.
 
 ## 잃는 것
 
-- Carbon 결정이 근거로 든 "Carbon의 원칙을 따르는 UI"는 색과 모양에서는 더 이상 맞지 않는다. 남은 것은 패턴이다.
-- 다크 우선 테마는 밝은 사무실 화면에서 대비를 따로 확인하지 않았다. light 변형은 `prefers-color-scheme: light`에서만 쓰인다.
 - 내부 이름과 표면 이름이 달라 코드를 처음 읽는 사람이 둘을 연결해야 한다.
