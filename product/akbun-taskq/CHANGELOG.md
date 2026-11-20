@@ -2,6 +2,16 @@
 
 <!-- markdownlint-configure-file {"MD024": {"siblings_only": true}} -->
 
+## 0.22.1
+
+### Fixed
+
+- Finder에서 연 데스크톱 앱이 `EROFS: read-only file system, mkdir '/data'`로 시작하지 못하던 문제. Finder로 연 앱의 현재 디렉터리는 `/`이고, `TASKQ_HOME`이 없으면 taskq는 현재 디렉터리를 home으로 쓴다. 이제 앱은 셸 프로필에 `TASKQ_HOME`이 없으면 `~/.taskq`를 만들어 home으로 쓴다. 명령줄 실행은 그대로 현재 디렉터리를 쓴다.
+
+### SDK
+
+변경 없음.
+
 ## 0.22.0
 
 ### Fixed
