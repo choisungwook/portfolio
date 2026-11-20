@@ -189,6 +189,6 @@ jobs:
           # 코드블록은 줄 수에서 뺀다.
           lines=$(printf '%s\n' "$body" | awk '/^```/{fence=!fence; next} !fence && NF{n++} END{print n+0}')
           if [ "$lines" -gt 30 ]; then
-            echo "::warning::PR body가 ${lines}줄로 30줄을 넘음. 방식 절부터 줄일 것"
+            echo "::warning::PR body가 ${lines}줄로 30줄을 넘음. 검증 표의 행은 줄이지 말 것"
           fi
           exit $fail
