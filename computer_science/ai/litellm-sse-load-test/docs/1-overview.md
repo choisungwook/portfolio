@@ -50,7 +50,7 @@ flowchart LR
 | 지표 | 일반 웹 도구(k6 기본)의 의미 | LLM 벤치마크 도구의 의미 | 혼동 시 문제 |
 | --- | --- | --- | --- |
 | `http_req_waiting` vs TTFT | HTTP 200 응답 헤더 도착 시점(TTFB) | Prefill 완료 후 첫 번째 실제 텍스트 토큰 도착 시점 | 프록시가 헤더를 먼저 열면 TTFB가 10ms로 찍혀 첫 글자 대기를 놓침 |
-| `http_req_duration` vs E2E | 요청 시작부터 응답 바디 전체 종료까지 | 첫 토큰부터 마지막 `[DONE]` 청크 완료까지 | 스트리밍 체감 속도(TTFT)가 전체 생성 시간에 가려짐 |
+| `http_req_duration` vs E2E | 요청 시작부터 응답 바디 전체 종료까지 (단일 값) | 요청 시작부터 마지막 `[DONE]` 청크 완료까지 (TTFT·TPOT와 분리 집계) | 스트리밍 체감 속도(TTFT)가 전체 생성 시간에 가려짐 |
 | `http_reqs` (RPS) vs TPS | 1초당 완료한 HTTP 요청 건수 | 1초당 생성한 출력 토큰 수(Output Tokens/sec) | 짧은 답변과 긴 답변의 GPU 비용 차이를 무시함 |
 | `vus` vs `request-rate` | 응답을 기다렸다가 다음 요청을 보내는 폐쇄 루프 | 응답 속도와 무관하게 일정 분포로 쏘는 개방 루프 | 서버가 느려지면 부하가 자동 감소해 한계점이 숨겨짐 |
 

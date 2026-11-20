@@ -86,7 +86,7 @@ cd computer_science/ai/litellm-sse-load-test
 ![GuideLLM 동시성 스윕 TTFT P95와 Output TPS 포화 그래프](../imgs/guidellm-concurrency-sweep.png)
 
 ```bash
-open computer_science/ai/litellm-sse-load-test/benchmarks/output/guidellm/report.html
+open benchmarks/output/guidellm/report.html
 ```
 
 ### 2. Mooncake Trace 파일 구조 확인과 리플레이 실행
