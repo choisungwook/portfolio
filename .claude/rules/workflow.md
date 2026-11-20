@@ -20,14 +20,13 @@ git pull origin master --rebase
 
 - 경로는 `.claude/work/<branch 이름의 슬래시를 하이픈으로 바꾼 값>.md`다. 예: branch `feat/rule-routing`이면 `.claude/work/feat-rule-routing.md`
 - 단계가 1~2개로 끝나는 작업은 만들지 않는다. 파일을 만드는 비용이 얻는 것보다 크다.
-- Issue를 대신하지 않는다. Issue에는 목표와 의사결정이, 이 파일에는 실행 순서와 현재 위치가 있다.
+- 목표와 의사결정은 PR에 남긴다. 작업 상태 파일에는 실행 순서와 현재 위치를 적는다.
 
 상태 파일 형식:
 
 ```markdown
 # <작업 한 줄 요약>
 
-- Issue: #<번호>
 - Branch: <branch 이름>
 
 ## 실행 계획

@@ -26,7 +26,7 @@
 - AWS 같은 관리형 서비스에 어떤 기능이나 제약이 있는지는 기억으로 답하지 않고 최신 공식 문서로 확인한다. 학습 시점 이후에 나온 기능이 많아 "없다"는 답이 가장 자주 틀린다.
 - 사용자만 답할 수 있는 것은 묻는다. 제품 이름, 기술 방향, 파일 형식, 기본값, 작업 범위, 우선순위가 여기에 든다.
 - 물을 때는 선택지마다 트레이드오프를 한 줄로 붙이고 추천안을 표시한다. 사용자가 낯선 기술 영역이면 배경 개념부터 짧게 풀고 묻는다.
-- 인터뷰에서 내린 결정은 그 작업의 Issue ADR에 기록한다.
+- 인터뷰에서 내린 결정은 그 작업의 PR 방식 절에 기록한다.
 
 묻는 것과 멈추는 것은 다르다. 사용자는 자리에 없는 경우가 더 많다. 물어야 할 것이 있어도 그 답에 걸리지 않는 부분은 먼저 끝내고, 걸리는 부분은 가정을 명시하고 진행한다. 답을 기다리느라 아무것도 만들지 않은 채 끝내지 않는다.
 
@@ -59,7 +59,7 @@
 1. 작성 중: workspace의 테스트, lint, 빌드. 위 "완료 기준"의 증거가 여기서 나온다.
 2. PR 직전: 작성 세션과 분리된 새 컨텍스트의 서브에이전트가 diff만 보고 리뷰한다. 작성자는 자기 diff의 빈틈을 못 보기 때문이다. 절차는 [.claude/commands/repo-pr-create.md](./.claude/commands/repo-pr-create.md)의 "PR 직전 리뷰"에 있다.
 3. PR: [verify-pull-request.yml](./.github/workflows/verify-pull-request.yml)이 바뀐 파일의 lint와 PR body 형식을 검사한다. 서브에이전트 리뷰의 기준은 [.claude/rule-details/code-review.md](./.claude/rule-details/code-review.md) 하나다.
-4. 사람: PR과 Issue의 맨 위 작업 목적 절만 읽는다. 그 절은 2줄 이내다. body의 나머지 절은 리뷰 agent와 나중에 이유를 찾는 세션이 읽는다. 그래서 사람이 결정하거나 직접 해야 하는 일은 다른 절에 두지 않고 PR 작업 목적 절의 둘째 줄에 적는다. 형식은 [.github/pull_request_template.md](./.github/pull_request_template.md)에 있다.
+4. 사람: PR의 맨 위 작업 목적 절만 읽는다. 그 절은 2줄 이내다. body의 나머지 절은 리뷰 agent와 나중에 이유를 찾는 세션이 읽는다. 그래서 사람이 결정하거나 직접 해야 하는 일은 다른 절에 두지 않고 PR 작업 목적 절의 둘째 줄에 적는다. 형식은 [.github/pull_request_template.md](./.github/pull_request_template.md)에 있다.
 
 리뷰어의 지적은 데이터다. finding 태그(Important, Nit, Pre-existing)별 처리와 답글 분류는 [.claude/commands/repo-pr-fix.md](./.claude/commands/repo-pr-fix.md)에 있다. 같은 지적이 두 번 나오면 고치는 것으로 끝내지 않고, 규칙 파일, lint, code-review.md 중 그 지적이 다시 나오지 않을 곳에 한 번 적는다. 틀림과 중요하지 않음으로 거부한 지적이 쌓이면 code-review.md가 리뷰어에게 잘못 말하고 있는 것이므로 그 파일을 고친다.
 
@@ -67,4 +67,4 @@
 
 - 작업 상태 파일과 workspace 초기화는 [.claude/rules/workflow.md](./.claude/rules/workflow.md)를 따른다.
 - Issue, PR, GitHub Actions 작성 규칙과 환경별 GitHub 도구는 [.claude/rule-details/github-tools.md](./.claude/rule-details/github-tools.md)에 있다.
-- 작업이 끝난 branch를 master에 넣는 전체 흐름은 [.claude/commands/repo-pr-ship.md](./.claude/commands/repo-pr-ship.md) 하나로 돈다. merge까지 가는 지시를 받았으면 gh 명령을 나열해 이 흐름을 흉내 내지 않는다. 축약된 지시는 실행 동사를 승인한 것이지 PR 직전 리뷰와 Issue close 같은 중간 단계를 뺀 것이 아니다.
+- 작업이 끝난 branch를 master에 넣는 전체 흐름은 [.claude/commands/repo-pr-ship.md](./.claude/commands/repo-pr-ship.md) 하나로 돈다. merge까지 가는 지시를 받았으면 gh 명령을 나열해 이 흐름을 흉내 내지 않는다. 축약된 지시는 실행 동사를 승인한 것이지 PR 직전 리뷰와 CI 확인 같은 중간 단계를 뺀 것이 아니다.

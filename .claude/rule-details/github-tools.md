@@ -56,12 +56,12 @@ gh auth status
 
 ## Issue와 PR 작성 규칙
 
-형식의 기준은 템플릿 2개다. 섹션 구성과 항목 형식은 [.github/ISSUE_TEMPLATE/work-record.md](../../.github/ISSUE_TEMPLATE/work-record.md)와 [.github/pull_request_template.md](../../.github/pull_request_template.md)에서 읽고 이 파일에 다시 적지 않는다. 생성 절차는 [repo-pr-create.md](../commands/repo-pr-create.md)에 있다.
+섹션 구성과 항목 형식은 [PR 템플릿](../../.github/pull_request_template.md)과 [Issue 템플릿](../../.github/ISSUE_TEMPLATE/work-record.md)을 따른다. 생성 절차는 [PR 만들기](../commands/repo-pr-create.md)와 [Issue 만들기](../commands/repo-issue-create.md)에 있다.
 
-- PR을 생성할 때 기록용 Issue를 함께 만들고 PR 본문 끝에 `Issue #<number>` 형식으로 링크한다.
+- PR이 작업 기록을 담는다. Issue 생성은 사용자가 별도로 요청했을 때 진행하고 관련 기존 Issue는 필요할 때 링크한다.
 - target branch는 `master`다.
 - PR을 만들기 직전에 현재 branch 이름을 확인한다. `<type>/<short-description>` 형식이 아니면 그 형식으로 바꾸고 push한 뒤 PR을 만든다. 실행 환경이 지정한 branch에만 push하도록 제한하면(클라우드 세션 등) 이름을 바꾸지 않고 결과 보고에 건너뛴 단계로 남긴다.
-- 사용자가 요청하면 git diff를 다시 읽고 PR body를 재작성한다. Issue 번호는 유지한다.
+- 사용자가 요청하면 git diff를 다시 읽고 PR body를 재작성한다. 기존 관련 Issue 링크가 있으면 유지한다.
 - squash merge commit 제목 끝에는 `(#<PR 번호>)`를 붙여 commit에서 PR을 추적할 수 있게 한다.
 - Issue body, PR body, commit message에 claude session 링크를 넣지 않는다.
 
@@ -73,16 +73,9 @@ gh auth status
 - 명령, 파일 경로, 식별자는 backtick으로 감싼다. Issue와 PR의 독자가 agent이고, agent는 그 값을 그대로 실행하거나 검색한다. 강조에는 쓰지 않는다.
 - label은 작업 유형(예: `feat`, `docs`, `fix`)과 기술 태그(예: `kubernetes`, `aws`, `terraform`)를 함께 붙인다.
 
-## Issue와 PR의 역할 분리
+## 작업 기록
 
-같은 내용을 두 곳에 쓰지 않는다.
-
-- Issue: 왜 하나, 무엇이면 끝인가, 무엇을 골랐고 무엇을 버렸나.
-- PR: 어떤 방식으로 했나, 어떻게 증명했나, 무엇을 감수하고 어떻게 되돌리나.
-
-예외는 맨 위 작업 목적 절 하나다. 사람이 두 문서에서 그 절만 읽으므로 Issue와 PR 양쪽에 2줄 이내로 적는다.
-
-그 밖의 issue 내용은 PR에 다시 쓰지 않고 issue 링크로 대체한다. 두 문서는 issue의 완료 조건과 PR의 검증 절에서 연결된다.
+PR 본문에 작업 목적, 범위, 완료 조건, 중요한 결정과 그 근거를 남긴다. 구현 전에 별도의 작업 항목을 기록할 때는 Issue 템플릿을 사용한다.
 
 ## Issue 계층
 
