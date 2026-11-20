@@ -40,8 +40,8 @@ taskq calls the SDK from three places. All three run the Claude Code executable 
 | `hooks` | `PreToolUse`, `PostToolUse`, `PostToolUseFailure` | `PreToolUse` | not set |
 | `settingSources` | `['user']`, plus `project` for a trusted repo | `[]`: a bot never reads the user's Claude settings | `[]` |
 | `strictMcpConfig` | `true` | `true`, `false` when the bot has plugins (their MCP servers must load) | not set |
-| `mcpServers` | `{}` | `{ team }` plus the registered MCP servers the bot picked, as `{ type: 'stdio', command, args }` | not set |
-| `plugins` | not set | the bot's skill copy (one local plugin, `skipMcpDiscovery: true` since it has skills only) and selected plugins | not set |
+| `mcpServers` | `{}` | `{ team }` plus every registered MCP server, as `{ type: 'stdio', command, args }` | not set |
+| `plugins` | not set | the bot's skill copy (one local plugin, `skipMcpDiscovery: true` since it has skills only) and every registered plugin | not set |
 | `additionalDirectories` | per task type | `TASKQ_HOME/shared`, the folder every bot shares, and `TASKQ_HOME/worktrees`, where code tasks have their worktrees | not set |
 | `sandbox` | on, per profile | only when the bot turns it on: writes to workdir and shared folder, reads of taskq data denied, network to `allowed_domains` | not set |
 | `effort` | not set | the bot's effort (`low` to `max`), else the model default | not set |
@@ -78,7 +78,7 @@ OpenAI bots (`sdk: openai`) run on `src/agents/openai/team.ts`. The hub, mailbox
 | `previousResponseId`, `result.lastResponseId` | The conversation lives on OpenAI's side (Responses API). The last response id is the bot's session id; a `previous_response_not_found` error drops it so the next turn starts fresh |
 | `OpenAIProvider({ apiKey, baseURL, useResponses: false })` | A Bedrock bot: Chat Completions at `https://bedrock-runtime.<region>.amazonaws.com/openai/v1` with `AWS_BEARER_TOKEN_BEDROCK`. No server-side conversation, so the turn's input is the saved `result.history` plus the new message (`user()`), and the history is saved after the turn |
 | `result.rawResponses.at(-1).usage` | The last call's input tokens: the context ring |
-| `MCPServerStdio` (`Agent({ mcpServers })`) | The registered MCP servers the bot picked, started in the bot's working directory for the turn and closed after it |
+| `MCPServerStdio` (`Agent({ mcpServers })`) | Every registered MCP server, started in the bot's working directory for the turn and closed after it |
 | `maxTurns`, `signal` | The bot's turn limit, and cancel (Stop, Esc, disable, delete, shutdown) |
 | `result.runContext.usage` | `inputTokens`, `outputTokens`, `requests`: the turn count and the cost estimate from `bots.openaiInputPerMTok` and `bots.openaiOutputPerMTok` |
 | `MaxTurnsExceededError`, an error with `status` 401 | A failed turn with a reason; 401 pauses the bots like a Claude login failure |

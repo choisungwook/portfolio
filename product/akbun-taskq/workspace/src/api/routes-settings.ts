@@ -105,9 +105,7 @@ export function registerSettingsRoutes(api: Hono, { db, config }: ApiDeps): void
     const plugin = (await catalog()).plugins.find((p) => p.name === name)
     if (!plugin) throw new HttpError(404, `${name} is not in the official marketplace`)
     const entry = await asHttpAsync(() => installPlugin(db, config.home, plugin))
-    const reloaded = entry.replaced ? botsUsing(db, 'plugin', name) : []
-    for (const bot of reloaded) noteReload(db, bot, [reload(db, config, bot, 'plugin')])
-    return { ...entry, reloaded }
+    return { ...entry, reloaded: reloadShared('plugin') }
   }
   api.post('/plugins/install', async (c) => {
     const body = await readJson(c) as { name?: unknown } | null
@@ -115,13 +113,22 @@ export function registerSettingsRoutes(api: Hono, { db, config }: ApiDeps): void
     return c.json(await install(body.name), 201)
   })
 
-  // The global skill and plugin registry the bots pick from.
+  // Every bot shares the registry, so a change reaches every bot of the kinds that load it (plugins: Claude bots).
+  const reloadShared = (kind: RegistryKind) => {
+    const bots = botsUsing(db, kind)
+    for (const bot of bots) noteReload(db, bot, [reload(db, config, bot, kind)])
+    return bots
+  }
+
+  // The global skill and plugin registry every bot shares.
   for (const kind of ['skill', 'plugin'] as RegistryKind[]) {
     api.post(`/bot-${kind}s`, async (c) => {
       const body = await readJson(c) as { path?: unknown } | null
       if (typeof body?.path !== 'string' || body.path === '') throw new HttpError(400, 'path is required')
       const path = body.path
-      return c.json(asHttp(() => registerEntry(db, config.home, kind, path)), 201)
+      const entry = asHttp(() => registerEntry(db, config.home, kind, path))
+      reloadShared(kind)
+      return c.json(entry, 201)
     })
     // Updates a registered folder from its source: `git pull --ff-only` when it is a git checkout. Then every bot that
     // uses it reloads its copy, so the update reaches the bots' next turns.
@@ -142,6 +149,7 @@ export function registerSettingsRoutes(api: Hono, { db, config }: ApiDeps): void
       const row = listEntries(db, kind).find((e) => e.name === c.req.param('name'))
       if (!removeEntry(db, kind, c.req.param('name'))) throw new HttpError(404, `no ${kind} named ${c.req.param('name')}`)
       if (kind === 'plugin' && row) deleteInstalled(config.home, row.name, row.path)
+      reloadShared(kind)
       return c.body(null, 204)
     })
   }

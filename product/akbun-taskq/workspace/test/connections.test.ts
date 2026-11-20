@@ -6,7 +6,7 @@ import { endTurn, getAgent, postMessage, setAgentEnabled, startTurn, updateAgent
 import { createTeamHub, isTeamPaused, pauseTeam, signedOutKey } from '../src/team/hub.ts'
 import { setMeta } from '../src/db/meta.ts'
 import { teamChanged } from '../src/wake.ts'
-import { botConnection, clearConnectionCache, codexModelProvider, listConnections, type Checks } from '../src/team/connections.ts'
+import { botConnection, clearConnectionCache, codexModelProvider, listConnections, testConnection, type Checks } from '../src/team/connections.ts'
 import { createApp } from '../src/api/server.ts'
 import { seedTestBots, setup, TOKEN, type TestEnv } from './helpers.ts'
 
@@ -37,11 +37,11 @@ describe('connections', () => {
     const { team, connections } = await listConnections(env.db, env.config, { checks: passing })
     assert.deepEqual(team, { paused: false, pause_reason: null })
     const by = Object.fromEntries(connections.map((c) => [c.id, c]))
-    assert.deepEqual(Object.keys(by), ['claude', 'openai:api', 'openai:bedrock', 'openai:chatgpt', 'kiro'])
+    assert.deepEqual(Object.keys(by), ['claude:api', 'claude:subscription', 'claude:bedrock', 'openai:api', 'openai:bedrock', 'openai:chatgpt', 'kiro'])
     assert.deepEqual(by.kiro.bots, ['coder'])
     assert.deepEqual(by['openai:chatgpt'].bots, ['reviewer'])
-    assert.ok(by.claude.bots.includes('taskq') && !by.claude.bots.includes('coder'))
-    assert.match(by.claude.detail, /provider bedrock, region .*, AWS profile/)
+    assert.ok(by['claude:bedrock'].bots.includes('taskq') && !by['claude:bedrock'].bots.includes('coder'), 'the Connections choice is the default')
+    assert.match(by['claude:bedrock'].detail, /region .*, AWS profile/)
     assert.equal(by['openai:api'].status, 'ok')
     assert.match(by['openai:bedrock'].reason ?? '', /AWS_BEARER_TOKEN_BEDROCK/)
     assert.deepEqual([by['openai:chatgpt'].status, by['openai:chatgpt'].reason], ['error', 'Not logged in'])
@@ -130,9 +130,9 @@ describe('connections', () => {
     env.config.provider = 'api_key'
     const all = await get('/connections')
     assert.equal(all.status, 200)
-    assert.equal(((await all.json()) as { connections: unknown[] }).connections.length, 5)
+    assert.equal(((await all.json()) as { connections: unknown[] }).connections.length, 7)
     const one = await get('/bots/coder/connection')
-    assert.equal(((await one.json()) as { connection: { id: string } }).connection.id, 'claude')
+    assert.equal(((await one.json()) as { connection: { id: string } }).connection.id, 'claude:api')
     assert.equal((await get('/bots/nobody/connection')).status, 404)
     postMessage(env.db, { sender: USER, recipient: 'coder', body: 'hi' })
     const turn = startTurn(env.db, 'coder', 5)!
@@ -140,6 +140,22 @@ describe('connections', () => {
     const errors = (await (await get('/bots/coder/turn-errors')).json()) as { outcome: string; error: string }[]
     assert.deepEqual(errors.map((e) => [e.outcome, e.error]), [['failed', 'ANTHROPIC_API_KEY is not set']])
     assert.equal((await get('/bots/nobody/turn-errors')).status, 404)
+  })
+
+  test('[critical] a Claude bot signs in its own way; the test button gives a check 5 seconds and restores what it turned off', async () => {
+    updateAgent(env.db, 'coder', { ...getAgent(env.db, 'coder')!, provider: 'subscription' })
+    const { connections } = await listConnections(env.db, env.config, { checks: passing })
+    assert.deepEqual(connections.find((c) => c.id === 'claude:subscription')?.bots, ['coder'])
+    const seen: string[] = []
+    const slow: Checks = { ...passing, async claude(config) { seen.push(config.provider); return new Promise(() => {}) } }
+    const started = Date.now()
+    const late = await testConnection(env.db, env.config, 'claude:api', slow, 50)
+    assert.deepEqual([late.status, seen], ['error', ['api_key']])
+    assert.ok(Date.now() - started < 1000)
+    setAgentEnabled(env.db, 'coder', false)
+    setMeta(env.db, signedOutKey('coder'), '1')
+    assert.equal((await testConnection(env.db, env.config, 'claude:subscription', passing)).status, 'ok')
+    assert.equal(getAgent(env.db, 'coder')?.enabled, true)
   })
 
   test('the model provider of Codex is read from the top of its config.toml', () => {

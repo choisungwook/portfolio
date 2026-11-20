@@ -38,3 +38,28 @@ export function saveApiKey(config: Pick<Config, 'home'>, key: string): string | 
   chmodSync(path, 0o600) // mode applies only when the file is created
   return null
 }
+
+// The OpenAI API key saved the same way, for OpenAI bots that sign in with a key.
+export function openaiKeyPath(config: Pick<Config, 'home'>): string {
+  return join(config.home, 'data', 'openai-api-key')
+}
+
+export function readOpenaiKey(config: Pick<Config, 'home'>): string | undefined {
+  try {
+    return readFileSync(openaiKeyPath(config), 'utf8').trim() || undefined
+  } catch {
+    return undefined
+  }
+}
+
+export function saveOpenaiKey(config: Pick<Config, 'home'>, key: string): void {
+  const value = key.trim()
+  const path = openaiKeyPath(config)
+  if (!value) {
+    rmSync(path, { force: true })
+    return
+  }
+  mkdirSync(dirname(path), { recursive: true })
+  writeFileSync(path, `${value}\n`, { mode: 0o600 })
+  chmodSync(path, 0o600)
+}

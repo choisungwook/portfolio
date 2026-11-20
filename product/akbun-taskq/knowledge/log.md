@@ -4,6 +4,10 @@ concept를 추가·수정·삭제할 때마다 오늘 날짜 섹션을 맨 위�
 
 ## 2026-11-20
 
+* **Creation**: [shared registry and sign-in](decisions/2026-11-shared-registry-and-signin.md) - registry를 타입별로 공유하고, Claude bot도 인증 방식을 고르고, 연결을 방식별 5초 테스트로 바꾸고, routine을 없앤 결정.
+* **Update**: [marketplace plugin install](decisions/2026-11-marketplace-plugin-install.md)의 "설치와 사용이 분리된다"를 설치가 곧 모든 Claude bot의 사용이라는 내용으로 고침.
+* **Update**: [bots execute tasks](decisions/2026-11-bots-execute-tasks.md)에서 skill·plugin을 bot마다 고른다는 내용을 공유로 고침.
+* **Update**: [bot runtimes](decisions/2026-11-bot-runtimes-beyond-sdks.md)의 되돌리기 계기를 "다시 확인"에서 연결 테스트로 고침.
 * **Creation**: [marketplace plugin install](decisions/2026-11-marketplace-plugin-install.md) - 공식 marketplace에서 고정 commit으로 설치하는 결정.
 * **Creation**: [session transcript locations](decisions/2026-11-session-transcript-locations.md) - 세션 기록을 옮기지 않고 런타임별로 보이는 결정.
 * **Update**: [inference providers](decisions/2026-11-inference-providers.md)에 설정에서 저장하는 Anthropic API key(평문, 0600, DB 밖)와 암호화하지 않은 이유를 추가.

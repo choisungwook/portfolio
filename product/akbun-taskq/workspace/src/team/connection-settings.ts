@@ -39,9 +39,13 @@ function put(config: Config, s: ConnectionSettings): void {
   config.bots.bedrockRegion = s.bedrock_region
 }
 
+// The config file's values, kept from the first apply so Clear can go back to them.
+const fileValues = new WeakMap<Config, ConnectionSettings>()
+
 // At startup: saved values win over the config file.
 export function applyConnectionSettings(db: Db, config: Config): void {
-  const current = connectionSettings(config)
+  if (!fileValues.has(config)) fileValues.set(config, connectionSettings(config))
+  const current = fileValues.get(config)!
   const saved = { ...current }
   for (const [field, key] of Object.entries(KEYS) as [keyof ConnectionSettings, string][]) {
     const value = getMeta(db, key)
@@ -79,4 +83,17 @@ export function saveConnectionSettings(db: Db, config: Config, body: Record<stri
   put(config, next)
   forgetBedrockTokens()
   return next
+}
+
+// Clear on one runtime's section: its saved values go, so the config file's values (and the environment) apply again.
+export type Runtime = 'claude' | 'openai' | 'kiro'
+const OWN: Record<Runtime, string[]> = {
+  claude: [KEYS.claude_provider, KEYS.claude_region, KEYS.claude_profile],
+  openai: [KEYS.bedrock_profile, KEYS.bedrock_region],
+  kiro: ['kiro_start_url', 'kiro_region'],
+}
+export function clearConnectionSettings(db: Db, config: Config, runtime: Runtime): void {
+  for (const key of OWN[runtime]) db.prepare('DELETE FROM meta WHERE key = ?').run(key)
+  applyConnectionSettings(db, config)
+  forgetBedrockTokens()
 }

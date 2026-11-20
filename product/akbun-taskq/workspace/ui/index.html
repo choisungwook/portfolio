@@ -148,7 +148,7 @@
 
 
     <section id="view-shared" data-view-panel="shared" aria-label="Shared folder" data-area="shared-view" hidden>
-      <h2 class="view-title" data-i18n="shared.title">Shared folder</h2>
+      <h1 class="view-title" data-i18n="shared.title">Shared folder</h1>
       <p class="meta" data-i18n="shared.hint">Every bot reads and writes this folder at the same path. Attached files are saved under attachments/.</p>
       <div class="shared-bar">
         <nav class="shared-crumbs" data-area="shared-crumbs" aria-label="Folder path"></nav>
@@ -179,18 +179,22 @@
     </section>
 
     <section id="view-plugins" data-view-panel="plugins" aria-label="Plugins" data-area="plugins-view" hidden>
-      <h2 class="view-title" data-i18n="nav.plugins">Plugins</h2>
-      <p class="meta" data-i18n="plugins.hint">Skills and plugins registered here can be chosen per bot in its settings. Update pulls a git checkout and reloads every bot that uses it.</p>
+      <h1 class="view-title" data-i18n="nav.plugins">Plugins</h1>
+      <p class="meta" data-i18n="plugins.hint">Everything registered here is shared: every bot of the type uses it (plugins only Claude bots). Update pulls a git checkout and reloads the bots.</p>
       <div class="wf-tabs plugins-tabs" role="tablist" aria-label="Agent SDK">
         <button type="button" role="tab" data-sdk-tab="claude" aria-selected="true">Claude</button>
         <button type="button" role="tab" data-sdk-tab="openai" aria-selected="false">OpenAI</button>
+        <button type="button" role="tab" data-sdk-tab="kiro" aria-selected="false">Kiro</button>
       </div>
     <section class="plugins-section" data-sdk="openai" hidden>
       <p class="meta" data-i18n="plugins.openai_hint">OpenAI bots use the same skills (they read SKILL.md with the read_skill tool when they need one) and the MCP servers below. Claude Code plugins do not load in the OpenAI Agents SDK.</p>
     </section>
+    <section class="plugins-section" data-sdk="kiro" hidden>
+      <p class="meta" data-i18n="plugins.kiro_hint">Kiro bots use the same skills (given to kiro-cli as skill:// resources) and the MCP servers below. Claude Code plugins do not load in Kiro.</p>
+    </section>
     <section class="plugins-section" aria-labelledby="bot-skills-title" data-sdk="both">
-      <h3 class="plugins-heading" id="bot-skills-title" data-i18n="settings.skills">Skills for bots</h3>
-      <p class="meta">Agent skill folders (with SKILL.md) that bots can load. Each bot picks its own in its settings.</p>
+      <h2 class="section-title" id="bot-skills-title" data-i18n="settings.skills">Skills for bots</h2>
+      <p class="meta" data-i18n="plugins.skills_hint">Agent skill folders (with SKILL.md). Every bot loads them.</p>
       <ul class="skill-list" data-area="registry-skill"></ul>
       <details class="add-by-path">
         <summary data-i18n="plugins.add_by_path">Add by path</summary>
@@ -201,8 +205,8 @@
       </details>
     </section>
     <section class="plugins-section" aria-labelledby="bot-plugins-title" data-sdk="claude">
-      <h3 class="plugins-heading" id="bot-plugins-title" data-i18n="settings.plugins">Plugins for bots</h3>
-      <p class="meta">Claude Code plugin folders (with .claude-plugin/plugin.json): skills, commands, hooks and MCP servers together.</p>
+      <h2 class="section-title" id="bot-plugins-title" data-i18n="settings.plugins">Plugins for bots</h2>
+      <p class="meta" data-i18n="plugins.plugins_hint">Claude Code plugin folders (with .claude-plugin/plugin.json): skills, commands, hooks and MCP servers together. Every Claude bot loads them.</p>
       <ul class="skill-list" data-area="registry-plugin"></ul>
       <details class="add-by-path">
         <summary data-i18n="plugins.add_by_path">Add by path</summary>
@@ -213,8 +217,8 @@
       </details>
     </section>
     <section class="plugins-section" aria-labelledby="bot-mcp-title" data-sdk="both">
-      <h3 class="plugins-heading" id="bot-mcp-title" data-i18n="plugins.mcp">MCP servers for bots</h3>
-      <p class="meta" data-i18n="plugins.mcp_hint">A command started over stdio for the bots that pick it, Claude and OpenAI alike. It runs as you, outside the bot gate: register only servers you trust, and keep keys in your environment, not here.</p>
+      <h2 class="section-title" id="bot-mcp-title" data-i18n="plugins.mcp">MCP servers for bots</h2>
+      <p class="meta" data-i18n="plugins.mcp_hint">A command started over stdio for every bot, Claude, OpenAI and Kiro alike. It runs as you, outside the bot gate: register only servers you trust, and keep keys in your environment, not here.</p>
       <ul class="skill-list" data-area="registry-mcp"></ul>
       <details class="add-by-path">
         <summary data-i18n="plugins.add_mcp">Add an MCP server</summary>
@@ -229,12 +233,12 @@
     </section>
       <section class="plugins-section" aria-labelledby="official-title" data-sdk="claude">
         <div class="plugins-head">
-          <h3 id="official-title" class="plugins-heading" data-i18n="plugins.official">Official marketplace</h3>
+          <h2 id="official-title" class="section-title" data-i18n="plugins.official">Official marketplace</h2>
           <label class="check"><input type="checkbox" data-area="official-anthropic" checked> <span data-i18n="plugins.anthropic_only">Anthropic only</span></label>
           <span class="meta" data-area="official-count"></span>
           <input type="search" data-area="official-filter" data-i18n-placeholder="plugins.filter" placeholder="Filter" aria-label="Filter the official plugins">
         </div>
-        <p class="meta" data-i18n="plugins.official_hint">Install fetches the plugin at the commit the marketplace lists into the taskq data folder and registers it above. Nothing runs until you pick it in a bot's settings. Install again to update it.</p>
+        <p class="meta" data-i18n="plugins.official_hint">Install fetches the plugin at the commit the marketplace lists into the taskq data folder and registers it above. Every Claude bot loads it from its next turn. Install again to update it.</p>
         <ul class="official-list" data-area="official-list"></ul>
       </section>
     </section>
@@ -242,7 +246,7 @@
     <section id="view-workflows" data-view-panel="workflows" aria-label="Workflows" data-area="workflows-view" hidden></section>
 
     <section id="view-wiki" data-view-panel="wiki" aria-label="Wiki" data-area="wiki" hidden>
-      <h2 class="view-title" data-i18n="wiki.title">Wiki</h2>
+      <h1 class="view-title" data-i18n="wiki.title">Wiki</h1>
       <form class="wiki-search" data-area="wiki-search" role="search">
         <input type="search" data-area="wiki-query" aria-label="Search the bots' wiki" placeholder="Search the wiki">
         <button type="submit" class="quiet">Search</button>
@@ -304,15 +308,15 @@
 
 <dialog data-area="bot-settings" aria-labelledby="bot-settings-title">
   <form class="dialog-body bot-form" data-area="bot-form" method="dialog">
-    <h2 id="bot-settings-title" data-area="bot-settings-title">Bot settings</h2>
+    <h1 class="page-title" id="bot-settings-title" data-area="bot-settings-title">Bot settings</h1>
     <div class="bot-form-grid">
-      <label data-area="bot-name-row">Name <input name="name" type="text" maxlength="32" pattern="[a-z][a-z0-9\-]*" autocomplete="off" spellcheck="false" placeholder="coder"></label>
-      <label data-edit-only>Role <input name="role" type="text" maxlength="40" autocomplete="off"></label>
-      <label>Agent SDK <select name="sdk" data-area="bot-sdk"><option value="claude">Claude Agent SDK</option><option value="openai">OpenAI</option><option value="kiro">Kiro (AWS)</option></select></label>
-      <label data-area="bot-provider-row" hidden>Sign in with <select name="provider"><option value="api">OpenAI API key (Agents SDK)</option><option value="bedrock">Amazon Bedrock (Agents SDK)</option><option value="chatgpt">ChatGPT plan (Codex CLI)</option></select></label>
+      <label class="wide" data-area="bot-name-row">Name <input name="name" type="text" maxlength="32" pattern="[a-z][a-z0-9\-]*" autocomplete="off" spellcheck="false" placeholder="coder"></label>
+      <label class="wide"><span data-i18n="bot.agent_type">Agent type</span> <select name="sdk" data-area="bot-sdk"><option value="claude">Claude</option><option value="openai">OpenAI</option><option value="kiro">Kiro (AWS)</option></select></label>
+      <label class="wide"><span data-i18n="bot.auth">Sign-in method</span> <select name="provider" data-area="bot-provider"></select></label>
       <p class="meta wide" data-area="bot-sdk-hint" hidden></p>
+      <label data-edit-only>Role <input name="role" type="text" maxlength="40" autocomplete="off"></label>
       <label class="wide">Description <span class="meta">What this bot does. Other bots hand work to it by this text.</span><textarea name="description" rows="2" maxlength="500" required placeholder="Developer. Takes code tasks, changes the repository and runs the tests."></textarea></label>
-      <p class="meta wide" data-create-only>Role, instructions, permissions, skills and limits start with defaults; change them later with the gear next to the bot.</p>
+      <p class="meta wide" data-create-only>Role, instructions, permissions and limits start with defaults; change them later with the gear next to the bot. Skills, plugins and MCP servers come from the Plugins menu and every bot of the type uses them.</p>
       <label class="wide" data-edit-only>Instructions <textarea name="instructions" rows="5" maxlength="8000"></textarea></label>
       <label class="wide" data-edit-only>Working directory <input name="workdir" type="text" maxlength="500" autocomplete="off" spellcheck="false" placeholder="its own folder: shared/bots/<name>"></label>
     </div>
@@ -331,18 +335,6 @@
       <label class="wide">Blocked commands <span class="meta">One pattern per line; * matches anything; matched anywhere in the command. Example: git push*. This prevents accidents; it is not a security boundary: use the sandbox for that.</span><textarea name="blocked_commands" rows="3" spellcheck="false"></textarea></label>
       <label class="wide">Ask me first <span class="meta">One pattern per line, like blocked commands. A matching command does not run: it waits in Must check until you approve it once. tool:mcp__slack__* matches a tool by name. Pushing, publishing, deploying and deleting cloud resources also ask (except in bypass mode), with options between the tool and the subcommand too. Like blocked commands this prevents accidents; it is not a boundary.</span><textarea name="ask_first" rows="3" spellcheck="false" placeholder="git commit*&#10;tool:mcp__gmail__send*"></textarea></label>
       <p class="meta">taskq's own data and config are always off limits; a call that reaches them stops the turn and pauses the bots.</p>
-    </fieldset>
-    <fieldset data-edit-only>
-      <legend>Skills, plugins and MCP servers</legend>
-      <p class="meta">Registered in the Plugins menu. Saving copies the chosen skills and plugins for this bot; Reload copies them again. Plugins load only in Claude bots.</p>
-      <div class="bot-picks" data-area="bot-skills"></div>
-      <div class="bot-picks" data-area="bot-plugins"></div>
-      <div class="bot-picks" data-area="bot-mcp"></div>
-    </fieldset>
-    <fieldset data-edit-only>
-      <legend>Routines</legend>
-      <p class="meta">Work this bot does without being asked: on a schedule (cron in local time: "0 7 * * 1-5" is 7am on weekdays) or when a task fails, a task is created, or a webhook is called. Bots can also set routines when you ask them in chat.</p>
-      <div data-area="bot-routines"></div>
     </fieldset>
     <fieldset data-edit-only>
       <legend>Limits</legend>
@@ -399,7 +391,7 @@
     </nav>
     <div class="settings-pages">
     <section class="settings-section" data-settings-page="appearance" aria-labelledby="appearance-title">
-      <h3 id="appearance-title" data-i18n="settings.appearance">Appearance</h3>
+      <h1 class="page-title" id="appearance-title" data-i18n="settings.appearance">Appearance</h1>
       <div class="appearance-row">
         <label><span data-i18n="settings.language">Language</span> <select data-area="ui-language"><option value="ko">한국어</option><option value="en">English</option></select></label>
         <label><span data-i18n="settings.theme">Theme</span> <select data-area="ui-theme"><option value="system" data-i18n="settings.theme.system">System</option><option value="dark" data-i18n="settings.theme.dark">Dark</option><option value="light" data-i18n="settings.theme.light">Light</option></select></label>
@@ -408,51 +400,44 @@
       </div>
     </section>
     <section class="settings-section" data-settings-page="connections" aria-labelledby="connections-title" hidden>
-      <div class="plugins-head">
-        <h3 id="connections-title" data-i18n="settings.connections">Connections</h3>
-        <button type="button" data-area="connections-refresh" data-i18n="connections.check">Check again</button>
-      </div>
-      <p class="meta" data-i18n="connections.hint">How bots reach their models. Claude bots share the provider chosen below (it starts from taskq.config.json); an OpenAI bot uses the sign-in chosen in its settings, and on Bedrock the AWS profile chosen below; Kiro bots share the kiro-cli login. A bot that does not answer usually has a failing connection here.</p>
-      <div data-area="connections-report"></div>
-      <h4 data-i18n="connections.signin">How bots sign in</h4>
-      <p class="meta" data-i18n="connections.signin_hint">Pick the AWS profile from this machine (an SSO profile uses the short-term credentials of aws sso login). Saving applies from the next turn and overrides taskq.config.json.</p>
-      <form class="conn-settings" data-area="conn-settings-form">
-        <fieldset>
-          <legend>Claude</legend>
-          <label>Provider <select name="claude_provider"><option value="bedrock">Amazon Bedrock (AWS profile)</option><option value="api_key">Anthropic API key</option><option value="subscription">Claude subscription (signed-in Claude Code)</option></select></label>
-          <label data-area="conn-claude-key" hidden>API key <input name="claude_api_key" type="password" maxlength="512" autocomplete="new-password" spellcheck="false"></label>
-          <button type="button" data-area="conn-claude-key-remove" hidden data-i18n="connections.key_remove">Remove saved key</button>
-          <label data-area="conn-claude-aws">AWS profile <input name="claude_profile" type="text" list="aws-profile-list" maxlength="64" autocomplete="off" spellcheck="false"></label>
-          <label data-area="conn-claude-region">Region <input name="claude_region" type="text" maxlength="30" autocomplete="off" spellcheck="false" placeholder="us-east-1"></label>
-        </fieldset>
-        <fieldset>
-          <legend>OpenAI on Amazon Bedrock</legend>
-          <label>AWS profile <input name="bedrock_profile" type="text" list="aws-profile-list" maxlength="64" autocomplete="off" spellcheck="false" placeholder="empty: AWS_BEARER_TOKEN_BEDROCK"></label>
-          <label>Region <input name="bedrock_region" type="text" maxlength="30" autocomplete="off" spellcheck="false" placeholder="us-west-2"></label>
-        </fieldset>
-        <datalist id="aws-profile-list" data-area="aws-profile-list"></datalist>
-        <p class="meta" data-area="aws-profile-note"></p>
-        <button type="submit" data-i18n="connections.save">Save sign-in</button>
+      <h1 class="page-title" id="connections-title" data-i18n="settings.connections">Connections</h1>
+      <p class="meta" data-i18n="connections.hint">How bots reach their models. Each agent type signs in the way chosen here; a bot picks its own sign-in method when it is created. Saving runs the connection test. A bot that does not answer usually fails this test.</p>
+      <form class="conn-runtime" data-runtime="claude" aria-labelledby="conn-claude-title">
+        <h2 class="section-title" id="conn-claude-title">Claude</h2>
+        <label><span data-i18n="bot.auth">Sign-in method</span> <select name="claude_provider" data-method><option value="api_key" data-i18n="bot.auth.claude.api">SDK (Anthropic API key)</option><option value="subscription" data-i18n="bot.auth.claude.subscription">Subscription (signed-in Claude Code)</option><option value="bedrock" data-i18n="bot.auth.claude.bedrock">AWS Bedrock</option></select></label>
+        <label data-for="api_key">API key <input name="claude_api_key" type="password" maxlength="512" autocomplete="new-password" spellcheck="false"></label>
+        <p class="meta" data-for="subscription" data-i18n="connections.claude_sub">Uses the Claude Code signed in on this computer (claude login).</p>
+        <label data-for="bedrock">AWS profile <input name="claude_profile" type="text" list="aws-profile-list" maxlength="64" autocomplete="off" spellcheck="false"></label>
+        <label data-for="bedrock">Region <input name="claude_region" type="text" maxlength="30" autocomplete="off" spellcheck="false" placeholder="us-east-1"></label>
+        <div class="conn-buttons"><button type="button" data-test data-i18n="connections.test">Connection test</button><button type="submit" data-i18n="connections.save">Save</button><button type="button" class="quiet" data-clear data-i18n="connections.clear">Clear</button><span class="conn-result" data-result role="status"></span></div>
       </form>
-      <h4 id="kiro-title">Kiro (AWS) sign-in</h4>
-      <p class="meta" data-i18n="kiro.hint">Kiro bots use your AWS IAM Identity Center session. Enter your SSO start URL and region and sign in: kiro-cli shows a code to approve in the browser and keeps the session; taskq stores no token.</p>
-      <p data-area="kiro-status"></p>
-      <form class="mcp-form kiro-form" data-area="kiro-form">
-        <label>SSO start URL <input name="start_url" type="url" required placeholder="https://your-org.awsapps.com/start" autocomplete="off" spellcheck="false"></label>
-        <label>Region <input name="region" type="text" required placeholder="us-east-1" autocomplete="off" spellcheck="false"></label>
-        <button type="submit" data-i18n="kiro.sign_in">Sign in with AWS SSO</button>
-        <button type="button" data-area="kiro-check" data-i18n="kiro.check">Check status</button>
+      <form class="conn-runtime" data-runtime="openai" aria-labelledby="conn-openai-title">
+        <h2 class="section-title" id="conn-openai-title">OpenAI</h2>
+        <label><span data-i18n="bot.auth">Sign-in method</span> <select name="openai_method" data-method><option value="api" data-i18n="bot.auth.openai.api">SDK (OpenAI API key)</option><option value="chatgpt" data-i18n="bot.auth.openai.chatgpt">Subscription (ChatGPT plan, Codex CLI)</option><option value="bedrock" data-i18n="bot.auth.openai.bedrock">AWS Bedrock</option></select></label>
+        <label data-for="api">API key <input name="openai_api_key" type="password" maxlength="512" autocomplete="new-password" spellcheck="false"></label>
+        <p class="meta" data-for="chatgpt" data-i18n="connections.openai_sub">Uses the Codex CLI signed in on this computer (codex login, Sign in with ChatGPT).</p>
+        <label data-for="bedrock">AWS profile <input name="bedrock_profile" type="text" list="aws-profile-list" maxlength="64" autocomplete="off" spellcheck="false" placeholder="empty: AWS_BEARER_TOKEN_BEDROCK"></label>
+        <label data-for="bedrock">Region <input name="bedrock_region" type="text" maxlength="30" autocomplete="off" spellcheck="false" placeholder="us-west-2"></label>
+        <div class="conn-buttons"><button type="button" data-test data-i18n="connections.test">Connection test</button><button type="submit" data-i18n="connections.save">Save</button><button type="button" class="quiet" data-clear data-i18n="connections.clear">Clear</button><span class="conn-result" data-result role="status"></span></div>
       </form>
-      <div data-area="kiro-login"></div>
+      <form class="conn-runtime" data-runtime="kiro" aria-labelledby="conn-kiro-title">
+        <h2 class="section-title" id="conn-kiro-title">Kiro (AWS)</h2>
+        <label><span data-i18n="bot.auth">Sign-in method</span> <select name="kiro_method" data-method disabled><option value="sso" data-i18n="bot.auth.kiro.sso">AWS IAM Identity Center (kiro-cli)</option></select></label>
+        <label data-for="sso">SSO start URL <input name="kiro_start_url" type="url" placeholder="https://your-org.awsapps.com/start" autocomplete="off" spellcheck="false"></label>
+        <label data-for="sso">Region <input name="kiro_region" type="text" placeholder="us-east-1" autocomplete="off" spellcheck="false"></label>
+        <div class="conn-buttons"><button type="button" data-test data-i18n="connections.test">Connection test</button><button type="submit" data-i18n="connections.save">Save</button><button type="button" class="quiet" data-clear data-i18n="connections.clear">Clear</button><button type="button" class="quiet" data-area="kiro-sign-in" data-i18n="kiro.sign_in">Sign in with AWS SSO</button><span class="conn-result" data-result role="status"></span></div>
+        <div data-area="kiro-login"></div>
+      </form>
+      <datalist id="aws-profile-list" data-area="aws-profile-list"></datalist>
     </section>
     <section class="settings-section" data-settings-page="limits" aria-labelledby="limits-title" hidden>
-      <h3 id="limits-title" data-i18n="settings.limits">Rate limits</h3>
+      <h1 class="page-title" id="limits-title" data-i18n="settings.limits">Rate limits</h1>
       <p class="meta" data-i18n="settings.limits.hint">Limits for all bots together, and the defaults each bot uses unless its own settings say otherwise.</p>
       <form class="limits-form" data-area="limits-form"></form>
     </section>
     <section class="settings-section" data-settings-page="usage" aria-labelledby="usage-title" hidden>
       <div class="plugins-head">
-        <h3 id="usage-title" data-i18n="settings.usage">Usage</h3>
+        <h1 class="page-title" id="usage-title" data-i18n="settings.usage">Usage</h1>
         <select data-area="usage-period" aria-label="Period">
           <option value="today" data-i18n="usage.today">Today</option>
           <option value="7d" selected data-i18n="usage.7d">Last 7 days</option>
@@ -465,33 +450,33 @@
     </section>
     <section class="settings-section" data-settings-page="review" aria-labelledby="review-title" hidden>
       <div class="plugins-head">
-        <h3 id="review-title" data-i18n="settings.review">Weekly review</h3>
+        <h1 class="page-title" id="review-title" data-i18n="settings.review">Weekly review</h1>
         <select data-area="review-days" aria-label="Period"><option value="7" selected>7 days</option><option value="14">14 days</option><option value="30">30 days</option></select>
       </div>
-      <p class="meta" data-i18n="review.hint">Did each bot and routine run, did it go well, and would you miss it? A bot that checks its own work misses what it misses, so a few recent results are picked for you to check by hand.</p>
+      <p class="meta" data-i18n="review.hint">Did each bot run, did it go well, and would you miss it? A bot that checks its own work misses what it misses, so a few recent results are picked for you to check by hand.</p>
       <div data-area="review-report"></div>
     </section>
     <section class="settings-section" data-settings-page="folders" aria-labelledby="folders-title" hidden>
-      <h3 id="folders-title" data-i18n="settings.folders">Folders</h3>
+      <h1 class="page-title" id="folders-title" data-i18n="settings.folders">Folders</h1>
       <ul class="folder-list" data-area="folder-list"></ul>
     </section>
     <section class="settings-section" data-settings-page="queue" aria-labelledby="queue-title" hidden>
-      <h3 id="queue-title" data-i18n="settings.queue">Queue</h3>
+      <h1 class="page-title" id="queue-title" data-i18n="settings.queue">Queue</h1>
       <label class="check"><input type="checkbox" data-area="queue-autorun"> <span data-i18n="settings.autorun">Run tasks no bot owns automatically</span></label>
       <p class="meta">Off, a task without an owner runs only when you press its run button. A bot's task always waits for that bot.</p>
     </section>
     <section class="settings-section" data-settings-page="update" aria-labelledby="update-title" hidden>
-      <h3 id="update-title" data-i18n="settings.update">Update</h3>
+      <h1 class="page-title" id="update-title" data-i18n="settings.update">Update</h1>
       <div class="stack" data-area="update-status"></div>
       <div class="actions" data-area="update-actions"><button type="button" class="quiet" data-area="update-check" data-i18n="update.check">Check again</button></div>
     </section>
     <section class="settings-section" data-settings-page="notifications" aria-labelledby="notifications-title" hidden>
-      <h3 id="notifications-title">Notifications</h3>
+      <h1 class="page-title" id="notifications-title">Notifications</h1>
       <label class="check"><input type="checkbox" data-area="desktop-notifications" disabled> Desktop notifications</label>
       <p class="meta">Show system notifications for handoffs and critical alerts.</p>
     </section>
     <section class="settings-section" data-settings-page="database" aria-labelledby="db-title" hidden>
-      <h3 id="db-title">Database</h3>
+      <h1 class="page-title" id="db-title">Database</h1>
       <p class="meta">The SQLite file that holds every task, run and event. Its location is fixed while taskq is running.</p>
       <div class="db-path-row">
         <label class="sr-only" for="db-path">SQLite database path</label>
@@ -501,7 +486,7 @@
       </div>
     </section>
     <section class="settings-section" data-settings-page="configuration" aria-labelledby="config-title" hidden>
-      <h3 id="config-title">Configuration</h3>
+      <h1 class="page-title" id="config-title">Configuration</h1>
       <p class="meta">Read from taskq.config.json. These values change only when that file is edited and taskq is restarted.</p>
       <dl class="config-list" data-area="settings-config"></dl>
     </section>

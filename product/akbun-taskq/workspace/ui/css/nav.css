@@ -28,7 +28,7 @@
 .bot-menu hr { border: 0; border-top: 1px solid var(--border); margin: 4px 0; }
 .sidebar {
   position: sticky; top: 12px; height: calc(100vh - 24px); overflow: auto; display: flex; flex-direction: column;
-  background: var(--panel); border-radius: var(--radius-l); padding: 16px 8px;
+  background: var(--panel); border-radius: var(--radius-l); padding: 16px 8px; box-shadow: inset 0 0 0 1px var(--border);
 }
 /* New task and search first, like a chat app; the views follow, then the bots. */
 .side-top { margin-bottom: 8px; padding-bottom: 8px; box-shadow: inset 0 -1px 0 var(--border); }
@@ -66,7 +66,6 @@
 .unread-dot { position: absolute; top: 10px; left: 44px; width: 12px; height: 12px; border-radius: 50%; background: var(--running); box-shadow: 0 0 0 2px var(--panel); }
 @keyframes bob { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-3px); } }
 
-.view-title { font-size: 1.6em; font-weight: 700; margin: 4px 0 16px; }
 
 @media (max-width: 800px) {
   .sidebar { position: static; max-height: none; padding: 8px; }

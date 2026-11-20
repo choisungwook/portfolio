@@ -12,7 +12,6 @@ import { limits } from '../db/settings.ts'
 import { raiseAlert } from '../alerts/rules.ts'
 import { consumeApproval, requestApproval } from '../db/bot-requests.ts'
 import { applyConnectionSettings } from './connection-settings.ts'
-import { runDueRoutines, runTriggeredRoutines, nextRoutineAt } from '../db/routines.ts'
 import { nowSec } from '../time.ts'
 import { teamChanged } from '../wake.ts'
 import { ROSTER } from './roster.ts'
@@ -367,9 +366,6 @@ export function createTeamHub({ db, config, backend: claude, backends = {}, retr
     if (isTeamPaused(db)) return
     // A sign-in changed from the CLI or MCP (another process) reaches this one here; the UI applies it at once.
     applyConnectionSettings(db, config)
-    // Routines come due as messages; the turn that follows is an ordinary one, under the same guards.
-    runDueRoutines(db)
-    runTriggeredRoutines(db)
     joinRunning()
     for (const id of skipDisabledSpeakers(db).closed) {
       raiseAlert(db, { task_id: null, kind: 'team_message', message: `Discussion #${id} was closed without a conclusion: its moderator is disabled.` })
@@ -386,7 +382,7 @@ export function createTeamHub({ db, config, backend: claude, backends = {}, retr
   async function loop(seen: number): Promise<void> {
     while (running) {
       const now = nowSec()
-      const due = Math.min(nextDelivery(db, now) ?? Infinity, nextRoutineAt(db) ?? Infinity)
+      const due = nextDelivery(db, now) ?? Infinity
       const untilDue = due === Infinity ? Infinity : Math.max(0, (due - now) * 1000)
       await teamChanged.wait(Math.min(config.pollSec * 1000, untilDue + 50), stopped.signal, seen)
       if (!running) return

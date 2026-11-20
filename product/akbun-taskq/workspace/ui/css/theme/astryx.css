@@ -1,12 +1,13 @@
 /* Theme: Astryx (Meta's open source design system, MIT, LICENSE-astryx.txt beside this file). The values come from the
    Astryx neutral theme (@astryxdesign/theme-neutral 0.7.16): a monochrome accent (near-black in light, near-white in
-   dark), a gray page under white cards, blue only for links and focus, and status colors from its palette.
+   dark), one white surface for the menu and the page with gray tiles on it, blue only for links and focus, and status colors from its palette.
    Astryx ships React components built with StyleX; taskq has no build step and no framework, so only the tokens are
    carried over. Shapes follow its radius scale: 12px containers, 10px elements, 6px inner parts. Figtree is the
    Astryx font; it is used when installed, and Korean falls back to the system Korean faces (no font is downloaded). */
 :root {
   color-scheme: dark;
-  --bg: #1b1b1b;
+  /* The page is the sidebar's color, so the menu and the content read as one surface; tiles use --panel-soft. */
+  --bg: #262626;
   --panel: #262626;
   --panel-soft: #303030;
   --stage: #303030;
@@ -72,7 +73,7 @@
 /* Light: chosen in Settings (data-theme="light"), or by the system when Settings says System. */
 :root[data-theme="light"] {
   color-scheme: light;
-  --bg: #f1f1f1;
+  --bg: #ffffff;
   --panel: #ffffff;
   --panel-soft: #f1f1f1;
   --stage: #e2e2e2;

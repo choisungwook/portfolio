@@ -1,10 +1,10 @@
 import type { Hono } from 'hono'
 import { kiroSso, loginState, setKiroSso, startLogin, whoami } from '../agents/kiro/login.ts'
 import { PERIODS, usageReport, type Period } from '../db/usage.ts'
-import { botConnection, clearConnectionCache, listConnections } from '../team/connections.ts'
-import { connectionSettings, saveConnectionSettings } from '../team/connection-settings.ts'
+import { botConnection, clearConnectionCache, IDS, listConnections, testConnection, type ConnectionId } from '../team/connections.ts'
+import { clearConnectionSettings, connectionSettings, saveConnectionSettings, type Runtime } from '../team/connection-settings.ts'
 import { listProfiles } from '../aws/profiles.ts'
-import { apiKeyProblem, readApiKey, saveApiKey } from '../agents/claude/api-key.ts'
+import { apiKeyProblem, readApiKey, readOpenaiKey, saveApiKey, saveOpenaiKey } from '../agents/claude/api-key.ts'
 import { HttpError, optionalJson, type ApiDeps } from './http.ts'
 
 // Connections (how bots reach their models and whether that works), sign-in for the SDKs that keep their own session
@@ -31,7 +31,10 @@ export function registerProviderRoutes(api: Hono, { db, config }: ApiDeps): void
 
   // How Claude and OpenAI-on-Bedrock sign in: provider, region and AWS profile. Saving applies at once and reruns checks.
   // The API key is write-only: answers say only whether one is saved. Omitted or "" in a PUT keeps it; null removes it.
-  const withKey = <T extends object>(s: T) => ({ ...s, claude_api_key_set: readApiKey(config) !== undefined })
+  const withKey = <T extends object>(s: T) => ({
+    ...s, kiro_start_url: kiroSso(db).start_url, kiro_region: kiroSso(db).region,
+    claude_api_key_set: readApiKey(config) !== undefined, openai_api_key_set: readOpenaiKey(config) !== undefined,
+  })
   api.get('/connection-settings', (c) => c.json(withKey(connectionSettings(config))))
   api.put('/connection-settings', async (c) => {
     const body = await optionalJson(c)
@@ -39,11 +42,37 @@ export function registerProviderRoutes(api: Hono, { db, config }: ApiDeps): void
     const changeKey = key === null || (typeof key === 'string' && key.trim() !== '')
     const problem = typeof key === 'string' && changeKey ? apiKeyProblem(key) : null
     if (problem) throw new HttpError(400, problem)
+    const openai = body.openai_api_key
+    const changeOpenai = openai === null || (typeof openai === 'string' && openai.trim() !== '')
+    const openaiProblem = typeof openai === 'string' && changeOpenai ? apiKeyProblem(openai) : null
+    if (openaiProblem) throw new HttpError(400, openaiProblem.replace('claude_api_key', 'openai_api_key'))
+    if (typeof body.kiro_start_url === 'string' && body.kiro_start_url.trim()) {
+      const problem = setKiroSso(db, { start_url: body.kiro_start_url.trim(), region: String(body.kiro_region ?? kiroSso(db).region).trim() })
+      if (problem) throw new HttpError(400, problem)
+    }
     const saved = saveConnectionSettings(db, config, body)
     if (typeof saved === 'string') throw new HttpError(400, saved)
     if (changeKey) saveApiKey(config, typeof key === 'string' ? key : '')
+    if (changeOpenai) saveOpenaiKey(config, typeof openai === 'string' ? openai : '')
     clearConnectionCache()
     return c.json(withKey(saved))
+  })
+  // Clear on one runtime: its saved sign-in (and saved key) goes; the config file and environment apply again.
+  api.delete('/connection-settings/:runtime', (c) => {
+    const runtime = c.req.param('runtime') as Runtime
+    if (!['claude', 'openai', 'kiro'].includes(runtime)) throw new HttpError(400, 'runtime must be claude, openai or kiro')
+    clearConnectionSettings(db, config, runtime)
+    if (runtime === 'claude') saveApiKey(config, '')
+    if (runtime === 'openai') saveOpenaiKey(config, '')
+    clearConnectionCache()
+    return c.json(withKey(connectionSettings(config)))
+  })
+  // The Connection test button: one connection's check, rerun now with a 5 second limit.
+  api.post('/connections/test', async (c) => {
+    const body = await optionalJson(c)
+    const id = String(body.id ?? '') as ConnectionId
+    if (!IDS.includes(id)) throw new HttpError(400, `id must be one of ${IDS.join(', ')}`)
+    return c.json(await testConnection(db, config, id))
   })
   // The AWS profiles on this machine (names, how each signs in, region); never keys.
   api.get('/aws/profiles', (c) => c.json(listProfiles()))

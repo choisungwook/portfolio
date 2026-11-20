@@ -1,6 +1,5 @@
 import type { Hono } from 'hono'
 import { decideApprovalRequest, openApprovals } from '../db/bot-requests.ts'
-import { createRoutine, deleteRoutine, fireWebhookRoutine, getRoutine, listRoutines, setRoutineEnabled, type Trigger } from '../db/routines.ts'
 import { closeGoal, createGoal, getGoal, listGoals } from '../db/goals.ts'
 import { getAgent, ORCHESTRATOR, postMessage, USER } from '../db/team.ts'
 import { weeklyReview } from '../team/review.ts'
@@ -8,7 +7,7 @@ import { workflowFromTask } from '../team/workflow-from-task.ts'
 import { teamChanged } from '../wake.ts'
 import { HttpError, optionalJson, type ApiDeps } from './http.ts'
 
-// What bots wait on the user for (approvals), routines, goals, the weekly review, and saving a finished task
+// What bots wait on the user for (approvals), goals, the weekly review, and saving a finished task
 // as a workflow. Paths stay out of /bots/:name so a bot cannot be named after them.
 export function registerAutonomyRoutes(api: Hono, { db }: ApiDeps): void {
   const idOf = (value: string) => {
@@ -25,41 +24,6 @@ export function registerAutonomyRoutes(api: Hono, { db }: ApiDeps): void {
     const done = decideApprovalRequest(db, idOf(c.req.param('id')), body.approve)
     if (!done) throw new HttpError(409, 'that request is not waiting any more')
     return c.json(done)
-  })
-
-  api.get('/routines', (c) => c.json(listRoutines(db, c.req.query('bot') || undefined)))
-  api.post('/routines', async (c) => {
-    const body = await optionalJson(c)
-    const bot = String(body.bot ?? '')
-    if (!getAgent(db, bot)) throw new HttpError(404, 'no such bot')
-    const made = createRoutine(db, {
-      bot, name: String(body.name ?? ''), prompt: String(body.prompt ?? ''), schedule: (body.schedule as string | undefined) || null,
-      trigger: (body.trigger as Trigger | undefined) || null, created_by: USER,
-    })
-    if (typeof made === 'string') throw new HttpError(400, made)
-    teamChanged.notify()
-    return c.json(made, 201)
-  })
-  // { enabled: true|false }
-  api.post('/routines/:id', async (c) => {
-    const body = await optionalJson(c)
-    if (typeof body.enabled !== 'boolean') throw new HttpError(400, 'enabled must be true or false')
-    if (!setRoutineEnabled(db, idOf(c.req.param('id')), body.enabled)) throw new HttpError(404, 'no such routine')
-    teamChanged.notify()
-    return c.json(getRoutine(db, idOf(c.req.param('id'))))
-  })
-  api.delete('/routines/:id', (c) => {
-    if (!deleteRoutine(db, idOf(c.req.param('id')))) throw new HttpError(404, 'no such routine')
-    return c.json({ ok: true })
-  })
-  // A webhook routine's URL. It takes the same token as the rest of the API; { text } comes along to the bot.
-  api.post('/routines/:id/fire', async (c) => {
-    const body = await optionalJson(c)
-    if (!fireWebhookRoutine(db, idOf(c.req.param('id')), typeof body.text === 'string' ? body.text : '')) {
-      throw new HttpError(404, 'no enabled webhook routine with that id')
-    }
-    teamChanged.notify()
-    return c.json({ ok: true })
   })
 
   api.get('/goals', (c) => c.json(listGoals(db)))

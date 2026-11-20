@@ -4,8 +4,6 @@ import { createApp } from '../src/api/server.ts'
 import { getAgent, listAgents, listMessages, postMessage, USER } from '../src/db/team.ts'
 import { botGate, type ApprovalBroker } from '../src/team/bot-gate.ts'
 import { consumeApproval, requestApproval } from '../src/db/bot-requests.ts'
-import { createRoutine, runDueRoutines, runTriggeredRoutines } from '../src/db/routines.ts'
-import { nextRun } from '../src/util/cron.ts'
 import { systemFor } from '../src/team/prompt.ts'
 import { teamTools } from '../src/team/tools.ts'
 import { hybridSearch } from '../src/team/search.ts'
@@ -75,46 +73,6 @@ describe('bot autonomy', () => {
     assert.equal(botGate(env.config, own, env.home, 'mcp__gmail__read', {}, broker('coder')).action, 'allow')
   })
 
-  test('[critical] routines: cron in local time, due runs delivered once and tagged, triggers on new failures, webhooks', async () => {
-    const saturday = Math.floor(new Date(2026, 10, 21, 12, 0).getTime() / 1000)
-    assert.equal(nextRun('0 7 * * 1-5', saturday), Math.floor(new Date(2026, 10, 23, 7, 0).getTime() / 1000), 'next weekday 7am is Monday')
-    assert.equal(nextRun('*/15 * * * *', Math.floor(new Date(2026, 10, 21, 12, 7).getTime() / 1000)), Math.floor(new Date(2026, 10, 21, 12, 15).getTime() / 1000))
-    assert.equal(typeof createRoutine(env.db, { bot: 'coder', name: 'x', prompt: 'y', schedule: '61 * * * *', created_by: USER }), 'string')
-    assert.match(String(createRoutine(env.db, { bot: 'coder', name: 'x', prompt: 'y', schedule: '0 0 31 2 *', created_by: USER })), /never comes due/)
-
-    const routine = createRoutine(env.db, { bot: 'coder', name: 'Morning brief', prompt: 'Summarise failures', schedule: '0 7 * * *', created_by: USER })
-    assert.ok(typeof routine !== 'string')
-    assert.equal(runDueRoutines(env.db, (routine.next_run_at ?? 0) - 1), 0)
-    assert.equal(runDueRoutines(env.db, (routine.next_run_at ?? 0) + 3 * 86_400), 1, 'missed runs come as one')
-    const delivered = env.db.prepare('SELECT routine_id, sender, body FROM team_messages WHERE recipient = ? ORDER BY id DESC LIMIT 1').get('coder')
-    assert.deepEqual([delivered?.routine_id, delivered?.sender], [routine.id, 'routine'])
-    assert.match(String(delivered?.body), /Routine "Morning brief".*\nSummarise failures/s)
-
-    const onFail = createRoutine(env.db, { bot: 'planner', name: 'Triage', prompt: 'Look at it', trigger: 'task_failed', created_by: USER })
-    assert.ok(typeof onFail !== 'string')
-    runTriggeredRoutines(env.db)
-    const res = await call('POST', '/tasks', { type: 'research', intent: 'find the slow query', status: 'ready' })
-    const task = (await res.json()) as { id: string }
-    insertEvent(env.db, { task_id: task.id, run_id: null, kind: 'finished', payload: { outcome: 'failed' } })
-    assert.equal(runTriggeredRoutines(env.db), 1)
-    assert.equal(runTriggeredRoutines(env.db), 0, 'each failure fires once')
-    assert.match(inbox('planner').at(-1) ?? '', new RegExp(`Failed since the last check:\\ntask ${task.id}: find the slow query`))
-
-    const onNew = createRoutine(env.db, { bot: 'planner', name: 'Intake', prompt: 'Sort it', trigger: 'task_created', created_by: USER })
-    assert.ok(typeof onNew !== 'string')
-    runTriggeredRoutines(env.db)
-    const fresh = (await (await call('POST', '/tasks', { type: 'research', intent: 'same second as the tick' })).json()) as { id: string }
-    env.db.prepare('UPDATE tasks SET created_at = ? WHERE id = ?').run(nowSec() - 5, fresh.id)
-    assert.equal(runTriggeredRoutines(env.db), 1, 'a task created in the same second as a tick still fires')
-    assert.match(inbox('planner').at(-1) ?? '', /same second as the tick/)
-
-    const hook = (await (await call('POST', '/routines', { bot: 'coder', name: 'Deploy hook', prompt: 'Check the deploy', trigger: 'webhook' })).json()) as { id: number }
-    assert.equal((await call('POST', `/routines/${hook.id}/fire`, { text: 'build 42 finished' })).status, 200)
-    assert.match(inbox('coder').at(-1) ?? '', /Webhook payload:\nbuild 42 finished/)
-    assert.throws(() => tool('coder', 'schedule_routine').handler({ name: 'n', prompt: 'p', schedule: '0 9 * * *', bot: 'planner' }), /only coordinators/)
-    assert.equal((tool('taskq', 'schedule_routine').handler({ name: 'n', prompt: 'p', schedule: '0 9 * * *', bot: 'planner' }) as { bot: string }).bot, 'planner')
-  })
-
   test('the charter reaches the standing orders; ask_first and the charter are bot settings', async () => {
     const res = await call('PUT', '/bots/coder', { charter_owns: 'the export job', charter_good: 'tests pass', charter_never: 'force push', ask_first: ['git commit*'] })
     assert.equal(res.status, 200)
@@ -152,23 +110,16 @@ describe('bot autonomy', () => {
     assert.match(again.name, /\(from .*\) 2$/, 'saving again gets a new name')
 
     env.db.prepare(`UPDATE runs SET bot = 'coder' WHERE id = 'r1'`).run()
-    const old = createRoutine(env.db, { bot: 'planner', name: 'Stale report', prompt: 'p', schedule: '0 7 1 1 *', created_by: USER })
-    assert.ok(typeof old !== 'string')
-    env.db.prepare('UPDATE bot_routines SET created_at = ? WHERE id = ?').run(now - 30 * 86_400, old.id)
     const review = (await (await call('GET', '/review?days=7')).json()) as { prune: { kind: string; ref: string }[]; spot_checks: { task_id: string }[]; bots: { bot: string; tasks_done: number }[] }
-    assert.ok(review.prune.some((p) => p.kind === 'routine' && p.ref === String(old.id)), 'a routine that never ran')
     assert.ok(review.prune.some((p) => p.kind === 'bot' && p.ref === 'reviewer'), 'an idle bot')
     assert.ok(!review.prune.some((p) => p.ref === 'taskq'), 'the orchestrator is never a prune candidate')
     assert.equal(review.bots.find((b) => b.bot === 'coder')?.tasks_done, 1)
     assert.deepEqual(review.spot_checks.map((s) => s.task_id), [task.id])
   })
 
-  test('deleting a bot removes its routines and denies its unused approvals', async () => {
-    const routine = createRoutine(env.db, { bot: 'coder', name: 'n', prompt: 'p', schedule: '0 7 * * *', created_by: USER })
-    assert.ok(typeof routine !== 'string')
+  test('deleting a bot denies its unused approvals', async () => {
     const request = requestApproval(env.db, 'coder', 'Bash', 'git push', 'git push*')
     assert.ok((await call('DELETE', '/bots/coder')).ok)
-    assert.equal(env.db.prepare('SELECT count(*) AS n FROM bot_routines WHERE bot = ?').get('coder')?.n, 0)
     assert.equal(env.db.prepare('SELECT status FROM bot_approvals WHERE id = ?').get(request.id)?.status, 'denied')
   })
 

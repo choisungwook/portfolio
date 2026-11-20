@@ -14,6 +14,13 @@ const INHERITED = new Set([
   'ANTHROPIC_BEDROCK_REGION_PREFIX', 'ANTHROPIC_SMALL_FAST_MODEL_AWS_REGION',
 ])
 
+// A Claude bot's own sign-in (bot.provider) wins over the one chosen in Settings > Connections.
+const FROM_BOT: Record<string, Config['provider']> = { api: 'api_key', subscription: 'subscription', bedrock: 'bedrock' }
+export function configForBot(config: Config, agent: { provider?: string | null }): Config {
+  const provider = agent.provider ? FROM_BOT[agent.provider] : undefined
+  return provider && provider !== config.provider ? { ...config, provider } : config
+}
+
 // Keys are never read into logs or storage. AWS_PROFILE is set only for bedrock, so target commands must name --profile.
 export function buildEnv(config: Config, base: NodeJS.ProcessEnv = process.env): Record<string, string | undefined> {
   const env: Record<string, string | undefined> = {}

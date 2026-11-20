@@ -1,10 +1,12 @@
-// The bot settings dialog: create a bot or edit one. Creating asks only for a name, a description and the SDK; everything
-// else starts with defaults and is edited later. The gear on a bot and the right-click menu open it. Name is fixed after
+// The bot settings dialog: create a bot or edit one. Creating asks only for a name, the agent type, how it signs in and a
+// description; everything else starts with defaults and is edited later. Skills, plugins and MCP servers are not picked
+// here: every bot of a type uses what the Plugins menu registers. The gear on a bot and the right-click menu open it. Name is fixed after
 // creation; taskq, the orchestrator, can be neither disabled nor deleted.
 import { api, mutate, notify } from '../core/api.js'
 import { area, clear, el } from '../core/dom.js'
 import { emit } from '../core/bus.js'
 import { show } from '../core/nav.js'
+import { t } from '../core/i18n.js'
 
 const MODES = [
   ['auto', 'Auto (default): Claude decides, risky calls are refused'],
@@ -28,7 +30,7 @@ function init() {
   dialog = area('bot-settings')
   form = area('bot-form')
   form.elements.sdk.addEventListener('change', () => showSdk(form.elements.permission_mode.value))
-  form.elements.provider.addEventListener('change', () => showSdk(form.elements.permission_mode.value))
+  form.elements.provider.addEventListener('change', () => showHint())
   dialog.querySelector('[data-close]').addEventListener('click', () => dialog.close())
   form.addEventListener('submit', save)
   area('bot-session-folder').addEventListener('click', () => mutate(() => api.post('/open-folder', { target: 'bot', bot: editing })))
@@ -47,18 +49,6 @@ function init() {
   })
 }
 
-function picks(target, kind, entries, chosen) {
-  const box = area(target)
-  if (entries.length === 0) {
-    clear(box).append(el('p', { class: 'meta', text: `No ${kind === 'mcp' ? 'MCP server' : kind}s registered. Add them in the Plugins menu.` }))
-    return
-  }
-  const title = { skill: 'Skills', plugin: 'Plugins (Claude only)', mcp: 'MCP servers' }[kind]
-  clear(box).append(el('p', { class: 'pick-title', text: title }), ...entries.map((entry) => el('label', { class: 'check' },
-    el('input', { type: 'checkbox', name: kind, value: entry.name, checked: chosen.includes(entry.name) || null }),
-    ` ${entry.name}`, entry.ok === false ? el('span', { class: 'meta', text: ' (missing)' }) : null)))
-}
-
 // name null creates a bot.
 export async function openBotSettings(name) {
   init()
@@ -68,7 +58,8 @@ export async function openBotSettings(name) {
   remove.textContent = 'Delete bot'
   area('bot-form-error').textContent = ''
   try {
-    const [settings, bot] = await Promise.all([api.get('/settings'), name ? api.get(`/bots/${name}`) : null])
+    const [conn, bot] = await Promise.all([api.get('/connection-settings').catch(() => ({})), name ? api.get(`/bots/${name}`) : null])
+    claudeDefault = CLAUDE_FROM_CONN[conn.claude_provider] ?? 'subscription'
     const value = bot ?? { role: 'custom', description: '', instructions: '', model: null, workdir: null, permission_mode: 'auto',
       sandbox: false, allowed_domains: [], blocked_commands: [], skills: [], plugins: [], enabled: true, may_message_user: false,
       hourly_turns: null, turn_max_turns: null }
@@ -84,8 +75,7 @@ export async function openBotSettings(name) {
     f.instructions.value = value.instructions
     f.workdir.value = value.workdir ?? ''
     f.sdk.value = value.sdk ?? 'claude'
-    f.provider.value = value.provider ?? 'api'
-    showSdk(value.permission_mode)
+    showSdk(value.permission_mode, value.provider)
     f.sandbox.checked = value.sandbox
     f.allowed_domains.value = value.allowed_domains.join('\n')
     f.blocked_commands.value = value.blocked_commands.join('\n')
@@ -98,12 +88,8 @@ export async function openBotSettings(name) {
     f.charter_good.value = value.charter_good ?? ''
     f.charter_never.value = value.charter_never ?? ''
     f.ask_first.value = (value.ask_first ?? []).join('\n')
-    if (name) renderRoutines(name)
     area('bot-session-folder').hidden = !name
     remove.hidden = !name || Boolean(bot?.system)
-    picks('bot-skills', 'skill', settings.bot_skills, value.skills)
-    picks('bot-plugins', 'plugin', settings.bot_plugins, value.plugins)
-    picks('bot-mcp', 'mcp', settings.bot_mcp_servers ?? [], value.mcp_servers ?? [])
     dialog.showModal()
     ;(name ? f.description : f.name).focus()
   } catch (error) {
@@ -114,13 +100,12 @@ export async function openBotSettings(name) {
 async function save(event) {
   event.preventDefault()
   const f = form.elements
-  const checked = (kind) => [...form.querySelectorAll(`input[name="${kind}"]:checked`)].map((input) => input.value)
   const body = {
     role: f.role.value, description: f.description.value, instructions: f.instructions.value,
     workdir: f.workdir.value, permission_mode: f.permission_mode.value, sandbox: f.sandbox.checked, sdk: f.sdk.value,
-    provider: f.sdk.value === 'openai' ? f.provider.value : null,
+    provider: f.provider.value || null,
     allowed_domains: lines(f.allowed_domains.value), blocked_commands: lines(f.blocked_commands.value),
-    skills: checked('skill'), plugins: checked('plugin'), mcp_servers: checked('mcp'), enabled: f.enabled.checked, may_message_user: f.may_message_user.checked,
+    enabled: f.enabled.checked, may_message_user: f.may_message_user.checked,
     hourly_turns: f.hourly_turns.value === '' ? null : Number(f.hourly_turns.value),
     turn_max_turns: f.turn_max_turns.value === '' ? null : Number(f.turn_max_turns.value),
     charter_owns: f.charter_owns.value, charter_good: f.charter_good.value, charter_never: f.charter_never.value,
@@ -139,63 +124,41 @@ async function save(event) {
   }
 }
 
-// The bot's routines, with a row to add one. The inputs have no name, so they are not part of the settings form.
-async function renderRoutines(name) {
-  const box = area('bot-routines')
-  let routines = []
-  try {
-    routines = await api.get(`/routines?bot=${encodeURIComponent(name)}`)
-  } catch (error) {
-    clear(box).append(el('p', { class: 'error', text: error.message }))
-    return
-  }
-  const when = (r) => r.schedule ?? `on ${r.trigger}`
-  const next = (r) => (r.next_run_at ? ` · next ${new Date(r.next_run_at * 1000).toLocaleString()}` : '')
-  const fields = {
-    name: el('input', { type: 'text', maxlength: 100, placeholder: 'Morning brief', 'aria-label': 'Routine name' }),
-    kind: el('select', { 'aria-label': 'When' }, ...[['schedule', 'On a schedule'], ['task_failed', 'When a task fails'], ['task_created', 'When a task is created'], ['webhook', 'When a webhook is called']]
-      .map(([value, text]) => el('option', { value, text }))),
-    schedule: el('input', { type: 'text', maxlength: 100, placeholder: '0 7 * * *', 'aria-label': 'Cron schedule', spellcheck: 'false' }),
-    prompt: el('textarea', { rows: 2, maxlength: 4000, placeholder: 'Summarise yesterday\'s failed tasks and what to do about each', 'aria-label': 'What to do' }),
-  }
-  fields.kind.addEventListener('change', () => { fields.schedule.hidden = fields.kind.value !== 'schedule' })
-  const add = async () => {
-    const schedule = fields.kind.value === 'schedule'
-    const made = await mutate(() => api.post('/routines', {
-      bot: name, name: fields.name.value, prompt: fields.prompt.value,
-      ...(schedule ? { schedule: fields.schedule.value } : { trigger: fields.kind.value }),
-    }), 'Routine added')
-    if (made) renderRoutines(name)
-  }
-  clear(box).append(
-    routines.length === 0 ? el('p', { class: 'meta', text: 'No routines yet.' }) : el('ul', { class: 'routine-list' }, ...routines.map((r) => el('li', {},
-      el('label', { class: 'check' }, el('input', {
-        type: 'checkbox', checked: r.enabled || null, 'aria-label': `${r.name} on`,
-        onchange: (event) => mutate(() => api.post(`/routines/${r.id}`, { enabled: event.target.checked })),
-      }), ` ${r.name}`),
-      el('span', { class: 'meta mono', text: ` ${when(r)}${next(r)}${r.trigger === 'webhook' ? ` · POST /api/routines/${r.id}/fire` : ''}` }),
-      el('p', { class: 'meta', text: r.prompt }),
-      el('button', { type: 'button', class: 'quiet', text: 'Delete', onclick: async () => { if (await mutate(() => api.del(`/routines/${r.id}`), 'Routine deleted')) renderRoutines(name) } })))),
-    el('div', { class: 'routine-add' }, fields.name, fields.kind, fields.schedule, fields.prompt, el('button', { type: 'button', text: 'Add routine', onclick: add })),
-  )
-}
-
 // The permission modes the bot's SDK has. OpenAI has no auto mode, so a Claude bot switched to OpenAI moves to accept edits.
 const NO_AUTO_MODES = ['plan', 'acceptEdits', 'bypassPermissions']
-const HINTS = {
-  api: 'OpenAI Agents SDK with OPENAI_API_KEY. No auto mode: plan reads files, accept edits also writes in its folder and the shared folder, bypass also runs shell commands.',
-  bedrock: 'OpenAI open-weight models (gpt-oss) on Amazon Bedrock. It signs in with the AWS profile chosen in Settings > Connections (an SSO profile works), or a Bedrock API key in AWS_BEARER_TOKEN_BEDROCK. Same tools as the API key bot.',
-  chatgpt: 'Your ChatGPT plan through the Codex CLI: install codex and run codex login (Sign in with ChatGPT). Plan is a read-only sandbox, accept edits writes its folders, bypass has full access. No per-turn cost.',
-  kiro: 'Kiro headless with your AWS IAM Identity Center session: sign in under Settings > Connections. Plan sees read tools, accept edits also write, bypass trusts every tool. Kiro reports credits, not dollars.',
+// How each agent type signs in: an SDK with an API key, the vendor's subscription, or AWS Bedrock. Kiro has one way.
+const PROVIDERS = {
+  claude: [['api', 'SDK (Anthropic API key)'], ['subscription', 'Subscription (signed-in Claude Code)'], ['bedrock', 'AWS Bedrock']],
+  openai: [['api', 'SDK (OpenAI API key)'], ['chatgpt', 'Subscription (ChatGPT plan, Codex CLI)'], ['bedrock', 'AWS Bedrock']],
+  kiro: [['', 'AWS IAM Identity Center (kiro-cli)']],
 }
-function showSdk(current) {
+const CLAUDE_FROM_CONN = { api_key: 'api', subscription: 'subscription', bedrock: 'bedrock' }
+let claudeDefault = 'subscription'
+const HINTS = {
+  'claude:api': 'Claude Agent SDK with the Anthropic API key saved in Settings > Connections (or ANTHROPIC_API_KEY).',
+  'claude:subscription': 'Claude Agent SDK with the signed-in Claude Code (your Claude plan).',
+  'claude:bedrock': 'Claude on Amazon Bedrock with the AWS profile and region chosen in Settings > Connections.',
+  'openai:api': 'OpenAI Agents SDK with the key saved in Settings > Connections (or OPENAI_API_KEY). No auto mode: plan reads files, accept edits also writes in its folder and the shared folder, bypass also runs shell commands.',
+  'openai:bedrock': 'OpenAI open-weight models (gpt-oss) on Amazon Bedrock. It signs in with the AWS profile chosen in Settings > Connections (an SSO profile works), or a Bedrock API key in AWS_BEARER_TOKEN_BEDROCK. Same tools as the API key bot.',
+  'openai:chatgpt': 'Your ChatGPT plan through the Codex CLI: install codex and run codex login (Sign in with ChatGPT). Plan is a read-only sandbox, accept edits writes its folders, bypass has full access. No per-turn cost.',
+  'kiro:': 'Kiro headless with your AWS IAM Identity Center session: sign in under Settings > Connections. Plan sees read tools, accept edits also write, bypass trusts every tool. Kiro reports credits, not dollars.',
+}
+function showHint() {
+  const hint = HINTS[`${form.elements.sdk.value}:${form.elements.provider.value}`] ?? ''
+  area('bot-sdk-hint').textContent = hint
+  area('bot-sdk-hint').hidden = !hint
+}
+function showSdk(current, provider = form.elements.provider.value) {
   const sdk = form.elements.sdk.value
   const noAuto = sdk !== 'claude'
   const modes = noAuto ? MODES.filter(([value]) => NO_AUTO_MODES.includes(value)) : MODES
   clear(area('bot-mode')).append(...modes.map(([value, text]) => el('option', { value, text })))
   form.elements.permission_mode.value = modes.some(([value]) => value === current) ? current : noAuto ? 'acceptEdits' : 'auto'
-  area('bot-provider-row').hidden = sdk !== 'openai'
-  const hint = sdk === 'openai' ? HINTS[form.elements.provider.value] : sdk === 'kiro' ? HINTS.kiro : ''
-  area('bot-sdk-hint').textContent = hint
-  area('bot-sdk-hint').hidden = !hint
+  const options = PROVIDERS[sdk]
+  const select = form.elements.provider
+  clear(select).append(...options.map(([value, text]) => el('option', { value, text: t(`bot.auth.${sdk}.${value || 'sso'}`, text) })))
+  const fallback = sdk === 'claude' ? claudeDefault : options[0][0]
+  select.value = options.some(([value]) => value === provider) ? provider : fallback
+  select.disabled = options.length === 1
+  showHint()
 }

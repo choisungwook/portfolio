@@ -9,7 +9,7 @@ import { claudeExecutable } from '../../resources.ts'
 import { botGate } from '../../team/bot-gate.ts'
 import { ToolError, type TeamTool } from '../../team/tools.ts'
 import type { Catalog, CatalogRequest, TeamBackend, TurnRequest, TurnResult } from '../../team/types.ts'
-import { buildEnv } from './auth.ts'
+import { buildEnv, configForBot } from './auth.ts'
 import { LiveInput } from '../../team/live-input.ts'
 import { worktreesDir } from '../../workspace/worktree.ts'
 
@@ -106,7 +106,7 @@ function optionsFor(config: Config, request: TurnRequest, abort: AbortController
   const dataDir = join(config.home, 'data')
   return {
     cwd: request.cwd,
-    env: buildEnv(config),
+    env: buildEnv(configForBot(config, agent)),
     pathToClaudeCodeExecutable: claudeExecutable(),
     model: agent.model ?? config.model,
     // The user's own Claude settings are not loaded: a bot is what its settings say, nothing more. Skills and plugins
@@ -210,7 +210,7 @@ async function claudeCatalog(config: Config, request: CatalogRequest, runQuery: 
   const q = runQuery({
     prompt: nothing(),
     options: {
-      cwd: request.cwd, env: buildEnv(config), pathToClaudeCodeExecutable: claudeExecutable(), settingSources: [],
+      cwd: request.cwd, env: buildEnv(configForBot(config, request.agent)), pathToClaudeCodeExecutable: claudeExecutable(), settingSources: [],
       plugins: request.plugins.map((path) => ({ type: 'local' as const, path, skipMcpDiscovery: true })), tools: [], abortController: abort,
     },
   }) as AsyncIterable<SDKMessage> & { supportedModels?: () => Promise<ModelInfo[]>; supportedCommands?: () => Promise<SlashCommand[]> }
