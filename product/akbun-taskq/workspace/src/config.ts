@@ -11,8 +11,8 @@ export interface SandboxConfig {
   allowWrite: string[]
 }
 
-// The resident bots (the code calls them the team). They always run with taskq; the loop guards and Pause
-// in the menu are what stop them. An old config's bots.enabled is ignored.
+// The resident bots (the code calls them the team). They always run with taskq; Pause in the menu is what
+// stops them. An old config's bots.enabled is ignored.
 export interface BotsConfig {
   maxConcurrentTurns: number   // agent turns running at once, separate from maxConcurrent for tasks
   turnMaxTurns: number         // model turns inside one agent turn

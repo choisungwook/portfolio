@@ -365,7 +365,7 @@ bot과 대화할 때 쓰는 기능은 아래와 같다.
 | bot이 "승인을 기다린다"고 한다 | 되돌릴 수 없는 명령(push, 배포, 클라우드 자원 삭제 등)이나 bot 설정의 "먼저 묻기"에 걸렸다. Must check에서 명령을 보고 "한 번 승인"이나 "거부"를 누른다 |
 | 매일 같은 일을 시키고 싶다 | bot에게 "매일 7시에 …"라고 말하거나 bot 설정의 Routines에서 cron 일정이나 트리거로 추가한다. 설정의 주간 점검에서 돌았는지 본다 |
 | bot이 대답하지 않는다 | 왼쪽 bot 목록에서 이름 옆 점이 빨간색이면 연결이 실패한 것이다. 내가 보낸 메시지 아래에 "아직 대답할 수 없음"과 이유가 나온다. 흔한 원인은 bot이 일시정지됐거나, Claude `provider`가 기본값 bedrock인데 AWS 프로파일이 없거나, 그 bot의 로그인(API 키, Codex, Kiro)이 실패한 경우다. 설정의 연결 페이지에서 연결마다 상태를 보고 다시 확인한다 |
-| Must check에 "Bots paused"가 떠 있다 | bot 하나가 1시간 턴 상한을 넘었거나(메시지 루프 의심), Claude 모델 로그인이 실패했거나, bot이 taskq 데이터를 읽으려 했다. `taskq bots log`로 원인을 보고 `taskq bots resume`이나 메뉴 Bots 옆의 Resume all(전체 다시 켜기)로 다시 켠다 |
+| Must check에 "Bots paused"가 떠 있다 | Claude 모델 로그인이 실패했거나, bot이 taskq 데이터를 읽으려 했다. `taskq bots log`로 원인을 보고 `taskq bots resume`이나 메뉴 Bots 옆의 Resume all(전체 다시 켜기)로 다시 켠다 |
 | 고친 화면이 안 보인다 | 브라우저를 새로 고친다 |
 | 회사 네트워크에서 `certificate verify failed`나 `self-signed certificate in certificate chain`이 뜬다 | TLS 검사 장비가 인증서를 자기 CA로 다시 서명한다. 그 CA를 넣은 PEM 파일을 `caBundle`에 적고 다시 시작한다 |
 

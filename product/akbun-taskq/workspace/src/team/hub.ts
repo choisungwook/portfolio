@@ -48,8 +48,8 @@ const BATCH = 20                // messages handed to one turn; the rest wait fo
 const STOP_GRACE_MS = 3000      // same grace the task runner gives its runs on shutdown
 const SESSION_MAX_TOKENS = 100_000 // a conversation larger than this is handed over to a new session
 const RETRY_AFTER_SEC = 60      // wait after a failed turn, so an outage does not use up every attempt at once
-// Messages sent into a running turn. Past this the turn is left to end, and the rest start a new turn that goes through
-// the loop guards again; otherwise two bots answering each other could keep one turn open forever.
+// Messages sent into a running turn. Past this the turn is left to end, and the rest start a new turn that waits for a
+// free slot like any other; otherwise two bots answering each other could keep one turn open forever.
 const MAX_JOINS = 10
 
 interface ActiveTurn {
@@ -339,7 +339,7 @@ export function createTeamHub({ db, config, backend: claude, backends = {}, retr
     if (isTeamPaused(db)) return
     // A sign-in changed from the CLI or MCP (another process) reaches this one here; the UI applies it at once.
     applyConnectionSettings(db, config)
-    // Routines come due as messages; the turn that follows is an ordinary one, under the same guards.
+    // Routines come due as messages; the turn that follows is an ordinary one.
     runDueRoutines(db)
     runTriggeredRoutines(db)
     joinRunning()
