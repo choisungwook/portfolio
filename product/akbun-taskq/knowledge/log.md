@@ -4,6 +4,7 @@ concept를 추가·수정·삭제할 때마다 오늘 날짜 섹션을 맨 위�
 
 ## 2026-11-20
 
+* **Update**: [bot runtimes](decisions/2026-11-bot-runtimes-beyond-sdks.md)에 로그인 실패를 확실할 때만 판정하는 기준(Kiro는 whoami, Bedrock은 프로파일의 자격 증명)과 Kiro 로그인을 터미널 아래에서 실행하는 결정을 추가.
 * **Add**: [The macOS desktop app is a Tauri window around the released executable](decisions/2026-11-desktop-app-shell.md)
 * **Update**: 결정 기록을 정리해 서로 어긋나던 부분을 마지막 결정으로 맞춤. 지운 파일과 합친 파일은 없고, 뒤집힌 부분만 다시 썼다.
 * **Update**: [resident bots](decisions/2026-11-resident-agent-team.md)를 다시 씀. 고정 역할 agent, 읽기 전용 bot, 기본 꺼짐, 하루·turn당 예산과 그 근거, 세션 교체 정책 없음을 빼고 지금의 turn 한도와 Pause만 남김.

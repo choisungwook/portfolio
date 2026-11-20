@@ -3,7 +3,8 @@ import assert from 'node:assert/strict'
 import { writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { endTurn, getAgent, postMessage, setAgentEnabled, startTurn, updateAgent, USER } from '../src/db/team.ts'
-import { createTeamHub, isTeamPaused, pauseTeam } from '../src/team/hub.ts'
+import { createTeamHub, isTeamPaused, pauseTeam, signedOutKey } from '../src/team/hub.ts'
+import { setMeta } from '../src/db/meta.ts'
 import { teamChanged } from '../src/wake.ts'
 import { botConnection, clearConnectionCache, codexModelProvider, listConnections, type Checks } from '../src/team/connections.ts'
 import { createApp } from '../src/api/server.ts'
@@ -76,6 +77,23 @@ describe('connections', () => {
     setAgentEnabled(env.db, 'coder', false)
     await listConnections(env.db, env.config, { checks: passing, refresh: true })
     assert.equal(getAgent(env.db, 'coder')?.enabled, false)
+  })
+
+  test('[critical] Bedrock with an AWS profile comes back on the polled check; with only a key it waits for the rerun', async () => {
+    updateAgent(env.db, 'coder', { ...getAgent(env.db, 'coder')!, sdk: 'openai', provider: 'bedrock' })
+    const off = () => {
+      setAgentEnabled(env.db, 'coder', false)
+      setMeta(env.db, signedOutKey('coder'), '1')
+      clearConnectionCache()
+    }
+    const checks: Checks = { ...passing, env: { AWS_BEARER_TOKEN_BEDROCK: 'key' }, bedrockToken: async () => 'token' }
+    off()
+    await listConnections(env.db, env.config, { checks })
+    assert.equal(getAgent(env.db, 'coder')?.enabled, false, 'a key that is only present proves nothing')
+    env.config.bots.bedrockProfile = 'example-sso'
+    off()
+    await listConnections(env.db, env.config, { checks })
+    assert.equal(getAgent(env.db, 'coder')?.enabled, true)
   })
 
   test('[critical] a silent bot says why, in the order a message meets the reasons', async () => {

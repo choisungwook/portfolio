@@ -169,7 +169,10 @@ async function cachedCheck(config: Config, id: ConnectionId, checks: Checks, ref
 
 // A check the user reran that passes undoes what the failed login did (signedOut in hub.ts): bots it turned off are
 // on again, and bots paused for the Claude login resume. Only a rerun does this, not the cached check the UI polls: a
-// bot whose key is set but wrong would otherwise be turned on again every minute.
+// bot whose key is set but wrong would otherwise be turned on again every minute. Bedrock with an AWS profile is the
+// exception (selfHeals): its check and its failure are the same question, whether the profile gives credentials, so
+// the polled check restores too and `aws sso login` alone brings the bot back.
+const selfHeals = (config: Config, id: ConnectionId) => id === 'openai:bedrock' && Boolean(config.bots.bedrockProfile)
 function restore(db: Db, connection: Connection): void {
   if (connection.status !== 'ok') return
   let changed = false
@@ -195,7 +198,7 @@ export async function listConnections(db: Db, config: Config, options: { refresh
     id, ...describe(config, id), ...(await cachedCheck(config, id, checks, options.refresh ?? false)),
     bots: agents.filter((a) => connectionOf(a) === id).map((a) => a.name), ...lastTurns(db, id),
   })))
-  if (options.refresh) for (const connection of connections) restore(db, connection)
+  for (const connection of connections) if (options.refresh || selfHeals(config, connection.id)) restore(db, connection)
   return { team: teamState(db, config), connections }
 }
 
@@ -211,7 +214,7 @@ export async function botConnection(db: Db, config: Config, name: string, option
     id, ...describe(config, id), ...(await cachedCheck(config, id, checks, options.refresh ?? false)),
     bots: listAgents(db).filter((a) => connectionOf(a) === id).map((a) => a.name), ...lastTurns(db, id),
   }
-  if (options.refresh) restore(db, connection)
+  if (options.refresh || selfHeals(config, id)) restore(db, connection)
   const enabled = options.refresh ? getAgent(db, name)?.enabled : agent.enabled
   const team = teamState(db, config)
   const row = db.prepare('SELECT outcome, error, ended_at FROM team_turns WHERE agent = ? AND ended_at IS NOT NULL ORDER BY id DESC LIMIT 1').get(name)

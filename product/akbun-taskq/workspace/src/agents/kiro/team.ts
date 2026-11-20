@@ -1,4 +1,4 @@
-import { spawn } from 'node:child_process'
+import { execFile, spawn } from 'node:child_process'
 import { mkdirSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { createInterface } from 'node:readline'
@@ -6,6 +6,7 @@ import type { Config } from '../../config.ts'
 import { selfCommand } from '../../mcp/server.ts'
 import { agentDir } from '../../team/prompt.ts'
 import type { Catalog, TeamBackend, TurnRequest, TurnResult } from '../../team/types.ts'
+import { whoami as kiroWhoami } from './login.ts'
 
 // A bot on Kiro: one turn is one headless `kiro-cli chat --no-interactive` in the bot's own folder. Kiro signs in with
 // the user's AWS IAM Identity Center (SSO) session from `kiro-cli login` (or KIRO_API_KEY); taskq never sees the token.
@@ -26,8 +27,56 @@ export type KiroSpawn = (command: string, args: string[], input: string, cwd: st
 // A session id taskq makes up when Kiro's output names none: `kiro:<ms>`, one per session so Usage groups its turns. A
 // later turn with such an id resumes the newest session in the bot's folder.
 const LOCAL = 'kiro:'
-// What kiro-cli prints when it has no login (or the login expired). Narrow on purpose: an auth failure turns the bot off.
-const KIRO_SIGNED_OUT = /not logged in|kiro-cli login|login (is )?required|session (has )?expired|token (has )?expired|unauthori[sz]ed/i
+// What kiro-cli prints when it has no login, the login expired, or the account changed under it. An auth failure turns
+// the bot off, so these name a sign-in problem and nothing else.
+const KIRO_SIGNED_OUT = /not logged in|kiro-cli login|login (is )?required|sign-?in required|session (has |is )?expired|token (has |is )?expired|ExpiredToken|UnrecognizedClientException|bearer token[^.\n]{0,40}invalid/i
+// These can be a lost login or something else (a model the account may not use, an MCP server's own 401, a network fault). A signed-out kiro-cli
+// can fail a prompt with only "dispatch failure". `kiro-cli whoami` decides.
+const KIRO_MAYBE_SIGNED_OUT = /AccessDenied|InvalidSignatureException|unauthori[sz]ed|invalid token|\b40[13]\b|dispatch failure/i
+// The plan's quota is used up: the same turn fails until the quota resets, so it is not retried. A rate limit also
+// says "limit" but passes in seconds, so only the words of a period count.
+const KIRO_QUOTA = /(monthly|daily|weekly)[^.\n]{0,30}limit|MonthlyLimit|FreeTierLimitExceeded/i
+// The request itself is refused; sending it again changes nothing.
+const KIRO_REFUSED = /improperly formed request|context window overflow/i
+const SIGN_IN = 'Kiro is not signed in: sign in with your AWS SSO session under Settings > Connections'
+
+export type KiroWhoami = (config: Config) => Promise<{ signed_out: boolean }>
+// `kiro-cli chat --list-models --format json --no-interactive`, as text.
+export type KiroModelLister = (config: Config) => Promise<string>
+
+const listKiroModels: KiroModelLister = (config) => new Promise((resolve, reject) => {
+  execFile(config.bots.kiroPath, ['chat', '--list-models', '--format', 'json', '--no-interactive'], { timeout: 30_000, maxBuffer: 1 << 20 },
+    (error, stdout) => error ? reject(new Error('kiro-cli did not list its models')) : resolve(stdout))
+})
+
+// The model rows wherever they sit in the answer: objects with a model id. kiro-cli can print lines around the JSON,
+// so the whole text is tried first and then each line.
+export function kiroModels(text: string): Catalog['models'] {
+  let parsed: unknown
+  for (const candidate of [text, ...text.split(/\r?\n/)]) {
+    try {
+      parsed = JSON.parse(candidate)
+      if (parsed && typeof parsed === 'object') break
+    } catch {
+      parsed = undefined
+    }
+  }
+  const out = new Map<string, Catalog['models'][number]>()
+  const walk = (value: unknown): void => {
+    if (Array.isArray(value)) return value.forEach(walk)
+    if (!value || typeof value !== 'object') return
+    const row = value as Record<string, unknown>
+    const id = row.model_id ?? row.modelId
+    if (typeof id === 'string' && id) {
+      const window = Number(row.context_window_tokens ?? row.contextWindowTokens)
+      const rate = Number(row.rate_multiplier ?? row.rateMultiplier)
+      const notes = [Number.isFinite(window) && window > 0 ? `${Math.round(window / 1000)}k context` : '', Number.isFinite(rate) && rate > 0 ? `${rate}x credits` : ''].filter(Boolean)
+      out.set(id, { id, name: String(row.model_name ?? row.modelName ?? id), description: notes.join(', '), efforts: [] })
+    } else Object.values(row).forEach(walk)
+  }
+  walk(parsed)
+  return [...out.values()]
+}
 
 export function agentFile(config: Config, request: TurnRequest): { dir: string; name: string; body: Record<string, unknown> } {
   const agent = request.agent
@@ -128,7 +177,16 @@ function scan(value: unknown, seen: Seen, key = ''): void {
   else if (k === 'contextusagepercentage' || k === 'contextpercent') seen.contextPercent = value
 }
 
-export function createKiroTeamBackend(run: KiroSpawn = spawnKiro): TeamBackend {
+export function createKiroTeamBackend(run: KiroSpawn = spawnKiro, whoami: KiroWhoami = kiroWhoami, listModels: KiroModelLister = listKiroModels): TeamBackend {
+  // Why a turn failed, from kiro-cli's own words (an exit message or an error record in the stream).
+  async function failure(config: Config, message: string): Promise<Pick<TurnResult, 'error' | 'auth_failed' | 'rejected'>> {
+    if (KIRO_QUOTA.test(message)) return { error: `Kiro's usage limit is reached: ${message.slice(0, 200)}`, rejected: true }
+    if (KIRO_REFUSED.test(message)) return { error: message.slice(0, 300), rejected: true }
+    if (KIRO_SIGNED_OUT.test(message)) return { error: SIGN_IN, auth_failed: true }
+    if (KIRO_MAYBE_SIGNED_OUT.test(message) && (await whoami(config).catch(() => ({ signed_out: false }))).signed_out) return { error: SIGN_IN, auth_failed: true }
+    return { error: message.slice(0, 300) }
+  }
+
   return {
     sdk: 'kiro',
     supportsLiveInput: false,
@@ -154,20 +212,18 @@ export function createKiroTeamBackend(run: KiroSpawn = spawnKiro): TeamBackend {
         if (request.resume && /session/i.test(message) && /not found|no such|invalid/i.test(message)) {
           return { ...failed, error: 'the Kiro session is gone; the next turn starts a new one', session_missing: true }
         }
-        if (KIRO_SIGNED_OUT.test(message)) {
-          return { ...failed, error: 'Kiro is not signed in: sign in with your AWS SSO session under Settings > Connections', auth_failed: true }
-        }
-        return { ...failed, error: message.slice(0, 300) }
+        return { ...failed, ...await failure(config, message) }
       }
       const usage = { input_tokens: seen.input, output_tokens: seen.output, ...(seen.credits === undefined ? {} : { credits: seen.credits }) }
       // Kiro reports a share of the context, not tokens: window 100 marks a percentage, which the ring shows as is.
       const context = seen.context !== undefined ? { tokens: seen.context, window: null }
         : seen.contextPercent !== undefined ? { tokens: Math.round(seen.contextPercent), window: 100 } : undefined
       const base = { session_id: seen.session ?? request.resume ?? `${LOCAL}${Date.now()}`, turns: 1, cost_usd: 0, usage, model: seen.model ?? request.agent.model ?? 'auto', context }
-      return seen.error ? { ...base, outcome: 'failed', error: seen.error.slice(0, 300) } : { ...base, outcome: 'done' }
+      return seen.error ? { ...base, outcome: 'failed', ...await failure(config, seen.error) } : { ...base, outcome: 'done' }
     },
-    async catalog(): Promise<Catalog> {
-      return { models: [], commands: [] }
+    // The models kiro-cli lists for the signed-in account. An empty list makes the menu fall back to the built-in one.
+    async catalog(config: Config): Promise<Catalog> {
+      return { models: kiroModels(await listModels(config)), commands: [] }
     },
   }
 }

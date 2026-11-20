@@ -333,7 +333,7 @@ bot과 대화할 때 쓰는 기능은 아래와 같다.
 | 문서를 bot이 쓰게 넣기 | Wiki에서 가져오기로 zip, 파일, 폴더를 넣는다. 문서가 절 단위 페이지와 링크로 바뀌고 색인 페이지가 생긴다. 멈추면 "마지막 단계부터 다시" |
 | wiki 백업 | Wiki에서 zip으로 내보내기. 공용 폴더의 `exports/`에 생기고, 다른 taskq에서 가져오기로 그대로 복원된다 |
 | OpenAI bot을 다른 방식으로 쓰기 | bot 설정에서 Agent SDK를 OpenAI로 두고 Sign in with를 고른다. API 키는 `OPENAI_API_KEY`, Bedrock은 설정 > 연결의 "bot 로그인 방식"에서 AWS 프로파일(SSO 프로파일이면 `aws sso login` 뒤의 단기 자격증명)과 region을 고르거나(`bots.bedrockProfile`, `bots.bedrockRegion`), 프로파일을 비우고 `AWS_BEARER_TOKEN_BEDROCK`(Bedrock API 키)를 쓴다. Claude도 같은 곳에서 provider bedrock과 AWS 프로파일을 고른다. ChatGPT 구독은 Codex CLI를 설치하고 `codex login`에서 Sign in with ChatGPT |
-| Kiro bot 쓰기 | kiro-cli를 설치하고 설정의 연결 페이지에서 IAM Identity Center start URL과 region을 넣어 AWS SSO로 로그인한다(화면의 URL에서 코드 입력). 그다음 bot 설정에서 Agent SDK를 Kiro로 고른다 |
+| Kiro bot 쓰기 | kiro-cli를 설치하고 설정의 연결 페이지에서 IAM Identity Center start URL과 region을 넣어 AWS SSO로 로그인한다(화면의 URL에서 코드 입력, 15분 안에 끝낸다). 로그인이 풀리면 그 bot이 꺼지고, 다시 로그인한 뒤 연결의 다시 확인을 누르면 켜진다. 모델은 대화 입력창 아래 메뉴에서 kiro-cli가 알려 주는 목록 중에 고른다. 그다음 bot 설정에서 Agent SDK를 Kiro로 고른다 |
 | 얼마나 썼는지 보기 | 설정의 사용량. SDK별 합계와 bot 세션별 토큰·비용이 보인다 |
 | context가 얼마나 찼는지 보기 | 입력창 아래 원과 %, 왼쪽 bot 이름 옆 작은 원. 85%를 넘으면 빨갛게 보이니 bot 메뉴의 새 세션으로 비운다 |
 | bot에게 MCP server 주기 | Plugins 메뉴에서 MCP server를 등록하고 bot 설정에서 고른다. Claude와 OpenAI bot 모두 쓴다 |
