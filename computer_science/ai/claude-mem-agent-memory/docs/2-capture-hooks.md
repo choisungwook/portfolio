@@ -1,72 +1,68 @@
-# 시나리오 2. 캡처: lifecycle hook으로 도구 호출을 모은다
+# 시나리오 2. 캡처: lifecycle hook으로 도구 호출 모으기
 
-## 이 시나리오의 목표
+메모리 파이프라인의 첫 번째 단계는 에이전트가 세션 동안 무엇을 했는지 빠짐없이 수집하는 일입니다. 이 시나리오에서는 Claude Code의 lifecycle hook과 `minimem/hook.py`가 도구 호출을 LLM 호출 없이 원본 그대로 SQLite에 기록하는 구조를 살펴봅니다. 시나리오 1에서 실행한 세션 A의 이벤트가 실제로 어떻게 저장되었는지 확인하고, hook 1회 실행에 걸리는 지연 시간(100 ms 이내)과 hook이 실패했을 때 세션이 안전하게 계속 도는지도 직접 측정해 봅니다.
 
-| 항목 | 내용 |
-| --- | --- |
-| 기능 | 에이전트 활동 캡처 |
-| 쓰는 도구 | Claude Code hook, `minimem/hook.py` |
-| 입력 | 시나리오 1에서 실행한 세션 A의 도구 호출 |
-| 작업 | 1. 저장된 이벤트 확인 2. 이벤트 원본 1건 확인 3. hook 실행 시간 측정 4. hook 실패가 세션을 멈추지 않는지 확인 |
-| 달성할 것 | 모든 도구 호출이 LLM 없이 원본 그대로 저장되고, hook 1회가 100 ms 안에 끝나는 것을 확인 |
+## 캡처는 에이전트 판단과 무관하게 모든 활동을 받아 적는 단계
 
-## 캡처는 에이전트 판단과 상관없이 모든 도구 호출을 받아 적는 일이다
+Claude Code hook은 세션의 특정 lifecycle 시점에 Claude Code 프로세스가 자동으로 실행하는 셸 명령입니다. 이벤트가 발생하면 Claude Code가 관련 정보를 JSON 형태로 명령의 stdin에 넘겨주고, `SessionStart`처럼 모델에게 돌려줄 내용이 있는 이벤트라면 stdout을 읽어 컨텍스트에 반영합니다.
 
-Claude Code hook은 lifecycle 이벤트가 일어날 때 Claude Code가 실행하는 셸 명령입니다. Claude Code는 이벤트 내용을 JSON으로 명령의 stdin에 넘기고, `SessionStart`처럼 출력이 의미 있는 이벤트에서는 stdout을 읽어 모델 컨텍스트에 넣습니다.
+`minimem`은 이 중 네 가지 이벤트를 사용합니다.
 
-minimem이 쓰는 이벤트는 4개입니다.
-
-| 이벤트 | 시점 | stdin의 핵심 필드 | minimem 동작 |
+| 이벤트 | 발생 시점 | stdin 핵심 필드 | minimem 동작 |
 | --- | --- | --- | --- |
-| `SessionStart` | 세션 시작 | `session_id`, `cwd`, `source` | 지난 기록을 출력해 주입([시나리오 5](5-context-injection.md)) |
-| `UserPromptSubmit` | 사용자가 프롬프트를 보낼 때 | `prompt` | 세션의 첫 프롬프트와 `cwd` 저장 |
-| `PostToolUse` | 도구 호출이 성공한 뒤 | `tool_name`, `tool_input`, `tool_response` | 이벤트 1건 저장 |
-| `Stop` | 에이전트가 응답을 끝낼 때 | `session_id` | observer를 분리 프로세스로 실행([시나리오 3](3-observer.md)) |
+| `SessionStart` | 새 세션 시작 | `session_id`, `cwd`, `source` | 지난 세션 요약과 관찰 인덱스를 출력해 컨텍스트에 주입 ([시나리오 5](5-context-injection.md)) |
+| `UserPromptSubmit` | 사용자가 프롬프트를 전송할 때 | `prompt` | 세션의 첫 프롬프트와 `cwd`를 DB에 저장 |
+| `PostToolUse` | 도구 호출이 성공적으로 끝난 직후 | `tool_name`, `tool_input`, `tool_response` | 도구 호출 이벤트 1건을 원본 그대로 저장 |
+| `Stop` | 에이전트가 응답을 마칠 때 | `session_id` | observer를 별도 분리 프로세스로 백그라운드 실행 ([시나리오 3](3-observer.md)) |
 
-캡처가 다루지 않는 것도 있습니다. hook은 모델의 내부 추론이나 응답 텍스트를 받지 않습니다. 권한이 거부된 도구 호출은 `PostToolUse`가 아니라 `PostToolUseFailure`로 가므로 minimem은 기록하지 않습니다. claude-mem은 두 이벤트를 모두 받습니다.
+물론 hook이 모든 것을 다 받는 것은 아닙니다. 모델의 내부 추론 과정이나 일반 응답 텍스트는 hook으로 전달되지 않습니다. 또한 권한이 거부되어 실패한 도구 호출은 `PostToolUse`가 아니라 `PostToolUseFailure` 이벤트로 빠지는데, `minimem`은 단순화를 위해 `PostToolUse`만 구독합니다. 반면 원본 `claude-mem`은 두 이벤트를 모두 받아 실패한 시도까지 기록합니다.
 
-### 용어
+### 핵심 용어 정리
 
-| 용어 | 뜻 | 이 실습의 예 |
+| 용어 | 의미 | 이 실습에서의 예 |
 | --- | --- | --- |
-| lifecycle 이벤트 | Claude Code 세션의 정해진 시점 | `PostToolUse` |
-| matcher | 어느 도구에 hook을 걸지 정하는 패턴 | `"matcher": "*"`는 모든 도구 |
-| `additionalContext` | `SessionStart` hook이 stdout JSON으로 돌려주는 모델 입력 | 지난 세션 요약 806자 |
-| async hook | Claude Code가 끝나기를 기다리지 않는 hook | claude-mem의 `PostToolUse`(`"async": true`) |
+| lifecycle 이벤트 | Claude Code 세션의 정해진 동작 시점 | `PostToolUse` |
+| matcher | 어떤 도구 호출에 hook을 적용할지 지정하는 패턴 | `"matcher": "*"` (모든 도구 대상) |
+| `additionalContext` | `SessionStart` hook이 stdout JSON으로 반환해 모델 입력에 추가하는 문자열 | 지난 세션 요약 및 인덱스 806자 |
+| async hook | Claude Code가 종료를 기다리지 않고 비동기로 넘기는 hook | `claude-mem`의 `PostToolUse` (`"async": true`) |
 
-## 기록을 작업 에이전트에게 맡기면 빠진다
+## 왜 작업 에이전트에게 기록을 맡기지 않을까
 
-에이전트에게 "중요한 것은 메모해라"라고 지시하는 방식은 모델의 판단에 의존합니다. 모델은 작업에 집중할수록 기록을 건너뛰고, 무엇이 중요한지는 작업이 끝난 뒤에야 알 수 있는 경우가 많습니다. 시나리오 1의 `pytest`가 없다는 사실이 그런 예입니다. 세션 A의 에이전트는 `python -m pytest` 실패를 우회했을 뿐 기록하지 않았지만, hook은 그 실패 출력을 이벤트로 남겼고 observer가 그것을 관찰로 만들었습니다.
+흔히 떠올리는 방법은 프롬프트로 "중요한 발견이 있으면 메모 파일에 적어 두라"고 지시하는 것입니다. 하지만 이 방식은 기록 여부가 전적으로 작업 중인 모델의 판단에 좌우됩니다. 모델은 당장 눈앞의 버그를 고치는 데 집중할수록 메모를 건너뛰기 쉽고, 애초에 작업 도중에는 어떤 사실이 나중에 중요해질지 알기 어려운 경우도 많습니다.
 
-hook은 모델이 아니라 Claude Code 프로세스가 실행하므로, 모델이 무엇을 생각하든 모든 도구 호출이 빠짐없이 저장됩니다.
+시나리오 1에서 드러난 "`pytest`가 설치되어 있지 않다"는 사실이 딱 그런 사례입니다. 세션 A의 에이전트는 `python -m pytest`가 실패하자 별다른 메모를 남기지 않고 조용히 `unittest`로 우회해 버렸습니다. 그럼에도 다음 세션이 이 사실을 알 수 있었던 이유는, hook이 실패한 명령의 출력까지 기계적으로 이벤트에 남겨 두었고 observer가 나중에 그 기록에서 유용한 환경 정보를 건져 올렸기 때문입니다.
 
-## 대안 비교
+hook은 모델이 아니라 Claude Code 런타임 프로세스가 직접 호출하므로, 모델이 무엇을 생각하든 도구 호출이 하나도 빠지지 않고 기록됩니다.
+
+## 캡처 방식별 대안 비교
 
 | 방식 | 장점 | 단점 |
 | --- | --- | --- |
-| hook(claude-mem, minimem) | 실시간, 도구 호출 단위, 에이전트 판단과 무관 | hook이 느리면 에이전트도 느려집니다 |
-| transcript 파일 감시 | Claude Code 설정을 바꾸지 않아도 됩니다 | 파일 형식이 공개 API가 아니라 버전마다 바뀔 수 있습니다. claude-mem도 `transcripts` 감시 기능을 보조로 둡니다 |
-| 에이전트 자기 기록(auto memory) | 별도 프로세스가 필요 없습니다 | 기록 누락이 모델 판단에 달려 있습니다 |
+| lifecycle hook (`claude-mem`, `minimem`) | 실시간으로 도구 호출 단위 캡처 가능, 에이전트 판단과 무관하게 누락 없음 | 동기 hook이 느리면 에이전트 응답 전체가 함께 느려짐 |
+| transcript 파일 감시 | Claude Code hook 설정을 따로 건드리지 않아도 됨 | 파일 포맷이 공개 API가 아니라 버전업 시 깨질 수 있음 (`claude-mem`도 보조 수단으로만 사용) |
+| 에이전트 자기 기록 (auto memory) | 별도 프로세스나 설정 없이 가볍게 동작 | 무엇을 남길지 모델 판단에 달려 있어 기록이 누락될 수 있음 |
 
-## hook은 빨라야 하므로 LLM을 부르지 않는다
+## hook 안에서 LLM을 호출하지 않는 이유
 
-`PostToolUse` hook은 도구 호출마다 실행되고, 동기 hook이면 Claude Code가 끝나기를 기다립니다. hook 안에서 LLM을 부르면 도구 호출마다 수 초가 추가됩니다. 그래서 minimem의 `on_tool`은 이벤트를 SQLite에 INSERT만 하고 끝나며, LLM 호출은 세션이 끝날 때 `Stop` hook이 분리 프로세스로 넘깁니다.
+`PostToolUse` hook은 에이전트가 도구를 한 번 쓸 때마다 매번 실행됩니다. 만약 동기(sync) hook 안에서 곧바로 LLM을 호출해 요약을 만들면, 도구 호출 1회마다 수 초의 지연이 그대로 사용자 대기 시간으로 누적됩니다.
 
-claude-mem은 한 단계 더 나아갑니다. `PostToolUse` hook을 `"async": true`로 등록하고, hook은 이벤트를 로컬 worker HTTP 서버로 보내며, worker가 응답하지 않으면 로컬 spool 파일에 적어 둡니다. `src/cli/handlers/observation.ts`의 주석은 Codex의 hook timeout 5초 안에 spool 기록까지 끝내도록 서버 대기 시간을 2초로 잡았다고 설명합니다.
+그래서 `minimem`의 `on_tool`은 아주 단순한 일만 합니다. 받은 JSON을 적당한 길이로 자른 뒤 SQLite `events` 테이블에 `INSERT`하고 즉시 종료합니다. 시간이 오래 걸리는 LLM 요약 작업은 세션이 끝나는 `Stop` hook 시점에 별도 프로세스로 넘겨 백그라운드에서 처리합니다.
 
-## 컴포넌트 역할
+원본 `claude-mem`은 여기서 한 걸음 더 나아갑니다. `PostToolUse` hook 자체를 `"async": true`로 등록해 Claude Code가 기다리지 않게 만들고, hook은 이벤트를 로컬에서 상주하는 worker HTTP 서버로 전송합니다. 만약 worker가 죽어 있거나 응답하지 않으면 로컬 spool 파일에 임시로 적어 두고 끝납니다. `src/cli/handlers/observation.ts`의 주석을 보면 Codex의 hook timeout인 5초 안에 spool fallback까지 안전하게 마치기 위해 서버 대기 시간을 2초로 잡았다는 배경까지 확인할 수 있습니다.
 
-| 컴포넌트 | 역할 |
+## 주요 구성 요소와 역할
+
+| 구성 요소 | 역할 |
 | --- | --- |
-| `.claude/settings.json`의 `hooks` | 이벤트별로 실행할 명령 등록 |
-| `minimem-hook <이벤트>` | stdin JSON을 읽어 `HANDLERS[이벤트]` 실행 |
-| `truncate()` | 도구 입력과 출력을 각 2,000자로 자릅니다. 큰 파일 `Read`가 DB와 observer 입력을 키우지 않게 합니다 |
-| `should_skip()` | `mcp__minimem__*`, `ToolSearch` 호출은 저장하지 않습니다([시나리오 6](6-mcp-search.md)) |
-| `events` 테이블 | 이벤트 원본, `processed` 플래그 |
+| `.claude/settings.json`의 `hooks` | 각 lifecycle 이벤트에 실행할 셸 명령 등록 |
+| `minimem-hook <이벤트>` | stdin의 JSON을 파싱해 `HANDLERS[이벤트]`로 라우팅 |
+| `truncate()` | 도구 입력과 출력을 각각 2,000자로 제한해 대용량 `Read`가 DB와 observer 입력을 부풀리지 않도록 방지 |
+| `should_skip()` | `mcp__minimem__*`, `ToolSearch` 같은 메모리 조회 도구 호출은 캡처 대상에서 제외 ([시나리오 6](6-mcp-search.md)) |
+| `events` 테이블 | 도구 호출 원본과 observer 처리 여부(`processed` 플래그) 저장 |
 
-## 흐름
+## 도구 호출 캡처 흐름
 
-도구 호출 1번이 `events` 테이블의 행 1개가 되기까지의 순서입니다.
+에이전트가 도구를 한 번 호출했을 때 `events` 테이블에 행 하나가 쌓이기까지의 흐름입니다.
 
 ```mermaid
 sequenceDiagram
@@ -83,17 +79,19 @@ sequenceDiagram
   CC->>M: tool_result
 ```
 
-## 실습
+## 실습: 저장된 이벤트와 hook 지연 측정
 
-[시나리오 1](1-memory-map.md)의 3단계(minimem을 켜고 세션 A 실행)까지 끝낸 상태에서 시작합니다. 명령은 workspace 루트(`computer_science/ai/claude-mem-agent-memory`)에서 실행합니다.
+[시나리오 1](1-memory-map.md)의 3단계(`minimem`을 켜고 세션 A 실행)까지 완료된 상태에서 진행합니다. 모든 명령은 workspace 루트(`computer_science/ai/claude-mem-agent-memory`)에서 실행합니다.
 
 ### 1. 저장된 이벤트 목록 확인
 
-세션 A의 도구 호출이 모두 저장됐는지 봅니다. `processed=1`은 observer가 이미 처리한 이벤트입니다.
+세션 A 동안 발생한 도구 호출이 빠짐없이 기록되었는지 조회합니다. 출력의 `processed=1`은 observer가 이미 이 이벤트를 읽어 관찰로 압축했다는 표시입니다.
 
 ```bash
 uv run --project minimem minimem events shop
 ```
+
+실행하면 세션 A의 도구 호출 5건이 순서대로 출력됩니다.
 
 ```text
 1  Bash  379 chars  processed=1  {"command": "ls -R . | head -50 && python -m pytest tests/te
@@ -103,29 +101,33 @@ uv run --project minimem minimem events shop
 5  Bash  266 chars  processed=1  {"command": "python -m unittest tests.test_discount 2>&1 | t
 ```
 
-`run_session.py`가 보고한 세션 A의 도구 호출 5개(`Bash` 2, `Read` 2, `Edit` 1)가 모두 행으로 남았습니다. 1번 이벤트의 출력에는 `No module named pytest`가 들어 있고, 이것이 시나리오 3에서 관찰 `#2`가 됩니다.
+시나리오 1에서 `run_session.py`가 집계했던 도구 호출 5회(`Bash` 2회, `Read` 2회, `Edit` 1회)가 정확히 5개 행으로 남았습니다. 특히 1번 `Bash` 이벤트 출력에 들어 있던 `No module named pytest`가 나중에 시나리오 3에서 관찰 `#2`로 태어나게 됩니다.
 
-### 2. 이벤트 원본 1건 확인
+### 2. 이벤트 원본 1건 들여다보기
 
-`Edit` 이벤트에 무엇이 담기는지 확인합니다. `tool_response`에는 Claude Code가 돌려준 수정 전 파일 전체(`originalFile`)까지 들어 있습니다.
+실제 DB에 저장된 `Edit` 이벤트(4번 행)의 입력과 출력 앞부분을 꺼내 보면, hook이 얼마나 날것의 데이터를 받는지 실감할 수 있습니다.
 
 ```bash
 python3 -c "import sqlite3,os;c=sqlite3.connect(os.path.expanduser('~/.minimem/memory.db'));print(c.execute('select tool_input, substr(tool_output,1,200) from events where id=4').fetchone())"
 ```
 
+출력 결과를 보면 수정된 코드 한 줄 외에 절대 경로, 중복된 JSON 키, 심지어 수정 전 파일 전체(`originalFile`)까지 그대로 담겨 있습니다.
+
 ```text
 ('{"file_path": "/root/minimem-workspace/shop/shop/discount.py", "old_string": "  return price - price * rate", "new_string": "  return price - price * rate // 100", "replace_all": false}', '{"filePath": "/root/minimem-workspace/shop/shop/discount.py", "oldString": "  return price - price * rate", "newString": "  return price - price * rate // 100", "originalFile": "\\"\\"\\"할인 계산.\\"\\"\\"\\n\\n')
 ```
 
-이벤트 원본에는 다음 세션에 필요 없는 정보(절대 경로, 파일 전문, JSON 키 중복)가 많습니다. 이 원본을 그대로 다음 세션에 넣지 않고 observer로 압축하는 이유입니다.
+다음 세션에 필요한 핵심은 "할인율 계산에서 100 나눗셈을 추가했다"는 사실 하나인데, 원본 데이터에는 불필요한 잡음이 훨씬 많습니다. 바로 이 점 때문에 원본을 그대로 주입하지 않고 observer로 한 번 압축하는 단계가 필요합니다.
 
 ### 3. hook 실행 시간 측정
 
-`hook_latency.py`는 임시 `MINIMEM_HOME`에서 hook을 10번씩 실행합니다. 실습 DB는 바뀌지 않습니다.
+동기 hook이 에이전트 속도에 얼마나 영향을 주는지 확인하기 위해 `hook_latency.py`로 hook을 10회씩 반복 측정합니다. 임시 `MINIMEM_HOME`을 사용하므로 기존 실습 DB는 건드리지 않습니다.
 
 ```bash
 uv run scripts/hook_latency.py
 ```
+
+측정 결과는 다음과 같습니다.
 
 ```text
 PostToolUse, uv run 경유: median 80 ms, max 94 ms
@@ -133,25 +135,27 @@ PostToolUse, venv 직접 실행: median 39 ms, max 52 ms
 Stop, observer 분리 실행: median 43 ms, max 45 ms
 ```
 
-hook 시간의 절반은 `uv run`이 가상환경을 확인하는 데 씁니다. 도구 호출이 수십 번인 세션이면 `uv run` 경유가 수 초를 더하므로, 운영 환경에서는 venv의 `minimem-hook`을 직접 호출하거나 claude-mem처럼 async hook으로 등록합니다. `Stop`은 observer를 기다리지 않으므로 observer 실행 시간(약 10초)과 상관없이 43 ms에 끝납니다.
+흥미로운 지점은 `uv run`을 거쳤을 때(80 ms)와 가상환경의 바이너리를 직접 실행했을 때(39 ms)의 차이입니다. 전체 소요 시간의 절반 가까이가 `uv run`의 가상환경 확인에 쓰이고 있었습니다. 도구 호출이 수십 번 이어지는 긴 세션이라면 이 차이가 수 초로 쌓이기 때문에, 실전 환경에서는 venv의 `minimem-hook`을 직접 호출하거나 `claude-mem`처럼 async hook을 쓰는 편이 낫습니다. 한편 `Stop` hook은 observer 프로세스만 띄우고 기다리지 않으므로, observer가 실제로 10초 가까이 돌더라도 hook 자체는 43 ms 만에 끝납니다.
 
-### 4. hook 실패 시 동작 확인
+### 4. hook 실패 시 세션 안전성 확인
 
-hook이 예외를 던져도 세션이 멈추지 않아야 합니다. 잘못된 JSON을 넣어 확인합니다.
+메모리 기록은 어디까지나 보조 기능입니다. hook 내부에서 예외가 터졌다고 해서 사용자의 코딩 세션까지 멈춰서는 안 됩니다. 일부러 깨진 JSON을 stdin으로 넘겨 종료 코드를 확인해 봅니다.
 
 ```bash
 echo 'not json' | minimem/.venv/bin/minimem-hook tool; echo "exit=$?"
 ```
+
+에러 메시지는 stderr로 출력되지만, 종료 코드는 `0`으로 반환됩니다.
 
 ```text
 minimem hook error: Expecting value: line 1 column 1 (char 0)
 exit=0
 ```
 
-`main()`은 모든 예외를 stderr로 보내고 exit 0으로 끝납니다. Claude Code hook에서 exit 2는 작업을 차단하는 신호이므로, 메모리 기록 실패가 사용자 작업을 멈추게 해서는 안 됩니다. claude-mem의 handler 주석도 "never exit 2"를 규칙으로 둡니다.
+Claude Code hook 규약에서 `exit 2`는 "이 작업을 차단하라"는 신호로 해석됩니다. 만약 메모리 저장 중 DB 잠금이나 파싱 오류가 났을 때 `exit 2`나 처리되지 않은 예외로 빠져나가면 에이전트 작업 흐름이 깨집니다. 그래서 `minimem`의 `main()`은 모든 예외를 잡아 stderr에 남기고 항상 `exit 0`으로 끝나도록 방어하며, `claude-mem`의 handler 주석 역시 "never exit 2"를 명시적인 규칙으로 두고 있습니다.
 
-## 부록. 실무에서 얻는 것
+## 실무 관점에서 짚어볼 점
 
-- hook 명령 하나의 시간이 곧 에이전트의 도구 호출마다 붙는 지연입니다. 측정해 보면 인터프리터 기동과 패키지 매니저 확인이 대부분입니다. claude-mem이 PATH에 별도 launcher를 설치하고 hook을 셸 없이 실행하는 이유도 같습니다.
-- 권한 거부 같은 실패는 `PostToolUseFailure`로 갑니다. 실패한 시도도 다음 세션에 유용한 정보(이 명령은 승인이 필요하다)이므로 운영에서는 두 이벤트를 모두 받습니다.
-- 이벤트에는 파일 전문과 명령 출력이 들어가므로 비밀값도 그대로 저장될 수 있습니다. claude-mem은 `<private>` 태그 제거(`src/utils/tag-stripping.ts`)와 redaction(`src/utils/redaction.ts`)을 둡니다. minimem에는 없습니다.
+- **hook의 오버헤드는 대부분 코드가 아니라 실행기 기동 비용입니다**: 측정해 보면 SQLite `INSERT` 자체는 몇 밀리초에 불과하고, 인터프리터 기동과 패키지 매니저 확인이 지연의 대부분을 차지합니다. `claude-mem`이 PATH에 전용 launcher를 설치해 셸 없이 hook을 띄우는 것도 이 비용을 줄이기 위함입니다.
+- **실패한 도구 호출도 훌륭한 기억 소재입니다**: 권한 거부나 명령 실패는 `PostToolUseFailure`로 전달됩니다. "이 명령은 승인이 필요하다"거나 "이 테스트 러너는 안 된다" 같은 실패 경험이 다음 세션의 시행착오를 크게 줄여주므로, 운영 수준에서는 성공과 실패 이벤트를 모두 수집하는 편이 유리합니다.
+- **원본 이벤트에는 민감 정보가 섞일 수 있습니다**: 파일 전문과 셸 출력이 그대로 저장되므로 API 키나 환경 변수 값이 DB로 흘러들어갈 위험이 있습니다. `minimem`에는 빠져 있지만, `claude-mem`은 `<private>` 태그 제거(`src/utils/tag-stripping.ts`)와 민감정보 마스킹(`src/utils/redaction.ts`) 단계를 캡처 앞단에 두고 있습니다.
