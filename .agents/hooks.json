@@ -1,0 +1,16 @@
+{
+  "claude-shared-pretool": {
+    "PreToolUse": [
+      {
+        "matcher": "run_command",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash ./hooks/pretool-run-command.sh",
+            "timeout": 300
+          }
+        ]
+      }
+    ]
+  }
+}
