@@ -56,7 +56,7 @@ export const OPERATIONS: Operation[] = [
   // bots
   op('bots_list', 'GET', '/bots', 'Every bot with its settings, whether it works now, queued messages and owned tasks; open discussions and recent turns.'),
   op('bot_presets', 'GET', '/bots/presets', 'Role presets for a new bot.'),
-  op('bot_create', 'POST', '/bots', 'Create a bot. Fields: name, preset or role/description/instructions, sdk (claude|openai), model, effort, permission_mode, sandbox, allowed_domains, blocked_commands, workdir, skills, plugins, limits.'),
+  op('bot_create', 'POST', '/bots', 'Create a bot. Fields: name, preset or role/description/instructions, sdk (claude|openai|kiro), provider (claude: api|subscription|bedrock, empty follows Connections; openai: api|chatgpt|bedrock), model, effort, permission_mode, sandbox, allowed_domains, blocked_commands, workdir, limits. Skills, plugins and MCP servers are not per bot: every bot uses the registered ones.'),
   op('file_open', 'POST', '/open-file', 'Open a file of the shared folder with its default app on this machine, or reveal its folder. Fields: path (relative to the shared folder), reveal (true opens the folder).'),
   op('file_preview', 'POST', '/shared/preview', 'A short-lived URL (/preview/<ticket>/<name>) that serves an HTML file of the shared folder, and the files beside it, sandboxed for the UI preview. Fields: path.'),
   op('bot_get', 'GET', '/bots/:name', 'One bot\'s settings.'),

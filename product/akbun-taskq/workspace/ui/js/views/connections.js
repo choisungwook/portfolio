@@ -66,7 +66,11 @@ let keys = {}
 // Fills every section from what is saved. Keys are never sent back: an empty key field keeps the saved key.
 async function load() {
   try {
-    const [settings, profiles] = await Promise.all([api.get('/connection-settings'), api.get('/aws/profiles')])
+    const [settings, profiles, bots] = await Promise.all([api.get('/connection-settings'), api.get('/aws/profiles'), api.get('/bots').catch(() => ({ agents: [] }))])
+    // OpenAI's method is not saved anywhere; start from the one an OpenAI bot uses, so the test checks what runs.
+    const openai = document.querySelector('.conn-runtime[data-runtime="openai"]')
+    if (!openai.dataset.loaded) settings.openai_method = bots.agents.find((a) => a.sdk === 'openai')?.provider ?? 'api'
+    openai.dataset.loaded = 'true'
     for (const form of forms()) {
       for (const [name, value] of Object.entries(settings)) if (form.elements[name]) form.elements[name].value = value ?? ''
     }
@@ -109,6 +113,7 @@ export function initConnections() {
   on('settings-page', (page) => {
     if (page !== 'connections') return
     for (const form of forms()) result(form, null)
+    delete document.querySelector('.conn-runtime[data-runtime="openai"]').dataset.loaded
     load()
   })
   for (const form of forms()) {

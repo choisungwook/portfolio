@@ -3,7 +3,7 @@ import assert from 'node:assert/strict'
 import { writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { endTurn, getAgent, postMessage, setAgentEnabled, startTurn, updateAgent, USER } from '../src/db/team.ts'
-import { createTeamHub, isTeamPaused, pauseTeam, signedOutKey } from '../src/team/hub.ts'
+import { createTeamHub, isTeamPaused, LOGIN_FAILED, pauseTeam, signedOutKey } from '../src/team/hub.ts'
 import { setMeta } from '../src/db/meta.ts'
 import { teamChanged } from '../src/wake.ts'
 import { botConnection, clearConnectionCache, codexModelProvider, listConnections, testConnection, type Checks } from '../src/team/connections.ts'
@@ -154,8 +154,12 @@ describe('connections', () => {
     assert.ok(Date.now() - started < 1000)
     setAgentEnabled(env.db, 'coder', false)
     setMeta(env.db, signedOutKey('coder'), '1')
+    pauseTeam(env.db, `${LOGIN_FAILED} for coder`)
+    await testConnection(env.db, env.config, 'claude:api', passing)
+    assert.equal(isTeamPaused(env.db), true, 'another Claude method passing does not fix coder')
     assert.equal((await testConnection(env.db, env.config, 'claude:subscription', passing)).status, 'ok')
     assert.equal(getAgent(env.db, 'coder')?.enabled, true)
+    assert.equal(isTeamPaused(env.db), false)
   })
 
   test('the model provider of Codex is read from the top of its config.toml', () => {

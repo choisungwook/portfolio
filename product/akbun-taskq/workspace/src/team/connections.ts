@@ -182,7 +182,7 @@ async function cachedCheck(config: Config, id: ConnectionId, checks: Checks, ref
 // exception (selfHeals): its check and its failure are the same question, whether the profile gives credentials, so
 // the polled check restores too and `aws sso login` alone brings the bot back.
 const selfHeals = (config: Config, id: ConnectionId) => id === 'openai:bedrock' && Boolean(config.bots.bedrockProfile)
-function restore(db: Db, connection: Connection): void {
+function restore(db: Db, config: Config, connection: Connection): void {
   if (connection.status !== 'ok') return
   let changed = false
   for (const name of connection.bots) {
@@ -190,7 +190,10 @@ function restore(db: Db, connection: Connection): void {
     setAgentEnabled(db, name, true)
     changed = true
   }
-  if (connection.id.startsWith('claude:') && teamPauseReason(db)?.startsWith(LOGIN_FAILED)) resumeTeam(db)
+  // The pause names the bot whose Claude login failed; another Claude method passing does not fix that bot.
+  const reason = teamPauseReason(db)
+  const failed = reason?.startsWith(LOGIN_FAILED) ? getAgent(db, reason.slice(`${LOGIN_FAILED} for `.length)) : undefined
+  if (reason?.startsWith(LOGIN_FAILED) && (!failed || connectionOf(failed, config) === connection.id)) resumeTeam(db)
   else if (changed) teamChanged.notify()
 }
 
@@ -207,7 +210,7 @@ export async function listConnections(db: Db, config: Config, options: { refresh
     id, ...describe(config, id), ...(await cachedCheck(config, id, checks, options.refresh ?? false)),
     bots: agents.filter((a) => connectionOf(a, config) === id).map((a) => a.name), ...lastTurns(db, id),
   })))
-  for (const connection of connections) if (options.refresh || selfHeals(config, connection.id)) restore(db, connection)
+  for (const connection of connections) if (options.refresh || selfHeals(config, connection.id)) restore(db, config, connection)
   return { team: teamState(db, config), connections }
 }
 
@@ -223,7 +226,7 @@ export async function botConnection(db: Db, config: Config, name: string, option
     id, ...describe(config, id), ...(await cachedCheck(config, id, checks, options.refresh ?? false)),
     bots: listAgents(db).filter((a) => connectionOf(a, config) === id).map((a) => a.name), ...lastTurns(db, id),
   }
-  if (options.refresh || selfHeals(config, id)) restore(db, connection)
+  if (options.refresh || selfHeals(config, id)) restore(db, config, connection)
   const enabled = options.refresh ? getAgent(db, name)?.enabled : agent.enabled
   const team = teamState(db, config)
   const row = db.prepare('SELECT outcome, error, ended_at FROM team_turns WHERE agent = ? AND ended_at IS NOT NULL ORDER BY id DESC LIMIT 1').get(name)
@@ -250,7 +253,7 @@ export async function testConnection(db: Db, config: Config, id: ConnectionId, c
   const at = Date.now()
   cache.set(id, { at, check: result })
   const bots = listAgents(db).filter((a) => connectionOf(a, config) === id).map((a) => a.name)
-  restore(db, { id, ...describe(config, id), ...result, bots, last: null, last_ok_at: null, checked_at: Math.floor(at / 1000) })
+  restore(db, config, { id, ...describe(config, id), ...result, bots, last: null, last_ok_at: null, checked_at: Math.floor(at / 1000) })
   return { ...result, checked_at: Math.floor(at / 1000) }
 }
 

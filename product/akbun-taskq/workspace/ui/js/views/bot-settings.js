@@ -59,7 +59,7 @@ export async function openBotSettings(name) {
   area('bot-form-error').textContent = ''
   try {
     const [conn, bot] = await Promise.all([api.get('/connection-settings').catch(() => ({})), name ? api.get(`/bots/${name}`) : null])
-    claudeDefault = CLAUDE_FROM_CONN[conn.claude_provider] ?? 'subscription'
+    claudeDefault = CLAUDE_FROM_CONN[conn.claude_provider] ?? 'bedrock'
     const value = bot ?? { role: 'custom', description: '', instructions: '', model: null, workdir: null, permission_mode: 'auto',
       sandbox: false, allowed_domains: [], blocked_commands: [], skills: [], plugins: [], enabled: true, may_message_user: false,
       hourly_turns: null, turn_max_turns: null }
@@ -76,6 +76,8 @@ export async function openBotSettings(name) {
     f.workdir.value = value.workdir ?? ''
     f.sdk.value = value.sdk ?? 'claude'
     showSdk(value.permission_mode, value.provider)
+    // A Claude bot without its own sign-in keeps following Settings > Connections unless the user picks another one.
+    shown = { sdk: f.sdk.value, provider: f.provider.value, stored: value.provider ?? null }
     f.sandbox.checked = value.sandbox
     f.allowed_domains.value = value.allowed_domains.join('\n')
     f.blocked_commands.value = value.blocked_commands.join('\n')
@@ -103,7 +105,7 @@ async function save(event) {
   const body = {
     role: f.role.value, description: f.description.value, instructions: f.instructions.value,
     workdir: f.workdir.value, permission_mode: f.permission_mode.value, sandbox: f.sandbox.checked, sdk: f.sdk.value,
-    provider: f.provider.value || null,
+    provider: shown && f.sdk.value === shown.sdk && f.provider.value === shown.provider ? shown.stored : f.provider.value || null,
     allowed_domains: lines(f.allowed_domains.value), blocked_commands: lines(f.blocked_commands.value),
     enabled: f.enabled.checked, may_message_user: f.may_message_user.checked,
     hourly_turns: f.hourly_turns.value === '' ? null : Number(f.hourly_turns.value),
@@ -133,7 +135,8 @@ const PROVIDERS = {
   kiro: [['', 'AWS IAM Identity Center (kiro-cli)']],
 }
 const CLAUDE_FROM_CONN = { api_key: 'api', subscription: 'subscription', bedrock: 'bedrock' }
-let claudeDefault = 'subscription'
+let claudeDefault = 'bedrock'
+let shown = null
 const HINTS = {
   'claude:api': 'Claude Agent SDK with the Anthropic API key saved in Settings > Connections (or ANTHROPIC_API_KEY).',
   'claude:subscription': 'Claude Agent SDK with the signed-in Claude Code (your Claude plan).',
