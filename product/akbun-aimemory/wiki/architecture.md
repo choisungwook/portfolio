@@ -43,3 +43,18 @@ One file, `$AIMEMORY_HOME/data/aimemory.db` (`src/store.ts`).
 | `DELETE /api/memories/:id` | Delete one memory |
 | `GET /api/search?q=` | Hybrid search, 30 hits |
 | `GET /api/export` | Download a backup |
+
+## Planned directories
+
+Each directory holds only a README until its issue is done.
+
+| Directory | Issue |
+|---|---|
+| `workspace/desktop/` | Tauri desktop app (#1592) |
+| `workspace/scripts/` | Binary build for release (#1593) |
+| `workspace/src/mcp/` | MCP server (#1594) |
+| `workspace/src/indexer/` | LLM summaries and memory updates (#1595) |
+| `workspace/src/connection/` | Connection settings and CA bundle (#1596) |
+| `workspace/src/tokenizers/` | Open-source subword tokenizers (#1597) |
+| `workspace/src/install/` | Hook installation and akbun-taskq integration (#1598) |
+| `workspace/bench/` | Search benchmark, decay and ANN (#1599) |
