@@ -60,6 +60,7 @@ export const OPERATIONS: Operation[] = [
   op('file_open', 'POST', '/open-file', 'Open a file of the shared folder with its default app on this machine, or reveal its folder. Fields: path (relative to the shared folder), reveal (true opens the folder).'),
   op('file_preview', 'POST', '/shared/preview', 'A short-lived URL (/preview/<ticket>/<name>) that serves an HTML file of the shared folder, and the files beside it, sandboxed for the UI preview. Fields: path.'),
   op('bot_get', 'GET', '/bots/:name', 'One bot\'s settings.'),
+  op('bot_activity', 'GET', '/bots/:name/activity', 'A bot\'s open pull requests (url, number, title, state OPEN or unknown without gh) and background work: unfinished owned tasks, tasks finished in the last day, and bots working on what it sent (sub_sessions).'),
   op('bot_steps', 'GET', '/bots/:name/steps', 'A bot\'s tool calls, oldest first: id, turn_id, at, tool, detail. Fields: name, since (unix seconds), limit (default 500).'),
   op('bot_turn_errors', 'GET', '/bots/:name/turn-errors', 'A bot\'s failed turns, newest first: id, outcome, error, ended_at. Fields: name, limit (default 50).'),
   op('bot_update', 'PUT', '/bots/:name', 'Change a bot\'s settings; only the fields given change. Same fields as bot_create, plus enabled.'),

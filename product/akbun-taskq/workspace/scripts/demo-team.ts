@@ -17,7 +17,7 @@ export function seedTeam(db: Db, taskId: string, openTaskIds: string[]): void {
   say('taskq', 'planner', 'Goal: export job stops after 3 retries. Schedule a code task for coder and a review for reviewer. Report task ids.')
   say('planner', 'taskq', `Created code task ${taskId} for coder. The security review is added automatically when it finishes.`, taskId)
   say('queue', 'coder', `Task ${taskId} (code) ended: done; task status is now done.\nSummary: retry limit added; npm test passed (42 tests).`, taskId)
-  say('coder', 'taskq', 'Retry limit is in. Test command and output are in the task summary.', taskId)
+  say('coder', 'taskq', 'Retry limit is in. Test command and output are in the task summary. PR: https://github.com/example/demo/pull/42', taskId)
   db.prepare('UPDATE team_messages SET read_at = created_at WHERE id >= ?').run(first)
   say('taskq', USER, 'The export job now stops after 3 retries. Review found nothing blocking. One decision is yours: should a stopped job page someone?', taskId)
   writePage(db, {
@@ -51,6 +51,8 @@ export function seedTeam(db: Db, taskId: string, openTaskIds: string[]): void {
   addTurnStep(db, coding, 'coder', 'Read', { file_path: 'src/export/job.ts' })
   addTurnStep(db, coding, 'coder', 'Edit', { file_path: 'src/export/job.ts' })
   addTurnStep(db, coding, 'coder', 'Bash', { command: 'npm test' })
+  // planner's open turn took taskq's message, so taskq's side panel shows planner as a sub-session.
+  db.prepare(`UPDATE team_messages SET turn_id = ? WHERE sender = 'taskq' AND recipient = 'planner'`).run(planning)
   addTurnStep(db, planning, 'planner', 'mcp__team__list_tasks', {})
   addTurnStep(db, planning, 'planner', 'Bash', { command: 'ls -la exports/nightly' })
 }

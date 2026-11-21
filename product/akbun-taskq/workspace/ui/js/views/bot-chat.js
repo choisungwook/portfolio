@@ -76,6 +76,7 @@ export function initBotChat() {
   })
   on('bot', (name) => {
     bot = name
+    area('bot-side').hidden = true
     lastKey = null
     clear(nodes.log)
     files.clear()
@@ -235,6 +236,7 @@ async function load() {
       api.get(`/bots/${encodeURIComponent(name)}/turn-errors?limit=50`).catch(() => []),
     ])
     const messages = list.reverse()
+    loadSide(name)
     const steps = await api.get(`/bots/${encodeURIComponent(name)}/steps?since=${messages[0]?.created_at ?? 0}`).catch(() => [])
     if (bot !== name) return
     conversationFiles = [...new Set(messages.flatMap((m) => parseFiles(m.attachments)))].reverse()
@@ -284,6 +286,37 @@ function parseFiles(value) {
   } catch {
     return []
   }
+}
+
+// The right column, as in Claude Desktop: the bot's open pull requests, to review them straight away, and its background
+// work (bots working on what it sent, its unfinished tasks, how many finished today). Read every 15 s at most, since a PR
+// state is a gh call; hidden while it has nothing to show or the file pane takes the column.
+const SIDE_MS = 15000
+let sideAt = { bot: null, at: 0 }
+
+async function loadSide(name) {
+  if (sideAt.bot === name && Date.now() - sideAt.at < SIDE_MS) return
+  sideAt = { bot: name, at: Date.now() }
+  const side = area('bot-side')
+  const a = await api.get(`/bots/${encodeURIComponent(name)}/activity`).catch(() => null)
+  if (bot !== name) return
+  if (!a || (!a.pull_requests.length && !a.background.length && !a.sub_sessions.length && !a.finished)) {
+    side.hidden = true
+    return
+  }
+  const row = (iconName, title, meta, props) => el(props.href ? 'a' : 'button', { class: 'side-row', ...(props.href ? {} : { type: 'button' }), ...props },
+    icon(iconName, 18), el('span', { class: 'side-text' }, el('span', { class: 'side-title', text: title }), meta ? el('span', { class: 'side-meta', text: meta }) : null))
+  const section = (title, rows) => rows.length ? el('section', {}, el('h2', { class: 'side-head', text: title }), ...rows) : null
+  clear(side).append(...[
+    section(t('side.changes', 'Changes'), a.pull_requests.map((pr) => row('pull-request', pr.title ?? pr.url.replace('https://github.com/', ''), `#${pr.number}`,
+      { href: pr.url, target: '_blank', rel: 'noopener noreferrer', title: pr.url }))),
+    section(t('side.background', 'Background work'), [
+      ...a.sub_sessions.map((s) => row('terminal', s.agent, `${t('chat.working', 'Working')} ${elapsed(s.started_at)}`, { onclick: () => show('bot', s.agent) })),
+      ...a.background.map((task) => row('terminal', task.task_title, label(task.status), { onclick: () => emit('open-task', task.id) })),
+      ...(a.finished ? [el('p', { class: 'side-row side-done' }, icon('done', 18), el('span', { text: t('side.finished', '{n} finished').replace('{n}', a.finished) }))] : []),
+    ]),
+  ].filter(Boolean))
+  side.hidden = false
 }
 
 // Tool calls in a row, with nothing said between them, fold into one line as in Claude Code: "Ran Bash git fetch…"

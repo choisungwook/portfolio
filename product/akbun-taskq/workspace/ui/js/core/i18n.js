@@ -48,7 +48,7 @@ const KO = {
   'kiro.hint': 'Kiro bot은 AWS IAM Identity Center 세션을 씁니다. SSO start URL과 region을 넣고 로그인하면 kiro-cli가 브라우저에서 승인할 코드를 보여 주고 세션을 보관합니다. taskq는 토큰을 저장하지 않습니다.',
   'kiro.sign_in': 'AWS SSO로 로그인', 'kiro.check': '상태 확인', 'kiro.open': '열기:', 'kiro.enter': '에서 코드 입력:', 'kiro.waiting': 'kiro-cli를 기다리는 중…',
   'kiro.pending': '브라우저에서 승인하기를 기다립니다. 승인한 뒤 연결 테스트를 누르세요.', 'kiro.signed_in': '로그인됨', 'kiro.signed_out': '로그인 안 됨',
-  'update.progress': '설치 진행률', 'update.downloading': '내려받는 중…', 'update.unpacking': '압축 푸는 중…', 'chat.files_short': '파일', 'window.close': '닫기', 'window.minimize': '내리기', 'window.minimized': '내린 창', 'chat.ran': '실행함', 'chat.ran_tools': '실행됨 도구 {n}개', 'chat.turn_failed': 'turn 실패', 'chat.no_reason': '이유 없음', 'chat.send_failed': '보내지 못함', 'chat.wont_answer': '아직 대답할 수 없음',
+  'update.progress': '설치 진행률', 'update.downloading': '내려받는 중…', 'update.unpacking': '압축 푸는 중…', 'chat.files_short': '파일', 'side.changes': '변경 사항', 'side.background': '백그라운드 작업', 'side.finished': '종료됨 {n}개', 'window.close': '닫기', 'window.minimize': '내리기', 'window.minimized': '내린 창', 'chat.ran': '실행함', 'chat.ran_tools': '실행됨 도구 {n}개', 'chat.turn_failed': 'turn 실패', 'chat.no_reason': '이유 없음', 'chat.send_failed': '보내지 못함', 'chat.wont_answer': '아직 대답할 수 없음',
   'settings.review': '주간 점검', 'review.hint': 'bot이 돌았는지, 잘 됐는지, 없어도 되는지 봅니다. 자기 결과를 스스로 검토하면 놓치는 것이 있어서, 최근 결과 몇 개를 직접 확인하도록 골라 둡니다.',
   'review.prune': '끌까요?', 'review.nothing': '정리할 것이 없습니다. 모두 한 번 이상 돌았고 잘 됐습니다.', 'review.turn_off': '끄기', 'review.bots': 'bot',
   'review.turns': 'turn', 'review.success': '성공률', 'review.tasks': '작업 완료 / 실패', 'review.last': '마지막 turn', 'review.when': '언제',

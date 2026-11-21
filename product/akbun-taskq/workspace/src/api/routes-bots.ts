@@ -12,6 +12,7 @@ import { releaseBotTasks } from '../team/bot-work.ts'
 import { getMemory, MEMORY_LIMIT, setMemory } from '../team/memory.ts'
 import { sharedRelative } from '../team/shared.ts'
 import { searchMessages } from '../db/message-search.ts'
+import { botActivity } from '../team/activity.ts'
 import { getPage, listPages } from '../db/wiki.ts'
 import { forceClose, listThreads } from '../db/threads.ts'
 import { hybridSearch } from '../team/search.ts'
@@ -169,6 +170,14 @@ export function registerBotsRoutes(api: Hono, { db, config, bots }: ApiDeps): vo
   })
 
   // The bot's tool calls since ?since= (unix seconds), oldest first, so its conversation shows what it did. ?limit= (500)
+  // The bot's open pull requests (from links in its conversation and its tasks' summaries, checked with gh) and its
+  // background work: unfinished tasks it owns, how many finished in the last day, and bots working on what it sent.
+  api.get('/bots/:name/activity', async (c) => {
+    const name = c.req.param('name')
+    if (!getAgent(db, name)) throw new HttpError(404, 'no such bot')
+    return c.json(await botActivity(db, name))
+  })
+
   api.get('/bots/:name/steps', (c) => {
     const name = c.req.param('name')
     if (!getAgent(db, name)) throw new HttpError(404, 'no such bot')

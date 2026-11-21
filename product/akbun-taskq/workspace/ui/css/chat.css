@@ -294,3 +294,26 @@ mark.find.current { background: var(--accent); color: var(--on-accent); }
   opacity: 0; pointer-events: none; transition: opacity 0.12s 0.25s;
 }
 .chat-gear[data-tip]:hover::after, .chat-gear[data-tip]:focus-visible::after { opacity: 1; }
+
+/* The conversation and the right pane scroll on their own. The page itself must not scroll under them: the main area's
+   padding and the layout's made it taller than the window (12 + 8 above, 12 below), so scrolling past the end of the conversation moved both. */
+.main:has(> .chat-page:not([hidden])) { padding-bottom: 0; }
+.chat-page { height: calc(100vh - 32px); overflow: hidden; }
+.chat-page > .chat, .chat-page > .file-pane, .chat-page > .chat-side { height: 100%; min-height: 0; }
+.chat-log, .file-pane .file-body, .file-pane > :last-child { overscroll-behavior: contain; }
+
+/* Right column: open pull requests and background work. Quiet rows like a sidebar, its own scroll. */
+.chat-page:has(> .chat-side:not([hidden])):has(> .file-pane[hidden]) { grid-template-columns: minmax(0, 1fr) 300px; }
+.chat-page:has(> .file-pane:not([hidden])) > .chat-side { display: none; }
+.chat-side { height: calc(100vh - 24px); overflow-y: auto; overscroll-behavior: contain; padding: 20px 12px; border-left: 1px solid var(--border); display: grid; align-content: start; gap: 20px; }
+.chat-side .side-head { font-size: var(--text-small); font-weight: 500; color: var(--muted); margin: 0 8px 6px; padding: 0; border: 0; }
+.side-row { display: flex; align-items: flex-start; gap: 10px; width: 100%; min-height: 40px; padding: 6px 8px; border-radius: 8px; color: var(--fg); background: transparent; text-align: left; text-decoration: none; }
+.side-row:hover, .side-row:focus-visible { background: var(--hover); }
+.side-row > .icon { flex: none; margin-top: 2px; color: var(--muted); }
+.side-row[href] > .icon { color: #8250df; }
+.side-text { display: grid; min-width: 0; }
+.side-title { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.side-meta { font-size: var(--text-small); color: var(--muted); }
+.side-done { color: var(--muted); margin: 0; }
+.side-done:hover { background: transparent; }
+@media (max-width: 1200px) { .chat-side { display: none; } .chat-page:has(> .chat-side:not([hidden])):has(> .file-pane[hidden]) { grid-template-columns: 1fr; } }

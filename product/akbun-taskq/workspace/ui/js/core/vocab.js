@@ -1,7 +1,8 @@
 import { currentLanguage, KO_WORDS } from './i18n.js'
 // Shared names for statuses, outcomes, types and alert kinds, plus helpers that read JSON text fields.
-export const BOARD_COLUMNS = ['ready', 'running', 'needs_approval', 'needs_auth', 'review', 'done']
-export const COLLAPSED_COLUMNS = ['draft', 'failed', 'cancelled']
+// The board's flow in order, in two rows; failed and cancelled sit collapsed after the second row, off the flow.
+export const BOARD_ROWS = [['draft', 'ready', 'running', 'needs_approval'], ['needs_auth', 'review', 'done']]
+export const COLLAPSED_COLUMNS = ['failed', 'cancelled']
 export const TASK_TYPES = ['ops_read', 'ops_change', 'code', 'research', 'security_review']
 export const OUTCOMES = ['done', 'failed', 'needs_approval', 'needs_auth', 'review', 'stale']
 export const SEVERITY_RANK = { critical: 0, high: 1, normal: 2 }
