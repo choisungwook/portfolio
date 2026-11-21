@@ -1,11 +1,11 @@
 /* Board and search results. Columns and cards are Carbon tiles: separation comes from layer color, not shadow. */
-/* Two rows of steps with a chevron between them; each row scrolls sideways on a narrow window. */
-.board-columns { display: grid; gap: 16px; background: var(--bg); padding: 0; }
-.board-row { display: flex; align-items: flex-start; gap: 4px; overflow-x: auto; }
-.board-row > .board-col { flex: 1 1 0; min-width: 200px; }
-.board-row > .board-col.collapsed { flex: 0 1 200px; min-width: 160px; }
-.board-arrow { flex: none; align-self: flex-start; display: grid; place-items: center; width: 20px; height: 44px; color: var(--muted); }
-.board-gap { flex: none; width: 16px; }
+/* Steps in one grid of equal columns with a chevron before each: how many fit in a row depends only on the window
+   width, not on how many columns there are. A column with many cards scrolls inside itself. */
+.board-columns { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 16px 4px; align-items: start; background: var(--bg); padding: 0; }
+.board-step { display: flex; align-items: flex-start; min-width: 0; }
+.board-step > .board-col { flex: 1; min-width: 0; }
+.board-arrow { flex: none; display: grid; place-items: center; width: 20px; height: 44px; color: var(--muted); }
+.board-col .cards { max-height: min(60vh, 640px); overflow-y: auto; padding: 2px; margin: -2px; }
 .board-col { background: var(--panel-soft); padding: 12px 8px; min-height: 120px; border-radius: var(--radius-l); }
 .board-col h3 { margin: 0 0 12px 4px; font-size: 14px; }
 .board-col.collapsed summary { cursor: pointer; font-weight: 600; padding: 4px 0; }

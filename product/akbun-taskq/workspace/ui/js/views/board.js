@@ -1,9 +1,9 @@
-// Board tab: one column per status in the order a task moves, draft first, in two rows with an arrow between steps.
-// Failed and cancelled are not steps; they sit collapsed at the end of the second row.
+// Board tab: one column per status in the order a task moves, draft first, with an arrow between steps. Columns wrap
+// to the next row by window width only. Failed and cancelled are not steps; they sit collapsed at the end.
 import { api } from '../core/api.js'
 import { area, clear, el } from '../core/dom.js'
 import { emit, on } from '../core/bus.js'
-import { BOARD_ROWS, COLLAPSED_COLUMNS, label, TYPE_MARK } from '../core/vocab.js'
+import { BOARD_COLUMNS, COLLAPSED_COLUMNS, label, TYPE_MARK } from '../core/vocab.js'
 import { icon } from '../core/icons.js'
 import { statusIndicator } from '../core/status.js'
 import { runNowButton, RUNNABLE } from '../core/run-now.js'
@@ -26,12 +26,13 @@ async function load() {
   try {
     const tasks = await api.get('/tasks')
     const of = (status) => tasks.filter((t) => t.status === status)
-    const arrow = () => el('span', { class: 'board-arrow', 'aria-hidden': 'true' }, icon('chevron-right', 18))
-    clear(columns).append(...BOARD_ROWS.map((row, r) => el('div', { class: 'board-row' },
-      // The second row goes on from the first, so it starts with an arrow too.
-      ...row.flatMap((status, i) => [i > 0 || r > 0 ? arrow() : null, column(status, of(status), false)]).filter(Boolean),
-      ...(r === BOARD_ROWS.length - 1 ? [el('span', { class: 'board-gap' }), ...COLLAPSED_COLUMNS.map((status) => column(status, of(status), true))] : []),
-    )))
+    // Every step keeps an arrow slot so all columns are the same width; only the first and collapsed ones leave it empty.
+    const step = (col, arrow) => el('div', { class: 'board-step' },
+      arrow ? el('span', { class: 'board-arrow', 'aria-hidden': 'true' }, icon('chevron-right', 18)) : el('span', { class: 'board-arrow' }), col)
+    clear(columns).append(
+      ...BOARD_COLUMNS.map((status, i) => step(column(status, of(status), false), i > 0)),
+      ...COLLAPSED_COLUMNS.map((status) => step(column(status, of(status), true), false)),
+    )
   } catch (error) {
     clear(columns).append(el('p', { class: 'error', text: error.message }))
   }
