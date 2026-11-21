@@ -5,6 +5,7 @@ import { raiseAlert } from '../alerts/rules.ts'
 import { mask } from '../mask.ts'
 import { nowSec } from '../time.ts'
 import { teamChanged } from '../wake.ts'
+import { allowSite } from '../browser/sites.ts'
 
 // A call a bot waits on the user for: it needs approval before it runs.
 
@@ -37,10 +38,12 @@ export function requestApproval(db: Db, bot: string, tool: string, command: stri
   })
 }
 
-// An approved request lets exactly that call run once; using it marks it used.
-export function consumeApproval(db: Db, bot: string, tool: string, command: string): boolean {
-  const row = db.prepare(`SELECT id FROM bot_approvals WHERE bot = ? AND tool = ? AND command = ? AND status = 'approved' ORDER BY id LIMIT 1`)
-    .get(bot, tool, mask(command).slice(0, 4000))
+// An approved request lets exactly that call run once; using it marks it used. maxAgeSec, when given, ignores an
+// approval decided longer ago than that.
+export function consumeApproval(db: Db, bot: string, tool: string, command: string, maxAgeSec?: number): boolean {
+  const since = maxAgeSec === undefined ? 0 : nowSec() - maxAgeSec
+  const row = db.prepare(`SELECT id FROM bot_approvals WHERE bot = ? AND tool = ? AND command = ? AND status = 'approved' AND coalesce(decided_at, 0) >= ? ORDER BY id LIMIT 1`)
+    .get(bot, tool, mask(command).slice(0, 4000), since)
   if (!row) return false
   db.prepare(`UPDATE bot_approvals SET status = 'used', used_at = ? WHERE id = ?`).run(nowSec(), row.id)
   return true
@@ -50,11 +53,16 @@ export function decideApprovalRequest(db: Db, id: number, approve: boolean): Bot
   return inTransaction(db, () => {
     const row = db.prepare(`SELECT * FROM bot_approvals WHERE id = ? AND status = 'pending'`).get(id) as unknown as BotApproval | undefined
     if (!row) return undefined
-    db.prepare(`UPDATE bot_approvals SET status = ?, decided_at = ? WHERE id = ?`).run(approve ? 'approved' : 'denied', nowSec(), id)
+    // A site request is not one call: approving it allows the bot to click and type on that site from now on.
+    const site = row.tool === 'browser_site'
+    if (approve && site) allowSite(db, row.bot, row.command)
+    db.prepare(`UPDATE bot_approvals SET status = ?, decided_at = ? WHERE id = ?`).run(approve ? (site ? 'used' : 'approved') : 'denied', nowSec(), id)
     db.prepare(`UPDATE alerts SET acked_at = ? WHERE ref = ? AND acked_at IS NULL`).run(nowSec(), `bot-approval:${id}`)
     postMessage(db, {
       sender: SYSTEM, recipient: row.bot,
-      body: approve
+      body: approve && site
+        ? `The user allowed you to click and type on ${row.command} in your browser (request #${id}). Read the page again and go on.`
+        : approve
         ? `The user approved request #${id}. You may now run this exact ${row.tool} call once:\n${row.command}`
         : `The user denied request #${id} (${row.tool}: ${row.command.slice(0, 200)}). Do not run it; find another way or report what is blocked.`,
     })

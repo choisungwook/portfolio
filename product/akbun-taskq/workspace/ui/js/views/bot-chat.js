@@ -511,6 +511,20 @@ function showBrowser() {
   const name = bot
   const input = el('input', { type: 'text', value: browserUrl, placeholder: 'https://example.com', 'aria-label': 'URL', spellcheck: 'false' })
   const status = el('p', { class: 'meta browser-status', role: 'status' })
+  // Sites where the user let this bot click and type; × takes one back.
+  const sites = el('div', { class: 'browser-sites' })
+  let sitesKey = null
+  const drawSites = (list) => {
+    const key = list.join(' ')
+    if (key === sitesKey) return
+    sitesKey = key
+    fill(sites, ...(list.length ? [el('span', { class: 'meta', text: t('chat.browser_sites', 'Allowed to click and type on') })] : []),
+      ...list.map((host) => el('span', { class: 'browser-site' }, host,
+        el('button', { type: 'button', class: 'quiet', 'aria-label': `${t('chat.browser_forget', 'Take back')} ${host}`, onclick: async () => {
+          const done = await mutate(() => api.del(`/bots/${encodeURIComponent(name)}/browser/sites/${encodeURIComponent(host)}`))
+          if (done) drawSites(done.sites)
+        } }, icon('close', 14)))))
+  }
   const img = el('img', { class: 'browser-screen', alt: t('chat.browser_alt', "The bot's browser"), hidden: true })
   let url = null
   const open = async (event) => {
@@ -534,6 +548,7 @@ function showBrowser() {
     if (paneMode !== 'browser' || bot !== name) return
     try {
       const state = await api.get(`/bots/${encodeURIComponent(name)}/browser`)
+      drawSites(state.sites ?? [])
       if (state.running) {
         const blob = await api.blob(`/bots/${encodeURIComponent(name)}/browser/screen`)
         if (paneMode !== 'browser' || bot !== name) return
@@ -557,7 +572,7 @@ function showBrowser() {
       el('button', { type: 'submit', text: t('chat.go', 'Go') }),
       el('button', { type: 'button', class: 'quiet', text: t('chat.new_tab', 'New tab'), onclick: () => browserUrl && window.open(browserUrl, '_blank', 'noopener') }),
       el('button', { type: 'button', class: 'quiet file-close', 'aria-label': t('file.close', 'Close'), onclick: () => setPane(null) }, icon('close', 18))),
-    el('div', { class: 'file-body browser-body' }, status, img))
+    el('div', { class: 'file-body browser-body' }, status, sites, img))
   refresh()
 }
 

@@ -14,6 +14,7 @@ import { sharedRelative } from '../team/shared.ts'
 import { searchMessages } from '../db/message-search.ts'
 import { botActivity } from '../team/activity.ts'
 import { browserClickAt, browserOpen, browserScreenshot, browserState } from '../browser/actions.ts'
+import { allowedSites, forgetSite } from '../browser/sites.ts'
 import { getPage, listPages } from '../db/wiki.ts'
 import { forceClose, listThreads } from '../db/threads.ts'
 import { hybridSearch } from '../team/search.ts'
@@ -192,7 +193,16 @@ export function registerBotsRoutes(api: Hono, { db, config, bots }: ApiDeps): vo
       throw new HttpError(409, error instanceof Error ? error.message : String(error))
     }
   }
-  api.get('/bots/:name/browser', async (c) => c.json(await browserState(config, botOf(c.req.param('name')))))
+  api.get('/bots/:name/browser', async (c) => {
+    const name = botOf(c.req.param('name'))
+    return c.json({ ...(await browserState(config, name)), sites: allowedSites(db, name) })
+  })
+  // Takes back a site the user allowed: the bot's next click or typing there asks again.
+  api.delete('/bots/:name/browser/sites/:host', (c) => {
+    const name = botOf(c.req.param('name'))
+    forgetSite(db, name, c.req.param('host'))
+    return c.json({ sites: allowedSites(db, name) })
+  })
   api.get('/bots/:name/browser/screen', async (c) => {
     const name = botOf(c.req.param('name'))
     if (!(await browserState(config, name)).running) throw new HttpError(404, 'the browser is not running')

@@ -88,6 +88,30 @@ async function clickAt(page: Page, x: number, y: number): Promise<void> {
   await settle(page)
 }
 
+// What a ref points at, before acting on it, so the approval gate can name the action in words the user recognizes.
+// host includes the port, so allowing one local dev server does not allow every service on 127.0.0.1. href and
+// action keep only origin and path: a query (?order=asc) says nothing about what the click does. form is the text of
+// the submit button of the field's form, what Enter in that field would press.
+export interface Target { host: string; page: string; label: string; tag: string; type: string; href: string; form: string; editable: boolean }
+export function browserTarget(config: Config, bot: string, ref: string) {
+  return withPage(config, bot, async (page) => {
+    const target = await page.evaluate<Target | null>(`(() => {
+      const el = document.querySelector('[data-taskq-ref=${JSON.stringify(ref)}]')
+      if (!el) return null
+      const text = (e) => (e ? (e.getAttribute('aria-label') || e.innerText || e.value || e.placeholder || e.title || e.name || '') : '').trim().replace(/\\s+/g, ' ').slice(0, 120)
+      const path = (u) => { try { const x = new URL(u, location.href); return x.origin + x.pathname } catch { return '' } }
+      const submit = el.form ? el.form.querySelector('button:not([type=button]):not([type=reset]), input[type=submit]') : null
+      return {
+        host: location.host, page: location.origin + location.pathname, label: text(el), tag: el.tagName.toLowerCase(), type: (el.type || '').toLowerCase(),
+        href: el.href ? path(el.href) : '', form: el.form ? (text(submit) + ' ' + path(el.form.action)).trim() : '',
+        editable: el.tagName === 'TEXTAREA' || el.isContentEditable,
+      }
+    })()`)
+    if (!target) throw new Error(`no element ${ref} on this page; call browser_read again, the page may have changed`)
+    return target
+  }, false)
+}
+
 export function browserClick(config: Config, bot: string, ref: string) {
   return withPage(config, bot, async (page) => {
     const { x, y } = await center(page, ref)
