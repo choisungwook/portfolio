@@ -159,9 +159,9 @@ export function callMcpTool(config: Config, name: string, rawArgs: Record<string
       rejectUnknownKeys(rawArgs, ['text', 'project', 'session', 'agent'])
       const text = optionalString(rawArgs, 'text')?.trim()
       if (!text) return errorResult('text must be a non-empty string')
-      const project = optionalString(rawArgs, 'project') ?? basename(process.cwd())
-      const session = optionalString(rawArgs, 'session') ?? 'manual'
-      const agent = optionalString(rawArgs, 'agent') ?? 'mcp'
+      const project = optionalString(rawArgs, 'project')?.trim() || basename(process.cwd())
+      const session = optionalString(rawArgs, 'session')?.trim() || 'manual'
+      const agent = optionalString(rawArgs, 'agent')?.trim() || 'mcp'
       const id = withStore(config, (s) => addMemory(s, { session_id: session, agent, project, kind: 'note', content: text }))
       return objectResult({ id })
     }
