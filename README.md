@@ -172,6 +172,7 @@
 - [Claude, Codex, Kiro 사용량을 보여주는 macOS 메뉴바 앱 (akbun-ai-useage)](./product/akbun-ai-useage/) (26.9.23)
 - [사진 카탈로그와 초보자용 자동 보정, AI용 CLI를 갖춘 macOS 사진 편집 앱 (akbun-makephoto)](./product/akbun-makephoto/) (26.10.31)
 - [사람과 AI agent가 함께 편집하는 영상 스토리보드 도구 (akbun-storyboard)](./product/akbun-storyboard/) (26.11.15)
+- [AI 에이전트 hook이 남긴 대화를 모델 없이 검색하는 로컬 AI 메모리 (akbun-aimemory)](./product/akbun-aimemory/) (26.11.21)
 - [여러 Claude 세션이 태스크를 병렬로 처리하는 개인용 에이전트 태스크 큐 (akbun-taskq)](./product/akbun-taskq/) (26.11.15)
 - [AI agent가 값을 보지 않고 쓰는 로컬 비밀 값 관리 도구 (akbun-keychain)](./product/akbun-keychain/) (26.11.17)
 

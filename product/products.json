@@ -1,7 +1,15 @@
 {
   "repoBase": "https://github.com/choisungwook/portfolio/tree/master/product",
-  "updated": "2026-11-18",
+  "updated": "2026-11-21",
   "products": [
+    {
+      "id": "akbun-aimemory",
+      "name": "akbun-aimemory",
+      "description": "Claude Code·Codex·Kiro·Antigravity hook이 남긴 대화를 SQLite에 모아 AI 모델 없이 하이브리드 검색하고 CLI와 웹 UI로 관리하는 AI 메모리",
+      "kind": "backend",
+      "tags": ["typescript", "sqlite", "cli", "memory", "search"],
+      "released": "2026-11-21"
+    },
     {
       "id": "akbun-keychain",
       "name": "akbun-keychain",

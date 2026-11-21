@@ -1,0 +1,6 @@
+{
+  "tokenizer": { "type": "builtin" },
+  "indexer": { "provider": "claude", "model": "claude-haiku-5-5", "effort": "low" },
+  "contextLimit": 8,
+  "halfLifeDays": 30
+}
