@@ -13,6 +13,7 @@ import { getMemory, MEMORY_LIMIT, setMemory } from '../team/memory.ts'
 import { sharedRelative } from '../team/shared.ts'
 import { searchMessages } from '../db/message-search.ts'
 import { botActivity } from '../team/activity.ts'
+import { botWorkdir } from '../team/shared.ts'
 import { browserClickAt, browserOpen, browserScreenshot, browserState } from '../browser/actions.ts'
 import { allowedSites, forgetSite } from '../browser/sites.ts'
 import { getPage, listPages } from '../db/wiki.ts'
@@ -176,8 +177,9 @@ export function registerBotsRoutes(api: Hono, { db, config, bots }: ApiDeps): vo
   // background work: unfinished tasks it owns, how many finished in the last day, and bots working on what it sent.
   api.get('/bots/:name/activity', async (c) => {
     const name = c.req.param('name')
-    if (!getAgent(db, name)) throw new HttpError(404, 'no such bot')
-    return c.json(await botActivity(db, name))
+    const agent = getAgent(db, name)
+    if (!agent) throw new HttpError(404, 'no such bot')
+    return c.json(await botActivity(db, name, undefined, botWorkdir(config, agent)))
   })
 
   // The bot's browser for the right pane: where it is (never starts one), a JPEG of what it shows, and the user driving

@@ -50,6 +50,7 @@ export interface TeamAgent extends BotSettings {
   name: string
   system: boolean
   memory: string              // the bot's notes to itself, sent with every turn (src/team/memory.ts)
+  context_breakdown: Record<string, unknown> | null  // what filled the context at the end of the last turn (ContextBreakdown), Claude only
   session_id: string | null
 }
 
@@ -97,6 +98,7 @@ function toAgent(row: Record<string, unknown>, all: ReturnType<typeof shared>): 
   agent.skills = all.skills
   agent.plugins = row.sdk === 'claude' ? all.plugins : []
   agent.mcp_servers = all.mcp_servers
+  agent.context_breakdown = row.context_breakdown ? JSON.parse(String(row.context_breakdown)) : null
   delete agent.created_at
   return agent as unknown as TeamAgent
 }
@@ -119,7 +121,7 @@ export function updateAgent(db: Db, name: string, settings: BotSettings): boolea
   const was = db.prepare('SELECT enabled FROM team_agents WHERE name = ?').get(name)
   if (was && Boolean(was.enabled) !== Boolean(settings.enabled)) forgetSignedOut(db, name)
   // A session of one runtime cannot be resumed by another: a new SDK or OpenAI provider starts a new session.
-  db.prepare(`UPDATE team_agents SET session_id = NULL, session_cost_usd = 0, context_tokens = NULL, context_window = NULL
+  db.prepare(`UPDATE team_agents SET session_id = NULL, session_cost_usd = 0, context_tokens = NULL, context_window = NULL, context_breakdown = NULL
     WHERE name = ? AND (sdk IS NOT ? OR coalesce(provider, 'api') IS NOT coalesce(?, 'api'))`).run(name, settings.sdk, settings.provider ?? null)
   return db.prepare(`UPDATE team_agents SET role = ?, description = ?, instructions = ?, may_message_user = ?, enabled = ?,
     permission_mode = ?, sandbox = ?, allowed_domains = ?, blocked_commands = ?, workdir = ?, skills = ?, plugins = ?, model = ?,
@@ -172,7 +174,7 @@ export function setAgentSession(db: Db, name: string, sessionId: string | null):
 
 // The user's reset: the next turn starts a new session with an empty context.
 export function resetAgentSession(db: Db, name: string): void {
-  db.prepare('UPDATE team_agents SET session_id = NULL, session_cost_usd = 0, context_tokens = NULL WHERE name = ?').run(name)
+  db.prepare('UPDATE team_agents SET session_id = NULL, session_cost_usd = 0, context_tokens = NULL, context_breakdown = NULL WHERE name = ?').run(name)
 }
 
 // Used when a turn ends: the session is replaced only if nobody reset it while the turn ran.

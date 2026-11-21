@@ -95,6 +95,22 @@ describe('claude team backend', () => {
     assert.equal(result.model, 'claude-sonnet-5-5')
   })
 
+  test('a turn that ends well reports what fills the context, and a session that cannot say reports nothing', async () => {
+    const f = fake(() => [done()])
+    const withUsage: typeof f.query = (params) => Object.assign(f.query(params), {
+      getContextUsage: async () => ({
+        totalTokens: 52000, maxTokens: 200000, percentage: 26, isAutoCompactEnabled: true,
+        categories: [{ id: 'messages', name: 'Messages', tokens: 40000, kind: 'used', color: 'x' }, { id: 'free_space', name: 'Free space', tokens: 148000, kind: 'free', color: 'y' }],
+      }),
+    })
+    const result = await createClaudeTeamBackend(withUsage).runTurn(env.config, request)
+    assert.deepEqual(result.context_breakdown, {
+      total: 52000, max: 200000, percentage: 26, auto_compact: true,
+      categories: [{ id: 'messages', name: 'Messages', tokens: 40000, kind: 'used' }, { id: 'free_space', name: 'Free space', tokens: 148000, kind: 'free' }],
+    })
+    assert.equal((await createClaudeTeamBackend(fake(() => [done()]).query).runTurn(env.config, request)).context_breakdown, undefined)
+  })
+
   test('an automatic compaction shows in the conversation as a step', async () => {
     const f = fake(() => [{ type: 'system', subtype: 'compact_boundary', compact_metadata: { trigger: 'auto', pre_tokens: 180000 } }, done()])
     const steps: [string, Record<string, unknown>][] = []

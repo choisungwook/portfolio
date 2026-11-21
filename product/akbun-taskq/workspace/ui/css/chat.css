@@ -327,6 +327,20 @@ mark.find.current { background: var(--accent); color: var(--on-accent); }
 .chat-side .side-head { font-size: var(--text-small); font-weight: 500; color: var(--muted); margin: 0 8px 6px; padding: 0; border: 0; }
 .side-row { display: flex; align-items: flex-start; gap: 10px; width: 100%; min-height: 40px; padding: 6px 8px; border-radius: 8px; color: var(--fg); background: transparent; text-align: left; text-decoration: none; }
 .side-row:hover, .side-row:focus-visible { background: var(--hover); }
+/* Context section: summary line, a bar split by category, and a row per category with tokens and share. */
+.side-context { display: grid; gap: 8px; padding: 0 8px; }
+.side-context .side-head { margin: 0 0 2px; }
+.ctx-summary { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
+.ctx-bar { display: flex; height: 6px; border-radius: 3px; overflow: hidden; background: var(--panel-soft); }
+.ctx-bar > span { height: 100%; }
+.ctx-rows { list-style: none; margin: 4px 0 0; padding: 0; display: grid; gap: 4px; font-size: var(--text-small); }
+.ctx-rows li { display: grid; grid-template-columns: 10px minmax(0, 1fr) auto 52px; align-items: center; gap: 8px; }
+.ctx-dot { width: 10px; height: 10px; border-radius: 2px; }
+.ctx-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--muted); }
+.ctx-num { text-align: right; font-variant-numeric: tabular-nums; color: var(--muted); }
+.side-changes { cursor: default; }
+.side-changes .diff-add { color: var(--done); font-weight: 600; }
+.side-changes .diff-del { color: var(--failed); font-weight: 600; }
 .side-row > .icon { flex: none; margin-top: 2px; color: var(--muted); }
 .side-row[href] > .icon { color: #8250df; }
 .side-text { display: grid; min-width: 0; }

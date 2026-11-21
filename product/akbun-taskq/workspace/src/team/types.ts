@@ -41,6 +41,7 @@ export interface TurnResult {
   model?: string            // the model that answered
   usage?: TokenUsage        // tokens of this turn
   context?: { tokens: number; window: number | null }   // the context size at the end of the turn, for the context ring
+  context_breakdown?: ContextBreakdown                   // what fills that context, when the runtime can say (Claude)
 }
 
 export interface TokenUsage {
@@ -68,4 +69,14 @@ export interface TeamBackend {
   runTurn(config: Config, request: TurnRequest): Promise<TurnResult>
   supportsLiveInput?: boolean   // can take messages into a running turn (Claude streaming input); otherwise they wait
   catalog?(config: Config, request: CatalogRequest): Promise<Catalog>
+}
+
+// What fills a bot's context, by category, as the Claude Agent SDK's getContextUsage reports it at the end of a turn.
+// kind: 'used' content, 'free' window left, 'buffer' reserved for compaction, 'deferred' tools loaded on demand.
+export interface ContextBreakdown {
+  total: number
+  max: number
+  percentage: number
+  auto_compact: boolean
+  categories: { id: string | null; name: string; tokens: number; kind: string }[]
 }

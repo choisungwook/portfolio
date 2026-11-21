@@ -232,12 +232,13 @@ describe('team hub', () => {
   test('[critical] a new SDK or provider starts a new session; the reset clears the context and the session cost', async () => {
     const { db } = env
     setAgentSession(db, 'coder', 'claude-session')
-    db.prepare(`UPDATE team_agents SET context_tokens = 5000, context_window = 200000, session_cost_usd = 2 WHERE name = 'coder'`).run()
+    db.prepare(`UPDATE team_agents SET context_tokens = 5000, context_window = 200000, session_cost_usd = 2, context_breakdown = '{"total":5000}' WHERE name = 'coder'`).run()
+    assert.deepEqual(getAgent(db, 'coder')?.context_breakdown, { total: 5000 }, 'the breakdown reads back as JSON')
     updateAgent(db, 'coder', { ...getAgent(db, 'coder')!, role: 'renamed' })
     assert.equal(getAgent(db, 'coder')?.session_id, 'claude-session', 'other edits keep the session')
     updateAgent(db, 'coder', { ...getAgent(db, 'coder')!, sdk: 'openai', provider: 'api' })
-    const moved = db.prepare(`SELECT session_id, context_tokens, context_window FROM team_agents WHERE name = 'coder'`).get()
-    assert.deepEqual({ ...moved }, { session_id: null, context_tokens: null, context_window: null })
+    const moved = db.prepare(`SELECT session_id, context_tokens, context_window, context_breakdown FROM team_agents WHERE name = 'coder'`).get()
+    assert.deepEqual({ ...moved }, { session_id: null, context_tokens: null, context_window: null, context_breakdown: null })
     setAgentSession(db, 'coder', 'resp_1')
     updateAgent(db, 'coder', { ...getAgent(db, 'coder')!, provider: 'bedrock' })
     assert.equal(getAgent(db, 'coder')?.session_id, null, 'a Responses id is not a Bedrock session')

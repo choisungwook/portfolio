@@ -16,6 +16,11 @@ export function recordUsage(db: Db, turnId: number, bot: string, result: TurnRes
     db.prepare('UPDATE team_agents SET context_tokens = ?, context_window = COALESCE(?, context_window) WHERE name = ?')
       .run(result.context.tokens, result.context.window, bot)
   }
+  // A turn that reports a size but no breakdown (it failed, or the session did not answer) clears the old breakdown, so
+  // the panel never shows one turn's categories under another turn's size.
+  if (result.context_breakdown || result.context) {
+    db.prepare('UPDATE team_agents SET context_breakdown = ? WHERE name = ?').run(result.context_breakdown ? JSON.stringify(result.context_breakdown) : null, bot)
+  }
 }
 
 export type Period = 'today' | '7d' | '30d' | 'all'

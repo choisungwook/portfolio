@@ -290,7 +290,8 @@ function parseFiles(value) {
   }
 }
 
-// The right column, as in Claude Desktop: the bot's open pull requests, to review them straight away, and its background
+// The right column, as in Claude Desktop: what fills the bot's context, what it changed (uncommitted lines in its
+// working folder and its open pull requests), to review them straight away, and its background
 // work (bots working on what it sent, its unfinished tasks, how many finished today). Read every 15 s at most, since a PR
 // state is a gh call; hidden while it has nothing to show or the file pane takes the column.
 const SIDE_MS = 15000
@@ -302,23 +303,67 @@ async function loadSide(name) {
   const side = area('bot-side')
   const a = await api.get(`/bots/${encodeURIComponent(name)}/activity`).catch(() => null)
   if (bot !== name) return
-  if (!a || (!a.pull_requests.length && !a.background.length && !a.sub_sessions.length && !a.finished)) {
+  const agent = botsSnapshot()?.agents.find((x) => x.name === name)
+  const context = contextSection(agent)
+  if (!a && !context) {
     side.hidden = true
     return
   }
   const row = (iconName, title, meta, props) => el(props.href ? 'a' : 'button', { class: 'side-row', ...(props.href ? {} : { type: 'button' }), ...props },
     icon(iconName, 18), el('span', { class: 'side-text' }, el('span', { class: 'side-title', text: title }), meta ? el('span', { class: 'side-meta', text: meta }) : null))
   const section = (title, rows) => rows.length ? el('section', {}, el('h2', { class: 'side-head', text: title }), ...rows) : null
-  clear(side).append(...[
-    section(t('side.changes', 'Changes'), a.pull_requests.map((pr) => row('pull-request', pr.title ?? pr.url.replace('https://github.com/', ''), `#${pr.number}`,
-      { href: pr.url, target: '_blank', rel: 'noopener noreferrer', title: pr.url }))),
-    section(t('side.background', 'Background work'), [
+  const changes = a?.changes && a.changes.files > 0
+    ? [el('div', { class: 'side-row side-changes', title: `${a.changes.path} · ${a.changes.branch}` }, icon('files', 18),
+      el('span', { class: 'side-text' },
+        el('span', { class: 'side-title' }, a.changes.repo, ' ', el('span', { class: 'diff-add', text: `+${a.changes.additions}` }), ' ', el('span', { class: 'diff-del', text: `-${a.changes.deletions}` })),
+        el('span', { class: 'side-meta', text: `${a.changes.branch} · ${t('side.files', '{n} files').replace('{n}', a.changes.files)}` })))]
+    : []
+  const sections = [
+    context,
+    section(t('side.changes', 'Changes'), [...changes, ...(a?.pull_requests ?? []).map((pr) => row('pull-request', pr.title ?? pr.url.replace('https://github.com/', ''), `#${pr.number}`,
+      { href: pr.url, target: '_blank', rel: 'noopener noreferrer', title: pr.url }))]),
+    a ? section(t('side.background', 'Background work'), [
       ...a.sub_sessions.map((s) => row('terminal', s.agent, `${t('chat.working', 'Working')} ${elapsed(s.started_at)}`, { onclick: () => show('bot', s.agent) })),
       ...a.background.map((task) => row('terminal', task.task_title, label(task.status), { onclick: () => emit('open-task', task.id) })),
       ...(a.finished ? [el('p', { class: 'side-row side-done' }, icon('done', 18), el('span', { text: t('side.finished', '{n} finished').replace('{n}', a.finished) }))] : []),
-    ]),
-  ].filter(Boolean))
-  side.hidden = false
+    ]) : null,
+  ].filter(Boolean)
+  // Nothing to show (a bot that never ran, with no work around it): the column stays hidden.
+  side.hidden = sections.length === 0
+  clear(side).append(...sections)
+}
+
+// The Context section, as in Claude Desktop: how full the window is, a bar split by what fills it, and a row per
+// category (system prompt, tools, MCP, memory, skills, messages, compaction reserve, free space) from the breakdown the
+// SDK gave at the end of the last turn. A bot whose runtime gives no breakdown shows the size alone.
+const CONTEXT_COLORS = {
+  messages: '#3b82f6', mcp_tools: '#f97316', system_tools: '#10b981', system_prompt: '#64748b', skills: '#8b5cf6',
+  memory_files: '#14b8a6', custom_agents: '#ec4899', mcp_instructions: '#a16207', autocompact_buffer: '#cbd5e1', compact_buffer: '#cbd5e1',
+}
+const kTokens = (n) => (n >= 1000 ? `${(n / 1000).toFixed(n >= 100_000 ? 0 : 1)}k` : String(n))
+
+function contextSection(agent) {
+  const b = agent?.context_breakdown
+  const total = b?.total ?? agent?.context_tokens
+  const max = b?.max ?? agent?.context_window
+  if (!total || !max) return null
+  const pct = Math.round((total / max) * 100)
+  const rows = (b?.categories ?? []).filter((c) => c.kind !== 'deferred' && c.tokens > 0)
+  const color = (c) => (c.kind === 'free' ? 'transparent' : CONTEXT_COLORS[c.id] ?? '#94a3b8')
+  return el('section', { class: 'side-context' },
+    el('h2', { class: 'side-head', text: t('side.context', 'Context') }),
+    el('div', { class: 'ctx-summary' },
+      el('strong', { text: t('side.used', '{n}% used').replace('{n}', pct) }),
+      el('span', { class: 'side-meta', text: `${kTokens(total)} / ${kTokens(max)}` })),
+    el('div', { class: 'ctx-bar', role: 'img', 'aria-label': `${pct}%` },
+      ...(rows.length ? rows.filter((c) => c.kind !== 'free') : [{ id: 'messages', tokens: total, kind: 'used' }])
+        .map((c) => el('span', { style: { width: `${(c.tokens / max) * 100}%`, background: color(c) } }))),
+    rows.length ? el('ul', { class: 'ctx-rows' }, ...rows.map((c) => el('li', {},
+      el('span', { class: 'ctx-dot', style: { background: c.kind === 'free' ? 'var(--border)' : color(c) } }),
+      el('span', { class: 'ctx-name', text: c.name }),
+      el('span', { class: 'ctx-num', text: kTokens(c.tokens) }),
+      el('span', { class: 'ctx-num', text: `${((c.tokens / max) * 100).toFixed(1)}%` })))) : null,
+    b && !b.auto_compact ? el('p', { class: 'side-meta', text: t('side.no_autocompact', 'Auto-compact is off for this session.') }) : null)
 }
 
 // Tool calls in a row, with nothing said between them, fold into one line as in Claude Code: "Ran Bash git fetch…"

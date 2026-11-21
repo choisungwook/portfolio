@@ -1,13 +1,14 @@
-// Settings > Update: the running version, the newest release, and Install for the single-file binary. Checked when the
-// page opens; installing replaces the binary, and Restart now starts the new version in place.
+// Settings > Update: the running version, the newest release, and Install for the single-file binary. Checked only
+// when the user presses Check for updates; installing replaces the binary, and Restart now starts the new version in place.
 import { api, mutate } from '../core/api.js'
 import { area, clear, el } from '../core/dom.js'
 import { on } from '../core/bus.js'
 import { t } from '../core/i18n.js'
 
 export function initUpdateSettings() {
+  // Opening the page asks nothing of GitHub; the user presses Check for updates.
   on('settings-page', (page) => {
-    if (page === 'update') check()
+    if (page === 'update' && !area('update-status').hasChildNodes()) area('update-status').append(el('p', { class: 'meta', text: t('update.idle', 'Press Check for updates to see whether a newer version exists.') }))
   })
   area('update-check').addEventListener('click', check)
 }
@@ -20,6 +21,8 @@ function showActions(...nodes) {
 }
 
 async function check() {
+  // After the first check, Install is the primary action and checking again is a quiet one.
+  area('update-check').className = 'quiet'
   const box = area('update-status')
   clear(box).append(el('p', { class: 'meta', text: t('update.checking', 'Checking…') }))
   showActions()
