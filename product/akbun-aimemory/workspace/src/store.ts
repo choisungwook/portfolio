@@ -31,11 +31,11 @@ export interface Store { db: DatabaseSync; tokenizer: Tokenizer; config: Config 
 export const dbPath = (config: Config) => join(config.home, 'data', 'aimemory.db')
 
 export function openStore(config: Config): Store {
+  const tokenizer = makeTokenizer(config.tokenizer, config.home)
   mkdirSync(join(config.home, 'data'), { recursive: true, mode: 0o700 })
   const db = new DatabaseSync(dbPath(config), { timeout: 5000 })
   db.exec('PRAGMA journal_mode = WAL')
   db.exec(SCHEMA)
-  const tokenizer = makeTokenizer(config.tokenizer, config.home)
   const row = db.prepare("SELECT value FROM meta WHERE key = 'tokenizer'").get() as { value: string } | undefined
   if (!row) db.prepare("INSERT INTO meta VALUES ('tokenizer', ?)").run(tokenizer.id)
   else if (row.value !== tokenizer.id) process.stderr.write(`aimem: index was built with ${row.value}; run \`aimem reindex\`\n`)
