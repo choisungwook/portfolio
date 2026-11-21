@@ -18,8 +18,8 @@ flowchart LR
 
 가장 확실한 방법은 TCP 포트를 아예 없애는 `--remote-debugging-pipe`다. 하지만 파이프는 Chrome을 띄운 프로세스만 쓸 수 있어서, 서버와 Kiro·Codex의 MCP 프로세스가 같은 브라우저를 보는 구조를 다시 짜야 한다. 그래서 taskq가 자기 데이터 폴더를 지키는 방식을 그대로 따랐다.
 
-- 브라우저 프로필 폴더를 데이터 폴더와 같은 "taskq 자신"으로 다룬다. 셸 명령의 글자에 그 경로가 나오거나, Read·Grep 같은 파일 도구의 경로가 그 안을 가리키면 turn을 멈추고 bot들을 일시정지한다.
-- 포트는 `lsof`나 `ps`로도 찾을 수 있으므로, 파일만 막아서는 부족하다. 그래서 DevTools를 찾거나 부를 때 쓰는 글자(`DevToolsActivePort`, `remote-debugging`, `/json/version`, `devtools/page/`, `Input.dispatchMouseEvent` 등)가 들어간 명령은 거부한다.
+- 브라우저 프로필 폴더를 데이터 폴더와 같은 "taskq 자신"으로 다룬다. 파일 도구 쪽은 처음에 따로 검사를 썼다가, 리뷰에서 `~/...` 경로와 Glob 패턴을 놓친다는 지적을 받았다. 데이터 폴더를 지키는 `tamperOf`가 이미 `~`를 펼치고 패턴을 경로로 읽기 때문에, 거기에 브라우저 폴더를 더하는 쪽으로 바꿨다. 덕분에 task worker도 같은 보호를 받는다. 셸 명령은 글자로 보므로 `~/.taskq/browser`, `$HOME/...`, `$TASKQ_HOME/browser` 같은 표기도 목록에 넣었고, 같은 구멍이 있던 데이터 폴더와 plugin 복사본도 함께 막았다.
+- 포트는 `lsof`로도 찾을 수 있으므로, 파일만 막아서는 부족하다. 그래서 DevTools에 붙을 때 쓰는 글자(`DevToolsActivePort`, `:포트/json`, `devtools/page/`, `Input.dispatchMouseEvent`, `connectOverCDP`, `browserWSEndpoint` 등)가 들어간 명령은 거부한다. 처음에는 `remote-debugging`도 넣었는데, 그러면 Chrome을 다루는 저장소에서 코드를 grep하거나 커밋 메시지에 그 단어를 쓰는 것까지 막혀서 뺐다. 포트를 찾는 것보다 붙는 것을 막는 편이 오탐이 적다.
 - sandbox를 켠 bot은 `denyRead`에 프로필 폴더를 더해 읽기 자체를 막는다.
 
 글자로 검사하는 방식은 변수나 스크립트 파일로 우회할 수 있다. 그래서 이것은 사고와 손쉬운 우회를 막는 층이고, 경계는 sandbox다. 기존 데이터 폴더 보호와 같은 수준이다.

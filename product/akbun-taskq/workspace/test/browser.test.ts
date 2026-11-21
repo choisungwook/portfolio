@@ -130,12 +130,18 @@ test('a bot cannot reach its browser around the gate: the profile stops the turn
     assert.equal(gate('Bash', { command: `cat ${profile}/DevToolsActivePort` }).action, 'stop')
     assert.equal(gate('Read', { file_path: join(profile, 'DevToolsActivePort') }).action, 'stop')
     assert.equal(gate('Grep', { pattern: 'x', path: join(env.config.home, 'browser') }).action, 'stop')
+    assert.equal(gate('Glob', { pattern: join(env.config.home, 'browser', '*', 'DevToolsActivePort') }).action, 'stop', 'a pattern is a path')
+    assert.equal(gate('Bash', { command: 'cat $TASKQ_HOME/browser/coder/DevToolsActivePort' }).action, 'stop')
     for (const command of [
       'curl -s http://127.0.0.1:9222/json/version',
-      'lsof -iTCP -sTCP:LISTEN | grep remote-debugging',
       'find / -name DevToolsActivePort',
       `node -e "ws.send(JSON.stringify({method:'Input.dispatchMouseEvent'}))"`,
+      'curl http://127.0.0.1:53111/json',
+      `node -e "require('playwright').chromium.connectOverCDP('http://127.0.0.1:53111')"`,
     ]) assert.equal(gate('Bash', { command }).action, 'deny', command)
+    for (const command of ['grep -rn remote-debugging src/', `curl -H 'content-type: application/json' https://api.example.com`]) {
+      assert.equal(gate('Bash', { command }).action, 'allow', `not a DevTools call: ${command}`)
+    }
     assert.equal(gate('Bash', { command: 'curl -s https://example.com/api/list' }).action, 'allow', 'ordinary requests still run')
   } finally {
     env.cleanup()

@@ -16,6 +16,7 @@ export interface GateContext {
   profile?: string     // the target AWS profile of the task
   accessSkill?: string // the registered folder of the task's access skill (realpath)
   shared?: string      // TASKQ_HOME/shared, where attachments live; readable by every task type
+  browserDir?: string  // TASKQ_HOME/browser, the bots' browser profiles: DevToolsActivePort there drives a browser
 }
 
 interface Touch { real: string; write: boolean }
@@ -88,10 +89,12 @@ export function decide(type: TaskType, tool: string, input: Input, ctx: GateCont
 export function tamperOf(tool: string, input: Input, ctx: GateContext): string | null {
   if (input.dangerouslyDisableSandbox === true) return 'tried to run a command outside the sandbox'
   const dataDir = realPath(ctx.dataDir)
+  const browserDir = ctx.browserDir ? realPath(ctx.browserDir) : null
   const claudeDir = realPath(join(homedir(), '.claude'))
   for (const touch of touchesOf(tool, input, ctx)) {
     const name = basename(touch.real)
     if (under(touch.real, dataDir) || globMatches(touch.real, join(dataDir, 'taskq.db'))) return `${tool} reached the taskq data directory`
+    if (browserDir && (under(touch.real, browserDir) || globMatches(touch.real, join(browserDir, '*', 'DevToolsActivePort')))) return `${tool} reached a bot's browser profile`
     if (name === 'taskq.config.json' || globMatches(name, 'taskq.config.json')) return `${tool} reached the taskq config`
     if (touch.write && under(touch.real, claudeDir)) return `${tool} tried to write Claude Code settings`
   }
