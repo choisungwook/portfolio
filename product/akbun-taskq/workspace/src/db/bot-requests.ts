@@ -38,10 +38,12 @@ export function requestApproval(db: Db, bot: string, tool: string, command: stri
   })
 }
 
-// An approved request lets exactly that call run once; using it marks it used.
-export function consumeApproval(db: Db, bot: string, tool: string, command: string): boolean {
-  const row = db.prepare(`SELECT id FROM bot_approvals WHERE bot = ? AND tool = ? AND command = ? AND status = 'approved' ORDER BY id LIMIT 1`)
-    .get(bot, tool, mask(command).slice(0, 4000))
+// An approved request lets exactly that call run once; using it marks it used. maxAgeSec, when given, ignores an
+// approval decided longer ago than that.
+export function consumeApproval(db: Db, bot: string, tool: string, command: string, maxAgeSec?: number): boolean {
+  const since = maxAgeSec === undefined ? 0 : nowSec() - maxAgeSec
+  const row = db.prepare(`SELECT id FROM bot_approvals WHERE bot = ? AND tool = ? AND command = ? AND status = 'approved' AND coalesce(decided_at, 0) >= ? ORDER BY id LIMIT 1`)
+    .get(bot, tool, mask(command).slice(0, 4000), since)
   if (!row) return false
   db.prepare(`UPDATE bot_approvals SET status = 'used', used_at = ? WHERE id = ?`).run(nowSec(), row.id)
   return true

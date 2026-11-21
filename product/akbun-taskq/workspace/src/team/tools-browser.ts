@@ -16,6 +16,10 @@ import { ToolError, type ScopedTools, type TeamTool } from './tools.ts'
 // 2. On an allowed site, an action that looks irreversible (buy, pay, send, publish, delete, …, in Korean too) waits
 //    for a one-time approval of exactly that action, named by its label and page so a new ref still matches.
 // 3. Typing into a password field is always refused.
+// An approved web action must be used soon: a list of identical Delete buttons should not let an approval from
+// yesterday, or for another row, run later.
+const APPROVAL_FRESH_SEC = 15 * 60
+
 export function browserTools(scope: ScopedTools): TeamTool[] {
   const { config, agent, db } = scope
   const gate = async (ref: string, typing?: { text: string; submit: boolean }) => {
@@ -28,8 +32,12 @@ export function browserTools(scope: ScopedTools): TeamTool[] {
     const action = typing
       ? `type into "${target.label}"${typing.submit ? ' and press Enter' : ''} on ${target.page}: ${typing.text}`
       : `click "${target.label}" (${target.tag}) on ${target.page}`
-    const risky = typing ? typing.submit && IRREVERSIBLE_ACTION.test(target.label) : IRREVERSIBLE_ACTION.test(`${target.label} ${target.href}`)
-    if (risky && !consumeApproval(db, agent, 'browser_action', action)) {
+    // Enter in a textarea or an editable box is how chats and comments send, so submitting there always asks; in a plain
+    // field it asks when the field, or the button its form would press, looks irreversible.
+    const risky = typing
+      ? typing.submit && (target.editable || IRREVERSIBLE_ACTION.test(`${target.label} ${target.form}`))
+      : IRREVERSIBLE_ACTION.test(`${target.label} ${target.href}`)
+    if (risky && !consumeApproval(db, agent, 'browser_action', action, APPROVAL_FRESH_SEC)) {
       const request = requestApproval(db, agent, 'browser_action', action, 'irreversible web action')
       throw new Error(`This looks like an action that cannot be taken back, so it needs the user's approval: ${action}. Request #${request.id} is waiting in the user's Must check list. Do not retry now; once approved, read the page again and do exactly this once.`)
     }
