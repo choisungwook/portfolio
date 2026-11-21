@@ -61,6 +61,17 @@ describe('bot management api', () => {
     assert.equal(getAgent(env.db, 'ops'), undefined)
   })
 
+  test('an effort-only save leaves no reload note in the conversation; other saves still do', async () => {
+    await call('GET', '/bots')
+    await call('POST', '/bots', { name: 'thinker', description: 'Thinks' })
+    const notes = () => listMessages(env.db, { agent: 'thinker', limit: 20 }).filter((m) => m.body.startsWith('Skills reloaded')).length
+    const before = notes()
+    assert.equal((await call('PUT', '/bots/thinker', { effort: 'medium' })).status, 200)
+    assert.equal(notes(), before)
+    assert.equal((await call('PUT', '/bots/thinker', { effort: 'high', description: 'Thinks hard' })).status, 200)
+    assert.equal(notes(), before + 1)
+  })
+
   test('a registered skill is copied into the bot on save and again on reload', async () => {
     const skill = join(env.home, 'skills-src', 'release-notes')
     mkdirSync(skill, { recursive: true })

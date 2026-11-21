@@ -37,6 +37,13 @@ export function fmtDateTime(sec) {
   })
 }
 
+// The exact moment for a tooltip: YY/MM/DD (weekday) hh:mm:ss, the weekday in the page's language.
+export function fmtExact(sec) {
+  const d = new Date(sec * 1000)
+  const weekday = d.toLocaleDateString(document.documentElement.lang || undefined, { weekday: 'short' })
+  return `${pad(d.getFullYear() % 100)}/${pad(d.getMonth() + 1)}/${pad(d.getDate())} (${weekday}) ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`
+}
+
 export function fmtClock(sec) {
   return new Date(sec * 1000).toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' })
 }

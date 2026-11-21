@@ -1,6 +1,6 @@
 /* A bot's conversation, plus the Discussions and Wiki views. */
 .chat { display: grid; grid-template-rows: auto minmax(0, 1fr) auto; height: calc(100vh - 24px); min-height: 480px; background: var(--panel); border-radius: var(--radius-l); overflow: hidden; }
-.chat-head { display: flex; gap: 16px; align-items: flex-start; padding: 16px 20px; border-bottom: 1px solid var(--border); }
+.chat-head { display: flex; gap: 16px; align-items: center; padding: 16px 20px; border-bottom: 1px solid var(--border); }
 .chat-head .avatar { flex: none; }
 .chat-who { min-width: 0; }
 .chat-who h2 { margin: 0; font-size: 1.47em; font-weight: 700; }
@@ -31,9 +31,10 @@
 .chat-compose button { min-height: 44px; border-radius: 22px; padding: 0 20px; }
 
 
-.wiki-search { display: flex; gap: 8px; margin-bottom: 12px; }
+.wiki-search { display: flex; gap: 8px; margin: 0; }
 .wiki-search input { flex: 1; min-height: 40px; border-radius: 20px; padding: 0 16px; }
-.wiki-layout { display: grid; grid-template-columns: minmax(220px, 1fr) minmax(0, 2fr); gap: 12px; align-items: start; }
+.wiki-layout { display: grid; grid-template-columns: minmax(260px, 360px) minmax(0, 1fr); gap: 24px; align-items: start; }
+@media (max-width: 900px) { .wiki-layout { grid-template-columns: 1fr; } }
 .wiki-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; }
 .wiki-item {
   display: grid; gap: 2px; width: 100%; text-align: left; padding: 10px 14px; min-height: 0;
@@ -41,7 +42,7 @@
 }
 .wiki-item[aria-current="true"] { box-shadow: inset 0 0 0 2px var(--accent); }
 .wiki-snippet { color: var(--muted); font-size: var(--text-small); }
-.wiki-page { background: var(--panel-soft); border-radius: var(--radius-l); padding: 16px 20px; }
+.wiki-page { background: var(--panel-soft); border-radius: var(--radius-l); padding: 24px 28px; line-height: 1.7; }
 .wiki-page pre { white-space: pre-wrap; overflow-wrap: anywhere; font-family: var(--font-sans); }
 @media (max-width: 900px) {
   .wiki-layout { grid-template-columns: 1fr; }
@@ -139,6 +140,23 @@ mark.find.current { background: var(--accent); color: var(--on-accent); }
 .slash-list li { padding: 6px 10px; border-radius: 8px; cursor: pointer; display: flex; flex-wrap: wrap; gap: 4px 8px; align-items: baseline; }
 .slash-list li.active, .slash-list li:hover { background: var(--panel-soft); }
 .slash-desc { flex-basis: 100%; color: var(--muted); font-size: 0.85em; }
+
+/* Model and effort menu (Claude Desktop style): one button that opens upward over the input. */
+.model-menu { position: relative; }
+.model-menu > summary { list-style: none; cursor: pointer; display: inline-flex; align-items: center; gap: 4px; min-height: 32px; padding: 0 10px;
+  border-radius: var(--radius); color: var(--fg); }
+.model-menu > summary::-webkit-details-marker { display: none; }
+.model-menu > summary::after { content: ''; width: 6px; height: 6px; border-right: 1.5px solid currentColor; border-bottom: 1.5px solid currentColor; transform: rotate(-135deg) translate(-1px, -1px); margin-left: 4px; opacity: 0.6; }
+.model-menu > summary:hover, .model-menu[open] > summary { background: var(--hover); }
+.model-menu-panel { position: absolute; right: 0; bottom: calc(100% + 6px); min-width: 280px; max-width: min(360px, 90vw); padding: 6px; z-index: 6;
+  background: var(--panel); border: 1px solid var(--border); border-radius: var(--radius-l, 12px); box-shadow: var(--shadow-2); }
+.model-menu-item { display: flex; align-items: center; gap: 8px; width: 100%; min-height: 36px; padding: 0 10px; text-align: left; color: var(--fg); background: none; border-radius: 8px; }
+.model-menu-item:hover, .model-menu-item:focus-visible { background: var(--panel-soft); }
+.model-menu-check { margin-left: auto; color: var(--link); display: inline-flex; }
+.model-menu-panel hr { border: 0; border-top: 1px solid var(--border); margin: 6px 4px; }
+.model-menu-note { margin: 4px 10px 6px; color: var(--muted); font-size: var(--text-small); line-height: 1.5; }
+.model-menu-item .badge { font-size: 0.75em; }
+.model-menu-item .badge.warn { display: inline-flex; align-items: center; gap: 3px; background: var(--warning-soft, var(--panel-soft)); color: var(--needs-approval); }
 
 /* Context ring: share of the model's context window the bot's last turn ended with. */
 .context-ring { flex: none; vertical-align: middle; }

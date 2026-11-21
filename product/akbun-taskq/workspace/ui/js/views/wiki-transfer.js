@@ -55,7 +55,12 @@ export function initWikiTransfer() {
     } }),
     el('button', { type: 'button', text: t('wiki.import', 'Import…'), onclick: () => { importForm.hidden = !importForm.hidden } }),
   )
-  view.querySelector('.view-title').after(toolbar, importForm, picker, box)
+  // The title and its actions share one header row, as a bot's chat head does.
+  const title = view.querySelector('.view-title')
+  const head = el('div', { class: 'view-head' })
+  title.replaceWith(head)
+  head.append(title, toolbar)
+  head.after(importForm, picker, box)
 
   async function start(source, batch) {
     if (await mutate(() => api.post('/bots/wiki/import', { source, name: batch }), t('wiki.import_started', 'Import started'))) {

@@ -6,6 +6,7 @@ import { area, clear, el } from '../core/dom.js'
 import { emit, on } from '../core/bus.js'
 import { BOARD_PANES, COLLAPSED_COLUMNS, ERROR_OUTCOMES, label, TYPE_MARK } from '../core/vocab.js'
 import { icon } from '../core/icons.js'
+import { t } from '../core/i18n.js'
 import { statusIndicator } from '../core/status.js'
 import { runNowButton, RUNNABLE } from '../core/run-now.js'
 import { dropRequest } from '../pure/board-drop.js'
@@ -29,9 +30,18 @@ async function load() {
     const tasks = await api.get('/tasks')
     const of = (status) => tasks.filter((t) => t.status === status)
     byId = new Map(tasks.map((t) => [t.id, t]))
-    const pane = (name) => el('div', { class: `board-pane board-${name}` },
-      ...BOARD_PANES[name].map((status) => column(status, of(status), COLLAPSED_COLUMNS.includes(status))))
-    clear(columns).append(pane('inbox'), pane('flow'), pane('ends'))
+    const col = (status) => column(status, of(status), COLLAPSED_COLUMNS.includes(status))
+    const arrow = () => el('span', { class: 'board-arrow', 'aria-hidden': 'true' }, icon('chevron-right', 18))
+    // The middle pane reads as the flow: an arrow between steps, three on the first row and two on the second.
+    const [a, b, c, d, e] = BOARD_PANES.flow
+    const body = {
+      inbox: BOARD_PANES.inbox.map(col),
+      flow: [col(a), arrow(), col(b), arrow(), col(c), col(d), arrow(), col(e)],
+      ends: BOARD_PANES.ends.map(col),
+    }
+    const pane = (name, title) => el('section', { class: `board-pane board-${name}`, 'aria-label': title },
+      el('h2', { class: 'board-pane-title', text: title }), el('div', { class: 'board-pane-body' }, ...body[name]))
+    clear(columns).append(pane('inbox', t('board.inbox', 'Inbox')), pane('flow', t('board.flow', 'In progress')), pane('ends', t('board.ends', 'Ended')))
   } catch (error) {
     clear(columns).append(el('p', { class: 'error', text: error.message }))
   }

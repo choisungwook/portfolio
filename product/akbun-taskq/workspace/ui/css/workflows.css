@@ -59,7 +59,7 @@
 }
 
 /* Wiki export and import: toolbar, import form and the background job list with progress bars. */
-.wiki-tools { display: flex; gap: 8px; flex-wrap: wrap; margin: -6px 0 10px; }
+.wiki-tools { display: flex; gap: 8px; flex-wrap: wrap; margin: 0; }
 .wiki-import { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin-bottom: 10px; }
 .wiki-import input { min-width: 220px; flex: 1 1 220px; }
 .job-list { list-style: none; margin: 0 0 14px; padding: 0; display: grid; gap: 8px; }

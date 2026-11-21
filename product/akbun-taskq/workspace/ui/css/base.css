@@ -71,6 +71,17 @@ button:has(> .icon:only-child) { display: inline-flex; align-items: center; just
 /* The page breathes on its right edge too, not only beside the sidebar. */
 .main { min-width: 0; padding: 8px 40px 32px 16px; }
 .main:focus { outline: none; }
+/* Wiki, Workflows and the shared folder read like a bot's chat page: a header with room around it and a hairline under
+   it, then the content with even gaps, instead of blocks pressed against the top and against each other. */
+:is([data-view-panel="wiki"], [data-view-panel="workflows"], [data-view-panel="shared"], [data-view-panel="review"]):not([hidden]) {
+  display: flex; flex-direction: column; gap: 16px; padding: 12px 8px 24px; line-height: 1.6;
+}
+:is([data-view-panel="wiki"], [data-view-panel="workflows"], [data-view-panel="shared"], [data-view-panel="review"]) > * { margin-top: 0; margin-bottom: 0; }
+:is([data-view-panel="wiki"], [data-view-panel="shared"], [data-view-panel="review"]) > :is(.view-title, .view-head),
+[data-view-panel="workflows"] > .wf-head { padding-bottom: 16px; border-bottom: 1px solid var(--border); margin: 0; }
+.view-head { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px 16px; }
+.view-head > .view-title { margin: 0; }
+[data-view-panel="shared"] > .view-title + .meta { margin-top: -6px; }
 /* Must check opens over the page from the bell at the bottom of the sidebar, like the macOS notification list. */
 .alerts-button { position: relative; }
 .alerts-button[aria-expanded="true"] { background: var(--panel-soft); }
