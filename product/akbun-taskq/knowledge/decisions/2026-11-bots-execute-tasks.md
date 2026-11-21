@@ -3,13 +3,14 @@ type: Decision
 title: Bots work on their own tasks with per-bot permissions; the run button stays a one-off run
 description: Tasks are notes a bot takes and closes in its own session; each bot sets its permission mode (auto), sandbox (off) and blocked commands (none), while taskq's own data is always off limits.
 tags: [bots, agents, permissions]
-generated: { by: claude-code/claude-opus-5-5, at: 2026-11-21T15:00:00Z }
+generated: { by: claude-code/claude-opus-5-5, at: 2026-11-21T20:00:00Z }
 ---
 
 ## 결정
 
 - task는 사용자의 작업 노트다. owner bot이 `start_task`로 가져가 running으로 바꾸고, 자기 세션에서 직접 처리한 뒤 `finish_task`로 done, review, failed 중 하나로 닫는다. 그 실행은 `runs.bot`에 기록되어 Calendar에 나온다.
 - task의 시작 버튼은 어느 bot에도 속하지 않는 일회성 실행이다. 지금까지처럼 runner가 task 유형별 권한 프로필과 승인 절차로 한 번 돌린다. 다만 0.31.0부터는 owner가 없는 task에서 시작 버튼이 꺼지고 `POST /tasks/:id/run`도 409를 돌려준다. 실행에는 언제나 맡은 agent가 있어야 한다는 사용자의 지정이다. 큐의 자동 실행(`queue_autorun`)은 이 규칙과 별개로 그대로 둔다.
+- 초안(draft)에 owner를 정하거나 바꿔도 bot은 일하지 않는다. "Task … is now yours" 알림은 읽은 메시지(`postMessage`의 `quiet`)로 저장되어 bot 대화에는 남지만 turn을 열지 않는다. 실행은 사용자가 직접 실행(Run now)을 누르거나 초안을 대기로 올렸을 때 시작한다. 대기로 올리면 owner에게 읽지 않은 알림이 다시 간다. 큐가 owner 있는 task를 실행하지 않으므로 이 알림이 없으면 task가 대기에 그대로 남는다. 전에는 알림이 bot을 깨웠고, bot은 draft라서 `start_task`가 거절된 채 사용자에게 ready로 올려 달라고 되물었다.
 - 큐는 owner가 있는 task를 자동 실행하지 않는다. owner가 없는 ready task의 자동 실행은 글로벌 설정 `queue_autorun`으로 켜고 끈다. 기본은 켬이다.
 - bot마다 권한 모드, 샌드박스, 차단 명령 목록을 설정한다. 기본값은 auto 모드, 샌드박스 없음, 차단 명령 없음이다.
 - 설정과 관계없이 모든 bot에서 taskq 자신을 건드리는 호출(데이터 디렉터리, 설정 파일, Claude Code 설정 쓰기, 샌드박스 끄기)은 그 turn을 끝내고 bot 전체를 멈춘다.

@@ -53,6 +53,10 @@ export function initBotChat() {
       event.preventDefault()
       nodes.form.requestSubmit()
     }
+    if ((event.key === 'ArrowUp' || event.key === 'ArrowDown') && !event.isComposing && !event.defaultPrevented && !event.shiftKey && recallHistory(event.key === 'ArrowUp' ? 1 : -1)) {
+      event.preventDefault()
+      return
+    }
     if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'u') {
       event.preventDefault()
       files.pick()
@@ -81,6 +85,8 @@ export function initBotChat() {
     bot = name
     sideAt = { bot: null, at: 0 }
     lastKey = null
+    sentHistory = []
+    historyAt = -1
     clear(nodes.log)
     files.clear()
     conversationFiles = []
@@ -110,6 +116,26 @@ export function initBotChat() {
     pendingMessage = id
     focusPending()
   })
+}
+
+// Up and Down walk through what I sent to this bot, newest first, like a shell. Up only starts while the caret is on the
+// first line (or the input is empty), so editing a long message still moves the caret; Down past the newest restores the draft.
+let sentHistory = []
+let historyAt = -1
+let historyDraft = ''
+
+function recallHistory(step) {
+  const input = nodes.input
+  if (step > 0 && historyAt < 0 && input.value.slice(0, input.selectionStart).includes('\n')) return false
+  if (step < 0 && historyAt < 0) return false
+  const next = historyAt + step
+  if (next >= sentHistory.length) return false
+  if (historyAt < 0) historyDraft = input.value
+  historyAt = next
+  input.value = historyAt < 0 ? historyDraft : sentHistory[sentHistory.length - 1 - historyAt]
+  input.setSelectionRange(input.value.length, input.value.length)
+  fit()
+  return true
 }
 
 let connectionShownAt = 0
@@ -238,6 +264,7 @@ async function load() {
       api.get(`/bots/${encodeURIComponent(name)}/turn-errors?limit=50`).catch(() => []),
     ])
     const messages = list.reverse()
+    sentHistory = messages.filter((m) => m.sender === 'user' && m.recipient === name && m.body).map((m) => m.body)
     loadSide(name)
     const steps = await api.get(`/bots/${encodeURIComponent(name)}/steps?since=${messages[0]?.created_at ?? 0}`).catch(() => [])
     if (bot !== name) return
@@ -446,8 +473,16 @@ function bubble(m, name) {
       el('div', { class: 'bubble', text: cancelled ? t('chat.cancelled', 'Cancelled') : m.body }),
       attached.length === 0 ? null : el('div', { class: 'msg-files' }, ...attached.map(fileCard)),
       el('span', { class: 'msg-meta' },
+        side === 'me' ? copyButton(m.body) : null,
         when(m.created_at), notes.length ? ` · ${notes.join(' · ')}` : '',
         m.task_id ? el('button', { type: 'button', class: 'link', text: ` · task ${m.task_id}`, onclick: () => emit('open-task', m.task_id) }) : null)))
+}
+
+function copyButton(text) {
+  return el('button', {
+    type: 'button', class: 'msg-copy', title: t('chat.copy', 'Copy'), 'aria-label': t('chat.copy', 'Copy'),
+    onclick: () => navigator.clipboard?.writeText(text).then(() => notify(t('ws.copied', 'Copied')), () => notify(t('chat.copy_failed', 'Could not copy'), true)),
+  }, icon('copy', 14))
 }
 
 // The + in the input opens a menu, as in Claude Desktop: files or photos (Cmd/Ctrl+U), a folder, slash commands, plugins.
@@ -662,6 +697,7 @@ async function send(event) {
     if (failed.length) notify(`${t('chat.not_sent_to', 'Not sent to')} ${failed.map((name) => `@${name}`).join(', ')}: ${results.find((r) => r.status === 'rejected').reason.message}`, true)
     sendError = null
     showConnection()
+    historyAt = -1
     nodes.input.value = ''
     fit()
     files.clear()

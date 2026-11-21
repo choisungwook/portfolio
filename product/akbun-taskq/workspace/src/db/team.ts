@@ -202,12 +202,14 @@ export function firstAgentWithRole(db: Db, role: string): string | undefined {
 export function postMessage(db: Db, message: {
   sender: string; recipient: string; body: string; task_id?: string | null; reply_to?: number | null
   thread_id?: number | null; deliver_at?: number; attachments?: string[]; routine_id?: number | null
+  // quiet: stored as already read, so it shows in the conversation without starting a turn.
+  quiet?: boolean
 }): number {
   const body = mask(message.body.slice(0, BODY_LIMIT))
   const now = nowSec()
-  const result = db.prepare(`INSERT INTO team_messages (sender, recipient, body, task_id, reply_to, thread_id, attachments, created_at, deliver_at, routine_id)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`).run(message.sender, message.recipient, body, message.task_id ?? null, message.reply_to ?? null,
-    message.thread_id ?? null, JSON.stringify(message.attachments ?? []), now, message.deliver_at ?? now, message.routine_id ?? null)
+  const result = db.prepare(`INSERT INTO team_messages (sender, recipient, body, task_id, reply_to, thread_id, attachments, created_at, deliver_at, routine_id, read_at)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`).run(message.sender, message.recipient, body, message.task_id ?? null, message.reply_to ?? null,
+    message.thread_id ?? null, JSON.stringify(message.attachments ?? []), now, message.deliver_at ?? now, message.routine_id ?? null, message.quiet ? now : null)
   return Number(result.lastInsertRowid)
 }
 

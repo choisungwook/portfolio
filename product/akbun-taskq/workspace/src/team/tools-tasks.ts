@@ -88,7 +88,7 @@ export function taskTools(scope: ScopedTools): TeamTool[] {
           throw new ToolError(error instanceof Error ? error.message : String(error))
         }
         wrote()
-        if (owner !== agent) postMessage(db, { sender: agent, recipient: owner, task_id: task.id, body: `I created task ${task.id} for you: ${task.data.intent}` })
+        if (owner !== agent) postMessage(db, { sender: agent, recipient: owner, task_id: task.id, body: `I created task ${task.id} for you: ${task.data.intent}`, quiet: task.status === 'draft' })
         queueChanged.notify()
         teamChanged.notify()
         return { task_id: task.id, status: task.status, owner }
@@ -114,12 +114,12 @@ export function taskTools(scope: ScopedTools): TeamTool[] {
         if (changed !== 1) throw new ToolError('the task changed meanwhile; read it again')
         wrote()
         const note = args.note ? `\n${String(args.note)}` : ''
-        postMessage(db, { sender: agent, recipient: to, task_id: task.id, body: `Task ${task.id} is now yours: ${task.data.intent}${note}` })
+        postMessage(db, { sender: agent, recipient: to, task_id: task.id, body: `Task ${task.id} is now yours: ${task.data.intent}${note}`, quiet: task.status === 'draft' })
         if (task.owner === null) {
           raiseAlert(db, { task_id: task.id, kind: 'team_message', message: `${agent} gave your task ${task.id} to ${to}; its result now goes to ${to}. Take it back in the task detail.` })
         }
         if (task.owner && task.owner !== agent && task.owner !== to) {
-          postMessage(db, { sender: agent, recipient: task.owner, task_id: task.id, body: `I moved task ${task.id} from you to ${to}.${note}` })
+          postMessage(db, { sender: agent, recipient: task.owner, task_id: task.id, body: `I moved task ${task.id} from you to ${to}.${note}`, quiet: task.status === 'draft' })
         }
         teamChanged.notify()
         return { task_id: task.id, owner: to }

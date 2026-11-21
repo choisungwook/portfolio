@@ -271,7 +271,8 @@ mark.find.current { background: var(--accent); color: var(--on-accent); }
    input share its edges, so lines stay short and the page has margins instead of stretching edge to edge. */
 .chat { --column: 820px; --gutter: max(24px, calc((100% - var(--column)) / 2)); }
 .chat-log { padding: 28px var(--gutter) 24px; gap: 22px; }
-.chat-working { padding-left: var(--gutter); padding-right: var(--gutter); }
+/* The working bar is as wide as the conversation column, not the whole page. */
+.chat-working { margin: 0 var(--gutter) 4px; padding: 8px 16px; border-top: 0; border-radius: var(--radius-l); }
 .chat-compose { padding: 8px var(--gutter) 16px; }
 .msg { max-width: 88%; gap: 10px; }
 .msg-body { gap: 6px; }
@@ -280,6 +281,9 @@ mark.find.current { background: var(--accent); color: var(--on-accent); }
 .msg[data-side="me"] .bubble { border-radius: 20px 20px 8px 20px; }
 .msg[data-side="error"] { max-width: none; }
 .msg-meta { padding: 0 6px; }
+.msg[data-side="me"] .msg-meta { display: inline-flex; align-items: center; gap: 4px; flex-wrap: wrap; }
+.msg-copy { display: inline-grid; place-items: center; width: 24px; height: 24px; min-height: 24px; padding: 0; border-radius: 6px; color: var(--muted); background: transparent; }
+.msg-copy:hover, .msg-copy:focus-visible { color: var(--fg); background: var(--hover); }
 .chat-head { padding: 18px var(--gutter); }
 
 /* Tool calls between messages: one quiet line that opens into the list. While running, four dots spin. */
@@ -320,9 +324,10 @@ mark.find.current { background: var(--accent); color: var(--on-accent); }
 .chat-page > .chat, .chat-page > .file-pane, .chat-page > .chat-side { height: 100%; min-height: 0; }
 .chat-log, .file-pane .file-body, .file-pane > :last-child { overscroll-behavior: contain; }
 
-/* Right column: open pull requests and background work. Quiet rows like a sidebar, its own scroll. */
+/* Right column: context, open pull requests and background work. Quiet rows like a sidebar, its own scroll. It stays at
+   the right edge: a file, folder or browser pane opens between it and the conversation and pushes the conversation left. */
 .chat-page:has(> .chat-side:not([hidden])):has(> .file-pane[hidden]) { grid-template-columns: minmax(0, 1fr) 300px; }
-.chat-page:has(> .file-pane:not([hidden])) > .chat-side { display: none; }
+@media (min-width: 1201px) { .chat-page:has(> .chat-side:not([hidden])):has(> .file-pane:not([hidden])) { grid-template-columns: minmax(0, 1fr) minmax(320px, 32%) 300px; } }
 .chat-side { height: calc(100vh - 24px); overflow-y: auto; overscroll-behavior: contain; padding: 20px 12px; border-left: 1px solid var(--border); display: grid; align-content: start; gap: 20px; }
 .chat-side .side-head { font-size: var(--text-small); font-weight: 500; color: var(--muted); margin: 0 8px 6px; padding: 0; border: 0; }
 .side-row { display: flex; align-items: flex-start; gap: 10px; width: 100%; min-height: 40px; padding: 6px 8px; border-radius: 8px; color: var(--fg); background: transparent; text-align: left; text-decoration: none; }

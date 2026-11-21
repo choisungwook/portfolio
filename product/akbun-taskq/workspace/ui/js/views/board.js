@@ -1,10 +1,10 @@
-// Board tab in three panes: drafts on the left as an inbox, the statuses a task moves through in the middle in two rows,
+// Board tab in three panes: drafts on the left as an inbox, running and one waiting column in the middle,
 // and failed (cancelled folded under it) above done on the right. Each column scrolls on its own. Cards move by drag and
 // drop where the API has that move (pure/board-drop.js); a card whose last run failed shows an error icon.
 import { api, mutate } from '../core/api.js'
 import { area, clear, el } from '../core/dom.js'
 import { emit, on } from '../core/bus.js'
-import { BOARD_PANES, COLLAPSED_COLUMNS, ERROR_OUTCOMES, label, TYPE_MARK } from '../core/vocab.js'
+import { BOARD_PANES, BOARD_WAITING, COLLAPSED_COLUMNS, ERROR_OUTCOMES, label, TYPE_MARK } from '../core/vocab.js'
 import { icon } from '../core/icons.js'
 import { t } from '../core/i18n.js'
 import { statusIndicator } from '../core/status.js'
@@ -32,12 +32,11 @@ async function load() {
     const of = (status) => tasks.filter((t) => t.status === status)
     byId = new Map(tasks.map((t) => [t.id, t]))
     const col = (status) => column(status, of(status), COLLAPSED_COLUMNS.includes(status))
-    const arrow = () => el('span', { class: 'board-arrow', 'aria-hidden': 'true' }, icon('chevron-right', 18))
-    // The middle pane reads as the flow: an arrow between steps, three on the first row and two on the second.
-    const [a, b, c, d, e] = BOARD_PANES.flow
+    // Waiting holds queued, approval, login and review tasks in one column; each card names which wait it is.
+    const waiting = tasks.filter((t) => BOARD_WAITING.includes(t.status))
     const body = {
       inbox: BOARD_PANES.inbox.map(col),
-      flow: [col(a), arrow(), col(b), arrow(), col(c), col(d), arrow(), col(e)],
+      flow: [col('running'), column('ready', waiting, false, t('board.waiting', 'Waiting'))],
       ends: BOARD_PANES.ends.map(col),
     }
     const pane = (name, title) => el('section', { class: `board-pane board-${name}`, 'aria-label': title },
@@ -51,15 +50,15 @@ async function load() {
 let byId = new Map()
 let dragged = null
 
-function column(status, tasks, collapsed) {
+function column(status, tasks, collapsed, title = label(status)) {
   const list = el('ul', { class: 'cards' }, ...tasks.map(card))
   const errors = tasks.filter(failedLast).length
-  const heading = el('span', { class: 'col-head' }, statusIndicator(status, `${label(status)} (${tasks.length})`),
+  const heading = el('span', { class: 'col-head' }, statusIndicator(status, `${title} (${tasks.length})`),
     errors ? el('span', { class: 'col-errors', title: `${errors} with a failed last run` }, icon('alert', 14), String(errors)) : null)
   const body = tasks.length === 0 ? el('p', { class: 'empty', text: 'None.' }) : list
   const node = collapsed
     ? el('details', { class: 'board-col collapsed', dataset: { column: status } }, el('summary', {}, heading), body)
-    : el('section', { class: 'board-col', dataset: { column: status }, 'aria-label': `${label(status)} (${tasks.length})` }, el('h3', {}, heading), body)
+    : el('section', { class: 'board-col', dataset: { column: status }, 'aria-label': `${title} (${tasks.length})` }, el('h3', {}, heading), body)
   acceptDrops(node, status)
   return node
 }
@@ -108,11 +107,12 @@ function card(task) {
       for (const col of columns.querySelectorAll('.drop-target')) col.classList.remove('drop-target')
     },
   },
-    el('button', { type: 'button', class: `card status-${task.status}`, draggable: 'true', onclick: () => emit('open-task', task.id) },
+    el('button', { type: 'button', class: 'card', draggable: 'true', onclick: () => emit('open-task', task.id) },
       el('span', { class: 'card-title' },
         failed ? el('span', { class: 'card-error', title: `Last run ${label(task.last_outcome)}`, 'aria-label': `Last run ${label(task.last_outcome)}` }, icon('alert', 16)) : null,
         title),
       el('span', { class: 'meta', text: `${TYPE_MARK[task.type] ?? label(task.type)} · ${task.lock_key ?? 'no account or repo'}` }),
+      BOARD_WAITING.includes(task.status) && task.status !== 'ready' ? statusIndicator(task.status) : null,
       task.owner ? el('span', { class: 'badge owner', text: `@${task.owner}`, title: `Owned by team agent ${task.owner}` }) : null,
       task.blocked ? el('span', { class: 'badge blocked', text: 'blocked' }) : null),
     cardActions(task))

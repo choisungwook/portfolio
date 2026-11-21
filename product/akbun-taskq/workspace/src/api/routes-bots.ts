@@ -255,8 +255,7 @@ export function registerBotsRoutes(api: Hono, { db, config, bots }: ApiDeps): vo
     // A model change shows in the conversation, followed by the skill and plugin reload note, so the user sees where the
     // new model starts.
     if ((parsed.value.model ?? null) !== (current.model ?? null)) {
-      const id = postMessage(db, { sender: SYSTEM, recipient: name, body: `Model changed: ${current.model ?? 'default'} → ${parsed.value.model ?? 'default'}` })
-      db.prepare('UPDATE team_messages SET read_at = created_at WHERE id = ?').run(id)
+      postMessage(db, { sender: SYSTEM, recipient: name, body: `Model changed: ${current.model ?? 'default'} → ${parsed.value.model ?? 'default'}`, quiet: true })
     }
     // Effort does not touch skills or plugins, so an effort-only save skips the reload and its note in the chat.
     const effortOnly = typeof body === 'object' && body !== null && Object.keys(body).every((key) => key === 'effort')

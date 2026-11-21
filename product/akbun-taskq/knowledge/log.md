@@ -4,6 +4,7 @@ concept를 추가·수정·삭제할 때마다 오늘 날짜 섹션을 맨 위�
 
 ## 2026-11-21
 
+* **Update**: [bots execute tasks](decisions/2026-11-bots-execute-tasks.md)에 초안에 owner를 정할 때 알림이 bot을 깨우지 않는다는 결정을 더했다 (0.40.0).
 * **Update**: 결정 문서를 정리했다. 코드와 어긋난 [task worktrees](decisions/2026-11-task-worktrees.md)(유형과 무관한 체크박스), [task not tied to session](decisions/2026-11-task-not-tied-to-session.md)(stale·needs_auth는 세션 유지), [openai bot backend](decisions/2026-11-openai-bot-backend.md)(도구 수, 경로별 대화, 권한 모드), [soft theme sidebar](decisions/2026-11-soft-theme-sidebar.md)(주간 점검 메뉴), [desktop app shell](decisions/2026-11-desktop-app-shell.md)(진행 줄과 재시작), [bot workspace](decisions/2026-11-bot-workspace.md), [workflows run by bots](decisions/2026-11-workflows-run-by-bots.md), [task ownership](decisions/2026-11-task-ownership-and-discussions.md)를 고쳤다. 예산 이야기는 [rejected turns](decisions/2026-11-rejected-turns.md)에서 [no usage limits](decisions/2026-11-no-usage-limits.md)로 옮겨 한 곳에만 두고, 중복된 설명(오케스트레이터 하나, Claude 로그인 실패, carbon.css)은 원본 문서 링크로 바꿨다. [inference providers](decisions/2026-11-inference-providers.md)에 bot별 sign-in을 덧붙였다.
 * **Update**: [task worktrees](decisions/2026-11-task-worktrees.md)에 저장소 여러 개, worktree 체크박스, 사라진 worktree 다시 만들기(0.37.0)를 추가.
 * **Creation**: [builtin taskq skill](decisions/2026-11-builtin-taskq-skill.md) - 모든 bot이 실행 중인 버전의 taskq skill과 매뉴얼을 갖는 결정.
