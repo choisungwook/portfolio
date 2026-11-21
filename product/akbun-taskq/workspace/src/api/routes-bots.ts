@@ -256,7 +256,9 @@ export function registerBotsRoutes(api: Hono, { db, config, bots }: ApiDeps): vo
       const id = postMessage(db, { sender: SYSTEM, recipient: name, body: `Model changed: ${current.model ?? 'default'} → ${parsed.value.model ?? 'default'}` })
       db.prepare('UPDATE team_messages SET read_at = created_at WHERE id = ?').run(id)
     }
-    noteReload(db, name, reloadAll(db, config, name))
+    // Effort does not touch skills or plugins, so an effort-only save skips the reload and its note in the chat.
+    const effortOnly = typeof body === 'object' && body !== null && Object.keys(body).every((key) => key === 'effort')
+    if (!effortOnly) noteReload(db, name, reloadAll(db, config, name))
     teamChanged.notify()
     return c.json(getAgent(db, name))
   })

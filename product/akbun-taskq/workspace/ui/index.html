@@ -40,11 +40,12 @@
     <div class="side-hero" data-area="side-hero"></div>
     <ul class="side-list side-top">
       <li><button type="button" class="side-item" data-area="new-task-button"><span class="side-icon" aria-hidden="true" data-icon="plus"></span><span data-i18n="header.new_task">New task</span></button></li>
-      <li><button type="button" class="side-item" data-area="search-open" aria-haspopup="dialog" title="Search (Cmd/Ctrl+K)"><span class="side-icon" aria-hidden="true" data-icon="search"></span><span data-i18n="nav.search">Search</span></button></li>
+      <li><button type="button" class="side-item" data-area="search-open" aria-haspopup="dialog" title="Search everything: tasks, wiki, files and conversations (Cmd/Ctrl+K)"><span class="side-icon" aria-hidden="true" data-icon="search"></span><span data-i18n="nav.search">Search all</span></button></li>
     </ul>
     <ul class="side-list" data-area="side-views">
       <li><button type="button" class="side-item" data-view="calendar"><span class="side-icon" aria-hidden="true" data-icon="calendar"></span><span data-i18n="nav.calendar">Calendar</span></button></li>
       <li><button type="button" class="side-item" data-view="board"><span class="side-icon" aria-hidden="true" data-icon="board"></span><span data-i18n="nav.board">Task status board</span></button></li>
+      <li><button type="button" class="side-item" data-view="review"><span class="side-icon" aria-hidden="true" data-icon="check"></span><span data-i18n="settings.review">Weekly review</span></button></li>
     </ul>
     <ul class="side-list" data-area="side-shared">
       <li><button type="button" class="side-item" data-view="shared"><span class="side-icon" aria-hidden="true"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><path d="M3 6.5a1.5 1.5 0 0 1 1.5-1.5h4.4l2 2.2h8.6A1.5 1.5 0 0 1 21 8.7v9.8a1.5 1.5 0 0 1-1.5 1.5h-15A1.5 1.5 0 0 1 3 18.5z"/></svg></span><span data-i18n="nav.shared">Shared folder</span></button></li>
@@ -246,6 +247,15 @@
 
     <section id="view-workflows" data-view-panel="workflows" aria-label="Workflows" data-area="workflows-view" hidden></section>
 
+    <section id="view-review" data-view-panel="review" aria-labelledby="review-title" hidden>
+      <div class="view-head">
+        <h1 class="view-title" id="review-title" data-i18n="settings.review">Weekly review</h1>
+        <select data-area="review-days" aria-label="Period"><option value="7" selected>7 days</option><option value="14">14 days</option><option value="30">30 days</option></select>
+      </div>
+      <p class="meta" data-i18n="review.hint">Did each bot run, did it go well, and would you miss it? A bot that checks its own work misses what it misses, so a few recent results are picked for you to check by hand. Counted from taskq's database; no AI call.</p>
+      <div data-area="review-report"></div>
+    </section>
+
     <section id="view-wiki" data-view-panel="wiki" aria-label="Wiki" data-area="wiki" hidden>
       <h1 class="view-title" data-i18n="wiki.title">Wiki</h1>
       <form class="wiki-search" data-area="wiki-search" role="search">
@@ -378,7 +388,6 @@
       <button type="button" data-page="appearance" data-i18n="settings.appearance">Appearance</button>
       <button type="button" data-page="connections" data-i18n="settings.connections">Connections</button>
       <button type="button" data-page="usage" data-i18n="settings.usage">Usage</button>
-      <button type="button" data-page="review" data-i18n="settings.review">Weekly review</button>
       <button type="button" data-page="folders" data-i18n="settings.folders">Folders</button>
       <button type="button" data-page="queue" data-i18n="settings.queue">Queue</button>
       <button type="button" data-page="notifications">Notifications</button>
@@ -439,14 +448,6 @@
       </div>
       <p class="meta" data-i18n="usage.hint">Tokens and cost of every bot session, by SDK. OpenAI cost is estimated from the prices in taskq.config.json; the ChatGPT plan has no per-turn price; Kiro reports credits when kiro-cli gives them.</p>
       <div data-area="usage-report"></div>
-    </section>
-    <section class="settings-section" data-settings-page="review" aria-labelledby="review-title" hidden>
-      <div class="plugins-head">
-        <h1 class="page-title" id="review-title" data-i18n="settings.review">Weekly review</h1>
-        <select data-area="review-days" aria-label="Period"><option value="7" selected>7 days</option><option value="14">14 days</option><option value="30">30 days</option></select>
-      </div>
-      <p class="meta" data-i18n="review.hint">Did each bot run, did it go well, and would you miss it? A bot that checks its own work misses what it misses, so a few recent results are picked for you to check by hand.</p>
-      <div data-area="review-report"></div>
     </section>
     <section class="settings-section" data-settings-page="folders" aria-labelledby="folders-title" hidden>
       <h1 class="page-title" id="folders-title" data-i18n="settings.folders">Folders</h1>

@@ -96,8 +96,14 @@
 /* The orchestrator: a large dark avatar centered at the top of the sidebar; pressing it opens its conversation. */
 .side-hero { display: flex; justify-content: center; padding: 4px 0 12px; }
 .side-hero:empty { display: none; }
-.side-hero-bot { display: grid; justify-items: center; gap: 8px; padding: 8px 16px; border-radius: var(--radius-l); background: transparent; color: var(--fg); }
-.side-hero-bot:hover { background: var(--hover); }
+.side-hero-bot { display: grid; justify-items: center; gap: 6px; padding: 12px 20px 10px; border-radius: var(--radius-l); background: transparent;
+  color: var(--fg); cursor: pointer; box-shadow: inset 0 0 0 1px transparent; transition: background var(--ease), box-shadow var(--ease); }
+.side-hero-bot:hover { background: var(--hover); box-shadow: inset 0 0 0 1px var(--border); }
+.side-hero-bot:hover .side-avatar { transform: scale(1.03); }
+.side-hero-bot .side-avatar { transition: transform var(--ease); }
+.side-hero-cta { display: inline-flex; align-items: center; gap: 2px; padding: 2px 10px; border-radius: 999px; font-size: var(--text-small);
+  color: var(--link); background: var(--panel-soft); }
+.side-hero-bot:hover .side-hero-cta { background: var(--control); }
 .side-hero-bot[aria-current="page"] { background: var(--panel-soft); }
 .side-hero-bot strong { font-size: 1.0em; font-weight: 600; }
 .side-hero .avatar { background: #111 !important; color: #fff; }

@@ -24,6 +24,7 @@ let popup = { items: [], index: 0 }
 let onFile = () => {}
 let sharedFiles = null
 let sharedAt = 0
+const pinned = new Set() // bots whose missing effort was set to the recommended level once
 
 export function initComposeMenus(input, { onPickFile } = {}) {
   if (onPickFile) onFile = onPickFile
@@ -57,18 +58,75 @@ function select(labelText, value, options, onchange) {
     ...options.map(([v, text]) => el('option', { value: v, text, selected: v === value })))
 }
 
+// Effort levels as Claude Desktop names them, with the recommended one marked and the costly one warned about.
+const EFFORT_LABEL = {
+  low: ['effort.low', 'Low'], medium: ['effort.medium', 'Medium'], high: ['effort.high', 'High'],
+  xhigh: ['effort.xhigh', 'Extra high'], max: ['effort.max', 'Max'],
+  minimal: ['effort.minimal', 'Minimal'], none: ['effort.none', 'None'],
+}
+const RECOMMENDED_EFFORT = (efforts) => (efforts.includes('medium') ? 'medium' : efforts[0])
+const effortName = (e) => t(...(EFFORT_LABEL[e] ?? [e, e]))
+
+// One button for the model and its effort, opening a menu: models with a check on the current one, then the effort
+// levels under a line that says what more effort costs. Closes on a pick, Escape or a click outside.
+function modelMenu(agent, modelOptions, efforts) {
+  const model = agent.model ?? modelOptions[0]?.[0] ?? ''
+  const modelName = modelOptions.find(([id]) => id === model)?.[1] ?? model
+  const menu = el('details', { class: 'model-menu' })
+  const close = () => menu.removeAttribute('open')
+  const item = (text, checked, onclick, badge) => el('button', {
+    type: 'button', role: 'menuitemradio', 'aria-checked': String(checked), class: 'model-menu-item',
+    onclick: () => { close(); if (!checked) onclick() },
+  }, el('span', { text }), badge ?? null, checked ? el('span', { class: 'model-menu-check' }, icon('check', 16)) : null)
+  const recommended = RECOMMENDED_EFFORT(efforts)
+  menu.append(
+    el('summary', { title: `${t('compose.model', 'Model')} · ${t('compose.effort', 'Effort')}` },
+      el('span', { text: agent.effort && efforts.length ? `${modelName} · ${effortName(agent.effort)}` : modelName })),
+    el('div', { class: 'model-menu-panel', role: 'menu' },
+      ...modelOptions.map(([id, name]) => item(name, id === model, () => changeModel(id))),
+      ...(efforts.length ? [
+        el('hr'),
+        el('p', { class: 'model-menu-note', text: t('effort.note', 'More effort means a more thorough answer, but it takes longer and uses your limit faster.') }),
+        ...efforts.map((e) => item(effortName(e), e === agent.effort, () => save({ effort: e }),
+          e === recommended ? el('span', { class: 'badge', text: t('effort.recommended', 'Recommended') })
+            : e === 'max' ? el('span', { class: 'badge warn' }, icon('alert', 12), t('effort.costly', 'Uses much more')) : null)),
+      ] : []),
+    ))
+  menu.addEventListener('toggle', () => {
+    if (!menu.open) return
+    const outside = (event) => {
+      if (menu.contains(event.target)) return
+      close()
+      document.removeEventListener('pointerdown', outside)
+    }
+    document.addEventListener('pointerdown', outside)
+    menu.querySelector('[aria-checked="true"]')?.focus()
+  })
+  menu.addEventListener('keydown', (event) => {
+    if (event.key !== 'Escape') return
+    event.stopPropagation()
+    close()
+    menu.querySelector('summary').focus()
+  })
+  return menu
+}
+
 // A new model gets the whole conversation again on its next turn, so the user confirms first and may compact before.
 async function changeModel(model) {
   const ok = await askConfirm(t('compose.model_warn', 'Changing the model sends the whole conversation to the new model again on the next turn, which costs more. If the conversation is long, compact it first (/compact). Change the model?'))
-  if (ok) await save({ model })
+  // An effort the new model does not take would keep going to the SDK unseen, so it moves to that model's recommended
+  // level (or none when the model has no effort levels).
+  const efforts = catalog?.models?.find((m) => m.id === model)?.efforts ?? []
+  const effort = efforts.includes(shown?.effort) ? shown.effort : efforts.length ? RECOMMENDED_EFFORT(efforts) : null
+  if (ok) await save({ model, effort })
   else {
     drawn = null
     if (shown) render(shown)
   }
 }
 
-async function save(change) {
-  const ok = await mutate(() => api.put(`/bots/${bot}`, change), `${bot}: ${t('compose.saved', 'saved, applies from the next turn')}`)
+async function save(change, { quiet = false } = {}) {
+  const ok = await mutate(() => api.put(`/bots/${bot}`, change), quiet ? undefined : `${bot}: ${t('compose.saved', 'saved, applies from the next turn')}`)
   if (ok) emit('bots-changed')
   else if (shown) {
     // The select still shows the value that was not saved.
@@ -91,8 +149,12 @@ function render(agent) {
   const modelOptions = models.map((m) => [m.id, m.name])
   if (agent.model && !current) modelOptions.push([agent.model, agent.model])
   const efforts = (current ?? models[0])?.efforts ?? []
-  const effortOptions = [['', t('compose.effort_default', 'Default effort')], ...efforts.map((e) => [e, e])]
-  if (agent.effort && !efforts.includes(agent.effort)) effortOptions.push([agent.effort, agent.effort])
+  // A bot always shows a real effort level, never "default": one with none yet is pinned to the recommended level, so
+  // what the menu says is what the next turn uses.
+  if (efforts.length && !efforts.includes(agent.effort) && !pinned.has(agent.name)) {
+    pinned.add(agent.name)
+    save({ effort: RECOMMENDED_EFFORT(efforts) }, { quiet: true })
+  }
   const modes = catalog?.permission_modes ?? [agent.permission_mode]
   const modeOptions = modes.map((m) => [m, t(...(MODE_LABEL[m] ?? [m, m]))])
   const source = catalog?.fallback ? t('compose.fallback', 'built-in list') : ''
@@ -104,8 +166,7 @@ function render(agent) {
     catalog?.commands?.length ? el('span', { class: 'meta', text: `/ ${catalog.commands.length} ${t('compose.commands', 'commands')}` }) : null,
     el('span', { class: 'compose-spacer' }),
     source ? el('span', { class: 'meta', title: catalog.error ?? '', text: source }) : null,
-    select(t('compose.model', 'Model'), agent.model ?? modelOptions[0]?.[0] ?? '', modelOptions, (v) => changeModel(v)),
-    efforts.length || agent.effort ? select(t('compose.effort', 'Effort'), agent.effort ?? '', effortOptions, (v) => save({ effort: v || null })) : null,
+    modelMenu(agent, modelOptions, efforts),
     select(t('compose.permission', 'Permissions'), agent.permission_mode, modeOptions, (v) => save({ permission_mode: v })),
     // The context ring sits last on the right, as in Claude Desktop; the number is in its tooltip.
     el('span', { class: 'compose-context', title: `${t('ctx.title', 'How full the context is after the last turn')}: ${contextLabel(agent)}` }, contextRing(agent, 20)),

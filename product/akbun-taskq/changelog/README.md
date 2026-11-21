@@ -10,6 +10,7 @@
 
 | 버전 | 해설 | 첫 항목 |
 |---|---|---|
+| [0.33.0](0.33.0/changelog.md) | [learning](0.33.0/learning_changelog.md) | task 상태보드의 세 칸을 테두리와 제목이 있는 패널로 나눴다. |
 | [0.32.0](0.32.0/changelog.md) | [learning](0.32.0/learning_changelog.md) | 모든 Claude bot과 작업 실행에서 auto compaction이 항상 켜진다. |
 | [0.31.0](0.31.0/changelog.md) | [learning](0.31.0/learning_changelog.md) | task 상태보드에서 카드를 끌어 다른 열에 놓아 상태를 바꾼다. |
 | [0.30.2](0.30.2/changelog.md) | [learning](0.30.2/learning_changelog.md) | 작업 상세 창을 설정 창처럼 창 가장자리만 남기고 화면을 채우도록 키웠다. |

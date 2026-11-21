@@ -1,5 +1,5 @@
-// The Weekly review page of Settings: per bot whether it ran and went well, what to turn off, and a few
-// recent results to check by hand.
+// The Weekly review menu: per bot whether it ran and went well, what to turn off, and a few recent results to check by
+// hand. Every number is a database query (GET /review); no model is called, so opening it costs no tokens.
 import { api, mutate } from '../core/api.js'
 import { emit, on } from '../core/bus.js'
 import { area, el, fill } from '../core/dom.js'
@@ -10,8 +10,8 @@ const pct = (rate) => (rate === null ? '—' : `${Math.round(rate * 100)}%`)
 const when = (sec) => (sec ? fmtDateTime(sec) : '—')
 
 export function initReviewSettings() {
-  on('settings-page', (page) => {
-    if (page === 'review') load()
+  on('tab', (view) => {
+    if (view === 'review') load()
   })
   area('review-days').addEventListener('change', load)
 }

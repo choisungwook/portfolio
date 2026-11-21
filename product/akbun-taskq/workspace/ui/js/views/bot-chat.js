@@ -12,6 +12,7 @@ import { autosize } from '../core/autosize.js'
 import { attachments } from '../core/attach.js'
 import { botAvatar, senderAvatar } from './avatar.js'
 import { botsSnapshot, shortTime } from './bots-sidebar.js'
+import { fmtExact } from '../core/time.js'
 import { openBotSettings } from './bot-settings.js'
 import { initChatFind, refreshFind } from './chat-find.js'
 import { initComposeMenus, showComposeMenus } from './compose-menus.js'
@@ -145,9 +146,8 @@ function renderHead() {
   clear(nodes.head).append(
     botAvatar(bot, 64, agent.sdk),
     el('div', { class: 'chat-who' },
-      el('h2', { text: agent.name }),
-      el('p', { class: 'meta', text: facts.join(' · ') }),
-      el('p', { class: 'chat-desc', text: agent.description }),
+      // Only the name is shown; role, mode and description stay in its tooltip and in the bot's settings.
+      el('h2', { text: agent.name, title: [facts.join(' · '), agent.description].filter(Boolean).join('\n') }),
       owned.length === 0 ? null : el('ul', { class: 'chat-tasks', 'aria-label': `Tasks ${agent.name} owns` },
         ...owned.map((task) => el('li', {},
           el('button', { type: 'button', class: 'chip-button', dataset: { status: task.status }, onclick: () => emit('open-task', task.id) },
@@ -365,7 +365,7 @@ function turnError(turn) {
   return el('div', { class: 'msg', dataset: { side: 'error', turn: String(turn.id) }, role: 'note' },
     el('div', { class: 'msg-body' },
       el('div', { class: 'bubble' }, el('strong', { text: `${t('chat.turn_failed', 'The turn failed')}: ` }), turn.error ?? t('chat.no_reason', 'no reason given')),
-      el('span', { class: 'msg-meta', text: shortTime(turn.ended_at) })))
+      el('span', { class: 'msg-meta' }, when(turn.ended_at))))
 }
 
 function wontAnswer(reason) {
@@ -378,7 +378,12 @@ function refused(failure) {
   return el('div', { class: 'msg', dataset: { side: 'error' }, role: 'alert' },
     el('div', { class: 'msg-body' },
       el('div', { class: 'bubble' }, el('strong', { text: `${t('chat.send_failed', 'Not sent')}: ` }), failure.message),
-      el('span', { class: 'msg-meta', text: `${shortTime(failure.at)} · ${failure.body.slice(0, 80)}` })))
+      el('span', { class: 'msg-meta' }, when(failure.at), ` · ${failure.body.slice(0, 80)}`)))
+}
+
+// A message's short time; hovering it shows the exact moment.
+function when(sec) {
+  return el('time', { datetime: new Date(sec * 1000).toISOString(), title: fmtExact(sec), text: shortTime(sec) })
 }
 
 function bubble(m, name) {
@@ -396,7 +401,7 @@ function bubble(m, name) {
       el('div', { class: 'bubble', text: cancelled ? t('chat.cancelled', 'Cancelled') : m.body }),
       attached.length === 0 ? null : el('div', { class: 'msg-files' }, ...attached.map(fileCard)),
       el('span', { class: 'msg-meta' },
-        `${shortTime(m.created_at)}${notes.length ? ` · ${notes.join(' · ')}` : ''}`,
+        when(m.created_at), notes.length ? ` · ${notes.join(' · ')}` : '',
         m.task_id ? el('button', { type: 'button', class: 'link', text: ` · task ${m.task_id}`, onclick: () => emit('open-task', m.task_id) }) : null)))
 }
 

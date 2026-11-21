@@ -12,6 +12,7 @@ import { t } from '../core/i18n.js'
 import { contextRing } from './context-ring.js'
 import { connectionByBot } from './connections.js'
 import { icon } from '../core/icons.js'
+import { fmtExact } from '../core/time.js'
 
 const POLL_MS = 5000
 
@@ -114,7 +115,9 @@ function render(team) {
   },
   el('span', { class: 'side-avatar', dataset: { busy: String(a.busy) } }, botAvatar(a.name, 88, a.sdk),
     a.unread > 0 ? el('span', { class: 'unread-dot', 'aria-label': `${a.unread} unread` }) : null),
-  el('strong', { text: a.name }))))
+  el('strong', { text: a.name }),
+  // A caption under the name so the big avatar reads as a button that opens the orchestrator's chat, not a logo.
+  el('span', { class: 'side-hero-cta' }, t('hero.open', 'Open chat'), icon('chevron-right', 14)))))
   clear(list).append(...team.agents.filter((a) => !a.system).map((a) => el('li', { class: 'side-bot-row', dataset: { system: String(a.system) } },
     el('button', {
       type: 'button', class: 'side-item side-bot', dataset: { bot: a.name, busy: String(a.busy), enabled: String(a.enabled) },
@@ -138,7 +141,7 @@ function render(team) {
       el('span', { class: 'side-bot-top' },
         el('strong', { text: a.name }),
         connectionDot(a.name),
-        el('time', { class: 'meta', text: a.last_message ? shortTime(a.last_message.created_at) : '' }),
+        el('time', { class: 'meta', text: a.last_message ? shortTime(a.last_message.created_at) : '', title: a.last_message ? fmtExact(a.last_message.created_at) : undefined }),
         a.context_window ? contextRing(a, 16) : null),
       a.busy
         ? el('span', { class: 'side-bot-working', dataset: { since: String(a.working_since ?? '') } }, el('span', { class: 'pulse', 'aria-hidden': 'true' }), el('span', { class: 'working-text', text: workingText(a.working_since) }))
