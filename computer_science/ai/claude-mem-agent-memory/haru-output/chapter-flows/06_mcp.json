@@ -1,0 +1,73 @@
+{
+  "palette": "ink-blue",
+  "layout": "split",
+  "subject": "Two lookup steps find observation identifiers before fetching one selected memory record",
+  "titles": {
+    "left": "Find an ID",
+    "right": "Open the record"
+  },
+  "nodes": [
+    {
+      "id": "a",
+      "label": [
+        "Claude Code"
+      ],
+      "shape": "box",
+      "half": "left"
+    },
+    {
+      "id": "s",
+      "label": [
+        "minimem-mcp"
+      ],
+      "shape": "box",
+      "half": "left"
+    },
+    {
+      "id": "b",
+      "label": [
+        "Claude Code"
+      ],
+      "shape": "box",
+      "half": "right"
+    },
+    {
+      "id": "t",
+      "label": [
+        "minimem-mcp"
+      ],
+      "shape": "box",
+      "half": "right"
+    }
+  ],
+  "edges": [
+    {
+      "from": "a",
+      "to": "s",
+      "kind": "call",
+      "label": "Search words",
+      "step": 1
+    },
+    {
+      "from": "s",
+      "to": "a",
+      "kind": "sync",
+      "label": "Titles and IDs",
+      "step": 2
+    },
+    {
+      "from": "b",
+      "to": "t",
+      "kind": "call",
+      "label": "Selected ID",
+      "step": 3
+    },
+    {
+      "from": "t",
+      "to": "b",
+      "kind": "sync",
+      "label": "Full record",
+      "step": 4
+    }
+  ]
+}

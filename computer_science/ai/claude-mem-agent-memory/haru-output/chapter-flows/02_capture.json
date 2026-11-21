@@ -1,0 +1,56 @@
+{
+  "palette": "ink-blue",
+  "layout": "row",
+  "subject": "A successful Write call becomes one local SQLite event through a Claude Code command hook",
+  "nodes": [
+    {
+      "id": "cc",
+      "label": [
+        "Claude Code"
+      ],
+      "shape": "box"
+    },
+    {
+      "id": "hook",
+      "label": [
+        "minimem-hook",
+        "tool"
+      ],
+      "shape": "box"
+    },
+    {
+      "id": "events",
+      "label": [
+        "SQLite",
+        "events"
+      ],
+      "shape": "cylinder"
+    }
+  ],
+  "edges": [
+    {
+      "from": "cc",
+      "to": "hook",
+      "kind": "call",
+      "label": "stdin JSON",
+      "step": 1
+    },
+    {
+      "from": "hook",
+      "to": "events",
+      "kind": "call",
+      "label": "INSERT",
+      "step": 2
+    }
+  ],
+  "notes": [
+    {
+      "node": "cc",
+      "text": "After successful Write"
+    },
+    {
+      "node": "events",
+      "text": "processed is zero"
+    }
+  ]
+}

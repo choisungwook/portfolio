@@ -8,4 +8,4 @@ concept를 추가할 때마다 `* [제목](파일명.md) - 한 문장 요약.` �
 
 * [observer는 임시 디렉터리에서 도구와 설정을 끈 claude -p로 실행한다](2026-11-observer-isolation.md) - 재귀 기록과 설정 오염을 막는 격리 장치.
 * [관찰 검색은 trigram FTS5와 LIKE를 조합하고 OR로 묶는다](2026-11-korean-search.md) - 한국어 조사, 2글자 단어, 긴 검색어 대응.
-* [메모리 비교 실험은 저장소 밖 프로젝트와 transcript 비활성화로 통제한다](2026-11-experiment-control.md) - 메모리 유무 비교를 흐리는 요인 제거.
+* [메모리 비교 실험은 저장소 밖 프로젝트와 transcript 비활성화로 통제한다](2026-11-experiment-control.md) - 같은 질문으로 비교할 때 파일 조회와 Claude Code 자동 메모리를 차단한다.

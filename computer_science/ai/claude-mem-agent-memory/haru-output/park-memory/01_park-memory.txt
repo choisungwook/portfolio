@@ -1,0 +1,19 @@
+Hand-drawn technical diagram sketch on a plain white canvas, landscape 16:9, flat 2D, like a quick whiteboard-app drawing made with a mouse.
+
+LAYOUT: The shapes sit in vertical columns placed from left to right, one column per stage, with arrows running between columns.
+
+SUBJECT: Capture and reuse of amusement park attendance decisions across two Claude Code sessions
+
+SHAPES (6): 1. a rectangle in column 1 from the left named "Session A". 2. a rectangle in column 2 from the left named "Capture" over "Hooks" on two lines. 3. an upright cylinder in column 3 from the left named "SQLite". 4. a rectangle in column 3 from the left named "Observer". 5. a rectangle in column 4 from the left named "SessionStart". 6. a rectangle in column 4 from the left named "Session B".
+
+ARROWS (5): 1. from shape 1 ("Session A") to shape 2 ("Capture Hooks"): a straight solid #4A90D0 line with a hollow #4A90D0 triangle head, labeled "Prompt, Write" in small #4A90D0 lettering beside the line. 2. from shape 2 ("Capture Hooks") to shape 3 ("SQLite"): a straight solid #4A90D0 line with a hollow #4A90D0 triangle head, labeled "Store events" in small #4A90D0 lettering beside the line. 3. from shape 3 ("SQLite") to shape 4 ("Observer"): two short parallel straight dashed #4A90D0 lines side by side, one pointing each way, each with a hollow #4A90D0 triangle head, labeled "Read, Save" in small #4A90D0 lettering beside the line. 4. from shape 3 ("SQLite") to shape 5 ("SessionStart"): a straight dashed #4A90D0 line with a hollow #4A90D0 triangle head, labeled "Load summary" in small #4A90D0 lettering beside the line. 5. from shape 5 ("SessionStart") to shape 6 ("Session B"): a straight solid #4A90D0 line with a hollow #4A90D0 triangle head, labeled "Add context" in small #4A90D0 lettering beside the line.
+
+NOTES: Just below shape 1 ("Session A"), a small note in #4A90D0 lettering reads "File contains only 137". Just below shape 4 ("Observer"), a small note in #4A90D0 lettering reads "Runs after Stop".
+
+TEXT: The only words in the image are the quoted texts above, spelled exactly.
+
+COLOR PALETTE: background #FFFFFF; ink #1E1E1E; accent #4A90D0. Use no other colors.
+
+STYLE: Every shape is outlined once in near-black ink (#1E1E1E), about 2 px at 1280 px width, even weight, drawn freehand yet nearly straight; corners are sharp or barely rounded. No doubled strokes, no sketch hatching, no brush texture. Shapes are empty inside, white like the canvas: no colored fills, no gradients, no drop shadows, no 3D depth. All text is casual rounded hand-lettering, slightly uneven, like a marker font in a sketch app. Shape names sit centered inside their shape in #1E1E1E; arrow labels and notes are smaller and written in #4A90D0. Write every quoted text exactly, letter for letter. Every arrow, line and head, is drawn in #4A90D0; no arrow is black. Arrowheads are small hollow (outlined, unfilled) triangles. Solid and dashed arrows keep the same thin weight. Arrows are straight lines; an arrow bends, in one shallow curve, only when a straight line would cross another shape, to pass around that shape. Each arrow ends exactly on the target outline and never crosses through a shape. The whole diagram, taken as one group of shapes, arrows and text, is centered on the canvas both horizontally and vertically: the empty margin on the left equals the margin on the right, and the margin above equals the margin below. Generous white space covers more than half of the canvas; shapes are well separated and never overlap. No frame, no background pattern, no grid.
+
+DO NOT: no colored fills, no 3D, no drop shadows, no gradients, no real product logos or brand marks, no icons or pictograms, no characters, mascots or decorative doodles, no title or heading that is not quoted above, no legend, no watermark.

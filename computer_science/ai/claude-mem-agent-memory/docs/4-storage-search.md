@@ -22,26 +22,24 @@
 
 | 용어 | 의미 | 이 실습에서의 예 |
 | --- | --- | --- |
-| FTS5 | SQLite에 내장된 전문(full-text) 검색 확장 | `observations_fts MATCH '"할인율"'` |
+| FTS5 | SQLite에 내장된 전문(full-text) 검색 확장 | `observations_fts MATCH '"방문객"'` |
 | 토크나이저 | 문장을 색인 단위 토큰으로 쪼개는 규칙 | `unicode61`, `trigram` |
-| `unicode61` | 공백과 구두점 기준으로 단어를 나누는 FTS5 기본 토크나이저 | `"할인율을"` 전체를 토큰 1개로 취급 |
-| `trigram` | 연속된 3글자 조각을 모두 토큰으로 만드는 토크나이저 (SQLite 3.34+) | `"할인율을"` → `"할인율"`, `"인율을"` |
+| `unicode61` | 공백과 구두점 기준으로 단어를 나누는 FTS5 기본 토크나이저 | `"방문객을"` 전체를 토큰 1개로 취급 |
+| `trigram` | 연속된 3글자 조각을 모두 토큰으로 만드는 토크나이저 (SQLite 3.34+) | `"방문객을"` → `"방문객"`, `"문객을"` |
 | AND 검색 | 질의의 모든 단어를 포함한 관찰만 반환하는 방식 | `--mode and` |
 | OR 검색 | 질의 단어 중 하나라도 포함하면 후보로 모아 점수순 정렬하는 방식 | `minimem` 기본값 |
 
 ## 한국어 검색에서 공백 기반 토크나이저가 막히는 이유
 
-에이전트가 과거 기억을 찾을 때 던지는 키워드는 보통 `"할인율"`, `"쿠폰"`, `"pytest"`처럼 깔끔한 명사입니다. 하지만 실제 한국어 관찰 문장 안에는 `"할인율을"`, `"pytest가"`, `"테스트를"`처럼 명사 뒤에 조사가 딱 붙어 있습니다. `claude-mem`이 기본으로 사용하는 `unicode61` 토크나이저는 공백과 구두점만으로 단어를 자르기 때문에 `"할인율을"`을 통째로 하나의 토큰으로 색인합니다. 결국 `"할인율"`로 검색하면 아무것도 걸리지 않습니다. 영어는 단어 사이에 공백이 들어가므로 기본 설정만으로도 문제가 거의 드러나지 않지만, 한국어에서는 치명적인 누락으로 이어집니다.
+관찰에 “방문객을 137명으로 기록했다”라고 적혀 있다면, `unicode61`은 “방문객을” 전체를 한 토큰으로 색인합니다. 검색어 “방문객”은 이 토큰과 정확히 일치하지 않습니다. `trigram`은 “방문객”, “문객을” 두 조각을 색인하므로 “방문객”도 찾을 수 있습니다.
 
-이를 피하기 위해 `trigram` 토크나이저를 쓰면 문장을 3글자 단위로 쪼개 색인하므로 조사와 무관하게 `"할인율"`을 잘 찾아냅니다. 그런데 여기에도 또 다른 함정이 있습니다. `"할인"`, `"쿠폰"`, `"버그"`, `"중복"`, `"적용"`처럼 한국어 핵심 단어 중 상당수가 **2글자**라는 점입니다. 3글자 미만 검색어는 `trigram` 색인에 아예 토큰이 존재하지 않아 검색 자체가 실패합니다.
+“직원”처럼 두 글자인 검색어는 `trigram` 색인에서 찾을 수 없습니다. 세 글자짜리 조각보다 짧기 때문입니다.
 
 그래서 `minimem`은 두 방식을 현실적으로 조합했습니다. 3글자 이상 단어는 `trigram` FTS5 색인으로 빠르게 찾고, 3글자 미만 단어는 `LIKE '%단어%'`로 조회합니다. 물론 `LIKE`는 인덱스를 타지 않는 풀 스캔이지만, 한 프로젝트에 쌓이는 관찰은 많아야 수천 행 수준이므로 로컬 SQLite에서는 지연이 거의 느껴지지 않습니다.
 
 ## 여러 단어 질의를 AND로 묶으면 0건이 나오는 이유
 
-토크나이저 문제를 해결하고 나서도 실제 세션에서 또 한 번 검색 실패를 겪었습니다. 에이전트는 검색어를 사람처럼 1~2단어로 압축해 넣지 않고, 관련 있어 보이는 단어를 넉넉하게 나열하는 경향이 있습니다. 실제로 세션 D의 에이전트는 `"테스트 실행 도구 pytest unittest"`라는 다섯 단어짜리 질의를 보냈습니다.
-
-처음에 구현했던 AND 검색은 이 다섯 단어가 모두 들어 있는 관찰만 찾으려 했고, 관찰 본문에 `"도구"`라는 단어 하나가 빠져 있었다는 이유만으로 0건을 돌려주었습니다. 다행히 당시에는 `SessionStart` 인덱스에 `#2`가 보여서 에이전트가 직접 골라 답을 찾았지만, 만약 인덱스 밖으로 밀려난 오래된 관찰이었다면 그대로 "기록 없음"으로 끝났을 상황입니다.
+“방문객 직원 퍼레이드”로 검색하면 AND는 세 단어가 모두 들어간 관찰을 찾습니다. 퍼레이드를 기록한 적이 없다면 결과는 0건입니다. OR는 방문객이나 직원이 들어간 관찰도 후보에 올립니다.
 
 그래서 `minimem`은 기본 검색 방식을 OR로 바꾸었습니다. 각 단어별로 일치하는 관찰 ID를 모은 뒤, **일치한 단어 개수가 많은 순서(동점이면 최신순)**로 정렬해 돌려줍니다. 후보 개수는 조금 늘어나지만 관련도 높은 관찰이 자연스럽게 맨 위로 올라오고, 어차피 본문은 에이전트가 인덱스를 보고 골라낸 일부만 조회하므로([시나리오 6](6-mcp-search.md)) 후보가 늘어나는 부담도 작습니다.
 
@@ -66,92 +64,71 @@
 | `search.search_ids()` | 단어별 결과를 합산해 일치 단어 수 점수를 매기고 AND/OR 조건 적용 |
 | `search.search()` | 최종 결과를 `#id [type] 제목 (파일)` 형태의 한 줄 인덱스로 포맷해 반환 |
 
+## 구현 코드
+
+SQLite는 새 관찰을 넣을 때 INSERT 트리거로 제목과 본문을 FTS5 색인에도 등록합니다. [db.py 53–62줄](../minimem/minimem/db.py#L53-L62)
+
+```sql
+CREATE TRIGGER IF NOT EXISTS observations_ai AFTER INSERT ON observations BEGIN
+  INSERT INTO observations_fts(rowid, title, facts, narrative)
+  VALUES (new.id, new.title, new.facts, new.narrative);
+END;
+```
+
+`term_ids()`는 단어마다 검색 방식을 정합니다. 실습의 ‘방문객’은 세 글자라 `MATCH`로, ‘직원’은 두 글자라 `LIKE`로 조회합니다. `search_ids()`는 단어별 결과를 모아 AND 또는 OR 조건을 적용합니다. [search.py 9–20줄](../minimem/minimem/search.py#L9-L20) · [search.py 29–36줄](../minimem/minimem/search.py#L29-L36)
+
+```python
+if len(term) >= TRIGRAM_MIN_CHARS:
+  sql = "SELECT o.id FROM observations o JOIN observations_fts f ON f.rowid = o.id WHERE o.project = ? AND observations_fts MATCH ?"
+  param = '"' + term.replace('"', '""') + '"'
+else:
+  sql = "SELECT id FROM observations WHERE project = ? AND (title || facts || narrative) LIKE ?"
+  param = f"%{term}%"
+return {row[0] for row in conn.execute(sql, (project, param))}
+```
+
 ## 키워드 검색 처리 흐름
 
 에이전트가 보낸 다중 단어 검색어가 관찰 인덱스로 변환되기까지의 처리 경로입니다.
 
+![검색어 길이에 따라 FTS5 trigram과 LIKE로 나뉘고 결과 ID를 AND 또는 OR 조건으로 정렬하는 과정](../haru-output/chapter-flows/04_search.png)
+
+<!-- markdownlint-disable MD033 -->
+<details>
+<summary>메시지와 분기를 포함한 상세 흐름</summary>
+
 ```mermaid
 flowchart TD
-  Q["검색어: 테스트 실행 도구 pytest unittest"] --> S["공백으로 분리"]
+  Q["검색어: 방문객 직원 퍼레이드"] --> S["공백으로 분리"]
   S --> L{"3글자 이상?"}
-  L -- "예: 테스트, pytest, unittest" --> F["observations_fts MATCH (trigram)"]
-  L -- "아니오: 실행, 도구" --> K["LIKE '%단어%'"]
+  L -- "예: 방문객, 퍼레이드" --> F["observations_fts MATCH (trigram)"]
+  L -- "아니오: 직원" --> K["LIKE '%단어%'"]
   F --> C["관찰 id별 일치 단어 수 합산"]
   K --> C
   C --> M{"mode"}
-  M -- "and: 5개 모두 일치" --> R1["0건"]
+  M -- "and: 3개 모두 일치" --> R1["0건"]
   M -- "or: 1개 이상 일치" --> R2["일치 수, 최신순 정렬 후 인덱스"]
 ```
 
-## 실습: 토크나이저와 AND/OR 검색 비교
+</details>
+<!-- markdownlint-enable MD033 -->
 
-명령은 workspace 루트에서 실행합니다. 3단계 비교는 [시나리오 6](6-mcp-search.md)의 세션 C까지 실행되어 관찰 6건이 쌓인 DB를 기준으로 합니다.
+## 실습: 한국어 검색 결과 비교
 
-### 1. 테이블 및 트리거 구성 확인
-
-먼저 `memory.db` 안에 어떤 테이블과 트리거가 생성되어 있는지 확인합니다. FTS5가 내부적으로 만드는 보조 테이블(`observations_fts_*`)은 제외하고 출력합니다.
-
-```bash
-python3 -c "import sqlite3,os;c=sqlite3.connect(os.path.expanduser('~/.minimem/memory.db'));[print(r[0]) for r in c.execute(\"select name from sqlite_master where type in ('table','trigger') and name not like 'observations_fts_%' and name != 'sqlite_sequence' order by name\")]"
-```
-
-실행하면 설계한 테이블 4개와 FTS5 가상 테이블, INSERT 트리거가 모두 보입니다.
-
-```text
-events
-observations
-observations_ai
-observations_fts
-sessions
-summaries
-```
-
-### 2. 토크나이저별 한국어 검색 적중 비교
-
-`tokenizer_compare.py`는 고정된 한국어 관찰 제목 4개를 각각 `unicode61`, `trigram`, 그리고 `minimem`(`trigram` + `LIKE`) 방식으로 색인한 뒤 8개 검색어의 적중 건수를 비교합니다. "부분 문자열 정답"은 제목 안에 해당 문자열이 실제로 포함된 행 수입니다. 고정 샘플을 쓰므로 어느 환경에서 돌려도 동일한 표가 나옵니다.
+고정 예제 관찰 네 건에 대한 결과를 바로 비교합니다.
 
 ```bash
-uv run scripts/tokenizer_compare.py
+minimem/.venv/bin/python scripts/tokenizer_compare.py
 ```
 
-실행 결과는 다음과 같습니다.
+“방문객”은 실제로 세 문장에 들어 있습니다. `unicode61`은 두 건, `trigram`은 세 건을 찾습니다. “직원”은 `unicode61`과 `trigram` 모두 0건이며, 부분 문자열을 확인하는 `LIKE`로는 한 건입니다.
 
-```text
-관찰 4건
-| 검색어 | 부분 문자열 정답 | unicode61 | trigram | minimem(trigram+LIKE) |
-| --- | --- | --- | --- | --- |
-| 할인 | 2 | 1 | 0 | 2 |
-| 할인율 | 1 | 0 | 1 | 1 |
-| 버그 | 1 | 1 | 0 | 1 |
-| 쿠폰 | 1 | 1 | 0 | 1 |
-| 중복 | 1 | 1 | 0 | 1 |
-| 적용 | 1 | 0 | 0 | 1 |
-| pytest | 1 | 0 | 1 | 1 |
-| 테스트 | 1 | 0 | 1 | 1 |
-```
-
-결과가 꽤 극명합니다. `unicode61`은 조사가 붙은 `"할인율을"`, `"적용을"`, `"pytest가"`, `"테스트를"`을 전부 놓쳤고, `"할인"`도 조사 없이 쓰인 `"할인 금액은"` 1건만 찾아냈습니다. 반대로 `trigram`은 2글자 검색어 5개를 모두 0건으로 놓쳤습니다. 특히 `"적용"`은 2글자이면서 문장 속에 `"적용을"`로 쓰여 두 토크나이저 모두 찾지 못했습니다. 반면 `minimem`의 조합 방식은 8개 검색어 모두 정답과 일치합니다. 참고로 `--db` 옵션을 붙이면 고정 샘플 대신 현재 실습 DB의 관찰로 같은 비교를 수행할 수 있습니다.
-
-### 3. AND 검색과 OR 검색 비교
-
-이번에는 실제 세션 D의 에이전트가 보냈던 5단어 검색어로 AND 모드와 기본 OR 모드의 차이를 비교합니다.
+[시나리오 1](1-memory-map.md)의 실제 관찰에서도 AND와 OR를 비교합니다. 퍼레이드가 관찰에 없으므로 AND는 0건이고, OR는 다른 단어가 들어간 관찰을 보여 줍니다.
 
 ```bash
-uv run --project minimem minimem search shop "테스트 실행 도구 pytest unittest" --mode and
-uv run --project minimem minimem search shop "테스트 실행 도구 pytest unittest"
+minimem/.venv/bin/minimem search park '방문객 직원 퍼레이드' --mode and
+minimem/.venv/bin/minimem search park '방문객 직원 퍼레이드'
 ```
-
-첫 번째 AND 검색은 결과를 찾지 못하지만, 두 번째 OR 검색은 가장 관련도가 높은 관찰 `#2`를 맨 위에 올려 돌려줍니다.
-
-```text
-검색 결과 없음
-#2 [discovery] 현재 환경에는 pytest가 없어 unittest로 테스트를 실행함 (tests/test_discount.py)
-#6 [discovery] 전체 테스트 실행 결과 7개 통과 (shop/coupon.py, tests/test_coupon.py)
-#1 [bugfix] apply_discount 할인율 계산 누락된 100 나눗셈 수정 (shop/discount.py, tests/test_discount.py)
-#5 [change] apply_coupons 단위 테스트 5개 추가 (tests/test_coupon.py)
-```
-
-AND 검색은 `"도구"`가 포함된 관찰이 없어 빈 결과를 냈습니다. 반면 OR 검색은 `"테스트"`, `"실행"`, `"pytest"`, `"unittest"` 네 단어가 모두 일치한 `#2`에 가장 높은 점수를 매겨 최상단에 배치했습니다. 관찰 문장은 observer가 생성한 결과이므로 독자 환경에서는 순서나 개수가 조금 다를 수 있습니다.
 
 ## 실무 관점에서 짚어볼 점
 

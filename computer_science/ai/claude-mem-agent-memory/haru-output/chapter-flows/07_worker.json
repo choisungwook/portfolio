@@ -1,0 +1,66 @@
+{
+  "palette": "ink-blue",
+  "layout": "columns",
+  "subject": "Original Claude Mem hooks hand events to a resident worker with a local spool fallback",
+  "nodes": [
+    {
+      "id": "hook",
+      "label": [
+        "claude-mem",
+        "Hook"
+      ],
+      "shape": "box",
+      "col": 1
+    },
+    {
+      "id": "spool",
+      "label": [
+        "Spool file"
+      ],
+      "shape": "cylinder",
+      "col": 2
+    },
+    {
+      "id": "worker",
+      "label": [
+        "Worker"
+      ],
+      "shape": "box",
+      "col": 3
+    },
+    {
+      "id": "db",
+      "label": [
+        "SQLite"
+      ],
+      "shape": "cylinder",
+      "col": 4
+    }
+  ],
+  "edges": [
+    {
+      "from": "hook",
+      "to": "worker",
+      "kind": "call",
+      "label": "HTTP"
+    },
+    {
+      "from": "hook",
+      "to": "spool",
+      "kind": "sync",
+      "label": "On failure"
+    },
+    {
+      "from": "spool",
+      "to": "worker",
+      "kind": "sync",
+      "label": "Replay"
+    },
+    {
+      "from": "worker",
+      "to": "db",
+      "kind": "call",
+      "label": "Save memory"
+    }
+  ]
+}

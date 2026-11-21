@@ -1,0 +1,66 @@
+{
+  "palette": "ink-blue",
+  "layout": "columns",
+  "subject": "SQLite search routes longer keywords through a trigram index and short keywords through LIKE",
+  "nodes": [
+    {
+      "id": "len",
+      "label": [
+        "Keyword",
+        "length"
+      ],
+      "shape": "box",
+      "col": 1
+    },
+    {
+      "id": "fts",
+      "label": [
+        "FTS5 trigram"
+      ],
+      "shape": "box",
+      "col": 2
+    },
+    {
+      "id": "like",
+      "label": [
+        "LIKE"
+      ],
+      "shape": "box",
+      "col": 2
+    },
+    {
+      "id": "rank",
+      "label": [
+        "AND or OR",
+        "Rank IDs"
+      ],
+      "shape": "box",
+      "col": 3
+    }
+  ],
+  "edges": [
+    {
+      "from": "len",
+      "to": "fts",
+      "kind": "call",
+      "label": "Three or more"
+    },
+    {
+      "from": "len",
+      "to": "like",
+      "kind": "call",
+      "label": "One or two"
+    },
+    {
+      "from": "fts",
+      "to": "rank",
+      "kind": "sync",
+      "label": "Matched IDs"
+    },
+    {
+      "from": "like",
+      "to": "rank",
+      "kind": "sync"
+    }
+  ]
+}

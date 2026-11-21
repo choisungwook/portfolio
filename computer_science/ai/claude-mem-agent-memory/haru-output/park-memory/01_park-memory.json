@@ -1,0 +1,24 @@
+{
+  "palette": "ink-blue",
+  "layout": "columns",
+  "subject": "Capture and reuse of amusement park attendance decisions across two Claude Code sessions",
+  "nodes": [
+    {"id": "a", "label": ["Session A"], "shape": "box", "col": 1},
+    {"id": "capture", "label": ["Capture", "Hooks"], "shape": "box", "col": 2},
+    {"id": "db", "label": ["SQLite"], "shape": "cylinder", "col": 3},
+    {"id": "observer", "label": ["Observer"], "shape": "box", "col": 3},
+    {"id": "start", "label": ["SessionStart"], "shape": "box", "col": 4},
+    {"id": "b", "label": ["Session B"], "shape": "box", "col": 4}
+  ],
+  "edges": [
+    {"from": "a", "to": "capture", "kind": "call", "label": "Prompt, Write"},
+    {"from": "capture", "to": "db", "kind": "call", "label": "Store events"},
+    {"from": "db", "to": "observer", "kind": "sync-pair", "label": "Read, Save"},
+    {"from": "db", "to": "start", "kind": "sync", "label": "Load summary"},
+    {"from": "start", "to": "b", "kind": "call", "label": "Add context"}
+  ],
+  "notes": [
+    {"node": "a", "text": "File contains only 137"},
+    {"node": "observer", "text": "Runs after Stop"}
+  ]
+}
