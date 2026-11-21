@@ -65,7 +65,9 @@ export async function checkUpdate(fetcher: typeof fetch = fetch, binary = isBina
 // How far the running install is, for the progress bar in Settings > Update. total is null when GitHub sends no length.
 export interface InstallProgress { phase: 'idle' | 'download' | 'unpack' | 'done' | 'failed'; received: number; total: number | null }
 let progress: InstallProgress = { phase: 'idle', received: 0, total: null }
-export const installProgress = (): InstallProgress => ({ ...progress })
+// A random id for this process, so a page waiting through a restart (same pid after execve) can tell the new one.
+export const BOOT_ID = Math.random().toString(16).slice(2) + Date.now().toString(16)
+export const installProgress = (): InstallProgress & { boot: string } => ({ ...progress, boot: BOOT_ID })
 
 // Reads the body chunk by chunk so the progress moves while it downloads.
 async function download(res: Response): Promise<Buffer> {

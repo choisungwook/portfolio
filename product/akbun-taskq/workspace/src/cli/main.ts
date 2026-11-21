@@ -9,6 +9,8 @@ import * as tasks from './commands.ts'
 import * as info from './info.ts'
 import { runCommand } from './run.ts'
 import { manualText } from '../team/builtin-skill.ts'
+import { applyPendingImport, undoImport } from '../db/backup.ts'
+import { db as dbCommand } from './db.ts'
 import { skills } from './skills.ts'
 import * as operator from './operator.ts'
 import { handoff, handoffs } from './handoffs.ts'
@@ -38,6 +40,7 @@ const COMMANDS: Record<string, Command> = {
   bots,
   workflows,
   api,
+  db: dbCommand,
 }
 
 const USAGE = `usage: taskq <command> [options]
@@ -51,6 +54,7 @@ const USAGE = `usage: taskq <command> [options]
   pause [--reason TEXT]    unpause    cancel ID    retry ID [--draft]
   bots list | say [--to NAME] TEXT | inbox | log | turns | threads | wiki [SLUG] | search | export | assign | pause | resume | enable | disable | reset
   workflows list | show | create FILE | update | delete | run ID --bot NAME | runs | run-show | cancel | approve
+  db export [FILE] | import FILE    back up the database, or restore one at the next start
   api [OPERATION key=value... | --json JSON]   every API route by name; taskq api lists them (the MCP server offers the same as taskq_<name>)`
 
 export async function main(argv: string[]): Promise<void> {
@@ -70,7 +74,18 @@ export async function main(argv: string[]): Promise<void> {
     return
   }
   const config = loadConfig()
-  const db = openDb(config.home)
+  // A database restored in Settings > Database is swapped in by the server's start, before anything opens the file.
+  const kept = name === 'run' ? applyPendingImport(config.home) : null
+  let db
+  try {
+    db = openDb(config.home)
+  } catch (error) {
+    // The restored file would not open or migrate: the previous database goes back, so taskq still starts next time.
+    if (!kept) throw error
+    undoImport(config.home, kept)
+    throw new Error(`the restored database could not be opened (${error instanceof Error ? error.message : String(error)}); the previous one is back`)
+  }
+  if (kept) console.log(`taskq: restored the imported database; the previous one is kept at ${kept}`)
   // Sign-in saved in Settings > Connections wins over taskq.config.json, in the CLI and MCP server as in the server.
   applyConnectionSettings(db, config)
   applyCaBundle(db, config)

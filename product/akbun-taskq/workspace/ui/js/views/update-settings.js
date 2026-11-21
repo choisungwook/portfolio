@@ -73,6 +73,7 @@ async function restart(event) {
   const button = event.currentTarget
   button.disabled = true
   const box = area('update-status')
+  const boot = (await api.get('/update/progress').catch(() => null))?.boot
   const ok = await mutate(() => api.post('/update/restart'))
   if (!ok) {
     button.disabled = false
@@ -82,7 +83,7 @@ async function restart(event) {
   for (let i = 0; i < 240; i++) {
     await new Promise((resolve) => setTimeout(resolve, 500))
     const progress = await api.get('/update/progress').catch(() => null)
-    if (progress?.phase === 'idle') return location.reload()
+    if (progress && (boot ? progress.boot !== boot : progress.phase === 'idle')) return location.reload()
   }
   clear(box).append(el('p', { class: 'error', text: t('update.restart_failed', 'taskq did not come back. Start it again by hand.') }))
 }

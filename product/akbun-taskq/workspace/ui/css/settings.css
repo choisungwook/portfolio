@@ -226,3 +226,8 @@ dialog[data-area="settings-dialog"][open] {
 .builtin-text .meta { flex-basis: 100%; overflow-wrap: anywhere; }
 .builtin-content > summary { cursor: pointer; color: var(--link); width: fit-content; }
 .builtin-content pre { max-height: 360px; overflow: auto; white-space: pre-wrap; padding: 12px; border-radius: var(--radius); background: var(--panel); font-size: var(--text-small); }
+
+/* Settings > Database: the latest backups with a download each. */
+.db-backups { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; }
+.db-backups li { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; }
+.db-backups code { font-family: var(--font-mono); font-size: 0.85em; }

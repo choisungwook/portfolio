@@ -5,6 +5,7 @@ import { api, mutate, notify } from '../core/api.js'
 import { area, clear, el } from '../core/dom.js'
 import { emit, on } from '../core/bus.js'
 import { initDbPath, showDbPath } from './db-path.js'
+import { initDbBackup } from './db-backup.js'
 
 let dialog
 let gear
@@ -70,6 +71,7 @@ export function initSettings() {
     emit('settings-closed')
   })
   initDbPath()
+  initDbBackup()
 }
 
 async function load() {

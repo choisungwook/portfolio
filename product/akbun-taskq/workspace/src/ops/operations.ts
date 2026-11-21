@@ -111,6 +111,11 @@ export const OPERATIONS: Operation[] = [
   // settings and plugins
   op('builtin_skill', 'GET', '/builtin-skill', 'The built-in taskq skill every bot carries: name, version, its folder, the manual path, when taskq last wrote it, and its SKILL.md. Read only.'),
   op('manual', 'GET', '/manual', 'The manual of the running taskq version: version and manual (Markdown).'),
+  op('database_backups', 'GET', '/database/backups', 'Database backups kept in the data folder: name, size and when.'),
+  op('database_export', 'POST', '/database/export', 'Back up the database now (a consistent copy while taskq runs); answers its name and size.'),
+  op('database_backup_get', 'GET', '/database/backups/:name', 'Download one backup file.'),
+  op('database_import_chunk', 'POST', '/database/import/chunk', 'Upload a database to restore, in order: upload (hex id), index, data (base64, at most 8 MB).'),
+  op('database_import', 'POST', '/database/import', 'Check the uploaded database and restart taskq to swap it in (the replaced one is kept as a backup). Only the running server can; a CLI call answers 409.'),
   op('update_check', 'GET', '/update', 'Whether a newer akbun-taskq release exists (current, latest, update_available, can_install and why not).'),
   op('update_progress', 'GET', '/update/progress', 'The running install: phase (idle, download, unpack, done, failed), received bytes and total bytes (null when unknown).'),
   op('update_install', 'POST', '/update', 'Download the latest release build for this machine and replace the running binary; restart taskq to use it. Only for the single-file binary.'),

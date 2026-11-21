@@ -497,6 +497,11 @@
         <button type="button" data-area="settings-db-copy">Copy</button>
         <button type="button" data-area="settings-db-change">Change</button>
       </div>
+      <h2 class="section-title" data-i18n="dbb.title">Backup and restore</h2>
+      <p class="meta" data-i18n="dbb.hint">A backup is a full copy of the database made while taskq runs; it is kept in taskq's data folder and downloaded to your computer. Restoring replaces every task, run, bot and setting with the file's; the current database is kept as a backup first, and taskq restarts.</p>
+      <div class="actions"><button type="button" class="primary" data-area="db-export" data-i18n="dbb.export">Back up and download</button><button type="button" data-area="db-import" data-i18n="dbb.import">Restore from a file…</button><input type="file" accept=".db,.sqlite,.sqlite3,application/vnd.sqlite3" data-area="db-import-file" hidden></div>
+      <div data-area="db-backup-status" role="status"></div>
+      <ul class="db-backups" data-area="db-backups"></ul>
     </section>
     <section class="settings-section" data-settings-page="configuration" aria-labelledby="config-title" hidden>
       <h1 class="page-title" id="config-title">Configuration</h1>
