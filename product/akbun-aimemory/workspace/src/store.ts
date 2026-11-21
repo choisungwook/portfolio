@@ -52,12 +52,17 @@ export function addMemory(s: Store, m: MemoryInput): number | null {
   const project = m.project ?? ''
   s.db.prepare('INSERT OR IGNORE INTO sessions (id, agent, project, started_at) VALUES (?, ?, ?, ?)').run(m.session_id, m.agent, project, now)
   const tokens = s.tokenizer.tokenize(content)
+  // A savepoint (not BEGIN, which importDb already holds) keeps the row and its FTS entry together.
+  s.db.exec('SAVEPOINT add_memory')
+  try {
   const r = s.db.prepare(`INSERT OR IGNORE INTO memories (session_id, agent, project, kind, content, created_at, digest, vec)
     VALUES (?, ?, ?, ?, ?, ?, ?, ?)`).run(m.session_id, m.agent, project, m.kind, content, now, digest({ ...m, content }), toBlob(embed(tokens)))
-  if (r.changes === 0) return null
+  if (r.changes === 0) { s.db.exec('RELEASE add_memory'); return null }
   const id = Number(r.lastInsertRowid)
   s.db.prepare('INSERT INTO memories_fts (rowid, tokens) VALUES (?, ?)').run(id, tokens.join(' '))
+  s.db.exec('RELEASE add_memory')
   return id
+  } catch (error) { s.db.exec('ROLLBACK TO add_memory; RELEASE add_memory'); throw error }
 }
 
 export function endSession(s: Store, id: string): void {
@@ -115,8 +120,11 @@ export function sessionMemories(s: Store, id: string): Memory[] {
 }
 
 export function deleteMemory(s: Store, id: number): boolean {
+  s.db.exec('SAVEPOINT del_memory')
   s.db.prepare('DELETE FROM memories_fts WHERE rowid = ?').run(id)
-  return s.db.prepare('DELETE FROM memories WHERE id = ?').run(id).changes > 0
+  const deleted = s.db.prepare('DELETE FROM memories WHERE id = ?').run(id).changes > 0
+  s.db.exec('RELEASE del_memory')
+  return deleted
 }
 
 export function deleteSession(s: Store, id: string): number {

@@ -1,13 +1,13 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { mkdtempSync, writeFileSync, existsSync, rmSync } from 'node:fs'
+import { mkdtempSync, readFileSync, writeFileSync, existsSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { spawnSync } from 'node:child_process'
 import { loadConfig } from '../src/config.ts'
 import { builtinTokenize } from '../src/tokenizer.ts'
 import { addMemory, dbPath, exportDb, importDb, openStore, search } from '../src/store.ts'
-import { runHook, spoolPath } from '../src/hook.ts'
+import { drainSpool, runHook, spoolPath } from '../src/hook.ts'
 
 const home = () => loadConfig(mkdtempSync(join(tmpdir(), 'aimem-')))
 const add = (s: ReturnType<typeof openStore>, content: string) => addMemory(s, { session_id: 's1', agent: 'claude', project: 'p', kind: 'note', content })
@@ -56,7 +56,20 @@ test('[critical] a broken database spools the hook event, and the next run repla
   assert.match(search(openStore(config), 'canary')[0].content, /canary/)
 })
 
-test('[critical] the hook command exits 0 even on garbage input', () => {
-  const r = spawnSync(process.execPath, ['src/cli.ts', 'hook', '--agent', 'kiro'], { input: '{oops', env: { ...process.env, AIMEMORY_HOME: home().home } })
-  assert.equal(r.status, 0)
+test('[critical] the hook command exits 0 on garbage input, a broken config and unknown flags', () => {
+  const dir = home().home
+  const run = (input: string) => spawnSync(process.execPath, ['src/cli.ts', 'hook', '--agent', 'kiro', '--bogus'], { input, env: { ...process.env, AIMEMORY_HOME: dir } })
+  assert.equal(run('{oops').status, 0)
+  writeFileSync(join(dir, 'aimemory.config.json'), '{broken')
+  assert.equal(run(JSON.stringify({ session_id: 'k', hook_event_name: 'userPromptSubmit', prompt: 'config broken' })).status, 0)
+  assert.match(search(openStore(loadConfig(dir, false)), 'config broken')[0].content, /config broken/)
+})
+
+test('[critical] a replay that fails to store puts the line back in the spool', () => {
+  const config = home()
+  writeFileSync(spoolPath(config), JSON.stringify({ agent: 'claude', payload: { session_id: 'r', hook_event_name: 'UserPromptSubmit', prompt: 'keep me' }, at: 1 }) + '\n')
+  const s = openStore(config)
+  s.tokenizer.tokenize = () => { throw new Error('tokenizer down') }
+  assert.equal(drainSpool(s), 0)
+  assert.match(readFileSync(spoolPath(config), 'utf8'), /keep me/)
 })

@@ -1,5 +1,5 @@
-import { appendFileSync, existsSync, mkdirSync, readFileSync, renameSync, rmSync } from 'node:fs'
-import { basename, join } from 'node:path'
+import { appendFileSync, existsSync, mkdirSync, readdirSync, readFileSync, renameSync, rmSync } from 'node:fs'
+import { basename, dirname, join } from 'node:path'
 import type { Config } from './config.ts'
 import { addMemory, endSession, openStore, recent, search, type Kind, type MemoryInput, type Store } from './store.ts'
 
@@ -60,21 +60,26 @@ export function spool(config: Config, agent: string, payload: HookPayload, error
   process.stderr.write(`aimem: memory store unavailable, spooled (${error instanceof Error ? error.message : String(error)})\n`)
 }
 
+// Claims the spool by renaming it, so two hooks never replay the same lines. A claimed file left by a killed process
+// is picked up too. A line that fails to store (busy database, tokenizer error) goes back to the spool.
 export function drainSpool(s: Store): number {
   const file = spoolPath(s.config)
-  if (!existsSync(file)) return 0
-  const claimed = `${file}.${process.pid}`
-  renameSync(file, claimed)
+  const dir = dirname(file)
+  if (existsSync(file)) renameSync(file, `${file}.${process.pid}`)
+  const claimed = readdirSync(dir).filter((f) => f.startsWith('spool.jsonl.')).map((f) => join(dir, f))
   let n = 0
-  for (const line of readFileSync(claimed, 'utf8').split('\n')) {
-    if (!line.trim()) continue
-    try {
-      const { agent, payload, at } = JSON.parse(line) as { agent: string; payload: HookPayload; at: number }
-      const m = toMemory(agent, payload)
-      if (m && addMemory(s, { ...m, created_at: at }) !== null) n++
-    } catch { /* a torn line from a crash; skip it */ }
+  for (const path of claimed) {
+    for (const line of readFileSync(path, 'utf8').split('\n')) {
+      if (!line.trim()) continue
+      let entry: { agent: string; payload: HookPayload; at: number }
+      try { entry = JSON.parse(line) } catch { continue } // a torn line from a crash
+      try {
+        const m = toMemory(entry.agent, entry.payload)
+        if (m && addMemory(s, { ...m, created_at: entry.at }) !== null) n++
+      } catch { appendFileSync(file, line + '\n') }
+    }
+    rmSync(path)
   }
-  rmSync(claimed)
   return n
 }
 

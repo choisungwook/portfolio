@@ -41,6 +41,22 @@ Exit codes: 0 ok, 1 error, 2 bad usage. --json prints machine-readable output on
 Example (Claude Code settings.json): {"hooks":{"SessionStart":[{"hooks":[{"type":"command","command":"aimem hook --agent claude"}]}]}}
 `
 
+// Hooks must exit 0 whatever happens, so they skip strict argument parsing, and a broken config falls back to the
+// default home, where the event is spooled.
+if (process.argv[2] === 'hook') {
+  const i = process.argv.indexOf('--agent')
+  const agent = (i > 0 && process.argv[i + 1]) || 'unknown'
+  let raw = ''
+  try { raw = readFileSync(0, 'utf8') } catch { /* no stdin */ }
+  let cfg
+  try { cfg = loadConfig() } catch (error) {
+    process.stderr.write(`aimem: config unreadable (${error instanceof Error ? error.message : error}), using defaults\n`)
+    cfg = loadConfig(undefined, false)
+  }
+  process.stdout.write(runHook(cfg, agent, raw))
+  process.exit(0)
+}
+
 const { values: o, positionals } = parseArgs({
   allowPositionals: true,
   options: {
@@ -60,10 +76,6 @@ const usage = (msg: string) => { process.stderr.write(`aimem: ${msg}\n\n${HELP}`
 if (o.help || !cmd || cmd === 'help') { process.stdout.write(HELP); process.exit(0) }
 if (cmd === 'version' || cmd === '--version') { console.log(VERSION); process.exit(0) }
 
-if (cmd === 'hook') {
-  process.stdout.write(runHook(config, o.agent!, readFileSync(0, 'utf8')))
-  process.exit(0)
-}
 if (cmd === 'config') { console.log(JSON.stringify(config, null, 2)); process.exit(0) }
 
 if (cmd === 'search' && rest.length) {

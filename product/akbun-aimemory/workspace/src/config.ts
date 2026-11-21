@@ -18,9 +18,9 @@ export interface Config {
 
 export const CONFIG_FILE = 'aimemory.config.json'
 
-export function loadConfig(home = process.env.AIMEMORY_HOME || join(homedir(), '.aimemory')): Config {
+export function loadConfig(home = process.env.AIMEMORY_HOME || join(homedir(), '.aimemory'), readFile = true): Config {
   const file = join(home, CONFIG_FILE)
-  const user = existsSync(file) ? JSON.parse(readFileSync(file, 'utf8')) as Partial<Config> : {}
+  const user = readFile && existsSync(file) ? JSON.parse(readFileSync(file, 'utf8')) as Partial<Config> : {}
   return {
     home,
     tokenizer: user.tokenizer ?? { type: 'builtin' },
