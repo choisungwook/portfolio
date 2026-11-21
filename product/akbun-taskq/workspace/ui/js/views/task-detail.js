@@ -2,6 +2,7 @@
 // approval, intent, files, runs and alerts. Events, dependencies and handoffs stay in the API and CLI.
 import { api, mutate } from '../core/api.js'
 import { area, clear, el } from '../core/dom.js'
+import { icon } from '../core/icons.js'
 import { emit, on } from '../core/bus.js'
 import { fmtDateTime } from '../core/time.js'
 import { ACTION_STATUS, label, outcomeOf } from '../core/vocab.js'
@@ -18,11 +19,21 @@ let dialog
 let body
 let currentId = null
 let focusApproval = false
+let editing = false
+let history
+let historyBody
+
+// While a run works on the task its request is locked; a stopped (cancelled) or failed task can be edited again.
+const LOCKED_FOR_EDIT = ['running', 'needs_approval']
 
 export function initTaskDetail() {
   dialog = area('task-detail')
   body = area('task-body')
   dialog.querySelector('[data-close]').addEventListener('click', () => dialog.close())
+  dialog.addEventListener('close', () => { editing = false })
+  history = area('task-history')
+  historyBody = area('task-history-body')
+  history.querySelector('[data-close]').addEventListener('click', () => history.close())
   on('open-workflow-run', () => dialog.close())
   on('open-task', openTask)
   // The Review button on an approval alert or in the must-check list: open the task at its approval panel.
@@ -36,6 +47,7 @@ export function initTaskDetail() {
 }
 
 async function openTask(id) {
+  if (id !== currentId) editing = false
   currentId = id
   if (!dialog.open) dialog.showModal()
   await fill(id)
@@ -69,8 +81,9 @@ function scrollToApproval() {
 function sections(task) {
   const data = task.data
   const refill = () => { if (dialog.open && currentId === task.id) fill(task.id) }
+  if (editing) return [editForm(task)]
   return [
-    el('h1', { class: 'page-title', text: data.title ?? data.intent }),
+    el('div', { class: 'task-head' }, actionButtons(task), el('h1', { class: 'page-title', text: data.title ?? data.intent })),
     el('dl', { class: 'facts' },
       el('dt', { text: 'Status' }), el('dd', {}, statusIndicator(task.status)),
       el('dt', { text: 'Owner' }), ownerValue(task, refill),
@@ -78,7 +91,6 @@ function sections(task) {
       el('dt', { text: 'Created' }), el('dd', { text: fmtDateTime(task.created_at) }),
       el('dt', { text: 'Updated' }), el('dd', { text: fmtDateTime(task.updated_at) }),
     ),
-    actionButtons(task),
     operatorControls(task, refill),
     task.pending_approval ? approvalPanel(task, task.pending_approval) : null,
     el('h2', { class: 'section-title', text: 'Intent' }),
@@ -101,7 +113,13 @@ function actionButtons(task) {
     text,
     onclick: () => mutate(() => api.post(`/tasks/${task.id}/${name}`, {}), ok),
   })
-  return el('div', { class: 'actions' },
+  const locked = LOCKED_FOR_EDIT.includes(task.status)
+  return el('div', { class: 'actions task-actions' },
+    el('button', {
+      type: 'button', disabled: locked, title: locked ? 'Stop the task to edit it' : undefined,
+      onclick: () => { editing = true; fill(task.id) },
+    }, icon('edit', 16), 'Edit'),
+    el('button', { type: 'button', onclick: () => openHistory(task) }, icon('history', 16), 'History'),
     runNowButton(task, { primary: true }),
     make('resume', 'Resume', 'Resumed'),
     make('done', 'Done', 'Marked done'),
@@ -121,6 +139,50 @@ function actionButtons(task) {
       onclick: () => mutate(() => api.patch(`/tasks/${task.id}`, { status: 'ready' }), 'Task is ready'),
     }),
   )
+}
+
+// Title and intent in place of the detail; Save sends only what changed.
+function editForm(task) {
+  const title = el('input', { type: 'text', name: 'title', maxlength: 200, value: task.data.title ?? '', placeholder: 'Title' })
+  const intent = el('textarea', { name: 'intent', rows: 8, maxlength: 4000, required: true })
+  intent.value = task.data.intent
+  const stop = () => { editing = false; fill(task.id) }
+  return el('form', {
+    class: 'task-edit',
+    onsubmit: async (event) => {
+      event.preventDefault()
+      const ok = await mutate(() => api.patch(`/tasks/${task.id}`, { title: title.value.trim(), intent: intent.value }), 'Saved')
+      if (ok) stop()
+    },
+  },
+    el('h1', { class: 'page-title', text: 'Edit task' }),
+    el('label', {}, 'Title', title),
+    el('label', {}, 'Intent', intent),
+    el('div', { class: 'actions' }, el('button', { type: 'button', onclick: stop, text: 'Cancel' }), el('button', { type: 'submit', class: 'primary', text: 'Save' })))
+}
+
+// Run history in its own window over the detail: when each run started, how long it took, which agent ran it and how
+// it ended. A run with no bot is taskq's runner (the run button or the queue).
+function openHistory(task) {
+  const runs = task.runs ?? []
+  clear(historyBody).append(
+    el('h1', { id: 'task-history-title', class: 'page-title', text: `History · ${task.data.title ?? task.data.intent}` }),
+    runs.length === 0 ? el('p', { class: 'meta', text: 'No runs yet.' }) : el('table', { class: 'history-table' },
+      el('thead', {}, el('tr', {}, ...['Started', 'Duration', 'Agent', 'Outcome', 'Summary', ''].map((h) => el('th', { text: h })))),
+      el('tbody', {}, ...runs.map((run) => el('tr', {},
+        el('td', { text: fmtDateTime(run.started_at) }),
+        el('td', { text: run.ended_at ? duration(run.ended_at - run.started_at) : 'running' }),
+        el('td', { text: run.bot ? `@${run.bot}` : 'taskq runner' }),
+        el('td', {}, statusIndicator(outcomeOf(run))),
+        el('td', { class: 'meta', text: run.summary ?? '' }),
+        el('td', {}, el('button', { type: 'button', text: 'Open run', onclick: () => emit('open-run', run.id) })))))))
+  if (!history.open) history.showModal()
+}
+
+function duration(sec) {
+  if (sec < 60) return `${sec}s`
+  const min = Math.floor(sec / 60)
+  return min < 60 ? `${min}m ${sec % 60}s` : `${Math.floor(min / 60)}h ${min % 60}m`
 }
 
 function runList(runs) {

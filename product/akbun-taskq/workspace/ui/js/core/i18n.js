@@ -65,7 +65,7 @@ const KO = {
   'settings.title': '설정', 'settings.appearance': '화면', 'settings.language': '언어', 'settings.theme': '테마',
   'settings.theme.system': '시스템', 'settings.theme.dark': '다크', 'settings.theme.light': '라이트', 'settings.font': '글꼴', 'settings.size': '크기',
   'ask.ok': '확인', 'ask.cancel': '취소',
-  'settings.save': '저장', 'settings.queue': '큐', 'settings.update': '업데이트', 'update.check': '다시 확인', 'update.checking': '확인 중…', 'update.current': '설치됨', 'update.latest': '최신', 'update.available': '새 버전이 있습니다.', 'update.none': '최신 버전입니다.', 'update.notes': '릴리스 노트', 'update.install': '설치', 'update.installed': '설치됨:', 'update.restart': 'taskq를 다시 시작하면(taskq run을 멈추고 다시 실행) 새 버전이 적용됩니다.', 'settings.autorun': '맡은 bot이 없는 작업을 자동으로 실행',
+  'settings.save': '저장', 'settings.queue': '큐', 'settings.update': '업데이트', 'update.check': '다시 확인', 'update.checking': '확인 중…', 'update.current': '설치됨', 'update.latest': '최신', 'update.available': '새 버전이 있습니다.', 'update.none': '최신 버전입니다.', 'update.notes': '릴리스 노트', 'update.install': '설치', 'update.installed': '설치됨:', 'update.restart_hint': '다시 시작하면 새 버전이 적용됩니다.', 'update.restart_now': '다시 시작', 'update.restarting': 'taskq를 다시 시작하는 중…', 'update.restart_failed': 'taskq가 다시 뜨지 않았습니다. 직접 다시 실행하세요.', 'settings.autorun': '맡은 bot이 없는 작업을 자동으로 실행',
   'settings.folders': '폴더', 'settings.folder.shared': '공용 폴더', 'settings.folder.sessions': '세션 대화 기록', 'settings.folder.home': 'taskq 데이터 폴더',
   'settings.sessions.intro': 'bot 런타임마다 대화를 저장하는 곳이 다릅니다. bot 하나의 기록은 그 bot 메뉴의 세션 폴더 열기로 엽니다.',
   'settings.sessions.claude': 'task와 Claude bot. 사용자의 Claude Code와 같은 폴더이며, taskq 세션은 실행한 폴더 이름의 하위 폴더에 따로 생깁니다.',

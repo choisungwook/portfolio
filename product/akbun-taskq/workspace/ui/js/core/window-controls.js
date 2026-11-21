@@ -4,7 +4,7 @@
 import { el } from './dom.js'
 import { t } from './i18n.js'
 
-const WINDOWS = ['settings-dialog', 'bot-settings', 'memory-dialog', 'task-detail', 'task-form', 'run-dialog']
+const WINDOWS = ['settings-dialog', 'bot-settings', 'memory-dialog', 'task-detail', 'task-history', 'task-form', 'run-dialog']
 
 export function initWindowControls() {
   const dock = el('div', { class: 'window-dock', 'aria-label': t('window.minimized', 'Minimized windows') })

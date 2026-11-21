@@ -4,6 +4,7 @@ concept를 추가·수정·삭제할 때마다 오늘 날짜 섹션을 맨 위�
 
 ## 2026-11-21
 
+* **Update**: [bots execute tasks](decisions/2026-11-bots-execute-tasks.md)에 시작 버튼은 owner가 있어야 켜진다(0.31.0)는 내용을 추가.
 * **Creation**: [turn steps in conversation](decisions/2026-11-turn-steps-in-conversation.md) - bot의 도구 호출을 `team_turn_steps`에 남기고 대화에 접어 보이는 결정.
 * **Update**: [no usage limits](decisions/2026-11-no-usage-limits.md)에 0.28.0에서 bot별 Limits를 없앤 내용을 추가.
 

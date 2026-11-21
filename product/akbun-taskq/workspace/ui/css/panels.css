@@ -132,6 +132,20 @@ dialog[data-area="task-detail"].wide > .dialog-body > * { max-width: 1240px; }
 .task-main > * { margin-top: 0; margin-bottom: 0; }
 .task-main > .section-title { margin-top: 12px; }
 .task-main > .facts { gap: 6px 24px; }
+/* The task's actions sit at the top right, above the title. */
+.task-head { display: grid; gap: 12px; }
+.task-head > .page-title { margin: 0; min-width: 0; overflow-wrap: anywhere; }
+.task-actions { margin: 0; justify-content: flex-end; }
+.task-actions > button { display: inline-flex; align-items: center; gap: 6px; }
+.task-edit { display: grid; gap: 16px; }
+.task-edit label { display: grid; gap: 6px; }
+.task-edit .actions { justify-content: flex-end; }
+/* Run history opens over the task detail. */
+dialog[data-area="task-history"] { width: min(1040px, calc(100vw - 64px)); }
+dialog[data-area="task-history"] > .dialog-body { padding: 28px 32px 24px; }
+.history-table { width: 100%; border-collapse: collapse; font-size: 0.9em; }
+.history-table th, .history-table td { text-align: left; padding: 8px; border-bottom: 1px solid var(--border); vertical-align: top; }
+.history-table td:nth-child(-n+3) { white-space: nowrap; }
 @media (max-width: 700px) {
   dialog[data-area="task-detail"][open] { width: calc(100vw - 32px); height: calc(100vh - 32px); }
   dialog[data-area="task-detail"] > .dialog-body { padding: 20px 16px 32px; }

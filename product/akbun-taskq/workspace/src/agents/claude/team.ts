@@ -12,6 +12,7 @@ import type { Catalog, CatalogRequest, TeamBackend, TurnRequest, TurnResult } fr
 import { buildEnv, configForBot } from './auth.ts'
 import { LiveInput } from '../../team/live-input.ts'
 import { worktreesDir } from '../../workspace/worktree.ts'
+import { modelName } from '../../team/model-name.ts'
 
 export type TeamQueryFn = (params: { prompt: AsyncIterable<SDKUserMessage>; options: Options }) => AsyncIterable<SDKMessage>
 
@@ -220,7 +221,7 @@ async function claudeCatalog(config: Config, request: CatalogRequest, runQuery: 
   try {
     const [models, commands] = await Promise.all([q.supportedModels?.() ?? [], q.supportedCommands?.() ?? []])
     return {
-      models: models.map((m) => ({ id: m.value, name: m.displayName, description: m.description, efforts: m.supportsEffort ? m.supportedEffortLevels ?? [] : [] })),
+      models: models.map((m) => ({ id: m.value, name: modelName(m.displayName, m.resolvedModel ?? m.value), description: m.description, efforts: m.supportsEffort ? m.supportedEffortLevels ?? [] : [] })),
       commands: commands.map((c) => ({ name: c.name, description: c.description, hint: c.argumentHint })),
     }
   } finally {

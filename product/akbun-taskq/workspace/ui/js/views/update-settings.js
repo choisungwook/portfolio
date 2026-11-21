@@ -1,5 +1,5 @@
 // Settings > Update: the running version, the newest release, and Install for the single-file binary. Checked when the
-// page opens; installing replaces the binary and the new version starts with the next `taskq run`.
+// page opens; installing replaces the binary, and Restart now starts the new version in place.
 import { api, mutate } from '../core/api.js'
 import { area, clear, el } from '../core/dom.js'
 import { on } from '../core/bus.js'
@@ -57,10 +57,31 @@ async function install(event) {
   clearInterval(poll)
   meter.remove()
   if (done) {
-    clear(box).append(el('p', { text: `${t('update.installed', 'Installed')} ${done.installed}. ${t('update.restart', 'Restart taskq (stop taskq run and start it again) to use it.')}` }))
-    showActions()
+    clear(box).append(el('p', { text: `${t('update.installed', 'Installed')} ${done.installed}. ${t('update.restart_hint', 'Restart taskq to use it.')}` }))
+    showActions(el('button', { type: 'button', class: 'primary', text: t('update.restart_now', 'Restart now'), onclick: restart }))
   }
   else button.disabled = false
+}
+
+// The server answers, stops its bots and runs, and starts the installed binary under the same token. The old process
+// keeps answering while it stops, so the page waits for the new one: its install progress starts at idle, where the old
+// one says done. Then it reloads and runs the new version's UI too.
+async function restart(event) {
+  const button = event.currentTarget
+  button.disabled = true
+  const box = area('update-status')
+  const ok = await mutate(() => api.post('/update/restart'))
+  if (!ok) {
+    button.disabled = false
+    return
+  }
+  clear(box).append(el('p', { class: 'meta', role: 'status', text: t('update.restarting', 'Restarting taskq…') }))
+  for (let i = 0; i < 240; i++) {
+    await new Promise((resolve) => setTimeout(resolve, 500))
+    const progress = await api.get('/update/progress').catch(() => null)
+    if (progress?.phase === 'idle') return location.reload()
+  }
+  clear(box).append(el('p', { class: 'error', text: t('update.restart_failed', 'taskq did not come back. Start it again by hand.') }))
 }
 
 function showProgress(bar, label, p) {
