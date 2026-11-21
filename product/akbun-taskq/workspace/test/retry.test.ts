@@ -41,7 +41,7 @@ describe('retry', () => {
     assert.equal(task.status, 'ready')
     assert.equal(task.claimed_by, null)
     assert.equal(task.heartbeat_at, null)
-    assert.equal(task.session_id, null, 'the session is cleared unless resume is asked for')
+    assert.equal(task.session_id, null, 'a retry always starts a new session')
     assert.equal(openAlerts(id).length, 0)
 
     const seen: (string | null)[] = []

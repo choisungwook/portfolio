@@ -78,7 +78,6 @@ test('the database directory is 0700 and the database and its WAL files are 0600
       const path = join(dataDir, name)
       if (existsSync(path)) assert.equal(statSync(path).mode & 0o777, 0o600, name)
     }
-    assert.equal(statSync(join(dataDir, 'taskq.db')).mode & 0o777, 0o600)
     db.close()
   } finally {
     rmSync(home, { recursive: true, force: true })

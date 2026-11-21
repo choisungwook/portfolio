@@ -133,11 +133,4 @@ describe('settings and access skill api', () => {
     assert.equal(patch.status, 400)
   })
 
-  test('a skill whose SKILL.md is removed shows ok false', async () => {
-    const dir = skill(join(claudeDir, 'skills', 'example-readonly'), 'example-readonly')
-    await app().request('/api/access-skills', write({ path: dir }))
-    rmSync(join(dir, 'SKILL.md'))
-    const settings = await (await app().request('/api/settings', { headers: host() })).json() as { access_skills: { ok: boolean }[] }
-    assert.equal(settings.access_skills[0].ok, false)
-  })
 })

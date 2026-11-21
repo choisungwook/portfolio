@@ -3,13 +3,13 @@ type: Decision
 title: Navigation is a left sidebar where bots read like chats, and the user-facing name is Bots
 description: A left sidebar holds the orchestrator, new task and search, every view and the bot chat list, with alerts and settings at its foot; there is no tab row or top bar, and Team is only the internal name.
 tags: [ui, navigation, bots]
-generated: { by: claude-code/claude-fable-5-2, at: 2026-11-20T00:00:00Z }
+generated: { by: claude-code/claude-opus-5-5, at: 2026-11-21T15:00:00Z }
 ---
 
 ## 결정
 
 - 사용자에게 보이는 이름은 Team이 아니라 Bots다. UI, CLI(`taskq bots`), API(`/api/bots`), 설정 키(`bots`)가 이 이름을 쓴다. 코드와 테이블 이름(`src/team/`, `team_*`)은 그대로 둔다.
-- 화면 전환은 왼쪽 사이드바 하나로 한다. 탭 줄과 상단 바는 없다. 위에서부터 오케스트레이터 taskq(가운데 큰 아바타), 새 작업과 검색, 모든 화면 메뉴(Calendar, task 상태보드, 공용 폴더, Workflows, Plugins, Wiki), Bots 목록이고, 맨 아래에 확인 필요(종)와 설정 아이콘이 있다.
+- 화면 전환은 왼쪽 사이드바 하나로 한다. 탭 줄과 상단 바는 없다. 위에서부터 오케스트레이터 taskq(가운데 큰 아바타), 새 작업과 검색, 모든 화면 메뉴(Calendar, task 상태보드, 주간 점검(0.33.0부터, 설정에서 옮김), 공용 폴더, Workflows, Plugins, Wiki), Bots 목록이고, 맨 아래에 확인 필요(종)와 설정 아이콘이 있다.
 - Bots 목록은 채팅 목록처럼 bot마다 아바타, 이름, 최근 메시지, 시각, 읽지 않음 점을 보인다. bot을 누르면 그 bot과의 대화가 말풍선으로 열리고 거기서 메시지를 보낸다.
 - Graph, Proposals, Goals, Discussions는 화면 메뉴가 없다. Graph를 뺀 나머지 기능은 API, CLI, bot 도구로 남아 있고 `/api/graph`도 남아 있다.
 - 색과 모양은 이 결정의 대상이 아니다. [Astryx 토큰 결정](2026-11-astryx-design-system.md)에 있다.

@@ -3,7 +3,7 @@ type: Decision
 title: Registered skills, plugins and MCP servers are shared by type; every runtime signs in from one Connections section
 description: Bots no longer pick from the registry, a Claude bot chooses its own sign-in like an OpenAI bot, Connections tests one method in 5 seconds, and routines were removed.
 tags: [bots, plugins, connections, ui]
-generated: { by: claude-code/claude-opus-5-5, at: 2026-11-20T23:50:00Z }
+generated: { by: claude-code/claude-opus-5-5, at: 2026-11-21T15:00:00Z }
 ---
 
 ## 결정
@@ -11,7 +11,7 @@ generated: { by: claude-code/claude-opus-5-5, at: 2026-11-20T23:50:00Z }
 - Plugins 메뉴에 등록한 skill, plugin, MCP server는 모든 bot이 타입에 맞게 쓴다. plugin은 Claude bot만 불러온다. bot 설정의 고르기 칸을 없앴고, `getAgent`가 registry에서 목록을 채워 저장된 bot별 목록은 읽지 않는다. 등록·삭제·설치·업데이트는 해당 bot의 사본을 모두 다시 만든다.
 - Claude bot도 OpenAI bot처럼 `provider`(api, subscription, bedrock)를 가진다. 값이 없으면 설정 > 연결의 Claude 방식을 따른다. CHECK 제약을 넓히려고 migration 011이 `team_agents`를 복사해 다시 만든다.
 - 연결 화면은 Claude, OpenAI, Kiro 절마다 방식 선택, 필요한 칸, 연결 테스트·저장·지우기만 둔다. 연결 테스트는 그 방식의 검사를 5초로 끊고, 저장은 테스트를 바로 돌린다. 지우기는 저장값을 지워 설정 파일과 환경 변수로 돌아간다.
-- Claude 로그인 실패는 계속 팀을 멈춘다. 오케스트레이터 taskq가 Claude bot이고 끌 수 없기 때문이다. 멈춤 이유에 실패한 bot 이름이 있어서, 그 bot의 Claude 방식 검사가 통과할 때만 재개한다. 다른 방식이 통과해도 재개하지 않는다.
+- Claude 로그인 실패가 팀을 멈추는 이유는 [bot runtimes 결정](2026-11-bot-runtimes-beyond-sdks.md)에 있다. 멈춤 이유에 실패한 bot 이름이 있어서, 그 bot의 Claude 방식 검사가 통과할 때만 재개한다. 다른 방식이 통과해도 재개하지 않는다.
 - 시작할 때 모든 bot의 skill·plugin 사본을 한 번 다시 만든다. 이전 버전에서 bot마다 고른 것만 담은 사본이 남아 있으면 공유가 지켜지지 않기 때문이다.
 - OpenAI API key도 Anthropic key처럼 `TASKQ_HOME/data/openai-api-key`(0600)에 저장할 수 있다.
 - routine 기능을 없앴다. migration 011이 `bot_routines`를 지운다. `team_messages.routine_id` 열은 남는다.

@@ -59,7 +59,7 @@ describe('docs cover the code', () => {
     }
   })
 
-  test('[critical] the changelog has an entry for this version with an SDK section and a learning note and a learning note', () => {
+  test('[critical] the changelog has an entry for this version with an SDK section and a learning note', () => {
     const dir = `changelog/${pkg.version}`
     const entry = read(`${dir}/changelog.md`)
     // Any of the four kinds wiki/development.md lists counts; a dependency-only release still says what Changed.

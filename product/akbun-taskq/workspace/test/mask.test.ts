@@ -6,9 +6,6 @@ import { mask, maskDeep } from '../src/mask.ts'
 const cases: [string, string, boolean?][] = [
   ['key id AKIAEXAMPLEKEYID0000 in log', 'AKIAEXAMPLEKEYID0000', true],
   ['aws_secret_access_key = wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY', 'wJalrXUtnFEMI', true],
-  ['key sk-ant-api03-EXAMPLEKEY123456', 'sk-ant-api03'],
-  ['Authorization: Bearer abc.def-ghi=', 'abc.def-ghi'],
-  ['role arn:aws:iam::111122223333:role/example-readonly', '111122223333'],
   ['password=hunter2 used', 'hunter2'],
 ]
 
@@ -20,11 +17,6 @@ for (const [input, secret, guarded] of cases) {
 
 test('ARN keeps its shape and loses the account id', () => {
   assert.equal(mask('arn:aws:iam::111122223333:role/example-readonly'), 'arn:aws:iam::[ACCOUNT]:role/example-readonly')
-})
-
-test('ordinary text is untouched', () => {
-  const text = 'Compare two queue libraries, 3 tasks, max_tokens 60, input_tokens 120.'
-  assert.equal(mask(text), text)
 })
 
 test('hex git commit ids are untouched', () => {

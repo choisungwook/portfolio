@@ -3,14 +3,14 @@ type: Decision
 title: UI themes implement a token contract, and status and notification patterns follow IBM Carbon
 description: Component CSS reads only contract tokens, so a theme is one file; Carbon was chosen for its license and its status and notification rules, and its patterns stay under the current Astryx theme.
 tags: [ui, design-system]
-generated: { by: claude-code/claude-fable-5-2, at: 2026-11-20T00:00:00Z }
+generated: { by: claude-code/claude-opus-5-5, at: 2026-11-21T15:00:00Z }
 ---
 
 ## 결정
 
 - 테마는 토큰 계약의 구현이다. `ui/css/theme/contract.css`가 토큰 이름을 정하고 테마 파일 하나가 값을 채우며, 컴포넌트 CSS는 계약 토큰만 읽는다. `test/ui-tokens.test.ts`가 이를 검사한다.
 - 상태 표시(기호, 색, 낱말을 함께), 타이머로 사라지지 않는 알림, 한 번 더 눌러야 하는 위험 버튼, 화면마다 하나인 primary 버튼은 IBM Carbon Design System의 패턴을 따른다. 근거 자료는 [Carbon 사본](../references/carbon-design-system.md)에 있다.
-- 색, 모서리, 글꼴은 Carbon을 따르지 않는다. `index.html`이 읽는 테마는 [Astryx 토큰](2026-11-astryx-design-system.md)이고, `carbon.css`(g10, g100)는 같은 계약의 다른 구현으로 남아 있다.
+- 색, 모서리, 글꼴은 Carbon을 따르지 않는다. 테마는 [Astryx 결정](2026-11-astryx-design-system.md)을 따른다.
 - Carbon CSS 패키지는 싣지 않는다.
 
 ## 이유

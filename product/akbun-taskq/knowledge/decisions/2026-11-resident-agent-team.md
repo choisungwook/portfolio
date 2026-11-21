@@ -3,7 +3,7 @@ type: Decision
 title: Resident bots are resumed sessions with an async mailbox, stopped by Pause
 description: Each bot is one session resumed per turn; bots talk through an async mailbox and share a SQLite wiki; they always run, and Pause is what stops them.
 tags: [bots, agents, architecture]
-generated: { by: claude-code/claude-opus-5-5, at: 2026-11-20T00:00:00Z }
+generated: { by: claude-code/claude-opus-5-5, at: 2026-11-21T15:00:00Z }
 sources:
   - id: grok-bot
     resource: https://composio.dev/content/guide-to-frok-bot
@@ -17,7 +17,7 @@ sources:
 - 일하는 Claude bot에게 온 메시지는 다음 턴을 기다리지 않고 진행 중인 턴의 입력 stream에 넣는다(한 턴에 최대 10번). 10번이 넘거나 stream이 없는 런타임이면 메시지는 큐에 남아 다음 턴에 처리되고, 그 턴은 일반 턴과 같은 동시 실행 수 제한을 거친다.
 - 장기 기억은 SQLite의 `wiki_pages`다. 쓰기는 읽은 revision을 같이 보내야 하고(낙관적 동시성), 이전 revision은 `wiki_revisions`에 남는다.
 - 사용자에게 먼저 말을 거는 bot은 기본으로 taskq 하나다(`may_message_user`). bot 설정에서 다른 bot에게도 허용할 수 있다. 사용자가 말을 건 bot은 설정과 상관없이 사용자에게 직접 답한다.
-- bot은 taskq와 함께 항상 돈다. bot 전체를 끄는 설정은 없고 멈춤(Pause)만 있다. bot 하나는 그 bot의 설정에서 끌 수 있다(오케스트레이터 taskq 제외). 자동 동작의 범위는 턴당 모델 턴, 열린 작업 수, 메시지 재시도 횟수로 묶는다. 시간당 턴 상한과 지출 한도는 두지 않는다([사용량 제한을 없앤 결정](2026-11-no-usage-limits.md), [예산을 없앤 결정](2026-11-rejected-turns.md)).
+- bot은 taskq와 함께 항상 돈다. bot 전체를 끄는 설정은 없고 멈춤(Pause)만 있다. bot 하나는 그 bot의 설정에서 끌 수 있다(오케스트레이터 taskq 제외). 자동 동작의 범위는 턴당 모델 턴, 열린 작업 수, 메시지 재시도 횟수로 묶는다. 시간당 턴 상한과 지출 한도는 두지 않는다([사용량 제한 결정](2026-11-no-usage-limits.md)).
 - 메시지를 보내거나 작업을 만든 뒤 실패한 turn은 다시 돌리지 않는다. 그 메시지는 내려놓고 사용자에게 알린다.
 - 시간에 맞춰 일을 시작해야 하면 `deliver_at`을 붙인 메시지를 보낸다. 받는 bot은 그 시각에 깨어난다.
 

@@ -3,14 +3,14 @@ type: Decision
 title: A task is never tied to a session; a new run is told what the last one did
 description: Retry always starts a new session and the run dialog has no resume command; the last run's outcome, summary and tool calls go into the new run's prompt instead.
 tags: [tasks, sessions, runs]
-generated: { by: claude-code/claude-opus-5-5, at: 2026-11-21T12:00:00Z }
+generated: { by: claude-code/claude-opus-5-5, at: 2026-11-21T15:00:00Z }
 ---
 
 ## 결정
 
 - 0.35.0부터 재시도(`POST /tasks/:id/retry`, `taskq retry`)는 언제나 새 세션으로 시작한다. `resume` 옵션과 작업 상세의 "Resume previous session", 실행 기록 창의 `claude --resume` 복사는 없앴다.
 - 대신 새 run의 프롬프트에 그 task의 직전 run의 결과, 요약, 마지막 도구 호출 8개(저장할 때 가린 그대로)를 "이미 한 일"로 넣는다(`previousRun`, `src/runner/context.ts`).
-- 로그인이 만료되어 멈춘 `needs_auth` task를 Resume이나 직접 실행으로 이어 가는 것은 그대로 그 실행의 세션을 쓴다. 한 run이 끊긴 자리에서 이어지는 것이지 task가 세션을 갖는 것이 아니다.
+- 한 run이 끊긴 자리에서 이어지는 경우는 그 run의 세션을 그대로 쓴다. 로그인 만료로 멈춘 `needs_auth`의 Resume·직접 실행, heartbeat가 끊겨 stale로 ready에 돌아온 task, 아직 끝나지 않은 run이다. 이때는 직전 run 요약(`previousRun`)을 넣지 않는다. task가 세션을 갖는 것이 아니다.
 
 ## 이유
 

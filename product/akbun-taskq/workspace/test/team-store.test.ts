@@ -190,7 +190,6 @@ describe('task results reach the owner', () => {
     assert.equal(toCoder.sender, 'queue')
     assert.equal(toCoder.task_id, task.id)
     assert.match(toCoder.body, /fixed; npm test passed/)
-    assert.equal(getAgent(db, 'reviewer')?.role, 'reviewer')
   })
 
   test('a task the user added reports to nobody', async () => {

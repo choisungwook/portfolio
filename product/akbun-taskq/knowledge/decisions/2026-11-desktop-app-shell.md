@@ -3,19 +3,19 @@ type: Decision
 title: The macOS desktop app is a Tauri window around the released executable
 description: The app starts the bundled taskq through the login shell and shows its page; it has no updater of its own.
 tags: [desktop, tauri, release]
-generated: { by: claude-code/claude-opus-5-5, at: 2026-11-20T00:00:00Z }
+generated: { by: claude-code/claude-opus-5-5, at: 2026-11-21T15:00:00Z }
 ---
 
 ## 결정
 
-- 데스크톱 앱(`workspace/desktop/`)은 release가 이미 만드는 `taskq` 실행 파일을 Tauri의 `externalBin`으로 싣고, 그 프로세스가 출력한 주소를 창에 띄운다. taskq의 코드는 바꾸지 않는다.
+- 데스크톱 앱(`workspace/desktop/`)은 release가 이미 만드는 `taskq` 실행 파일을 Tauri의 `externalBin`으로 싣고, 그 프로세스가 출력한 주소를 창에 띄운다. taskq는 서버와 화면을 그대로 쓰고, 시작 진행 줄(`taskq starting <percent> <step>`, 0.39.0)과 같은 pid를 유지하는 재시작(0.31.0)만 껍데기를 위해 더했다.
 - taskq는 사용자의 로그인 셸(`$SHELL -ilc`)을 거쳐 시작한다. 셸 프로필에 `TASKQ_HOME`이 없으면 `~/.taskq`를 home으로 쓴다.
 - Tauri updater plugin을 넣지 않는다. 설정 > 업데이트(`src/update.ts`)가 `process.execPath`, 곧 앱 번들 안의 실행 파일을 바꾼다.
 - dmg는 `release-akbun-taskq.yml`의 macOS job이 같은 tag에 올린다. 별도 workflow와 tag를 만들지 않는다.
 
 ## 이유
 
-- 화면과 서버가 이미 한 프로세스에 있고 실행 파일 하나로 배포된다. 앱 안에서 서버를 다시 구현하면 같은 것을 두 벌 유지하게 된다. 껍데기는 Rust 100줄 남짓이고 번들에 더하는 크기는 10 MB 안팎이다.
+- 화면과 서버가 이미 한 프로세스에 있고 실행 파일 하나로 배포된다. 앱 안에서 서버를 다시 구현하면 같은 것을 두 벌 유지하게 된다. 껍데기는 Rust 수백 줄이고 번들에 더하는 크기는 10 MB 안팎이다.
 - Electron은 버렸다. 껍데기를 TypeScript로 쓸 수 있지만 taskq는 Node 24의 type stripping과 `node:sqlite`에 기대므로 Electron 안에서 돌릴 수 없어 어차피 실행 파일을 따로 띄운다. 얻는 것 없이 Chromium만 더해진다.
 - Finder에서 연 앱은 PATH가 `/usr/bin:/bin` 수준이다. 그대로 띄우면 bot이 `aws`, `git`, `codex`, `kiro-cli`를 찾지 못한다. 로그인 셸을 거치면 터미널에서 `taskq run`을 한 것과 같은 환경이 된다. zsh와 bash만 쓰고 그 밖의 셸은 zsh로 대신한다.
 - updater를 따로 두면 서명 키를 하나 더 관리해야 하고, 470 MB 번들을 받는 경로가 둘이 된다. 껍데기는 거의 바뀌지 않으므로 실행 파일만 바뀌면 화면과 서버가 모두 새 버전이다. 대가로 껍데기 자체의 수정은 dmg를 다시 받아야 전달되고, 앱의 표시 버전은 설치한 때의 값으로 남는다.

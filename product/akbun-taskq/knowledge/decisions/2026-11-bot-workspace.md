@@ -3,7 +3,7 @@ type: Decision
 title: Bots share one folder, keep memory and settings in SQLite, and cancel a turn without retrying it
 description: The shared folder is mounted into every bot session; uploads stay JSON; memory, language and theme live in SQLite; a cancelled turn's work is not replayed.
 tags: [bots, storage, ui]
-generated: { by: claude-code/claude-opus-5-5, at: 2026-11-19T15:30:00Z }
+generated: { by: claude-code/claude-opus-5-5, at: 2026-11-21T15:00:00Z }
 ---
 
 ## 결정
@@ -12,7 +12,7 @@ generated: { by: claude-code/claude-opus-5-5, at: 2026-11-19T15:30:00Z }
 - bot이 작업하는 기본 폴더(세션 cwd)는 `shared/bots/<bot>/`이다(0.15.0부터, 이전은 `TASKQ_HOME/team/<bot>`). bot 설정의 작업 디렉터리를 정하면 그쪽을 쓴다. 메모리, OpenAI 기록, Kiro 설정은 `team/<bot>/`에 남는다. 사용자가 공용 폴더 화면에서 bot마다 무엇을 했는지 보게 하려는 것이고, 설정 파일까지 옮기면 bot이 자기 설정을 고칠 수 있게 되므로 작업 폴더만 옮겼다.
 - 업로드는 base64를 담은 JSON(`POST /api/files`, 20 MB)이다. multipart를 받지 않는다.
 - bot 메모리는 `team_agents.memory`에 두고 매 turn system prompt 끝에 붙인다. bot은 `memory_write`로, 사용자는 메모리 창으로 같은 글을 고친다.
-- 언어(한국어 기본), 테마, 글꼴은 SQLite(`meta`)에 둔다. 동시에 일하는 bot 수와 turn당 모델 턴의 기본값은 `taskq.config.json`에서만 정한다.
+- 언어(한국어 기본), 테마, 글꼴은 SQLite(`meta`)에 둔다. 동시에 일하는 bot 수, turn당 모델 턴, 열린 작업 수, 재시도 횟수는 `taskq.config.json`에서만 정한다([사용량 제한 결정](2026-11-no-usage-limits.md)).
 - 모든 bot 대화 검색은 `team_messages_fts`(trigram, trigger로 유지)를 쓴다.
 - bot이 사용자나 다른 bot을 위해 만든 파일은 `shared/outputs/<bot>/`에 저장하고 `send_message`의 `files`로 넘긴다. 공용 폴더 밖의 경로는 거부한다. 메시지에는 첨부파일과 같은 형식(공용 폴더 기준 경로)으로 남는다.
 - 파일 미리 보기에서 HTML은 `POST /api/shared/preview`가 발급한 10분짜리 ticket URL(`/preview/<ticket>/<이름>`)로 연다. 응답은 `sandbox allow-scripts` CSP를 달고, ticket은 그 파일이 있는 폴더 안의 파일만 내준다. Markdown은 파싱한 구조를 textContent로만 그린다.

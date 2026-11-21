@@ -71,7 +71,7 @@ export function requestCancel(db: Db, config: Config, id: string): Task {
   return getTask(db, id)!
 }
 
-// Ends a failed task so it can run again. The claim and heartbeat are cleared; the session is kept only on request.
+// Ends a failed or cancelled task so it can run again. The claim, heartbeat and session are cleared.
 // A retry always starts a new session. A task is an object that bots pick up; the session belongs to whoever ran it and
 // moves on to other work, so resuming it would put the task back into someone else's later conversation.
 export function retryTask(db: Db, id: string, options: { draft: boolean }): boolean {

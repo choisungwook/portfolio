@@ -32,10 +32,8 @@ describe('api', () => {
     assert.equal((await post({ type: 'nope', intent: 'x' })).status, 400)
     assert.equal((await post({ type: 'research', intent: '   ' })).status, 400)
     assert.equal((await post({ type: 'research', intent: 'x', depends_on: ['zzz'] })).status, 400)
-    assert.equal((await post({ type: 'research', intent: 'x' }, { 'content-type': 'text/plain' })).status, 415)
-    const created = await post({ type: 'research', intent: 'survey' })
-    assert.equal(created.status, 201)
-    assert.equal((await created.json()).status, 'draft')
+    // The JSON-only rule and the draft default are in api-auth.test.ts.
+    assert.equal((await post({ type: 'research', intent: 'survey' })).status, 201)
     const ready = await post({ type: 'research', intent: 'survey', status: 'ready' })
     assert.equal((await ready.json()).status, 'ready')
   })

@@ -3,12 +3,12 @@ type: Decision
 title: A task has one owner bot; several bots meet only in a bounded discussion
 description: tasks.owner holds one bot per task and create_task refuses look-alike work; debates run as ordered, round-limited threads that a moderator closes.
 tags: [bots, agents, ownership]
-generated: { by: claude-code/claude-fable-5-2, at: 2026-11-20T00:00:00Z }
+generated: { by: claude-code/claude-opus-5-5, at: 2026-11-21T15:00:00Z }
 ---
 
 ## 결정
 
-- 작업 하나에는 owner bot이 하나다(`tasks.owner`). owner만 그 작업을 시작해 처리하고, 작업을 넘기는 것은 owner와 조정 역할(오케스트레이터 taskq, planner)만 할 수 있다. 사용자는 작업 상세 화면이나 CLI에서 owner를 바꾼다.
+- 작업 하나에는 owner bot이 최대 하나다(`tasks.owner`). bot 중에서는 owner만 `start_task`로 처리하고, owner가 없으면 사용자의 작업이며 시작 버튼은 꺼진다(0.31.0). 작업을 넘기는 것은 owner와 조정 역할(오케스트레이터 taskq, planner)만 할 수 있다. 사용자는 작업 상세 화면이나 CLI에서 owner를 바꾼다.
 - 작업을 만들기 전에 끝나지 않은 모든 작업과 intent를 비교한다. 글자 trigram Jaccard 유사도가 0.5 이상이면 그 작업과 owner를 알려 주며 거절하고, 다르다고 판단한 agent가 `not_duplicate_of`에 그 id를 적어야 만든다.
 - 여러 agent가 같은 주제를 다뤄야 하는 경우는 작업이 아니라 토론(`team_threads`)으로 한다. 참가자 2~4명이 정해진 순서로 1~3라운드 말하고, 열어 둔 agent(moderator)가 결론을 내려 닫는다. 토론 중에는 작업을 만들지 않고, 결론 뒤 moderator가 작업을 만들거나 넘긴다.
 - 상태보드 카드에 `@owner` 배지를, bot 대화에 그 bot이 맡은 작업을 보인다. 토론은 화면 메뉴가 없고 bot 도구, API, CLI(`taskq bots threads`)로만 다루며, 토론 발언은 bot 대화에 `discussion #N` 표시로 나온다.
