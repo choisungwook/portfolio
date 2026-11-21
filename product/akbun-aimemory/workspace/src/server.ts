@@ -47,27 +47,40 @@ class BodyError extends Error {
   }
 }
 
-async function readJsonBody(req: IncomingMessage): Promise<Record<string, unknown>> {
-  const chunks: Buffer[] = []
-  let size = 0
-  for await (const chunk of req) {
-    const buf = typeof chunk === 'string' ? Buffer.from(chunk) : chunk
-    size += buf.length
-    if (size > MAX_BODY_BYTES) throw new BodyError(413, 'request body is too large')
-    chunks.push(buf)
-  }
-  const text = Buffer.concat(chunks).toString('utf8').trim()
-  if (!text) return {}
-  let parsed: unknown
-  try {
-    parsed = JSON.parse(text)
-  } catch {
-    throw new BodyError(400, 'request body must be valid JSON')
-  }
-  if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
-    throw new BodyError(400, 'request body must be a JSON object')
-  }
-  return parsed as Record<string, unknown>
+function readJsonBody(req: IncomingMessage): Promise<Record<string, unknown>> {
+  return new Promise((resolve, reject) => {
+    const chunks: Buffer[] = []
+    let size = 0
+    let tooLarge = false
+    req.on('data', (chunk: Buffer | string) => {
+      const buf = typeof chunk === 'string' ? Buffer.from(chunk) : chunk
+      size += buf.length
+      if (size > MAX_BODY_BYTES) {
+        tooLarge = true
+        chunks.length = 0
+        return
+      }
+      chunks.push(buf)
+    })
+    req.on('error', reject)
+    req.on('end', () => {
+      if (tooLarge) { reject(new BodyError(413, 'request body is too large')); return }
+      const text = Buffer.concat(chunks).toString('utf8').trim()
+      if (!text) { resolve({}); return }
+      let parsed: unknown
+      try {
+        parsed = JSON.parse(text)
+      } catch {
+        reject(new BodyError(400, 'request body must be valid JSON'))
+        return
+      }
+      if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
+        reject(new BodyError(400, 'request body must be a JSON object'))
+        return
+      }
+      resolve(parsed as Record<string, unknown>)
+    })
+  })
 }
 
 async function handle(s: Store, token: string, req: IncomingMessage, res: ServerResponse): Promise<void> {

@@ -81,12 +81,12 @@ export function applyCaBundle(db: DatabaseSync, config: Config): void {
   const getCas = (tls as { getCACertificates?: (kind: string) => string[] }).getCACertificates
   if (!setDefaults || !getCas) return
   defaultCas ??= getCas('default')
-  const extra = config.caBundle && existsSync(config.caBundle)
-    ? readFileSync(config.caBundle, 'utf8').match(BLOCK) ?? []
-    : []
   try {
+    const extra = config.caBundle && existsSync(config.caBundle)
+      ? readFileSync(config.caBundle, 'utf8').match(BLOCK) ?? []
+      : []
     setDefaults([...defaultCas, ...extra])
-  } catch { /* a runtime that refuses keeps its defaults */ }
+  } catch { /* unreadable caBundle or runtime refusal keeps defaults; caBundleInfo reports file errors */ }
 }
 
 export function caBundleInfo(db: DatabaseSync, config: Config): CaBundleInfo {
