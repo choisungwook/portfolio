@@ -19,13 +19,14 @@ One file, `$AIMEMORY_HOME/data/aimemory.db` (`src/store.ts`).
 | Table | Content |
 |---|---|
 | `sessions` | id, agent, project (basename of cwd), start and end time |
-| `memories` | session, kind (`prompt`, `tool`, `response`, `note`, `summary`), content, `digest` (unique, dedups double hook calls), `vec` (512 float32) |
+| `memories` | session, kind (`prompt`, `tool`, `response`, `note`, `summary`), content, `digest` (unique, dedups double hook calls), `vec` (512 float32), `access_count`, `last_accessed`, `valid_until` |
 | `memories_fts` | FTS5 over the tokenizer output, rowid = memory id |
-| `meta` | `tokenizer`: id of the tokenizer that built the index; `ca_bundle_saved`: `'1'` when an imported CA bundle is active |
+| `memories_vec` | Optional `sqlite-vec` `vec0` virtual table (enabled automatically at `annThreshold`, default 100,000 rows) |
+| `meta` | `tokenizer`: id of the tokenizer that built the index; `ca_bundle_saved`: `'1'` when an imported CA bundle is active; `ann_index`: `'sqlite-vec'` when ANN is active |
 
 ## Search
 
-`search()` tokenizes the query once, then runs BM25 on `memories_fts` and cosine on `vec` (`src/vector.ts`, FNV-1a hashed term frequency). The two rankings are fused with RRF (k = 60) and multiplied by `0.7 + 0.3 * 0.5^(age / halfLifeDays)`.
+`search()` tokenizes the query once, then runs BM25 on `memories_fts` and cosine on `vec` (`src/vector.ts`, FNV-1a hashed term frequency; brute-force below `annThreshold`, `sqlite-vec` `vec0` ANN at or above it). Invalidated memories (`valid_until <= now`) are excluded unless `--all` is set. The two rankings are fused with RRF (k = 60) and multiplied by an access-aware recency decay (`effectiveHalfLife = halfLifeDays * (1 + log2(1 + access_count))` from `max(created_at, last_accessed)`). Returned hits increment `access_count` and update `last_accessed`.
 
 ## Tokenizer
 
@@ -58,4 +59,3 @@ Each directory holds only a README until its issue is done.
 | `workspace/src/mcp/` | MCP server (#1594) |
 | `workspace/src/indexer/` | LLM summaries and memory updates (#1595) |
 | `workspace/src/install/` | Hook installation and akbun-taskq integration (#1598) |
-| `workspace/bench/` | Search benchmark, decay and ANN (#1599) |
