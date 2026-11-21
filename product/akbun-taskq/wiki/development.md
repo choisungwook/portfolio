@@ -79,7 +79,13 @@ Seed runs, events and alerts through the functions in `src/db` and `src/runner`,
 
 ## Maintain the changelog
 
-Add a `## <version>` section to [CHANGELOG.md](../CHANGELOG.md) for the version in `workspace/package.json`. Use `### Added`, `### Changed`, `### Fixed` or `### Removed` and describe each feature or behavior in a bullet. Commit the entry with the corresponding code. GitHub Actions uses that section for the release notes.
+Each version has its own folder, `changelog/<version>/`, for the version in `workspace/package.json`. Commit it with the corresponding code.
+
+- `changelog.md`: `# akbun-taskq <version>`, then `## Added`, `## Changed`, `## Fixed` or `## Removed` with one bullet per feature or behavior, and `## SDK`. GitHub Actions uses this file, without its title, as the release notes.
+- `learning_changelog.md`: written for the developer reading it later. It explains how the code was changed and why that place was chosen, and how the architecture moved; draw a changed flow or structure with Mermaid when prose alone does not show it.
+- Add the version to the top of the table in [changelog/README.md](../changelog/README.md).
+
+`docs-coverage.test.ts` fails when any of the three is missing for the current version.
 
 Codex checks the committed diff before direct `git push` and `gh pr create` shell commands. Review and trust the project hook in `/hooks`. In a linked worktree, Codex reads hook definitions from the main checkout. The taskq PR workflow also checks the entry against the PR's base.
 

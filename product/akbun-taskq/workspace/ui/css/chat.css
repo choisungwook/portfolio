@@ -317,3 +317,7 @@ mark.find.current { background: var(--accent); color: var(--on-accent); }
 .side-done { color: var(--muted); margin: 0; }
 .side-done:hover { background: transparent; }
 @media (max-width: 1200px) { .chat-side { display: none; } .chat-page:has(> .chat-side:not([hidden])):has(> .file-pane[hidden]) { grid-template-columns: 1fr; } }
+
+/* The slash and @ list and the + menu line up with the input box, which sits inside the compose gutter. */
+.chat .slash-list { left: var(--gutter, 16px); right: var(--gutter, 16px); }
+.chat .attach-menu { left: var(--gutter, 16px); }

@@ -59,14 +59,13 @@ describe('docs cover the code', () => {
     }
   })
 
-  test('[critical] the changelog has an entry for this version with an SDK section', () => {
-    const changelog = read('CHANGELOG.md')
-    const start = changelog.indexOf(`## ${pkg.version}\n`)
-    assert.ok(start >= 0, `CHANGELOG.md has no "## ${pkg.version}" entry`)
-    const next = changelog.indexOf('\n## ', start + 1)
-    const entry = changelog.slice(start, next < 0 ? undefined : next)
+  test('[critical] the changelog has an entry for this version with an SDK section and a learning note and a learning note', () => {
+    const dir = `changelog/${pkg.version}`
+    const entry = read(`${dir}/changelog.md`)
     // Any of the four kinds wiki/development.md lists counts; a dependency-only release still says what Changed.
-    assert.match(entry, /### (Added|Changed|Fixed|Removed)/)
-    assert.match(entry, /### SDK/, 'say which Agent SDK features this version uses and how')
+    assert.match(entry, /^## (Added|Changed|Fixed|Removed)/m)
+    assert.match(entry, /^## SDK/m, 'say which Agent SDK features this version uses and how')
+    assert.ok(read(`${dir}/learning_changelog.md`).trim().length > 0, `write ${dir}/learning_changelog.md: how the code and architecture changed`)
+    assert.ok(read('changelog/README.md').includes(`(${pkg.version}/changelog.md)`), 'list the version in changelog/README.md')
   })
 })

@@ -81,6 +81,11 @@ describe('files, search, memory and settings', () => {
     assert.equal((await call('POST', '/settings/appearance', { language: 'en', theme: 'dark' })).status, 200)
     assert.equal((await call('POST', '/settings/appearance', { theme: 'blue' })).status, 400)
     await call('PUT', '/bots/coder', { sandbox: true })
+    // A model change is noted in the conversation before the skill and plugin reload note.
+    await call('PUT', '/bots/coder', { model: 'claude-sonnet-5-5' })
+    const notes = env.db.prepare(`SELECT body FROM team_messages WHERE recipient = 'coder' AND sender = 'queue' ORDER BY id DESC LIMIT 2`).all().map((r) => String(r.body))
+    assert.match(notes[1], /^Model changed: .* → claude-sonnet-5-5$/)
+    assert.match(notes[0], /^Skills reloaded/)
     await call('PUT', '/bots/coder/memory', { memory: 'remember me' })
     // A second connection to the same file is what a restarted (or upgraded) taskq sees.
     const reopened = openDb(env.home)

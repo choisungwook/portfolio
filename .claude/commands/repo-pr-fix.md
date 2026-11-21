@@ -9,7 +9,7 @@ PR `$1`(없으면 현재 branch의 PR)의 리뷰 comment를 처리한다.
 ## 순서
 
 1. comment를 읽는다. 일반 comment와 review thread를 모두 읽는다.
-2. comment마다 태그를 본다. Important는 고친다. Nit은 이번 push에 코드 변경이 있으면 함께 고치고, Nit만 남았으면 고치지 않는다. Pre-existing은 고치지 않고 Issue 후보로 결과 보고에 남긴다. 태그가 없으면 [code-review.md](../rule-details/code-review.md)의 정의로 직접 분류한다.
+2. comment마다 태그를 본다. Important는 고친다. 사소한 개선은 이번 push에 코드 변경이 있으면 함께 고치고, 사소한 개선만 남았으면 고치지 않는다. Pre-existing은 고치지 않고 Issue 후보로 결과 보고에 남긴다. 태그가 없으면 [code-review.md](../rule-details/code-review.md)의 정의로 직접 분류한다.
 3. 고칠 때는 지적된 줄만 고치지 않고 같은 종류의 다른 위치까지 찾아 고친다. 코드 변경은 저장소 규칙을 따른다.
 4. commit하고 push한다. commit message에 claude session 링크가 있으면 제거한다.
 5. 처리한 review thread에 답글을 남기고 resolve한다.

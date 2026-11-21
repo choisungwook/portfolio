@@ -1,6 +1,6 @@
 import type { Hono } from 'hono'
 import {
-  ORCHESTRATOR, USER, createAgent, deleteAgent, getAgent, listAgents, listMessages, listTurnSteps, listTurns, markRead, openTurnAgents, postMessage,
+  ORCHESTRATOR, SYSTEM, USER, createAgent, deleteAgent, getAgent, listAgents, listMessages, listTurnSteps, listTurns, markRead, openTurnAgents, postMessage,
   queuedCounts, resetAgentSession, seedAgents, updateAgent,
 } from '../db/team.ts'
 import { createCatalog } from '../team/catalog.ts'
@@ -204,6 +204,12 @@ export function registerBotsRoutes(api: Hono, { db, config, bots }: ApiDeps): vo
     if (current.enabled && !parsed.value.enabled) {
       stopTurn(name)
       releaseBotTasks(db, name, 'the bot was disabled', 'ready')
+    }
+    // A model change shows in the conversation, followed by the skill and plugin reload note, so the user sees where the
+    // new model starts.
+    if ((parsed.value.model ?? null) !== (current.model ?? null)) {
+      const id = postMessage(db, { sender: SYSTEM, recipient: name, body: `Model changed: ${current.model ?? 'default'} → ${parsed.value.model ?? 'default'}` })
+      db.prepare('UPDATE team_messages SET read_at = created_at WHERE id = ?').run(id)
     }
     noteReload(db, name, reloadAll(db, config, name))
     teamChanged.notify()

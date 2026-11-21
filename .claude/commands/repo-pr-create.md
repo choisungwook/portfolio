@@ -27,9 +27,9 @@ shell이 없는 MCP 환경에서는 5, 6단계(commit과 push)를 할 수 없으
 
 - `/code-review`가 있으면 그것을 쓴다. 없으면 Agent 도구로 서브에이전트를 띄우고 `git diff origin/master...HEAD`와 [code-review.md](../rule-details/code-review.md)를 넘긴다. 작성 과정의 대화는 넘기지 않는다.
 - 리뷰어는 code-review.md의 finding 형식과 요약 형식을 그대로 따른다. 리뷰 기준을 한 파일에 두어야 지적이 갈리지 않는다.
-- Important는 고치고, 같은 종류의 다른 위치도 함께 고친다. Nit은 고치되 그것만으로 라운드를 늘리지 않는다. Pre-existing은 고치지 않고 결과 보고에 Issue 후보로 남긴다.
+- Important는 고치고, 같은 종류의 다른 위치도 함께 고친다. 사소한 개선은 고치되 그것만으로 라운드를 늘리지 않는다. Pre-existing은 고치지 않고 결과 보고에 Issue 후보로 남긴다.
 - 리뷰는 1회다. 고친 뒤 다시 돌리지 않는다. 고친 것은 verify-pull-request.yml과 사람이 본다.
-- 결과는 PR 검증 표의 마지막 행에 건수로 적는다. 예: Important 2건 모두 고침, Nit 1건 반영.
+- 결과는 PR 검증 표의 마지막 행에 건수로 적는다. 예: Important 2건 모두 고침, 사소한 개선 1건 반영.
 
 ## 제품 카탈로그 갱신
 

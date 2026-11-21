@@ -42,7 +42,7 @@ export function seedTeam(db: Db, taskId: string, openTaskIds: string[]): void {
   takeTurn(db, thread.id, 'reviewer', 'A ticket is enough: data is intact and the next run retries. A page trains people to ignore pages.')
   db.prepare('UPDATE team_messages SET read_at = created_at WHERE thread_id = ?').run(thread.id)
   postMessage(db, { sender: 'planner', recipient: 'planner', body: 'Check whether the nightly export ran.', deliver_at: Math.floor(Date.now() / 1000) + 8 * 3600 })
-  // One bot is shown working: an open turn that started 42 seconds ago. The demo runs no hub, so it stays open.
+  // One bot is shown working: an open turn that started 42 seconds ago. scripts/demo.ts ends it 90 seconds after start.
   const now = Math.floor(Date.now() / 1000)
   const planning = Number(db.prepare('INSERT INTO team_turns (agent, session_id, started_at) VALUES (?, ?, ?)').run('planner', 'demo-planner', now - 42).lastInsertRowid)
   // The tool calls each conversation folds into a line: coder's finished turn, and planner's turn still running.

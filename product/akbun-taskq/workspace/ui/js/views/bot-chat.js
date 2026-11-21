@@ -75,8 +75,10 @@ export function initBotChat() {
     }
   })
   on('bot', (name) => {
+    // A new bot's column must not show the old bot's PRs; reopening reads it again at once instead of waiting 15 s.
+    if (bot !== name) area('bot-side').hidden = true
     bot = name
-    area('bot-side').hidden = true
+    sideAt = { bot: null, at: 0 }
     lastKey = null
     clear(nodes.log)
     files.clear()

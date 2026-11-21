@@ -13,7 +13,7 @@ generated: { by: claude-code/claude-opus-5-5, at: 2026-11-21T00:00:00Z }
 - bot이 turn 중에 부른 도구는 `team_turn_steps` 표에 남긴다. Claude bot은 PreToolUse hook에서, OpenAI bot은 도구를 실행하기 직전에 `TurnRequest.onStep`을 부르고, hub가 그것을 지금 turn의 행으로 쓴다. gate가 거부할 호출도 시도로 남긴다.
 - 저장하는 것은 도구 이름(MCP `mcp__team__` 접두사 제거)과 사람이 알아보는 입력 하나(명령, 파일, 패턴 등)를 mask한 뒤 200자로 자른 값뿐이다. `send_message`는 메시지로 이미 보이므로 남기지 않는다.
 - 대화 화면은 메시지 사이에 이어진 호출을 한 줄로 접는다. bot이 아직 그 묶음에서 일하면 점 네 개가 돌고 지금 도구와 경과 초를 보인다.
-- Kiro는 kiro-cli가 별도 프로세스에서 도구를 돌려 taskq가 호출 시점을 보지 못하므로 기록하지 않는다.
+- Kiro는 kiro-cli가 별도 프로세스에서 도구를 돌려 taskq가 호출 시점을 보지 못하므로 기록하지 않는다. OpenAI bot에 붙인 MCP server 도구도 SDK runner가 직접 불러 기록되지 않는다.
 
 ## 이유
 
