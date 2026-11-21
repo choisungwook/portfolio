@@ -10,6 +10,7 @@
 
 | 버전 | 해설 | 첫 항목 |
 |---|---|---|
+| [0.32.0](0.32.0/changelog.md) | [learning](0.32.0/learning_changelog.md) | 모든 Claude bot과 작업 실행에서 auto compaction이 항상 켜진다. |
 | [0.31.0](0.31.0/changelog.md) | [learning](0.31.0/learning_changelog.md) | task 상태보드에서 카드를 끌어 다른 열에 놓아 상태를 바꾼다. |
 | [0.30.2](0.30.2/changelog.md) | [learning](0.30.2/learning_changelog.md) | 작업 상세 창을 설정 창처럼 창 가장자리만 남기고 화면을 채우도록 키웠다. |
 | [0.30.1](0.30.1/changelog.md) | [learning](0.30.1/learning_changelog.md) | 셸을 쓰는 bot이 Chrome의 DevTools 포트로 자기 브라우저를 직접 조종해 클릭·입력 승인을 건너뛸 수 있던 문제. |

@@ -39,6 +39,7 @@ taskq calls the SDK from three places. All three run the Claude Code executable 
 | `canUseTool` | approval wait for ops_change | refuse with a reason | not set |
 | `hooks` | `PreToolUse`, `PostToolUse`, `PostToolUseFailure` | `PreToolUse` | not set |
 | `settingSources` | `['user']`, plus `project` for a trusted repo | `[]`: a bot never reads the user's Claude settings | `[]` |
+| `settings` | `{ autoCompactEnabled: true }` (`compaction.ts`): flag settings outrank a user setting that turned auto-compact off, so a long run compacts instead of failing with "prompt is too long" | same; each `compact_boundary` is recorded as a `Compact` step in the conversation | not set (one short call) |
 | `strictMcpConfig` | `true` | `true`, `false` when the bot has plugins (their MCP servers must load) | not set |
 | `mcpServers` | `{}` | `{ team }` plus every registered MCP server, as `{ type: 'stdio', command, args }` | not set |
 | `plugins` | not set | the bot's skill copy (one local plugin, `skipMcpDiscovery: true` since it has skills only) and every registered plugin | not set |

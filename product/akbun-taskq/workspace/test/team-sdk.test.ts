@@ -95,6 +95,13 @@ describe('claude team backend', () => {
     assert.equal(result.model, 'claude-sonnet-5-5')
   })
 
+  test('an automatic compaction shows in the conversation as a step', async () => {
+    const f = fake(() => [{ type: 'system', subtype: 'compact_boundary', compact_metadata: { trigger: 'auto', pre_tokens: 180000 } }, done()])
+    const steps: [string, Record<string, unknown>][] = []
+    await createClaudeTeamBackend(f.query).runTurn(env.config, { ...request, onStep: (tool, input) => steps.push([tool, input]) })
+    assert.deepEqual(steps, [['Compact', { description: 'Auto-compacted 180,000 tokens of conversation' }]])
+  })
+
   test('effort reaches the session when the bot sets it', async () => {
     const f = fake(() => [done()])
     await createClaudeTeamBackend(f.query).runTurn(env.config, { ...request, agent: { ...request.agent, effort: 'high' } })
@@ -115,6 +122,7 @@ describe('claude team backend', () => {
     assert.equal(options.sandbox, undefined)
     assert.deepEqual(options.plugins, [])
     assert.deepEqual(options.settingSources, [])
+    assert.deepEqual(options.settings, { autoCompactEnabled: true }, 'auto-compact is always on for a bot')
     assert.equal(options.strictMcpConfig, true)
     assert.deepEqual(Object.keys(options.mcpServers ?? {}), ['team'])
     assert.deepEqual(options.additionalDirectories, [join(env.home, 'shared'), join(env.home, 'worktrees')])

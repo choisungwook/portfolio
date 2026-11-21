@@ -13,6 +13,7 @@ import { buildEnv, configForBot } from './auth.ts'
 import { LiveInput } from '../../team/live-input.ts'
 import { worktreesDir } from '../../workspace/worktree.ts'
 import { modelName } from '../../team/model-name.ts'
+import { COMPACTION_SETTINGS } from './compaction.ts'
 
 export type TeamQueryFn = (params: { prompt: AsyncIterable<SDKUserMessage>; options: Options }) => AsyncIterable<SDKMessage>
 
@@ -64,6 +65,11 @@ async function runTurn(config: Config, request: TurnRequest, runQuery: TeamQuery
   try {
     for await (const message of runQuery({ prompt: userMessages(live, request.prompt), options: optionsFor(config, request, abort, state) })) {
       if (message.type === 'system' && message.subtype === 'init') sessionId = message.session_id
+      // A compaction shows in the bot's conversation like a step, so a shorter memory of the past has a visible reason.
+      else if (message.type === 'system' && message.subtype === 'compact_boundary') {
+        const { trigger, pre_tokens: tokens } = message.compact_metadata
+        request.onStep?.('Compact', { description: `${trigger === 'auto' ? 'Auto' : 'Manual'}-compacted ${tokens.toLocaleString('en-US')} tokens of conversation` })
+      }
       else if (message.type === 'assistant' && message.error && INFERENCE_AUTH_ERRORS.has(message.error)) authFailed = true
       else if (message.type === 'assistant') {
         const u = message.message.usage
@@ -113,6 +119,7 @@ function optionsFor(config: Config, request: TurnRequest, abort: AbortController
     // The user's own Claude settings are not loaded: a bot is what its settings say, nothing more. Skills and plugins
     // come from the bot's snapshot (src/team/bot-plugin.ts). Plugin MCP servers load only when the bot has plugins.
     settingSources: [],
+    settings: COMPACTION_SETTINGS,
     // The skill copy is taskq's own plugin with skills only; it never brings MCP servers.
     plugins: request.plugins.map((path) => (path.endsWith('skills-plugin') ? { type: 'local' as const, path, skipMcpDiscovery: true } : { type: 'local' as const, path })),
     strictMcpConfig: request.plugins.length === 0,

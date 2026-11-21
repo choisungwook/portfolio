@@ -15,6 +15,7 @@ import { outputsOf, profileFor, type Profile } from './profiles.ts'
 import { buildPrompt, systemAppend } from '../../worker/prompt.ts'
 import { RESULT_SCHEMA, failed } from '../../worker/result-schema.ts'
 import { toWorkerResult } from './result.ts'
+import { COMPACTION_SETTINGS } from './compaction.ts'
 
 export type QueryFn = (params: { prompt: string; options: Options }) => AsyncIterable<SDKMessage>
 
@@ -109,6 +110,7 @@ function buildOptions(config: Config, ctx: WorkerContext, profile: Profile, stat
     canUseTool: task.type === 'ops_change' ? approvalGate(ctx) : undefined,
     hooks: buildHooks(ctx, state, abort, gate),
     settingSources: profile.settingSources,
+    settings: COMPACTION_SETTINGS,
     // No MCP server is loaded: the session sees only the servers listed here, which are none.
     strictMcpConfig: true,
     mcpServers: {},

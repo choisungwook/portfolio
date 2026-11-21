@@ -60,6 +60,7 @@ describe('sdk worker', () => {
     const options = calls[0] as Options
     assert.equal(options.permissionMode, 'dontAsk')
     assert.deepEqual(options.settingSources, ['user'])
+    assert.deepEqual(options.settings, { autoCompactEnabled: true }, 'flag settings keep auto-compact on over a user setting')
     assert.equal(options.maxTurns, config.maxTurns)
     assert.equal(options.env?.CLAUDE_CODE_USE_BEDROCK, '1')
     assert.equal((options.outputFormat as { type: string }).type, 'json_schema')
