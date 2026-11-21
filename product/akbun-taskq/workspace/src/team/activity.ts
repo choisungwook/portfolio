@@ -1,4 +1,5 @@
 import { execFile } from 'node:child_process'
+import { basename } from 'node:path'
 import type { Db } from '../db/open.ts'
 import { TASK_TITLE_SQL } from '../db/tasks.ts'
 import { nowSec } from '../time.ts'
@@ -39,7 +40,31 @@ export const ghPrState: PrState = (url) => {
   })
 }
 
-export async function botActivity(db: Db, name: string, prState: PrState = ghPrState) {
+// What the bot has changed in its working folder and not committed, summed like Claude Desktop's Changes row: the
+// repository, its branch, files, and lines added and removed. Null when the folder is not inside a git repository.
+export interface WorkdirChanges { repo: string; path: string; branch: string; files: number; additions: number; deletions: number }
+
+export async function workdirChanges(dir: string): Promise<WorkdirChanges | null> {
+  // execFile, not spawnSync: the panel asks every 15 s and a large repository must not hold the server up.
+  const git = (args: string[]) => new Promise<string | null>((resolve) => {
+    execFile('git', ['-C', dir, ...args], { timeout: 5000, maxBuffer: 16 * 1024 * 1024 }, (error, stdout) => resolve(error ? null : stdout))
+  })
+  const top = (await git(['rev-parse', '--show-toplevel']))?.trim()
+  if (!top) return null
+  const [branch, numstat, untracked] = await Promise.all([git(['branch', '--show-current']), git(['diff', '--numstat', 'HEAD']), git(['ls-files', '--others', '--exclude-standard'])])
+  let additions = 0
+  let deletions = 0
+  const changed = (numstat ?? '').split('\n').filter(Boolean)
+  for (const line of changed) {
+    const [add, del] = line.split('\t')
+    additions += add === '-' ? 0 : Number(add)
+    deletions += del === '-' ? 0 : Number(del)
+  }
+  const files = changed.length + (untracked ?? '').split('\n').filter(Boolean).length
+  return { repo: basename(top), path: top, branch: branch?.trim() || 'HEAD', files, additions, deletions }
+}
+
+export async function botActivity(db: Db, name: string, prState: PrState = ghPrState, workdir?: string) {
   const texts = [
     ...db.prepare(`SELECT body FROM team_messages WHERE sender = ? OR recipient = ? ORDER BY id DESC LIMIT 300`).all(name, name).map((r) => String(r.body)),
     ...db.prepare(`SELECT r.summary FROM runs r JOIN tasks t ON t.id = r.task_id WHERE t.owner = ? AND r.summary IS NOT NULL
@@ -55,5 +80,6 @@ export async function botActivity(db: Db, name: string, prState: PrState = ghPrS
     .get(name, nowSec() - FINISHED_WINDOW_SEC)?.n ?? 0)
   const sub_sessions = db.prepare(`SELECT t.agent, t.started_at FROM team_turns t WHERE t.ended_at IS NULL AND t.agent != ?
     AND EXISTS (SELECT 1 FROM team_messages m WHERE m.turn_id = t.id AND m.sender = ?) ORDER BY t.started_at`).all(name, name)
-  return { pull_requests, background, finished, sub_sessions }
+  const changes = workdir ? await workdirChanges(workdir) : null
+  return { pull_requests, background, finished, sub_sessions, changes }
 }

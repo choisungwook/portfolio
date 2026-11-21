@@ -1,19 +1,38 @@
 import { join } from 'node:path'
 import {
   createSdkMcpServer, query as sdkQuery, tool,
-  type HookCallback, type ModelInfo, type Options, type SDKMessage, type SDKUserMessage, type SlashCommand,
+  type HookCallback, type ModelInfo, type Options, type SDKControlGetContextUsageResponse, type SDKMessage, type SDKUserMessage, type SlashCommand,
 } from '@anthropic-ai/claude-agent-sdk'
 import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js'
 import type { Config } from '../../config.ts'
 import { claudeExecutable } from '../../resources.ts'
 import { botGate } from '../../team/bot-gate.ts'
 import { ToolError, type TeamTool } from '../../team/tools.ts'
-import type { Catalog, CatalogRequest, TeamBackend, TurnRequest, TurnResult } from '../../team/types.ts'
+import type { Catalog, CatalogRequest, ContextBreakdown, TeamBackend, TurnRequest, TurnResult } from '../../team/types.ts'
 import { buildEnv, configForBot } from './auth.ts'
 import { LiveInput } from '../../team/live-input.ts'
 import { worktreesDir } from '../../workspace/worktree.ts'
 import { modelName } from '../../team/model-name.ts'
 import { COMPACTION_SETTINGS } from './compaction.ts'
+
+type ContextQuery = AsyncIterable<SDKMessage> & { getContextUsage?: (opts?: { detail?: 'summary' | 'full' }) => Promise<SDKControlGetContextUsageResponse> }
+
+// The SDK's context breakdown, in summary form (from the last response and local estimates, no token-count calls, so
+// it costs nothing). A session that cannot answer in time just leaves the panel without a breakdown.
+async function readBreakdown(q: ContextQuery): Promise<ContextBreakdown | undefined> {
+  if (!q.getContextUsage) return undefined
+  try {
+    const usage = await Promise.race([q.getContextUsage({ detail: 'summary' }), new Promise<undefined>((resolve) => setTimeout(resolve, BREAKDOWN_TIMEOUT_MS))])
+    if (!usage) return undefined
+    return {
+      total: usage.totalTokens, max: usage.maxTokens, percentage: usage.percentage, auto_compact: usage.isAutoCompactEnabled,
+      categories: usage.categories.map((c) => ({ id: c.id ?? null, name: c.name, tokens: c.tokens, kind: c.kind })),
+    }
+  } catch {
+    return undefined
+  }
+}
+const BREAKDOWN_TIMEOUT_MS = 3000
 
 export type TeamQueryFn = (params: { prompt: AsyncIterable<SDKUserMessage>; options: Options }) => AsyncIterable<SDKMessage>
 
@@ -63,7 +82,8 @@ async function runTurn(config: Config, request: TurnRequest, runQuery: TeamQuery
   let context: { tokens: number; window: number | null } | undefined
   let model: string | undefined
   try {
-    for await (const message of runQuery({ prompt: userMessages(live, request.prompt), options: optionsFor(config, request, abort, state) })) {
+    const q: ContextQuery = runQuery({ prompt: userMessages(live, request.prompt), options: optionsFor(config, request, abort, state) })
+    for await (const message of q) {
       if (message.type === 'system' && message.subtype === 'init') sessionId = message.session_id
       // A compaction shows in the bot's conversation like a step, so a shorter memory of the past has a visible reason.
       else if (message.type === 'system' && message.subtype === 'compact_boundary') {
@@ -89,7 +109,14 @@ async function runTurn(config: Config, request: TurnRequest, runQuery: TeamQuery
         live.answer(ids, !ids && message.queued_turn_count === 0)
         const base = { session_id: sessionId ?? message.session_id, turns, session_total_usd: total, usage: { ...usage }, context, model }
         const failed = message.subtype !== 'success'
-        const pending = live.unanswered() > 0 || (message.queued_turn_count ?? 0) > 0
+        let pending = live.unanswered() > 0 || (message.queued_turn_count ?? 0) > 0
+        // The turn is ending well: ask the session what fills its context while the session is still open. A message
+        // the hub pushed during that wait keeps the turn going, so it is answered instead of being taken as done.
+        if (!state.tampered && !authFailed && !failed && !pending) {
+          const breakdown = await readBreakdown(q)
+          if (breakdown) Object.assign(base, { context_breakdown: breakdown })
+          pending = live.unanswered() > 0
+        }
         if (state.tampered || authFailed || failed || !pending) live.close()
         if (state.tampered) return { ...base, outcome: 'failed', error: state.tampered, tampered: state.tampered }
         if (authFailed) return { ...base, outcome: 'failed', error: 'model provider login failed', auth_failed: true }

@@ -10,6 +10,14 @@ export function seedUsage(db: Db, now: number): void {
   context.run(90_000, 200_000, 'coder')
   context.run(190_000, 272_000, 'reviewer')
   context.run(300, 1000, 'doc-reviewer')
+  // What fills taskq's context, as a Claude session reports it, for the context panel beside the chat.
+  const categories = [
+    ['system_prompt', 'System prompt', 3_100, 'used'], ['system_tools', 'System tools', 9_800, 'used'], ['mcp_tools', 'MCP tools', 6_200, 'used'],
+    ['memory_files', 'Memory files', 1_400, 'used'], ['skills', 'Skills', 900, 'used'], ['messages', 'Messages', 26_600, 'used'],
+    ['autocompact_buffer', 'Autocompact buffer', 33_000, 'buffer'], ['free_space', 'Free space', 119_000, 'free'],
+  ].map(([id, name, tokens, kind]) => ({ id, name, tokens, kind }))
+  db.prepare('UPDATE team_agents SET context_breakdown = ? WHERE name = ?')
+    .run(JSON.stringify({ total: 48_000, max: 200_000, percentage: 24, auto_compact: true, categories }), 'taskq')
   const turn = db.prepare(`INSERT INTO team_turns (agent, session_id, started_at, ended_at, outcome, turns, cost_usd, sdk, provider, model,
     input_tokens, output_tokens, cache_read_tokens, cache_write_tokens, credits) VALUES (?, ?, ?, ?, 'done', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
   const rows: [string, string, number, number, string, string | null, string, number, number, number, number, number | null][] = [

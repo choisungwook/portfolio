@@ -1,7 +1,11 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { addTurnStep, postMessage } from '../src/db/team.ts'
-import { botActivity, pullRequestUrls } from '../src/team/activity.ts'
+import { botActivity, pullRequestUrls, workdirChanges } from '../src/team/activity.ts'
+import { execFileSync } from 'node:child_process'
+import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { basename, join } from 'node:path'
 import { seedTestBots, setup } from './helpers.ts'
 
 test('pull request links are found once each, newest text first', () => {
@@ -39,5 +43,24 @@ test('a step keeps the command short and masked, and send_message is not a step'
     assert.ok(rows[0].detail.length <= 201)
   } finally {
     env.cleanup()
+  }
+})
+
+test('the Changes row sums what the bot changed and did not commit in its git folder, and is null outside git', async () => {
+  const dir = mkdtempSync(join(tmpdir(), 'taskq-changes-'))
+  try {
+    assert.equal(await workdirChanges(dir), null)
+    const git = (...args: string[]) => execFileSync('git', ['-C', dir, ...args], { stdio: 'ignore' })
+    git('init', '-q', '-b', 'main')
+    git('-c', 'user.email=t@example.com', '-c', 'user.name=t', 'commit', '-q', '--allow-empty', '-m', 'start')
+    writeFileSync(join(dir, 'a.txt'), 'one\ntwo\n')
+    git('add', 'a.txt')
+    git('-c', 'user.email=t@example.com', '-c', 'user.name=t', 'commit', '-q', '-m', 'a')
+    writeFileSync(join(dir, 'a.txt'), 'one\nthree\nfour\n')
+    writeFileSync(join(dir, 'new.txt'), 'x\n')
+    const changes = (await workdirChanges(dir))!
+    assert.deepEqual({ ...changes, path: undefined }, { repo: basename(dir), path: undefined, branch: 'main', files: 2, additions: 2, deletions: 1 })
+  } finally {
+    rmSync(dir, { recursive: true, force: true })
   }
 })
