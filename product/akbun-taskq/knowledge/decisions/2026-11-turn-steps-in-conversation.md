@@ -6,8 +6,6 @@ tags: [bots, ui, chat]
 generated: { by: claude-code/claude-opus-5-5, at: 2026-11-21T00:00:00Z }
 ---
 
-# A bot's tool calls are recorded in SQLite and folded into its conversation
-
 ## 결정
 
 - bot이 turn 중에 부른 도구는 `team_turn_steps` 표에 남긴다. Claude bot은 PreToolUse hook에서, OpenAI bot은 도구를 실행하기 직전에 `TurnRequest.onStep`을 부르고, hub가 그것을 지금 turn의 행으로 쓴다. gate가 거부할 호출도 시도로 남긴다.
