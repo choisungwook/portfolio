@@ -3,7 +3,7 @@ type: Decision
 title: Workflows are step graphs a bot executes and taskq judges
 description: A workflow is an n8n-like graph of steps; a bot does the work and reports each step, taskq enforces order and evidence and decides success, and runs keep a snapshot so a deleted workflow stays in the history.
 tags: [bots, workflows]
-generated: { by: claude-code/claude-fable-5-2, at: 2026-11-20T00:00:00Z }
+generated: { by: claude-code/claude-opus-5-5, at: 2026-11-21T15:00:00Z }
 ---
 
 ## 결정
@@ -12,7 +12,7 @@ generated: { by: claude-code/claude-fable-5-2, at: 2026-11-20T00:00:00Z }
 - 단계를 실행하는 것은 taskq가 아니라 bot이다. task에 `workflow_id`를 두고 owner bot이 `start_task`하면 실행이 시작되고, bot은 `workflow_step`으로 단계마다 보고한다.
 - 성공은 taskq가 판정한다. 검증 단계는 증거(명령과 출력) 없이 성공할 수 없고, 승인 단계는 사용자만 닫으며, 단계 하나가 실패하면 실행이 실패한다. 실행이 성공하지 않은 task를 bot이 done이나 review로 닫는 것은 거부한다.
 - 실행은 시작할 때의 정의를 복사(snapshot)한다. workflow 삭제는 soft delete이고, 실행 기록에는 "삭제됨"이 남으며 그 workflow를 실행 중인 bot에게 메시지를 보낸다.
-- bot 없이 workflow만 지정된 task는 큐가 실행하지 않는다.
+- workflow가 지정된 task는 큐 자동 실행도 시작 버튼도 실행하지 않는다. owner bot의 `start_task`로만 돈다.
 
 ## 이유
 

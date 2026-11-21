@@ -3,12 +3,14 @@ type: Decision
 title: Three inference providers selected by config
 description: bedrock, api_key and subscription differ only in the child environment taskq builds.
 tags: [auth, bedrock, agent-sdk]
-generated: { by: claude-code/claude-opus-5-5, at: 2026-11-20T00:00:00Z }
+generated: { by: claude-code/claude-opus-5-5, at: 2026-11-21T15:00:00Z }
 ---
 
 ## 결정
 
 `provider` is `bedrock`, `api_key` or `subscription`. taskq only sets or removes environment variables for the worker and runs a preflight check. The one credential taskq stores is the Anthropic API key entered in Settings > Connections: plain text in `data/anthropic-api-key` with mode 0600, outside the database, preferred over `ANTHROPIC_API_KEY`. The API never returns it.
+
+This selects how the queue's task runs sign in. Since 0.27.0 each Claude bot picks its own sign-in (`api`, `subscription`, `bedrock`) and falls back to this setting when it has none ([decision](2026-11-shared-registry-and-signin.md)).
 
 ## 이유
 

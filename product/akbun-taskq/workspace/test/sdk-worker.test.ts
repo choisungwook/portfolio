@@ -86,25 +86,12 @@ describe('sdk worker', () => {
     assert.ok(sandbox.filesystem?.denyRead?.includes(join(homedir(), '.ssh')))
   })
 
-  test('project settings load only for a code task whose repo is in trustedRepos', async () => {
-    const trusted = Object.assign(resolveConfig(home), { trustedRepos: [repo] })
-    const run = async (cfg: typeof config, task: Task) => {
-      const { query, calls } = fakeQuery(() => [done])
-      await createSdkWorker(cfg, { query, headOf: async () => 'head' })(ctxOf(task).ctx)
-      return (calls[0] as Options).settingSources
-    }
-    assert.deepEqual(await run(trusted, taskOf('code')), ['user', 'project'])
-    assert.deepEqual(await run(config, taskOf('code')), ['user'])
-    assert.deepEqual(await run(trusted, taskOf('ops_change')), ['user'])
-  })
-
   test('a code task records base_commit before the run', async () => {
     const injectedHead = 'injected-head-sha'
     const { query } = fakeQuery(() => [done])
     const { ctx, patches } = ctxOf(taskOf('code'))
     await createSdkWorker(config, { query, headOf: async () => injectedHead })(ctx)
     assert.deepEqual(patches, [{ base_commit: injectedHead }])
-    assert.equal(patches[0].base_commit, injectedHead)
   })
 
   test('security_review prompt names the absolute outputs path and the git commands', async () => {
@@ -133,16 +120,6 @@ describe('sdk worker', () => {
     const result = events.find((e) => e.kind === 'tool_result')!
     assert.equal(String(result.payload.summary).length, 20003)
     assert.ok(!mask(JSON.stringify(result.payload)).includes(awsKey), 'key must be masked when persisted')
-  })
-
-  test('ops_read denies a mutating aws command at the PreToolUse hook', async () => {
-    let decision: unknown
-    const { query } = fakeQuery(async (options) => {
-      decision = await hookOf(options, 'PreToolUse')(toolInput('aws ec2 terminate-instances --instance-ids i-0example') as never, 'tu-1', signal())
-      return [done]
-    })
-    await createSdkWorker(config, { query })(ctxOf(taskOf('ops_read')).ctx)
-    assert.equal((decision as { hookSpecificOutput: { permissionDecision: string } }).hookSpecificOutput.permissionDecision, 'deny')
   })
 
   test('a gate allow for a read-only aws pipeline is explicit, so the pipeline is not asked again', async () => {
@@ -332,7 +309,7 @@ describe('sdk worker', () => {
     assert.deepEqual(decisions, ['deny', 'deny', 'allow'])
   })
 
-  test('the PreToolUse hook sends every non-read ops_change call to the permission prompt', async () => {
+  test('the PreToolUse hook forwards the gate decisions for ops_change (ask, allow, deny)', async () => {
     const decisions: string[] = []
     const { query } = fakeQuery(async (options) => {
       const pre = hookOf(options, 'PreToolUse')

@@ -135,8 +135,9 @@ describe('runner', () => {
     assert.equal(started.at(-1), b.id)
   })
 
-  for (const decision of [true, false]) {
-    test(`approval resolves ${decision ? 'true' : 'false'} after decideApproval`, async () => {
+  // Both answers are covered by approval.test.ts and approval-api.test.ts; this one keeps the runner path and the alert.
+  for (const decision of [true]) {
+    test('the runner raises a critical approval alert and the run gets the decision', async () => {
       const { db, config } = env
       const task = addTask(db, { type: 'ops_change', data: { intent: 'change' } })
       let answer: boolean | undefined

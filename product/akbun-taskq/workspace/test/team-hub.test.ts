@@ -252,7 +252,7 @@ describe('team hub', () => {
     assert.deepEqual({ ...reset }, { session_id: null, context_tokens: null, session_cost_usd: 0 })
   })
 
-  test('a login failure pauses the team until the user resumes it', async () => {
+  test('a Claude login failure pauses the team until the user resumes it', async () => {
     const { db, config } = env
     const { backend } = fakeBackend(() => ({ outcome: 'failed', auth_failed: true, error: 'login' }))
     hub = createTeamHub({ db, config, backend, retryAfterSec: 0 })

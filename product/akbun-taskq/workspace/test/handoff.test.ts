@@ -69,6 +69,7 @@ test('[critical] a manual handoff persists its alert and blocks claims until the
   const { db, config } = env
   const draft = addTask(db, { status: 'review', data: { intent: 'Draft', output_path: 'intent.md' } })
   const spec = addTask(db, {
+    owner: 'coder',
     data: { intent: 'Spec', auto_accept_handoffs: false },
     deps: [{ kind: 'blocks', depends_on: draft.id }],
   })
@@ -82,7 +83,9 @@ test('[critical] a manual handoff persists its alert and blocks claims until the
   assert.equal(handoff.status, 'pending')
   assert.equal(handoff.accepted_at, null)
   assert.equal(claimTask(db, spec.id, 'runner'), false)
-  assert.equal((await post(`tasks/${spec.id}/run`)).status, 409)
+  const blockedRun = await post(`tasks/${spec.id}/run`)
+  assert.equal(blockedRun.status, 409)
+  assert.match((await blockedRun.json() as { error: string }).error, /dependency|handoff/, 'refused because the handoff waits, not for another reason')
   assert.equal((await app.request('/api/handoffs', { headers: { host: headers.host } })).status, 401)
 
   const notices: Notice[] = []
@@ -164,7 +167,7 @@ test('CLI accepts a handoff and a stdio MCP client reads the same record and pol
   }
 })
 
-test('a new run of a task is told what its last run did, and never resumes its session', async () => {
+test('a new run without a session is told what its last run did', async () => {
   const env = setup()
   try {
     const task = addTask(env.db, { status: 'failed' })

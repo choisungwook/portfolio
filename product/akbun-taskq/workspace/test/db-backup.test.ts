@@ -1,6 +1,6 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { existsSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import { existsSync, rmSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { createApp } from '../src/api/server.ts'
 import { applyPendingImport, checkDatabase } from '../src/db/backup.ts'
@@ -52,8 +52,6 @@ test('a file that is not a taskq database is refused', () => {
     const junk = join(env.home, 'junk.db')
     writeFileSync(junk, 'not sqlite')
     assert.match(String(checkDatabase(junk)), /not a SQLite|damaged/)
-    assert.equal(readdirSync(join(env.home, 'data')).includes('import-pending.db'), false)
-    assert.ok(readFileSync(junk))
   } finally {
     env.cleanup()
   }

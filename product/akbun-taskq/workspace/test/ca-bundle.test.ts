@@ -11,6 +11,8 @@ test('an imported CA bundle is checked, kept in TASKQ_HOME, applied, and cleared
   const env = setup()
   const dir = mkdtempSync(join(tmpdir(), 'taskq-ca-'))
   const before = { node: process.env.NODE_EXTRA_CA_CERTS, aws: process.env.AWS_CA_BUNDLE }
+  delete process.env.NODE_EXTRA_CA_CERTS
+  delete process.env.AWS_CA_BUNDLE
   try {
     execFileSync('openssl', ['req', '-x509', '-newkey', 'rsa:2048', '-nodes', '-keyout', join(dir, 'k.pem'), '-out', join(dir, 'c.pem'), '-days', '2', '-subj', '/CN=Inspection Root'], { stdio: 'ignore' })
     const pem = readFileSync(join(dir, 'c.pem'), 'utf8')
@@ -23,7 +25,8 @@ test('an imported CA bundle is checked, kept in TASKQ_HOME, applied, and cleared
     assert.equal(env.config.caBundle, join(env.home, CA_FILE_NAME))
     assert.equal(process.env.NODE_EXTRA_CA_CERTS, env.config.caBundle, 'children get it')
     const cleared = clearCaBundle(env.db, env.config)
-    assert.equal(cleared.path, before.node === undefined ? null : cleared.path)
+    assert.equal(cleared.path, null)
+    assert.equal(process.env.NODE_EXTRA_CA_CERTS, undefined, 'clearing takes it out of the children\'s environment')
     assert.equal(existsSync(join(env.home, CA_FILE_NAME)), false)
     assert.equal(caBundleInfo(env.db, env.config).source, null)
   } finally {

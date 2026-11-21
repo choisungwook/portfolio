@@ -136,7 +136,7 @@ describe('bots working on tasks', () => {
     assert.match(listMessages(env.db, { recipient: 'coder', limit: 1 })[0].body, /restarted while you were working/)
   })
 
-  test('the queue skips a bot\'s task and, with autorun off, unowned tasks too; run-now still runs once', async () => {
+  test('the queue skips a bot\'s task and, with autorun off, unowned tasks too; run-now runs an owned task once without its bot', async () => {
     const owned = insertTask(env.db, { type: 'research', status: 'ready', owner: 'coder', data: { intent: 'bot work' } })
     const mine = insertTask(env.db, { type: 'research', status: 'ready', data: { intent: 'my work' } })
     setQueueAutorun(env.db, false)
@@ -145,11 +145,12 @@ describe('bots working on tasks', () => {
     await sleep(60)
     assert.equal(statusOf(env.db, owned.id), 'ready')
     assert.equal(statusOf(env.db, mine.id), 'ready')
-    runner.runNow(mine.id)
-    await waitFor(() => statusOf(env.db, mine.id) === 'review')
+    // The run button needs an owner (prepareRun); it still runs once in the runner, not in the owner bot's session.
+    runner.runNow(owned.id)
+    await waitFor(() => statusOf(env.db, owned.id) === 'review')
     await runner.stop()
-    assert.equal(statusOf(env.db, owned.id), 'ready')
-    assert.equal(env.db.prepare('SELECT bot FROM runs WHERE task_id = ?').get(mine.id)?.bot, null)
+    assert.equal(statusOf(env.db, mine.id), 'ready', 'with autorun off the queue leaves an unowned task alone')
+    assert.equal(env.db.prepare('SELECT bot FROM runs WHERE task_id = ?').get(owned.id)?.bot, null)
   })
 
   test('blocked command patterns match anywhere in the command, and * is the only wildcard', () => {
@@ -159,7 +160,6 @@ describe('bots working on tasks', () => {
     assert.equal(blockedBy('git status', ['git push*']), null)
     assert.equal(blockedBy('/bin/rm -rf /tmp/x', ['rm -rf *']), 'rm -rf *')
     assert.equal(blockedBy('echo a.b', ['echo a?b']), null)
-    assert.ok(existsSync(env.home))
   })
 
   test('[critical] a shell command naming taskq data or config stops the turn even with no sandbox and no blocked commands', () => {

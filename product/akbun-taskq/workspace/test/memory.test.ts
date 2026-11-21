@@ -138,6 +138,5 @@ describe('runner wiring', () => {
     await runner.start()
     await waitFor(() => statusOf(env.db, task.id) === 'review')
     await runner.stop()
-    assert.equal(statusOf(env.db, task.id), 'review')
   })
 })
