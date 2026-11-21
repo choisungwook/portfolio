@@ -22,6 +22,16 @@ AIMEMORY_HOME=$(mktemp -d) node src/cli.ts serve
 
 `.github/workflows/verify-akbun-aimemory.yml` runs the type check and tests on pull requests. There is no release job yet, so the version in `package.json` does not create a tag.
 
+## Reindex performance
+
+Measured on Apple Silicon (Node 24) with 10,000 synthetic multilingual memories (English, Korean, Japanese, Chinese):
+
+| Tokenizer | 10,000 rows `reindex()` |
+|---|---|
+| `builtin` | ~224 ms |
+| `hf-json` (Unigram) | ~328 ms |
+| `hf-json` (BPE) | ~338 ms |
+
 ## Caveats
 
 - Vector search scans every row. Past about 100k memories, move to an ANN index such as sqlite-vec.

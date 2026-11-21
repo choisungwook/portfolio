@@ -1,9 +1,13 @@
 import { execFileSync } from 'node:child_process'
+import { loadHfJsonTokenizer } from './tokenizers/hf-json.ts'
 
 // Tokens drive both the lexical index (FTS5) and the hashed vectors, so changing the tokenizer needs `aimem reindex`.
-// No model is involved: the builtin splits by script, and `command` runs any open-source tokenizer the user installs
-// (SentencePiece, a HuggingFace tokenizer.json, ...) as a child process that reads text on stdin and prints tokens.
-export type TokenizerConfig = { type: 'builtin' } | { type: 'command'; command: string; args?: string[] }
+// No model is involved: the builtin splits by script, `hf-json` loads a HuggingFace tokenizer.json (Unigram/BPE), and
+// `command` runs any open-source tokenizer the user installs (SentencePiece, BlingFire, ...) as a child process.
+export type TokenizerConfig =
+  | { type: 'builtin' }
+  | { type: 'hf-json'; path: string }
+  | { type: 'command'; command: string; args?: string[] }
 
 export interface Tokenizer { id: string; tokenize(text: string): string[] }
 
@@ -30,8 +34,9 @@ export function builtinTokenize(text: string): string[] {
   return out
 }
 
-export function makeTokenizer(config: TokenizerConfig): Tokenizer {
+export function makeTokenizer(config: TokenizerConfig, baseDir?: string): Tokenizer {
   if (config.type === 'builtin') return { id: 'builtin-v1', tokenize: builtinTokenize }
+  if (config.type === 'hf-json') return loadHfJsonTokenizer(config.path, baseDir)
   const { command, args = [] } = config
   return {
     id: `command:${command} ${args.join(' ')}`,

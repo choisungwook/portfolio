@@ -29,7 +29,7 @@ One file, `$AIMEMORY_HOME/data/aimemory.db` (`src/store.ts`).
 
 ## Tokenizer
 
-`src/tokenizer.ts`. `builtin` splits by script: Latin words, CJK character bigrams, Hangul words plus bigrams. `command` runs an external tokenizer with text on stdin and expects a JSON array or whitespace-separated tokens. Changing it needs `aimem reindex`; the store warns when the stored id differs.
+`src/tokenizer.ts` and `src/tokenizers/hf-json.ts`. `builtin` splits by script: Latin words, CJK character bigrams, Hangul words plus bigrams. `hf-json` loads a local HuggingFace `tokenizer.json` (Unigram or BPE, e.g. Gemma 3 or XLM-RoBERTa) with no runtime dependency. `command` runs an external tokenizer with text on stdin and expects a JSON array or whitespace-separated tokens (an example SentencePiece Python adapter lives at `src/tokenizers/sentencepiece_command.py`). Changing it needs `aimem reindex`; the store warns when the stored id differs.
 
 ## HTTP API
 
@@ -55,6 +55,5 @@ Each directory holds only a README until its issue is done.
 | `workspace/src/mcp/` | MCP server (#1594) |
 | `workspace/src/indexer/` | LLM summaries and memory updates (#1595) |
 | `workspace/src/connection/` | Connection settings and CA bundle (#1596) |
-| `workspace/src/tokenizers/` | Open-source subword tokenizers (#1597) |
 | `workspace/src/install/` | Hook installation and akbun-taskq integration (#1598) |
 | `workspace/bench/` | Search benchmark, decay and ANN (#1599) |
