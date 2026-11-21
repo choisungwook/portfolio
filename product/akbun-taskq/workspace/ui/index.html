@@ -183,6 +183,14 @@
     <section id="view-plugins" data-view-panel="plugins" aria-label="Plugins" data-area="plugins-view" hidden>
       <h1 class="view-title" data-i18n="nav.plugins">Plugins</h1>
       <p class="meta" data-i18n="plugins.hint">Everything registered here is shared: every bot of the type uses it (plugins only Claude bots). Update pulls a git checkout and reloads the bots.</p>
+      <section class="builtin-skill" data-area="builtin-skill" aria-labelledby="builtin-skill-title">
+        <div class="builtin-head">
+          <h2 class="section-title" id="builtin-skill-title" data-i18n="builtin.title">taskq built-in skill</h2>
+          <span class="badge" data-i18n="builtin.locked">Updated automatically · cannot be removed</span>
+        </div>
+        <p class="meta" data-i18n="builtin.hint">Every bot of every type carries this skill: which taskq it runs inside, the running version, the manual of that version, and how to make workflows. taskq writes it again on every start, so an update brings its own.</p>
+        <div data-area="builtin-skill-body"></div>
+      </section>
       <div class="wf-tabs plugins-tabs" role="tablist" aria-label="Agent SDK">
         <button type="button" role="tab" data-sdk-tab="claude" aria-selected="true">Claude</button>
         <button type="button" role="tab" data-sdk-tab="openai" aria-selected="false">OpenAI</button>

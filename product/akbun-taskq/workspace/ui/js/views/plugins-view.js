@@ -6,6 +6,7 @@ import { area, clear, el, fill } from '../core/dom.js'
 import { askConfirm } from '../core/ask.js'
 import { on } from '../core/bus.js'
 import { t } from '../core/i18n.js'
+import { fmtDateTime } from '../core/time.js'
 
 let catalog = null
 let installed = new Set()   // plugin names already registered, so the marketplace says Installed
@@ -35,8 +36,29 @@ export function initPluginsView() {
   area('official-anthropic').addEventListener('change', renderCatalog)
   area('official-filter').addEventListener('input', renderCatalog)
   on('tab', (name) => {
-    if (name === 'plugins') load()
+    if (name === 'plugins') {
+      load()
+      loadBuiltin()
+    }
   })
+}
+
+// The built-in taskq skill: its version, when taskq last wrote it, where it is, and its SKILL.md to read. No update,
+// edit or delete control: taskq rewrites it from the running version on every start.
+async function loadBuiltin() {
+  const box = area('builtin-skill-body')
+  try {
+    const skill = await api.get('/builtin-skill')
+    fill(box,
+      el('div', { class: 'builtin-row' },
+        el('span', { class: 'builtin-mark', 'aria-hidden': 'true', text: 'T' }),
+        el('span', { class: 'builtin-text' },
+          el('strong', { text: skill.name }), el('span', { class: 'badge', text: `v${skill.version}` }),
+          el('span', { class: 'meta', text: `${t('builtin.written', 'Written')} ${fmtDateTime(skill.updated_at)} · ${skill.path}` }))),
+      el('details', { class: 'builtin-content' }, el('summary', { text: t('builtin.read', 'Read SKILL.md') }), el('pre', { text: skill.skill_md })))
+  } catch (error) {
+    fill(box, el('p', { class: 'error', text: error.message }))
+  }
 }
 
 async function load() {

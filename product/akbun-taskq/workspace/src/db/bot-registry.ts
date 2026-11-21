@@ -55,6 +55,8 @@ export function inspectPlugin(path: string): { name: string; path: string; descr
 
 export function registerEntry(db: Db, home: string, kind: RegistryKind, path: string): RegistryEntry {
   const info = kind === 'skill' ? inspectSkill(home, path) : inspectPlugin(path)
+  // "taskq" is the built-in skill every bot carries (src/team/builtin-skill.ts); a registered one would shadow it.
+  if (kind === 'skill' && info.name === 'taskq') throw new SkillError(409, 'the name taskq is the built-in skill; rename this skill')
   const table = TABLE[kind]
   if (db.prepare(`SELECT 1 FROM ${table} WHERE name = ? OR path = ?`).get(info.name, info.path)) {
     throw new SkillError(409, `a ${kind} with the name ${info.name} or that path is already registered`)

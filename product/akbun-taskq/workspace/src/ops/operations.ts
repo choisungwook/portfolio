@@ -109,6 +109,8 @@ export const OPERATIONS: Operation[] = [
   op('shared_read', 'GET', '/shared/file', 'Read a file of the shared folder. Fields: path.'),
   op('open_folder', 'POST', '/open-folder', 'Open a folder in the desktop file manager. Fields: target (shared|home|sessions|bot|task), runtime (claude|codex|kiro, for sessions), bot, task_id.'),
   // settings and plugins
+  op('builtin_skill', 'GET', '/builtin-skill', 'The built-in taskq skill every bot carries: name, version, its folder, the manual path, when taskq last wrote it, and its SKILL.md. Read only.'),
+  op('manual', 'GET', '/manual', 'The manual of the running taskq version: version and manual (Markdown).'),
   op('update_check', 'GET', '/update', 'Whether a newer akbun-taskq release exists (current, latest, update_available, can_install and why not).'),
   op('update_progress', 'GET', '/update/progress', 'The running install: phase (idle, download, unpack, done, failed), received bytes and total bytes (null when unknown).'),
   op('update_install', 'POST', '/update', 'Download the latest release build for this machine and replace the running binary; restart taskq to use it. Only for the single-file binary.'),

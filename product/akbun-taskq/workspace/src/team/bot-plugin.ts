@@ -5,6 +5,7 @@ import type { Db } from '../db/open.ts'
 import { entryOk, listEntries, type RegistryKind } from '../db/bot-registry.ts'
 import { getAgent, postMessage, SYSTEM, type TeamAgent } from '../db/team.ts'
 import { under } from '../worker/paths.ts'
+import { BUILTIN_SKILL, builtinSkillDir, installBuiltinSkill } from './builtin-skill.ts'
 
 // What a bot loads is a snapshot: the selected skills and plugins are copied into the bot's folder when its settings
 // are saved or the user picks Reload. A turn loads the snapshot, so editing a skill folder does not change a bot in the
@@ -80,7 +81,14 @@ export function reload(db: Db, config: Config, bot: string, kind: RegistryKind):
     mkdirSync(join(target, '.claude-plugin'), { recursive: true })
     writeFileSync(join(target, '.claude-plugin', 'plugin.json'), `${JSON.stringify({ name: `taskq-${bot}-skills`, description: `Skills selected for ${bot}` })}\n`)
   }
+  // Every bot carries the taskq skill first, whatever the registry holds (a registry entry of the same name is skipped).
+  if (kind === 'skill') {
+    if (!existsSync(join(builtinSkillDir(config), 'SKILL.md'))) installBuiltinSkill(config)
+    copy(builtinSkillDir(config), join(target, 'skills', BUILTIN_SKILL))
+    report.loaded.push(BUILTIN_SKILL)
+  }
   for (const name of selected) {
+    if (kind === 'skill' && name === BUILTIN_SKILL) continue
     const entry = registry.get(name)
     if (!entry || !entryOk(kind, entry.path)) {
       report.missing.push(name)
@@ -101,7 +109,8 @@ export function pluginPaths(db: Db, config: Config, bot: string): string[] {
   const agent = getAgent(db, bot)
   if (!agent) return []
   if (!existsSync(skillsPluginDir(config, bot))) reloadAll(db, config, bot)
-  const paths = agent.skills.length > 0 ? [skillsPluginDir(config, bot)] : []
+  // The skill folder always goes: it holds the taskq skill even when the bot has no other skill.
+  const paths = [skillsPluginDir(config, bot)]
   for (const name of agent.plugins) {
     const dir = join(pluginsDir(config, bot), name)
     if (existsSync(dir)) paths.push(dir)
@@ -120,10 +129,10 @@ export function noteReload(db: Db, bot: string, reports: LoadReport[]): string {
 // The bot's skills as folders of its own copy, for a backend that has no plugin loader (OpenAI): the bot reads
 // SKILL.md with read_skill when it needs one.
 export function skillsFor(db: Db, config: Config, agent: TeamAgent): { name: string; description: string; path: string }[] {
-  if (agent.skills.length === 0) return []
-  if (!existsSync(skillsPluginDir(config, agent.name))) reloadAll(db, config, agent.name)
+  if (!existsSync(join(skillsPluginDir(config, agent.name), 'skills', BUILTIN_SKILL))) reloadAll(db, config, agent.name)
   const described = new Map(listEntries(db, 'skill').map((e) => [e.name, e.description ?? '']))
-  return agent.skills
+  described.set(BUILTIN_SKILL, 'You run inside akbun-taskq: its version, its manual, and how to make workflows')
+  return [BUILTIN_SKILL, ...agent.skills.filter((name) => name !== BUILTIN_SKILL)]
     .map((name) => ({ name, description: described.get(name) ?? '', path: join(skillsPluginDir(config, agent.name), 'skills', name) }))
     .filter((s) => existsSync(join(s.path, 'SKILL.md')))
 }

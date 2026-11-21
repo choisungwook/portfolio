@@ -9,6 +9,7 @@ import {
   FONT_FAMILIES, FONT_SIZES, appearance, desktopNotificationsEnabled, queueAutorun, setAppearance, setDesktopNotifications, setQueueAutorun,
 } from '../db/meta.ts'
 import { botsUsing, listEntries, registerEntry, removeEntry, updateEntry, type RegistryKind } from '../db/bot-registry.ts'
+import { builtinSkillInfo, manualText } from '../team/builtin-skill.ts'
 import { sharedDir } from '../team/shared.ts'
 import { sessionPaths } from '../open-folder.ts'
 import { noteReload, reload } from '../team/bot-plugin.ts'
@@ -108,6 +109,10 @@ export function registerSettingsRoutes(api: Hono, { db, config }: ApiDeps): void
     for (const bot of bots) noteReload(db, bot, [reload(db, config, bot, kind)])
     return bots
   }
+
+  // The built-in taskq skill (read only: taskq writes it on every start) and the manual of the running version.
+  api.get('/builtin-skill', (c) => c.json(builtinSkillInfo(config)))
+  api.get('/manual', (c) => c.json({ version: builtinSkillInfo(config).version, manual: manualText() }))
 
   // The global skill and plugin registry every bot shares.
   for (const kind of ['skill', 'plugin'] as RegistryKind[]) {
