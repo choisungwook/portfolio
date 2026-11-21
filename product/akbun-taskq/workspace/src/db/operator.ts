@@ -72,10 +72,11 @@ export function requestCancel(db: Db, config: Config, id: string): Task {
 }
 
 // Ends a failed task so it can run again. The claim and heartbeat are cleared; the session is kept only on request.
-export function retryTask(db: Db, id: string, options: { draft: boolean; resume: boolean }): boolean {
+// A retry always starts a new session. A task is an object that bots pick up; the session belongs to whoever ran it and
+// moves on to other work, so resuming it would put the task back into someone else's later conversation.
+export function retryTask(db: Db, id: string, options: { draft: boolean }): boolean {
   return inTransaction(db, () => {
-    const sessionClause = options.resume ? '' : ', session_id = NULL'
-    const changed = db.prepare(`UPDATE tasks SET status = ?, claimed_by = NULL, heartbeat_at = NULL, updated_at = ?${sessionClause}
+    const changed = db.prepare(`UPDATE tasks SET status = ?, claimed_by = NULL, heartbeat_at = NULL, updated_at = ?, session_id = NULL
       WHERE id = ? AND status IN ('failed', 'cancelled')`)
       .run(options.draft ? 'draft' : 'ready', nowSec(), id).changes === 1
     if (!changed) return false
@@ -116,4 +117,23 @@ export function prepareRun(db: Db, id: string): Task {
     insertEvent(db, { task_id: id, run_id: null, kind: 'run_requested', payload: { from: task.status } })
   })
   return getTask(db, id)!
+}
+
+// Delete: the task and everything recorded about it (runs, events, alerts, approvals, dependencies, handoffs, search
+// history). A task a run is still working on must be cancelled first. Rows elsewhere that only mention it (bot
+// messages, workflow runs) keep their row and lose the link. A code task's worktree stays on disk.
+const UNDELETABLE: TaskStatus[] = ['running', 'needs_approval']
+
+export function deleteTask(db: Db, id: string): void {
+  const task = getTask(db, id)
+  if (!task) throw new OperatorError('task not found')
+  if (UNDELETABLE.includes(task.status)) throw new OperatorError(`task is ${task.status}; cancel it before deleting it`)
+  inTransaction(db, () => {
+    for (const table of ['approvals', 'events', 'alerts', 'runs', 'history_fts', 'proposals']) db.prepare(`DELETE FROM ${table} WHERE task_id = ?`).run(id)
+    db.prepare('DELETE FROM deps WHERE task_id = ? OR depends_on = ?').run(id, id)
+    db.prepare('DELETE FROM handoffs WHERE source_task_id = ? OR target_task_id = ?').run(id, id)
+    db.prepare('UPDATE team_messages SET task_id = NULL WHERE task_id = ?').run(id)
+    db.prepare('UPDATE workflow_runs SET task_id = NULL WHERE task_id = ?').run(id)
+    db.prepare('DELETE FROM tasks WHERE id = ?').run(id)
+  })
 }

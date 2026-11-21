@@ -44,16 +44,89 @@ const ASKS = /Enter (Start URL|Region)/gi
 const START_URL = /^https:\/\/[a-z0-9.-]+\.(awsapps\.com|amazonaws\.com|aws)\/start\/?#?\/?$|^https:\/\/[a-z0-9-]+\.awsapps\.com\/start/i
 const REGION = /^[a-z]{2}(-[a-z]+)+-\d$/
 
-export function kiroSso(db: Db): KiroSso {
-  return { start_url: getMeta(db, 'kiro_start_url') ?? '', region: getMeta(db, 'kiro_region') ?? 'us-east-1' }
+// Several IAM Identity Center sign-ins can be kept (one per AWS organization or account set), and one of them is the
+// one in use: kiro-cli holds a single login, so choosing another means signing in again with it. They live in meta
+// as JSON; a home from before keeps its one start URL as the first connection.
+export interface KiroConnection extends KiroSso { id: string; name: string }
+export interface KiroConnections { connections: KiroConnection[]; active: string | null }
+
+const LIST = 'kiro_connections'
+const ACTIVE = 'kiro_active'
+const NAME = /^[^\n]{1,60}$/
+
+export function kiroConnections(db: Db): KiroConnections {
+  const raw = getMeta(db, LIST)
+  let connections: KiroConnection[] = raw ? JSON.parse(raw) as KiroConnection[] : []
+  if (!raw) {
+    const url = getMeta(db, 'kiro_start_url')
+    if (url) connections = [{ id: 'k1', name: nameOf(url), start_url: url, region: getMeta(db, 'kiro_region') ?? 'us-east-1' }]
+  }
+  const active = getMeta(db, ACTIVE)
+  return { connections, active: connections.some((c) => c.id === active) ? active : connections[0]?.id ?? null }
 }
 
-export function setKiroSso(db: Db, sso: KiroSso): string | null {
+// The organization part of the start URL (https://acme.awsapps.com/start -> acme), as a default name.
+function nameOf(url: string): string {
+  return /^https:\/\/([^.]+)\./.exec(url)?.[1] ?? url
+}
+
+function store(db: Db, list: KiroConnections): KiroConnections {
+  setMeta(db, LIST, JSON.stringify(list.connections))
+  if (list.active) setMeta(db, ACTIVE, list.active)
+  else db.prepare('DELETE FROM meta WHERE key = ?').run(ACTIVE)
+  return kiroConnections(db)
+}
+
+function problemOf(sso: KiroSso): string | null {
   if (!START_URL.test(sso.start_url)) return 'the start URL looks like https://<name>.awsapps.com/start'
   if (!REGION.test(sso.region)) return 'the region looks like us-east-1'
-  setMeta(db, 'kiro_start_url', sso.start_url)
-  setMeta(db, 'kiro_region', sso.region)
   return null
+}
+
+// The connection in use, as the login and the connection test read it.
+export function kiroSso(db: Db): KiroSso {
+  const { connections, active } = kiroConnections(db)
+  const c = connections.find((x) => x.id === active)
+  return { start_url: c?.start_url ?? '', region: c?.region ?? 'us-east-1' }
+}
+
+// Changes the start URL and region of the connection in use, or adds the first one.
+export function setKiroSso(db: Db, sso: KiroSso): string | null {
+  const problem = problemOf(sso)
+  if (problem) return problem
+  const list = kiroConnections(db)
+  const current = list.connections.find((c) => c.id === list.active)
+  if (current) Object.assign(current, sso)
+  else return typeof addKiroConnection(db, { name: nameOf(sso.start_url), ...sso }) === 'string' ? 'could not add the connection' : null
+  store(db, list)
+  return null
+}
+
+export function addKiroConnection(db: Db, input: { name?: string; start_url: string; region: string }): KiroConnections | string {
+  const sso = { start_url: input.start_url.trim(), region: input.region.trim() || 'us-east-1' }
+  const problem = problemOf(sso)
+  if (problem) return problem
+  const name = (input.name ?? '').trim() || nameOf(sso.start_url)
+  if (!NAME.test(name)) return 'the name is one line of at most 60 characters'
+  const list = kiroConnections(db)
+  if (list.connections.some((c) => c.start_url === sso.start_url && c.region === sso.region)) return 'that start URL and region are already a connection'
+  const id = `k${Math.max(0, ...list.connections.map((c) => Number(c.id.slice(1)) || 0)) + 1}`
+  list.connections.push({ id, name, ...sso })
+  list.active ??= id
+  return store(db, list)
+}
+
+export function selectKiroConnection(db: Db, id: string): KiroConnections | string {
+  const list = kiroConnections(db)
+  if (!list.connections.some((c) => c.id === id)) return 'no such Kiro connection'
+  return store(db, { ...list, active: id })
+}
+
+export function removeKiroConnection(db: Db, id: string): KiroConnections | string {
+  const list = kiroConnections(db)
+  if (!list.connections.some((c) => c.id === id)) return 'no such Kiro connection'
+  const connections = list.connections.filter((c) => c.id !== id)
+  return store(db, { connections, active: list.active === id ? connections[0]?.id ?? null : list.active })
 }
 
 let login: { child: ChildProcess; state: LoginState } | null = null

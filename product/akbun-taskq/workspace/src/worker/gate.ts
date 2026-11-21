@@ -60,7 +60,12 @@ const POLICY: Record<TaskType, Check> = {
   },
 }
 
+// StructuredOutput is how the worker hands its result back (Options.outputFormat): it touches nothing, and refusing it
+// fails every run with "worker returned no valid structured result".
+const RESULT_TOOL = 'StructuredOutput'
+
 export function decide(type: TaskType, tool: string, input: Input, ctx: GateContext): Decision {
+  if (tool === RESULT_TOOL) return 'allow'
   if (input.dangerouslyDisableSandbox === true || tool.startsWith('mcp__')) return 'deny'
   const places = { dataDir: realPath(ctx.dataDir) }
   const touches = touchesOf(tool, input, ctx)
@@ -96,6 +101,7 @@ export function tamperOf(tool: string, input: Input, ctx: GateContext): string |
     if (under(touch.real, dataDir) || globMatches(touch.real, join(dataDir, 'taskq.db'))) return `${tool} reached the taskq data directory`
     if (browserDir && (under(touch.real, browserDir) || globMatches(touch.real, join(browserDir, '*', 'DevToolsActivePort')))) return `${tool} reached a bot's browser profile`
     if (name === 'taskq.config.json' || globMatches(name, 'taskq.config.json')) return `${tool} reached the taskq config`
+    if (name === 'taskq-ca-bundle.pem' || globMatches(name, 'taskq-ca-bundle.pem')) return `${tool} reached taskq's trusted CA bundle`
     if (touch.write && under(touch.real, claudeDir)) return `${tool} tried to write Claude Code settings`
   }
   return null

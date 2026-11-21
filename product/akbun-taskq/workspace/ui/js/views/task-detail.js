@@ -3,9 +3,11 @@
 import { api, mutate } from '../core/api.js'
 import { area, clear, el } from '../core/dom.js'
 import { icon } from '../core/icons.js'
+import { currentLanguage, t } from '../core/i18n.js'
+import { failureHelp } from '../pure/failure-help.js'
 import { emit, on } from '../core/bus.js'
 import { fmtDateTime } from '../core/time.js'
-import { ACTION_STATUS, label, outcomeOf } from '../core/vocab.js'
+import { ACTION_STATUS, BOARD_PANES, label, outcomeOf } from '../core/vocab.js'
 import { statusIndicator } from '../core/status.js'
 import { runNowButton } from '../core/run-now.js'
 import { approvalPanel } from './approval-panel.js'
@@ -85,14 +87,16 @@ function sections(task) {
   return [
     el('div', { class: 'task-head' }, actionButtons(task), el('h1', { class: 'page-title', text: data.title ?? data.intent })),
     el('dl', { class: 'facts' },
-      el('dt', { text: 'Status' }), el('dd', {}, statusIndicator(task.status)),
-      el('dt', { text: 'Owner' }), ownerValue(task, refill),
+      el('dt', { text: t('task.stage', 'Stage') }), el('dd', {}, stageOf(task)),
+      el('dt', { text: t('task.last_run', 'Last run') }), el('dd', {}, lastRun(task)),
+      el('dt', { text: t('owner.label', 'Assigned bot') }), ownerValue(task, refill),
       el('dt', { text: 'Workflow' }), workflowValue(task, refill),
       el('dt', { text: 'Created' }), el('dd', { text: fmtDateTime(task.created_at) }),
       el('dt', { text: 'Updated' }), el('dd', { text: fmtDateTime(task.updated_at) }),
     ),
     operatorControls(task, refill),
     task.pending_approval ? approvalPanel(task, task.pending_approval) : null,
+    failurePanel(task),
     el('h2', { class: 'section-title', text: 'Intent' }),
     el('p', { class: 'pre', text: data.intent }),
     ...(data.attachments?.length ? [el('h2', { class: 'section-title', text: 'Files' }), el('div', { class: 'msg-files' }, ...data.attachments.map((path) => el('button', {
@@ -139,6 +143,37 @@ function actionButtons(task) {
       onclick: () => mutate(() => api.patch(`/tasks/${task.id}`, { status: 'ready' }), 'Task is ready'),
     }),
   )
+}
+
+// Where the task is on the board, not whether it went well: the pane (inbox, in progress, ended) and, in progress, which
+// of the five steps. How its last run went is the next row.
+function stageOf(task) {
+  const flow = BOARD_PANES.flow
+  if (BOARD_PANES.inbox.includes(task.status)) return el('span', { class: 'stage' }, statusIndicator(task.status, t('board.inbox', 'Inbox')))
+  if (flow.includes(task.status)) {
+    return el('span', { class: 'stage' }, statusIndicator(task.status, `${t('board.flow', 'In progress')} · ${label(task.status)}`),
+      el('span', { class: 'meta', text: ` (${flow.indexOf(task.status) + 1}/${flow.length})` }))
+  }
+  return el('span', { class: 'stage' }, statusIndicator(task.status, `${t('board.ends', 'Ended')} · ${label(task.status)}`))
+}
+
+function lastRun(task) {
+  const run = task.runs?.[0]
+  if (!run) return el('span', { class: 'meta', text: t('task.no_runs', 'Not run yet') })
+  return el('span', { class: 'last-run' }, statusIndicator(outcomeOf(run)), ` ${fmtDateTime(run.started_at)}`,
+    run.summary ? el('span', { class: 'meta', text: ` · ${run.summary.length > 120 ? `${run.summary.slice(0, 120)}…` : run.summary}` }) : null)
+}
+
+// Why a failed task failed and what to do about it, above its runs, so the user does not have to read the run log first.
+function failurePanel(task) {
+  const help = failureHelp(task, currentLanguage())
+  if (!help) return null
+  return el('section', { class: 'failure-help', role: 'note' },
+    el('h2', { class: 'section-title' }, icon('alert', 18), ` ${t('failure.title', 'Why it failed')}`),
+    el('p', { class: 'failure-cause', text: help.cause }),
+    help.detail ? el('p', { class: 'meta' }, `${t('failure.reported', 'Reported')}: `, el('code', { text: help.detail })) : null,
+    el('h3', { text: t('failure.todo', 'What to do') }),
+    el('ol', {}, ...help.steps.map((step) => el('li', { text: step }))))
 }
 
 // Title and intent in place of the detail; Save sends only what changed.

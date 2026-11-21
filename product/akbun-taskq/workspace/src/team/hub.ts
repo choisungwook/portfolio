@@ -26,6 +26,7 @@ import { LiveInput } from './live-input.ts'
 import type { TeamBackend, TurnResult } from './types.ts'
 import { createCatalog, type CatalogFn } from './catalog.ts'
 import { recordUsage } from '../db/usage.ts'
+import { applyCaBundle } from '../ca-bundle.ts'
 
 export interface HubOptions {
   db: Db
@@ -340,6 +341,7 @@ export function createTeamHub({ db, config, backend: claude, backends = {}, retr
     if (isTeamPaused(db)) return
     // A sign-in changed from the CLI or MCP (another process) reaches this one here; the UI applies it at once.
     applyConnectionSettings(db, config)
+    applyCaBundle(db, config)
     joinRunning()
     for (const id of skipDisabledSpeakers(db).closed) {
       raiseAlert(db, { task_id: null, kind: 'team_message', message: `Discussion #${id} was closed without a conclusion: its moderator is disabled.` })

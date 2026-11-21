@@ -178,6 +178,10 @@ const table: Row[] = [
   ['code', 'Glob', { pattern: '~/.s[s]h/id_*' }, 'deny', 'character class into ~/.ssh'],
   ['code', 'Glob', { pattern: '~/.{ssh,aws}/*' }, 'deny', 'brace alternatives into ~/.ssh'],
   ['ops_read', 'Glob', { pattern: '~/.a*/*' }, 'deny'],
+  // The worker returns its result through StructuredOutput; every type must allow it or every run fails.
+  ['research', 'StructuredOutput', { outcome: 'done', summary: 'x' }, 'allow'],
+  ['ops_read', 'StructuredOutput', { outcome: 'done', summary: 'x' }, 'allow'],
+  ['security_review', 'StructuredOutput', { outcome: 'done', summary: 'x' }, 'allow'],
 ]
 
 describe('decide table', () => {

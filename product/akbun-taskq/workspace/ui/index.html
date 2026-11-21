@@ -408,6 +408,12 @@
     <section class="settings-section" data-settings-page="connections" aria-labelledby="connections-title" hidden>
       <h1 class="page-title" id="connections-title" data-i18n="settings.connections">Connections</h1>
       <p class="meta" data-i18n="connections.hint">How bots reach their models. Each agent type signs in the way chosen here; a bot picks its own sign-in method when it is created. Saving runs the connection test. A bot that does not answer usually fails this test.</p>
+      <section class="conn-ca" data-area="conn-ca" aria-labelledby="conn-ca-title">
+        <h2 class="section-title" id="conn-ca-title" data-i18n="ca.title">TLS inspection certificate</h2>
+        <p class="meta" data-i18n="ca.hint">On a network whose security device decrypts and re-signs HTTPS (TLS inspection), import that device's root certificate (PEM). Claude, OpenAI, Kiro, the aws CLI and taskq itself then trust it.</p>
+        <div data-area="ca-status"></div>
+        <div class="conn-buttons"><button type="button" data-area="ca-import" data-i18n="ca.import">Import certificate…</button><button type="button" class="quiet" data-area="ca-clear" data-i18n="ca.clear" hidden>Remove</button><input type="file" accept=".pem,.crt,.cer,application/x-pem-file" data-area="ca-file" hidden></div>
+      </section>
       <form class="conn-runtime" data-runtime="claude" aria-labelledby="conn-claude-title">
         <h2 class="section-title" id="conn-claude-title">Claude</h2>
         <label><span data-i18n="bot.auth">Sign-in method</span> <select name="claude_provider" data-method><option value="api_key" data-i18n="bot.auth.claude.api">SDK (Anthropic API key)</option><option value="subscription" data-i18n="bot.auth.claude.subscription">Subscription (signed-in Claude Code)</option><option value="bedrock" data-i18n="bot.auth.claude.bedrock">AWS Bedrock</option></select></label>
@@ -429,9 +435,15 @@
       <form class="conn-runtime" data-runtime="kiro" aria-labelledby="conn-kiro-title">
         <h2 class="section-title" id="conn-kiro-title">Kiro (AWS)</h2>
         <label><span data-i18n="bot.auth">Sign-in method</span> <select name="kiro_method" data-method disabled><option value="sso" data-i18n="bot.auth.kiro.sso">AWS IAM Identity Center (kiro-cli)</option></select></label>
-        <label data-for="sso">SSO start URL <input name="kiro_start_url" type="url" placeholder="https://your-org.awsapps.com/start" autocomplete="off" spellcheck="false"></label>
-        <label data-for="sso">Region <input name="kiro_region" type="text" placeholder="us-east-1" autocomplete="off" spellcheck="false"></label>
-        <div class="conn-buttons"><button type="button" data-test data-i18n="connections.test">Connection test</button><button type="submit" data-i18n="connections.save">Save</button><button type="button" class="quiet" data-clear data-i18n="connections.clear">Clear</button><button type="button" class="quiet" data-area="kiro-sign-in" data-i18n="kiro.sign_in">Sign in with AWS SSO</button><span class="conn-result" data-result role="status"></span></div>
+        <ul class="kiro-list" data-area="kiro-list" aria-label="Identity Center connections"></ul>
+        <details class="kiro-add" data-area="kiro-add">
+          <summary data-i18n="kiro.add">Add an Identity Center connection</summary>
+          <label><span data-i18n="kiro.name">Name</span> <input name="kiro_new_name" type="text" maxlength="60" autocomplete="off" placeholder="acme"></label>
+          <label>SSO start URL <input name="kiro_new_start_url" type="url" placeholder="https://your-org.awsapps.com/start" autocomplete="off" spellcheck="false"></label>
+          <label>Region <input name="kiro_new_region" type="text" placeholder="us-east-1" autocomplete="off" spellcheck="false"></label>
+          <div class="conn-buttons"><button type="button" data-area="kiro-add-save" data-i18n="kiro.add_save">Add</button></div>
+        </details>
+        <div class="conn-buttons"><button type="button" data-test data-i18n="connections.test">Connection test</button><button type="button" class="quiet" data-clear data-i18n="connections.clear">Clear</button><button type="button" class="quiet" data-area="kiro-sign-in" data-i18n="kiro.sign_in">Sign in with AWS SSO</button><span class="conn-result" data-result role="status"></span></div>
         <div data-area="kiro-login"></div>
       </form>
       <datalist id="aws-profile-list" data-area="aws-profile-list"></datalist>

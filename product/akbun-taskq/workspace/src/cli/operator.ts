@@ -25,13 +25,13 @@ export const cancel: Command = ({ config, db }, args) => {
 export const retry: Command = ({ db }, args) => {
   const { positionals, values } = parseArgs({
     args, strict: true, allowPositionals: true,
-    options: { draft: { type: 'boolean' }, resume: { type: 'boolean' } },
+    options: { draft: { type: 'boolean' } },
   })
   const id = positionals[0]
   if (!id) throw new Error('task id is required')
   if (!getTask(db, id)) throw new Error(`task not found: ${id}`)
-  if (!retryTask(db, id, { draft: values.draft === true, resume: values.resume === true })) {
-    throw new Error('only failed tasks can be retried')
+  if (!retryTask(db, id, { draft: values.draft === true })) {
+    throw new Error('only failed or cancelled tasks can be retried')
   }
   console.log(`${id} ${values.draft ? 'draft' : 'ready'}`)
 }

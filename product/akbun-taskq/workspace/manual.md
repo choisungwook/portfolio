@@ -209,7 +209,7 @@ taskq add --type T --intent TEXT [--title --cautions --access-skill --target-pro
 taskq list [--status S]      taskq show ID
 taskq approve ID             taskq deny ID
 taskq resume ID              taskq done ID
-taskq cancel ID              taskq retry ID [--draft] [--resume]
+taskq cancel ID              taskq retry ID [--draft]
 taskq pause [--reason TEXT]  taskq unpause
 taskq alerts                 taskq log [--date YYYY-MM-DD]
 taskq search QUERY           taskq skills list | add PATH | remove NAME | discover

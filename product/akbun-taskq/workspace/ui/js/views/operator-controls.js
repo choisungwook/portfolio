@@ -1,5 +1,5 @@
 // Operator controls in the task detail: Cancel for running, needs_approval and needs_auth tasks (a second click
-// confirms), and Retry for failed tasks with a resume checkbox. The armed cancel and the checkbox survive a redraw.
+// confirms), and Retry for failed tasks (always a new session). The armed cancel survives a redraw.
 import { api, mutate } from '../core/api.js'
 import { el } from '../core/dom.js'
 
@@ -7,7 +7,6 @@ export const CANCELLABLE_STATUS = ['running', 'needs_approval', 'needs_auth']
 const ARM_MS = 5000
 
 let armedTask = null
-let resumeNext = false
 
 // redraw re-renders the detail, so the armed state shows and disarms on time.
 export function operatorControls(task, redraw) {
@@ -46,17 +45,11 @@ function onCancel(id, redraw) {
 }
 
 function retryControl(task) {
-  const box = el('input', { type: 'checkbox', name: 'resume', dataset: { area: 'retry-resume' } })
-  box.checked = resumeNext
-  box.addEventListener('change', () => {
-    resumeNext = box.checked
-  })
   return el('span', { class: 'retry-control' },
-    el('label', {}, box, ' Resume previous session'),
     el('button', {
       type: 'button',
       dataset: { area: 'retry-task' },
       text: 'Retry',
-      onclick: () => mutate(() => api.post(`/tasks/${task.id}/retry`, { resume: resumeNext }), 'Task is ready to run again'),
+      onclick: () => mutate(() => api.post(`/tasks/${task.id}/retry`, {}), 'Task is ready to run again'),
     }))
 }

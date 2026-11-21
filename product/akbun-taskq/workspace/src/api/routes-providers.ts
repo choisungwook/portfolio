@@ -1,5 +1,6 @@
 import type { Hono } from 'hono'
-import { kiroSso, loginState, setKiroSso, startLogin, whoami } from '../agents/kiro/login.ts'
+import { addKiroConnection, kiroConnections, kiroSso, loginState, removeKiroConnection, selectKiroConnection, setKiroSso, startLogin, whoami } from '../agents/kiro/login.ts'
+import { caBundleInfo, clearCaBundle, saveCaBundle } from '../ca-bundle.ts'
 import { PERIODS, usageReport, type Period } from '../db/usage.ts'
 import { botConnection, clearConnectionCache, IDS, listConnections, testConnection, type ConnectionId } from '../team/connections.ts'
 import { clearConnectionSettings, connectionSettings, saveConnectionSettings, type Runtime } from '../team/connection-settings.ts'
@@ -24,6 +25,37 @@ export function registerProviderRoutes(api: Hono, { db, config }: ApiDeps): void
     if (problem) throw new HttpError(400, problem)
     clearConnectionCache('kiro')
     return c.json(await startLogin(config, sso))
+  })
+
+  // Kiro's IAM Identity Center connections: several can be kept, one is in use (kiro-cli holds one login at a time, so
+  // switching means signing in again). { name, start_url, region } adds; PUT .../active switches; DELETE removes.
+  const kiroAnswer = (result: ReturnType<typeof kiroConnections> | string) => {
+    if (typeof result === 'string') throw new HttpError(400, result)
+    clearConnectionCache('kiro')
+    return result
+  }
+  api.get('/kiro/connections', (c) => c.json(kiroConnections(db)))
+  api.post('/kiro/connections', async (c) => {
+    const body = await optionalJson(c)
+    return c.json(kiroAnswer(addKiroConnection(db, { name: String(body.name ?? ''), start_url: String(body.start_url ?? ''), region: String(body.region ?? '') })), 201)
+  })
+  api.put('/kiro/connections/:id/active', (c) => c.json(kiroAnswer(selectKiroConnection(db, c.req.param('id')))))
+  api.delete('/kiro/connections/:id', (c) => c.json(kiroAnswer(removeKiroConnection(db, c.req.param('id')))))
+
+  // The root certificate of a TLS inspection device, imported as PEM text ({ pem }); every runtime then trusts it.
+  api.get('/ca-bundle', (c) => c.json(caBundleInfo(db, config)))
+  api.put('/ca-bundle', async (c) => {
+    const body = await optionalJson(c)
+    if (typeof body.pem !== 'string') throw new HttpError(400, 'pem must be the text of a PEM file')
+    const saved = saveCaBundle(db, config, body.pem)
+    if (typeof saved === 'string') throw new HttpError(400, saved)
+    clearConnectionCache()
+    return c.json(saved)
+  })
+  api.delete('/ca-bundle', (c) => {
+    const info = clearCaBundle(db, config)
+    clearConnectionCache()
+    return c.json(info)
   })
 
   // Every connection with its check, the bots on it and its last turn. Checks are cached for a minute; ?refresh=1 reruns.

@@ -97,7 +97,7 @@ function protectedNames(config: Config): { stop: string[]; deny: string[] } {
     return out
   }
   return {
-    stop: [...new Set([data, realPath(data), 'taskq.db', 'taskq.config.json', plugins, realPath(plugins), browser, realPath(browser),
+    stop: [...new Set([data, realPath(data), 'taskq.db', 'taskq.config.json', 'taskq-ca-bundle.pem', plugins, realPath(plugins), browser, realPath(browser),
       ...spellings(data, 'data'), ...spellings(plugins, 'bot-plugins'), ...spellings(browser, 'browser')])],
     deny: [...new Set([join(home, '.claude'), realPath(join(home, '.claude')), '~/.claude', '$HOME/.claude', '${HOME}/.claude', 'CLAUDE_CONFIG_DIR'])],
   }

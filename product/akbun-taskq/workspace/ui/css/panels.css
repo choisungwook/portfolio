@@ -134,12 +134,21 @@ dialog[data-area="task-detail"].wide > .dialog-body > * { max-width: 1240px; }
 .task-main > .facts { gap: 6px 24px; }
 /* The task's actions sit at the top right, above the title. */
 .task-head { display: grid; gap: 12px; }
-.task-head > .page-title { margin: 0; min-width: 0; overflow-wrap: anywhere; }
+.task-head > .page-title { margin: 0; min-width: 0; overflow-wrap: anywhere; font-size: 2.1em; line-height: 1.2; }
+/* The body (intent, files, runs) starts with more room above it, so it reads apart from the title and the facts. */
+.task-main > h2.section-title:first-of-type { margin-top: 32px; }
 .task-actions { margin: 0; justify-content: flex-end; }
 .task-actions > button { display: inline-flex; align-items: center; gap: 6px; }
 .task-edit { display: grid; gap: 16px; }
 .task-edit label { display: grid; gap: 6px; }
 .task-edit .actions { justify-content: flex-end; }
+/* Why a failed task failed: a tinted block with the cause and numbered steps. */
+.failure-help { display: grid; gap: 8px; padding: 16px 20px; border-radius: var(--radius-l); background: var(--error-soft); }
+.failure-help .section-title { margin: 0; padding: 0; border: 0; display: flex; align-items: center; gap: 6px; color: var(--failed); }
+.failure-help h3 { margin: 4px 0 0; font-size: 1em; }
+.failure-help ol { margin: 0; padding-left: 20px; display: grid; gap: 4px; }
+.failure-cause { margin: 0; font-weight: 600; }
+.failure-help code { font-family: var(--font-mono); font-size: 0.9em; overflow-wrap: anywhere; }
 /* Run history opens over the task detail. */
 dialog[data-area="task-history"] { width: min(1040px, calc(100vw - 64px)); }
 dialog[data-area="task-history"] > .dialog-body { padding: 28px 32px 24px; }

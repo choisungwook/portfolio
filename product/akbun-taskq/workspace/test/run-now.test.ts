@@ -61,6 +61,22 @@ describe('run now', () => {
     }
   })
 
+  test('DELETE removes a task and what is recorded about it, and refuses a running one', async () => {
+    const app = createApp({ db: env.db, config: env.config }, TOKEN)
+    const running = addTask(env.db, { owner: 'coder', status: 'running' })
+    const del = (id: string) => app.request(`/api/tasks/${id}`, { method: 'DELETE', headers: headers(env) })
+    assert.equal((await del(running.id)).status, 409)
+    const failed = addTask(env.db, { status: 'failed' })
+    const child = addTask(env.db, { status: 'draft', deps: [{ depends_on: failed.id, kind: 'blocks' }] })
+    env.db.prepare("INSERT INTO runs (id, task_id, started_at, ended_at, outcome) VALUES ('r-del', ?, 1, 2, 'failed')").run(failed.id)
+    assert.equal((await del(failed.id)).status, 200)
+    assert.equal(getTask(env.db, failed.id), undefined)
+    assert.equal(env.db.prepare("SELECT count(*) AS n FROM runs WHERE task_id = ?").get(failed.id)?.n, 0)
+    assert.equal(env.db.prepare('SELECT count(*) AS n FROM deps WHERE depends_on = ?').get(failed.id)?.n, 0, 'the dependent task is no longer blocked by it')
+    assert.ok(getTask(env.db, child.id))
+    assert.equal((await del('missing')).status, 404)
+  })
+
   test('a task with no agent (owner) is refused without a change', () => {
     const task = addTask(env.db, { status: 'draft' })
     assert.throws(() => prepareRun(env.db, task.id), /no agent/)
