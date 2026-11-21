@@ -7,6 +7,10 @@ import { realPath, under } from '../worker/paths.ts'
 import { resolve } from 'node:path'
 
 const WRITE_TOOLS = new Set(['Write', 'Edit', 'MultiEdit', 'NotebookEdit'])
+const FILE_TOOLS = new Set([...WRITE_TOOLS, 'Read', 'Glob', 'Grep', 'LS'])
+// How a program finds or talks to a Chrome DevTools endpoint. A bot that reached its own browser this way would click
+// and type without the approval gate of its browser tools (src/team/tools-browser.ts).
+const DEVTOOLS = /DevToolsActivePort|remote-debugging|\/json\/(version|list|new|protocol)\b|devtools\/(page|browser)\/|Input\.dispatch(Mouse|Key)Event|Input\.insertText/i
 const TASKQ_CLI = /(^|[\s;&|(`'"/])taskq(\s|$|['"`;&|)])/
 
 // The per-bot command gate. Two layers:
@@ -80,9 +84,11 @@ export function blockedBy(command: string, patterns: string[]): string | null {
 function protectedNames(config: Config): { stop: string[]; deny: string[] } {
   const data = join(config.home, 'data')
   const plugins = join(config.home, 'bot-plugins')
+  // The bots' browser profiles: DevToolsActivePort there names the port that drives the browser without the gate.
+  const browser = join(config.home, 'browser')
   const home = homedir()
   return {
-    stop: [...new Set([data, realPath(data), 'taskq.db', 'taskq.config.json', plugins, realPath(plugins)])],
+    stop: [...new Set([data, realPath(data), 'taskq.db', 'taskq.config.json', plugins, realPath(plugins), browser, realPath(browser)])],
     deny: [...new Set([join(home, '.claude'), realPath(join(home, '.claude')), '~/.claude', '$HOME/.claude', '${HOME}/.claude', 'CLAUDE_CONFIG_DIR'])],
   }
 }
@@ -90,6 +96,12 @@ function protectedNames(config: Config): { stop: string[]; deny: string[] } {
 export function botGate(config: Config, agent: TeamAgent, cwd: string, tool: string, input: Record<string, unknown>, approvals?: ApprovalBroker): GateVerdict {
   const tamper = tamperOf(tool, input, { cwd, outputs: join(config.home, 'outputs'), dataDir: join(config.home, 'data') })
   if (tamper !== null) return { action: 'stop', reason: tamper }
+  // A bot's browser profile holds the DevTools port and the user's cookies; its browser tools are the only way in.
+  if (FILE_TOOLS.has(tool)) {
+    const target = [input.file_path, input.notebook_path, input.path].find((v): v is string => typeof v === 'string')
+    const browsers = realPath(join(config.home, 'browser'))
+    if (target && under(realPath(resolve(cwd, target)), browsers)) return { action: 'stop', reason: `${tool} reached a bot's browser profile` }
+  }
   // The bots' skill and plugin copies load as plugins; writing them would run code outside the gate on the next turn.
   if (WRITE_TOOLS.has(tool)) {
     const target = typeof input.file_path === 'string' ? input.file_path : typeof input.notebook_path === 'string' ? input.notebook_path : null
@@ -102,6 +114,9 @@ export function botGate(config: Config, agent: TeamAgent, cwd: string, tool: str
     if (named) return { action: 'stop', reason: `a shell command named taskq's own data or config (${named})` }
     if (names.deny.some((name) => String(input.command).includes(name))) {
       return { action: 'deny', reason: 'Commands that touch the user\'s Claude Code settings (~/.claude) are not allowed for bots.' }
+    }
+    if (DEVTOOLS.test(String(input.command))) {
+      return { action: 'deny', reason: 'Bots do not reach a browser through its DevTools endpoint; use your browser_* tools, whose clicks and typing the user approves.' }
     }
     // The taskq CLI could change a bot's own permissions, the limits or approvals. Bots use their team tools instead.
     if (TASKQ_CLI.test(String(input.command))) return { action: 'deny', reason: 'Bots do not run the taskq command; use your team tools.' }

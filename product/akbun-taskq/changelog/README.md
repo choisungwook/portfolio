@@ -10,6 +10,7 @@
 
 | 버전 | 해설 | 첫 항목 |
 |---|---|---|
+| [0.30.1](0.30.1/changelog.md) | [learning](0.30.1/learning_changelog.md) | 셸을 쓰는 bot이 Chrome의 DevTools 포트로 자기 브라우저를 직접 조종해 클릭·입력 승인을 건너뛸 수 있던 문제. |
 | [0.30.0](0.30.0/changelog.md) | [learning](0.30.0/learning_changelog.md) | bot 브라우저의 클릭과 입력에 승인 게이트를 넣었다. |
 | [0.29.0](0.29.0/changelog.md) | [learning](0.29.0/learning_changelog.md) | bot이 자기 브라우저를 조종하고, CSV·Excel·PowerPoint 파일을 다룬다. |
 | [0.28.1](0.28.1/changelog.md) | [learning](0.28.1/learning_changelog.md) | 설정 > 연결을 열 때마다 절마다의 연결 상태가 비고 OpenAI 방식 선택이 처음 값으로 돌아가던 문제. |

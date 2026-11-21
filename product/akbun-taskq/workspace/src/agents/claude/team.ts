@@ -130,7 +130,7 @@ function optionsFor(config: Config, request: TurnRequest, abort: AbortController
       enabled: true,
       failIfUnavailable: true,
       allowUnsandboxedCommands: false,
-      filesystem: { allowWrite: [request.cwd, request.sharedDir, worktreesDir(config)], denyRead: [dataDir, join(config.home, 'taskq.config.json')] },
+      filesystem: { allowWrite: [request.cwd, request.sharedDir, worktreesDir(config)], denyRead: [dataDir, join(config.home, 'taskq.config.json'), join(config.home, 'browser')] },
       network: { allowedDomains: agent.allowed_domains },
     } : undefined,
     effort: agent.effort ?? undefined,
