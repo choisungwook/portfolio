@@ -10,6 +10,7 @@
 
 | 버전 | 해설 | 첫 항목 |
 |---|---|---|
+| [0.39.0](0.39.0/changelog.md) | [learning](0.39.0/learning_changelog.md) | 데스크톱 앱의 시작 화면 글씨를 키우고 진행 막대와 퍼센트를 보인다. |
 | [0.38.0](0.38.0/changelog.md) | [learning](0.38.0/learning_changelog.md) | 설정 > Database에서 데이터베이스를 백업하고 내려받는다. |
 | [0.37.0](0.37.0/changelog.md) | [learning](0.37.0/learning_changelog.md) | 작업에 저장소를 여러 개 지정한다. |
 | [0.36.0](0.36.0/changelog.md) | [learning](0.36.0/learning_changelog.md) | 모든 bot이 taskq 기본 skill을 갖는다. |

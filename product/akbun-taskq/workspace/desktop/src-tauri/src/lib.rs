@@ -13,6 +13,13 @@ use tauri::{AppHandle, Manager, RunEvent, State, WebviewUrl, WebviewWindowBuilde
 struct Server {
     child: Mutex<Option<Child>>,
     error: Mutex<Option<String>>,
+    progress: Mutex<(u8, String)>,
+}
+
+/// The start page polls this for its bar: the last percent and step `taskq run` printed.
+#[tauri::command]
+fn startup_progress(server: State<'_, Server>) -> (u8, String) {
+    server.progress.lock().unwrap().clone()
 }
 
 /// The start page polls this: null while taskq is starting, its last output once it ended without an address.
@@ -48,6 +55,9 @@ fn follow(app: AppHandle) {
     let mut ready = false;
     for line in BufReader::new(stdout).lines().map_while(Result::ok) {
         if !ready {
+            if let Some(step) = taskq_launch::progress_line(&line) {
+                *app.state::<Server>().progress.lock().unwrap() = step;
+            }
             if let Some(url) = taskq_launch::ready_url(&line) {
                 ready = true;
                 if let (Some(window), Ok(url)) = (app.get_webview_window("main"), url.parse()) {
@@ -57,7 +67,7 @@ fn follow(app: AppHandle) {
             }
         }
         tail.push(line);
-        if tail.len() > 20 {
+        if tail.len() > 200 {
             tail.remove(0);
         }
     }
@@ -121,7 +131,7 @@ fn open_window(app: &tauri::App) -> tauri::Result<()> {
 pub fn run() {
     tauri::Builder::default()
         .manage(Server::default())
-        .invoke_handler(tauri::generate_handler![startup_error])
+        .invoke_handler(tauri::generate_handler![startup_error, startup_progress])
         .setup(|app| {
             open_window(app)?;
             let handle = app.handle().clone();

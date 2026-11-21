@@ -4,7 +4,7 @@
 
 | 이름 | data-area | API | 하는 일 |
 |---|---|---|---|
-| 데스크톱 시작 화면 | `#status`, `#error` (`workspace/desktop/src/index.html`) | 없음 | macOS 데스크톱 앱만. 앱을 열고 taskq가 주소를 출력할 때까지 "Starting taskq…"를 보이고, 주소가 나오면 창이 taskq 화면으로 넘어간다. taskq가 주소 없이 끝나면 "taskq did not start."와 마지막 출력 20줄을 보인다 |
+| 데스크톱 시작 화면 | `#starting`, `#fill`, `#percent`, `#failed`, `#log`, `#copy` (`workspace/desktop/src/index.html`) | 없음 (Tauri 명령 `startup_progress`, `startup_error`) | macOS 데스크톱 앱만. 큰 제목 아래 "taskq를 시작하는 중…"과 진행 막대, "60% starting the server"처럼 퍼센트와 단계를 보인다(taskq가 출력하는 `taskq starting <퍼센트> <단계>` 줄, 0.3초마다). 주소가 나오면 창이 taskq 화면으로 넘어간다. taskq가 주소 없이 끝나면 "taskq를 시작하지 못했습니다."와 마지막 출력 200줄을 코드 블록으로 보이고, 오른쪽 위 "로그 복사"가 클립보드에 넣는다(안 되면 로그를 선택해 둔다). 글은 웹뷰의 `navigator.language`가 `ko`로 시작하면 한국어, 아니면 영어다. 껍데기 수정이라 새 dmg부터 적용된다 |
 | 확인 dialog | `.ask-dialog` (`ui/js/core/ask.js`) | 없음 | 삭제 확인(workflow, worktree, MCP server), workflow 편집을 버릴지, workflow 승인·거절 메모를 묻는 작은 창. 취소·확인 버튼, Esc는 취소 |
 | 토큰 안내 | `token-notice` | 없음 | 토큰이 없거나 서버가 401을 돌려주면 전체 너비로 보인다. `taskq run`이 출력한 URL을 열라고 안내하고, 그 뒤로 폴링과 요청을 멈춘다 |
 | 검색 dialog | `search-dialog`, `msg-query`, `search-tabs`, `msg-hits`, `.sd-item` | `GET /api/bots/search`, `GET /api/search`, `GET /api/bots` | 화면 위에 뜨는 검색 창이다. 입력, 전체·작업·Bots 탭(Bots는 bot 이름과 그 대화 내용을 함께 찾는다), 결과 절. 입력 전에는 주의 필요(읽지 않은 bot, needs_approval·needs_auth 작업), 최근 항목(마지막 메시지 순 bot), 작업 메뉴(새 작업, bot 추가). 입력하면 bot 이름·설명, 열린 작업 제목, 대화(trigram FTS, 누르면 그 메시지로 이동), 지난 실행(누르면 run dialog)을 보인다. 위아래 화살표, Enter, Esc, 바깥 클릭으로 닫기 |

@@ -17,10 +17,17 @@ import { installBuiltinSkill } from '../team/builtin-skill.ts'
 
 // Runs the loop and the API in this process until SIGINT or SIGTERM. The API token lives in memory only: a new start
 // issues a new token, and the UI gets it from the URL fragment printed below. Settings > Update's restart keeps it.
+// The desktop app's start page shows these as a bar: `taskq starting <percent> <step>` (desktop/src-tauri, launch crate).
+export function starting(percent: number, step: string): void {
+  console.log(`taskq starting ${percent} ${step}`)
+}
+
 export async function runCommand(config: Config, db: Db): Promise<void> {
+  starting(35, 'writing the taskq skill')
   // The taskq skill and this version's manual are written fresh on every start; hub.start() then reloads every bot's
   // skill copy (one bot at a time, a failing one only logged), so each bot carries the running version's.
   installBuiltinSkill(config)
+  starting(45, 'preparing the runner')
   const agent = agentFor(config)
   const runner = createRunner({
     db, config, worker: agent.createWorker(config), preflight: () => agent.preflight(config),
@@ -29,11 +36,15 @@ export async function runCommand(config: Config, db: Db): Promise<void> {
   const dataDir = join(config.home, 'data')
   const token = takeRestartToken(dataDir) ?? randomBytes(32).toString('hex')
   const hub = teamHub(config, db, agent)
+  starting(60, 'starting the server')
   const server = await startServer({ db, config, control: runner, bots: hub, restart: () => void restart() }, token)
+  starting(70, 'starting the queue')
   await runner.start()
+  starting(85, 'loading the bots')
   await hub?.start()
   const jobs = createJobRunner(db, config, JOB_HANDLERS)
   jobs.start()
+  starting(100, 'ready')
   console.log(`taskq running at http://127.0.0.1:${config.port}/#token=${token}`)
   const stop = async () => {
     await hub?.stop()
