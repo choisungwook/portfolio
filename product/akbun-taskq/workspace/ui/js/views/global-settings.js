@@ -81,19 +81,21 @@ export async function loadGlobalSettings() {
 }
 
 function renderFolders(paths) {
-  const row = (title, path, open, note) => el('li', { class: 'folder-row' },
-    el('div', {}, el('strong', { text: title }), note ? el('span', { class: 'meta', text: note }) : null, el('code', { class: 'skill-path', text: path })),
+  // The folders and Session transcripts are sections (H2); each runtime under Session transcripts is a part of it (H3).
+  const row = (title, path, open, note, sub = false) => el('li', { class: 'folder-row' },
+    sub ? null : el('h2', { class: 'section-title', text: title }),
+    el('div', {}, sub ? el('h3', { class: 'sub-title', text: title }) : null, note ? el('span', { class: 'meta', text: note }) : null, el('code', { class: 'skill-path', text: path })),
     open
       ? el('button', { type: 'button', text: t('settings.open', 'Open'), onclick: () => mutate(() => api.post('/open-folder', open)) })
       : el('span', { class: 'meta', text: t('settings.sessions.none', 'Not created yet') }))
   clear(nodes.folders).append(
     ...FOLDERS.map(([target, key, english]) => row(t(key, english), paths[target], { target })),
     el('li', { class: 'folder-group' },
-      el('strong', { text: t('settings.folder.sessions', 'Session transcripts') }),
+      el('h2', { class: 'section-title', text: t('settings.folder.sessions', 'Session transcripts') }),
       el('p', { class: 'meta', text: t('settings.sessions.intro', "Each bot runtime keeps its conversations in its own place. To open one bot's, use Open session folder in its menu.") })),
     ...SESSION_RUNTIMES.map(([runtime, name, key, english]) => {
       const { path, exists } = paths.sessions[runtime]
-      return row(name, path, exists && { target: 'sessions', runtime }, t(key, english))
+      return row(name, path, exists && { target: 'sessions', runtime }, t(key, english), true)
     }),
     el('li', { class: 'folder-group' }, el('p', { class: 'meta', text: t('settings.sessions.openai', "OpenAI bots with an API key keep no local transcript; OpenAI keeps the conversation. With Bedrock, each bot's conversation is .openai-history.json in its folder under team/ in the taskq data folder.") })))
 }

@@ -60,6 +60,8 @@ export const OPERATIONS: Operation[] = [
   op('file_open', 'POST', '/open-file', 'Open a file of the shared folder with its default app on this machine, or reveal its folder. Fields: path (relative to the shared folder), reveal (true opens the folder).'),
   op('file_preview', 'POST', '/shared/preview', 'A short-lived URL (/preview/<ticket>/<name>) that serves an HTML file of the shared folder, and the files beside it, sandboxed for the UI preview. Fields: path.'),
   op('bot_get', 'GET', '/bots/:name', 'One bot\'s settings.'),
+  op('bot_activity', 'GET', '/bots/:name/activity', 'A bot\'s open pull requests (url, number, title, state OPEN or unknown without gh) and background work: unfinished owned tasks, tasks finished in the last day, and bots working on what it sent (sub_sessions).'),
+  op('bot_steps', 'GET', '/bots/:name/steps', 'A bot\'s tool calls, oldest first: id, turn_id, at, tool, detail. Fields: name, since (unix seconds), limit (default 500).'),
   op('bot_turn_errors', 'GET', '/bots/:name/turn-errors', 'A bot\'s failed turns, newest first: id, outcome, error, ended_at. Fields: name, limit (default 50).'),
   op('bot_update', 'PUT', '/bots/:name', 'Change a bot\'s settings; only the fields given change. Same fields as bot_create, plus enabled.'),
   op('bot_delete', 'DELETE', '/bots/:name', 'Delete a bot (not taskq). Its running turn is cancelled; its tasks go back to the user as drafts.'),
@@ -102,6 +104,7 @@ export const OPERATIONS: Operation[] = [
   op('open_folder', 'POST', '/open-folder', 'Open a folder in the desktop file manager. Fields: target (shared|home|sessions|bot|task), runtime (claude|codex|kiro, for sessions), bot, task_id.'),
   // settings and plugins
   op('update_check', 'GET', '/update', 'Whether a newer akbun-taskq release exists (current, latest, update_available, can_install and why not).'),
+  op('update_progress', 'GET', '/update/progress', 'The running install: phase (idle, download, unpack, done, failed), received bytes and total bytes (null when unknown).'),
   op('update_install', 'POST', '/update', 'Download the latest release build for this machine and replace the running binary; restart taskq to use it. Only for the single-file binary.'),
   op('settings_get', 'GET', '/settings', 'Settings: appearance, folders, registered skills and plugins.'),
   op('settings_appearance', 'POST', '/settings/appearance', 'Change appearance. Fields: font_family, font_size, language (ko|en), theme (system|dark|light).'),

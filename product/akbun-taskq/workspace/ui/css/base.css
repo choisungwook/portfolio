@@ -26,6 +26,11 @@ h3 { font-size: 14px; margin: 16px 0 8px; }
 
 /* Browser surfaces carry the theme too: selection, caret, native controls, scrollbars and the numerals in data. */
 :root { caret-color: var(--focus); accent-color: var(--accent); scrollbar-color: var(--border-strong) transparent; }
+/* Thin scrollbars everywhere (the session list, the conversation, panes), a narrow rounded thumb as in Claude Desktop. */
+* { scrollbar-width: thin; }
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--border-strong); border-radius: 999px; }
 ::selection { background: color-mix(in srgb, var(--focus) 32%, transparent); color: var(--fg); }
 time, td, .meta, .mono { font-variant-numeric: tabular-nums; }
 

@@ -162,6 +162,19 @@ function skillTool(skills: NonNullable<TurnRequest['skills']>): NeutralTool | un
 }
 
 // taskq's team tools as neutral tools: zod shape to JSON schema, handler errors returned to the model as text.
+// Each call shows in the bot's conversation before it runs, whatever the gate then decides.
+function withSteps(request: TurnRequest, tools: NeutralTool[]): NeutralTool[] {
+  return tools.map((t) => ({
+    ...t,
+    run(args) {
+      try {
+        request.onStep?.(t.name, args)
+      } catch { /* showing the step must never stop the call */ }
+      return t.run(args)
+    },
+  }))
+}
+
 function teamTool(t: TeamTool): NeutralTool {
   const { $schema: _schema, ...parameters } = z.toJSONSchema(z.object(t.input).strict()) as Record<string, unknown>
   return {
@@ -256,14 +269,14 @@ export function createOpenAITeamBackend(runFn?: OpenAIRunFn, fetcher: typeof fet
       request.signal.addEventListener('abort', onAbort, { once: true })
       let tampered: string | undefined
       const skill = skillTool(request.skills ?? [])
-      const tools = [
+      const tools = withSteps(request, [
         ...request.tools.map(teamTool),
         ...(skill ? [skill] : []),
         ...localTools(config, request.agent, request.cwd, request.sharedDir, request.approvals).map((t) => local(t, (reason) => {
           tampered = reason
           abort.abort()
         })),
-      ]
+      ])
       const cost = (r: OpenAIRunResult) => (r.inputTokens * config.bots.openaiInputPerMTok + r.outputTokens * config.bots.openaiOutputPerMTok) / 1_000_000
       try {
         const call = (effort: string | null) => run({

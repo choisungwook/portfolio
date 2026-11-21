@@ -1,5 +1,5 @@
 import type { Db } from '../src/db/open.ts'
-import { USER, createAgent, postMessage, seedAgents, setAgentSession } from '../src/db/team.ts'
+import { USER, addTurnStep, createAgent, postMessage, seedAgents, setAgentSession } from '../src/db/team.ts'
 import { writePage } from '../src/db/wiki.ts'
 import { BOT_DEFAULTS, PRESETS, ROSTER } from '../src/team/roster.ts'
 import { openThread, takeTurn } from '../src/db/threads.ts'
@@ -17,7 +17,7 @@ export function seedTeam(db: Db, taskId: string, openTaskIds: string[]): void {
   say('taskq', 'planner', 'Goal: export job stops after 3 retries. Schedule a code task for coder and a review for reviewer. Report task ids.')
   say('planner', 'taskq', `Created code task ${taskId} for coder. The security review is added automatically when it finishes.`, taskId)
   say('queue', 'coder', `Task ${taskId} (code) ended: done; task status is now done.\nSummary: retry limit added; npm test passed (42 tests).`, taskId)
-  say('coder', 'taskq', 'Retry limit is in. Test command and output are in the task summary.', taskId)
+  say('coder', 'taskq', 'Retry limit is in. Test command and output are in the task summary. PR: https://github.com/example/demo/pull/42', taskId)
   db.prepare('UPDATE team_messages SET read_at = created_at WHERE id >= ?').run(first)
   say('taskq', USER, 'The export job now stops after 3 retries. Review found nothing blocking. One decision is yours: should a stopped job page someone?', taskId)
   writePage(db, {
@@ -42,6 +42,17 @@ export function seedTeam(db: Db, taskId: string, openTaskIds: string[]): void {
   takeTurn(db, thread.id, 'reviewer', 'A ticket is enough: data is intact and the next run retries. A page trains people to ignore pages.')
   db.prepare('UPDATE team_messages SET read_at = created_at WHERE thread_id = ?').run(thread.id)
   postMessage(db, { sender: 'planner', recipient: 'planner', body: 'Check whether the nightly export ran.', deliver_at: Math.floor(Date.now() / 1000) + 8 * 3600 })
-  // One bot is shown working: an open turn that started 42 seconds ago. The demo runs no hub, so it stays open.
-  db.prepare('INSERT INTO team_turns (agent, session_id, started_at) VALUES (?, ?, ?)').run('planner', 'demo-planner', Math.floor(Date.now() / 1000) - 42)
+  // One bot is shown working: an open turn that started 42 seconds ago. scripts/demo.ts ends it 90 seconds after start.
+  const now = Math.floor(Date.now() / 1000)
+  const planning = Number(db.prepare('INSERT INTO team_turns (agent, session_id, started_at) VALUES (?, ?, ?)').run('planner', 'demo-planner', now - 42).lastInsertRowid)
+  // The tool calls each conversation folds into a line: coder's finished turn, and planner's turn still running.
+  const coding = Number(db.prepare(`INSERT INTO team_turns (agent, session_id, started_at, ended_at, outcome) VALUES ('coder', 'demo-coder', ?, ?, 'done')`).run(now - 300, now - 200).lastInsertRowid)
+  addTurnStep(db, coding, 'coder', 'Bash', { command: 'git fetch origin master && git rebase origin/master' })
+  addTurnStep(db, coding, 'coder', 'Read', { file_path: 'src/export/job.ts' })
+  addTurnStep(db, coding, 'coder', 'Edit', { file_path: 'src/export/job.ts' })
+  addTurnStep(db, coding, 'coder', 'Bash', { command: 'npm test' })
+  // planner's open turn took taskq's message, so taskq's side panel shows planner as a sub-session.
+  db.prepare(`UPDATE team_messages SET turn_id = ? WHERE sender = 'taskq' AND recipient = 'planner'`).run(planning)
+  addTurnStep(db, planning, 'planner', 'mcp__team__list_tasks', {})
+  addTurnStep(db, planning, 'planner', 'Bash', { command: 'ls -la exports/nightly' })
 }

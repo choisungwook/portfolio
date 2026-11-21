@@ -26,6 +26,7 @@ import { initConnections } from './views/connections.js'
 import { initReviewSettings } from './views/review-settings.js'
 import { initGlobalSettings, loadGlobalSettings } from './views/global-settings.js'
 import { initTokenNotice } from './views/token-notice.js'
+import { initWindowControls } from './core/window-controls.js'
 
 paintIcons()
 initTokenNotice()
@@ -39,6 +40,7 @@ initRunDialog()
 initTaskDetail()
 initTaskForm()
 initSettings()
+initWindowControls()
 initUpdateSettings()
 initGlobalSettings()
 initBotChat()

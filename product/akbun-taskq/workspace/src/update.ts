@@ -62,9 +62,39 @@ export async function checkUpdate(fetcher: typeof fetch = fetch, binary = isBina
   return status
 }
 
+// How far the running install is, for the progress bar in Settings > Update. total is null when GitHub sends no length.
+export interface InstallProgress { phase: 'idle' | 'download' | 'unpack' | 'done' | 'failed'; received: number; total: number | null }
+let progress: InstallProgress = { phase: 'idle', received: 0, total: null }
+export const installProgress = (): InstallProgress => ({ ...progress })
+
+// Reads the body chunk by chunk so the progress moves while it downloads.
+async function download(res: Response): Promise<Buffer> {
+  const length = Number(res.headers.get('content-length'))
+  progress = { phase: 'download', received: 0, total: length > 0 ? length : null }
+  if (!res.body) return Buffer.from(await res.arrayBuffer())
+  const chunks: Uint8Array[] = []
+  for await (const chunk of res.body) {
+    chunks.push(chunk)
+    progress.received += chunk.byteLength
+  }
+  return Buffer.concat(chunks)
+}
+
 // Downloads the release build, unpacks it next to the running executable and swaps it in with a rename, so a failed
 // download or unpack never leaves a half-written taskq. Returns the installed version.
 export async function installUpdate(fetcher: typeof fetch = fetch, target = process.execPath, binary = isBinary()): Promise<string> {
+  try {
+    const version = await install(fetcher, target, binary)
+    progress = { ...progress, phase: 'done' }
+    return version
+  } catch (error) {
+    progress = { ...progress, phase: 'failed' }
+    throw error
+  }
+}
+
+async function install(fetcher: typeof fetch, target: string, binary: boolean): Promise<string> {
+  progress = { phase: 'download', received: 0, total: null }
   const status = await checkUpdate(fetcher, binary)
   if (!status.can_install) throw new Error(status.reason ?? `taskq ${status.current} is already the latest`)
   const release = (await latestRelease(fetcher))!
@@ -76,7 +106,8 @@ export async function installUpdate(fetcher: typeof fetch = fetch, target = proc
   const work = mkdtempSync(join(tmpdir(), 'taskq-update-'))
   try {
     const archive = join(work, asset.name)
-    writeFileSync(archive, Buffer.from(await res.arrayBuffer()))
+    writeFileSync(archive, await download(res))
+    progress.phase = 'unpack'
     // Only the one entry, and only a regular file: a link in the archive must not put another file in taskq's place.
     execFileSync('tar', ['-xzf', archive, '-C', work, 'taskq'])
     const built = join(work, 'taskq')

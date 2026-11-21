@@ -24,6 +24,7 @@ export interface TurnRequest {
   signal: AbortSignal
   turnId?: number           // the turn's row; a runtime in its own process hands it to `taskq mcp --bot` as TASKQ_TURN_ID
   approvals?: ApprovalBroker  // ask-first calls become requests the user approves (src/team/bot-gate.ts)
+  onStep?: (tool: string, input: Record<string, unknown>) => void  // each tool call the bot attempts, for its conversation
 }
 
 export interface TurnResult {

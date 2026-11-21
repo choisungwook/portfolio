@@ -16,7 +16,7 @@ export function initChatFind(logNode) {
   input = area('chat-find-input')
   count = area('chat-find-count')
   document.addEventListener('keydown', (event) => {
-    if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'f' && currentView().view === 'bot') {
+    if ((event.metaKey || event.ctrlKey) && !event.shiftKey && event.key.toLowerCase() === 'f' && currentView().view === 'bot') {
       event.preventDefault()
       bar.hidden = false
       input.focus()

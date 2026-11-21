@@ -44,16 +44,6 @@ function effortOf(value: unknown): BotEffort | null {
   return value as BotEffort
 }
 
-// An optional number limit: null or '' means "use the global default".
-function limit(value: unknown, key: string, min: number, max: number, integer: boolean): number | null {
-  if (value === null || value === undefined || value === '') return null
-  const n = typeof value === 'string' ? Number(value) : value
-  if (typeof n !== 'number' || !Number.isFinite(n) || n < min || n > max || (integer && !Number.isInteger(n))) {
-    throw new Error(`${key} must be ${integer ? 'an integer' : 'a number'} from ${min} to ${max}, or empty for the global default`)
-  }
-  return n
-}
-
 export function parseBotSettings(body: unknown, known: { skills: Set<string>; plugins: Set<string>; mcp?: Set<string> }, base?: BotSettings): Parsed<BotSettings> {
   try {
     if (typeof body !== 'object' || body === null || Array.isArray(body)) throw new Error('body must be a JSON object')
@@ -89,7 +79,6 @@ export function parseBotSettings(body: unknown, known: { skills: Set<string>; pl
       sdk: has('sdk') ? sdkOf(o.sdk) : from.sdk,
       provider: has('provider') ? providerOf(o.provider) : from.provider ?? null,
       effort: has('effort') ? effortOf(o.effort) : from.effort,
-      turn_max_turns: has('turn_max_turns') ? limit(o.turn_max_turns, 'turn_max_turns', 1, 500, true) : from.turn_max_turns,
       charter_owns: has('charter_owns') ? text(o.charter_owns, 'charter_owns', 2000) : from.charter_owns ?? '',
       charter_good: has('charter_good') ? text(o.charter_good, 'charter_good', 2000) : from.charter_good ?? '',
       charter_never: has('charter_never') ? text(o.charter_never, 'charter_never', 2000) : from.charter_never ?? '',

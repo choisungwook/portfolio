@@ -39,14 +39,42 @@ async function check() {
   }
 }
 
+// Install shows a bar under the status with the percent downloaded, read from GET /update/progress while the install
+// request is still running. Without a length from GitHub the bar has no value and only moves.
 async function install(event) {
   const button = event.currentTarget
   button.disabled = true
-  const done = await mutate(() => api.post('/update'))
   const box = area('update-status')
+  const bar = el('progress', { class: 'update-bar', max: '100', 'aria-label': t('update.progress', 'Install progress') })
+  const label = el('span', { class: 'meta', text: t('update.downloading', 'Downloading…') })
+  const meter = el('div', { class: 'update-progress', role: 'status', 'aria-live': 'polite' }, bar, label)
+  box.append(meter)
+  const poll = setInterval(async () => {
+    const p = await api.get('/update/progress').catch(() => null)
+    if (p) showProgress(bar, label, p)
+  }, 250)
+  const done = await mutate(() => api.post('/update'))
+  clearInterval(poll)
+  meter.remove()
   if (done) {
     clear(box).append(el('p', { text: `${t('update.installed', 'Installed')} ${done.installed}. ${t('update.restart', 'Restart taskq (stop taskq run and start it again) to use it.')}` }))
     showActions()
   }
   else button.disabled = false
 }
+
+function showProgress(bar, label, p) {
+  if (p.phase === 'unpack') {
+    bar.value = 100
+    label.textContent = `100% · ${t('update.unpacking', 'Unpacking…')}`
+  } else if (p.phase === 'download' && p.total) {
+    const percent = Math.min(100, Math.floor((p.received / p.total) * 100))
+    bar.value = percent
+    label.textContent = `${percent}% · ${mb(p.received)} / ${mb(p.total)} MB`
+  } else if (p.phase === 'download') {
+    bar.removeAttribute('value')
+    label.textContent = `${t('update.downloading', 'Downloading…')} ${mb(p.received)} MB`
+  }
+}
+
+const mb = (bytes) => (bytes / 1_000_000).toFixed(1)

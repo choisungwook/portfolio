@@ -40,7 +40,6 @@ export interface BotSettings {
   effort: BotEffort | null    // reasoning effort; null leaves it to the model
   sdk: BotSdk                 // which agent SDK runs the bot
   provider: BotProvider | null   // how it signs in (PROVIDERS_BY_SDK); null is api for OpenAI, the Connections choice for Claude
-  turn_max_turns: number | null  // per-turn model turns; null uses the global default
   charter_owns: string           // charter: what this bot is responsible for
   charter_good: string           // charter: what a good result looks like
   charter_never: string          // charter: what it never does without asking
@@ -105,12 +104,12 @@ function toAgent(row: Record<string, unknown>, all: ReturnType<typeof shared>): 
 export function createAgent(db: Db, name: string, settings: BotSettings, system = false): void {
   db.prepare(`INSERT INTO team_agents (name, role, description, instructions, may_message_user, enabled, system,
     permission_mode, sandbox, allowed_domains, blocked_commands, workdir, skills, plugins, model, sdk,
-    turn_max_turns, effort, mcp_servers, provider, charter_owns, charter_good, charter_never, ask_first, created_at)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`).run(
+    effort, mcp_servers, provider, charter_owns, charter_good, charter_never, ask_first, created_at)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`).run(
     name, settings.role, settings.description, settings.instructions, settings.may_message_user ? 1 : 0, settings.enabled ? 1 : 0,
     system ? 1 : 0, settings.permission_mode, settings.sandbox ? 1 : 0, JSON.stringify(settings.allowed_domains),
     JSON.stringify(settings.blocked_commands), settings.workdir, JSON.stringify(settings.skills), JSON.stringify(settings.plugins),
-    settings.model, settings.sdk, settings.turn_max_turns, settings.effort,
+    settings.model, settings.sdk, settings.effort,
     JSON.stringify(settings.mcp_servers ?? []), settings.provider ?? null, settings.charter_owns ?? '', settings.charter_good ?? '',
     settings.charter_never ?? '', JSON.stringify(settings.ask_first ?? []), nowSec())
 }
@@ -124,13 +123,13 @@ export function updateAgent(db: Db, name: string, settings: BotSettings): boolea
     WHERE name = ? AND (sdk IS NOT ? OR coalesce(provider, 'api') IS NOT coalesce(?, 'api'))`).run(name, settings.sdk, settings.provider ?? null)
   return db.prepare(`UPDATE team_agents SET role = ?, description = ?, instructions = ?, may_message_user = ?, enabled = ?,
     permission_mode = ?, sandbox = ?, allowed_domains = ?, blocked_commands = ?, workdir = ?, skills = ?, plugins = ?, model = ?,
-    sdk = ?, turn_max_turns = ?, effort = ?, mcp_servers = ?, provider = ?,
+    sdk = ?, effort = ?, mcp_servers = ?, provider = ?,
     charter_owns = ?, charter_good = ?, charter_never = ?, ask_first = ?
     WHERE name = ?`).run(
     settings.role, settings.description, settings.instructions, settings.may_message_user ? 1 : 0, settings.enabled ? 1 : 0,
     settings.permission_mode, settings.sandbox ? 1 : 0, JSON.stringify(settings.allowed_domains), JSON.stringify(settings.blocked_commands),
     settings.workdir, JSON.stringify(settings.skills), JSON.stringify(settings.plugins), settings.model, settings.sdk,
-    settings.turn_max_turns, settings.effort, JSON.stringify(settings.mcp_servers ?? []), settings.provider ?? null,
+    settings.effort, JSON.stringify(settings.mcp_servers ?? []), settings.provider ?? null,
     settings.charter_owns ?? '', settings.charter_good ?? '', settings.charter_never ?? '', JSON.stringify(settings.ask_first ?? []), name).changes === 1
 }
 
@@ -362,4 +361,32 @@ export function listTurns(db: Db, limit: number): TeamTurn[] {
 
 export function openTurnAgents(db: Db): string[] {
   return db.prepare('SELECT agent FROM team_turns WHERE ended_at IS NULL').all().map((row) => String(row.agent))
+}
+
+// One tool call of a bot's turn, as the conversation shows it: the tool without its MCP prefix and the part of the input
+// a person recognizes (the command, the file, the pattern), masked and cut short. send_message is left out because the
+// message itself is already in the conversation.
+export interface TurnStep { id: number; turn_id: number; at: number; tool: string; detail: string }
+const STEP_DETAIL = 200
+const STEP_KEYS = ['command', 'file_path', 'notebook_path', 'path', 'pattern', 'url', 'query', 'description', 'prompt']
+
+export function stepOf(tool: string, input: Record<string, unknown>): { tool: string; detail: string } | null {
+  const name = tool.replace(/^mcp__team__/, '')
+  if (name === 'send_message') return null
+  const key = STEP_KEYS.find((k) => typeof input[k] === 'string' && input[k] !== '')
+  const raw = key ? String(input[key]) : Object.keys(input).length ? JSON.stringify(input) : ''
+  const text = mask(raw.replace(/\s+/g, ' ').trim())
+  return { tool: name, detail: text.length > STEP_DETAIL ? `${text.slice(0, STEP_DETAIL)}…` : text }
+}
+
+export function addTurnStep(db: Db, turnId: number, agent: string, tool: string, input: Record<string, unknown>): void {
+  const step = stepOf(tool, input)
+  if (!step) return
+  db.prepare('INSERT INTO team_turn_steps (turn_id, agent, at, tool, detail) VALUES (?, ?, ?, ?, ?)').run(turnId, agent, nowSec(), step.tool, step.detail)
+}
+
+// A bot's tool calls since `since`, oldest first, at most `limit` of the newest.
+export function listTurnSteps(db: Db, agent: string, since: number, limit: number): TurnStep[] {
+  return db.prepare(`SELECT * FROM (SELECT id, turn_id, at, tool, detail FROM team_turn_steps WHERE agent = ? AND at >= ? ORDER BY id DESC LIMIT ?)
+    ORDER BY id`).all(agent, since, limit) as unknown as TurnStep[]
 }

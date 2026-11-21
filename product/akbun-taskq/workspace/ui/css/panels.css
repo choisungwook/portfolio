@@ -125,3 +125,18 @@ dialog.wide { width: min(1180px, calc(100vw - 32px)); }
 }
 /* The whole call a bot waits to run, in its approval alert. */
 .alert-call pre { white-space: pre-wrap; overflow-wrap: anywhere; max-height: 240px; overflow: auto; margin: 4px 0 0; font-size: var(--text-small); }
+
+/* Window dialogs: close and minimize at the top left, as on the main macOS window. No zoom. */
+dialog.windowed { padding-top: 34px; }
+.window-controls { position: absolute; top: 12px; left: 14px; display: flex; gap: 8px; z-index: 2; }
+.wc { width: 12px; height: 12px; min-height: 0; padding: 0; border: 0; border-radius: 50%; position: relative; cursor: default; }
+.wc-close { background: #ff5f57; box-shadow: inset 0 0 0 0.5px rgb(0 0 0 / 15%); }
+.wc-min { background: #febc2e; box-shadow: inset 0 0 0 0.5px rgb(0 0 0 / 15%); }
+.window-controls:hover .wc::after, .wc:focus-visible::after {
+  position: absolute; inset: 0; display: grid; place-items: center; font: 600 10px/1 system-ui, sans-serif; color: rgb(0 0 0 / 55%);
+}
+.window-controls:hover .wc-close::after, .wc-close:focus-visible::after { content: "×"; }
+.window-controls:hover .wc-min::after, .wc-min:focus-visible::after { content: "−"; }
+.window-dock { position: fixed; left: 16px; bottom: 16px; display: flex; flex-wrap: wrap; gap: 8px; z-index: 50; max-width: calc(100vw - 32px); }
+.window-dock:empty { display: none; }
+.window-chip { min-height: 32px; padding: 0 14px; border-radius: 999px; background: var(--panel); color: var(--fg); border: 1px solid var(--border); box-shadow: var(--shadow-2); }

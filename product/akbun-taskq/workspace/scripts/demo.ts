@@ -48,8 +48,16 @@ async function main(): Promise<void> {
   const { JOB_HANDLERS } = await import('../src/jobs/handlers.ts')
   const jobs = createJobRunner(db, config, JOB_HANDLERS)
   jobs.start()
+  // The demo shows planner working, but with no hub nothing would ever end its turn and the timer would run forever.
+  // After 90 seconds the turn ends as done and planner answers, so the working bar, the spinner and the end all show.
+  const { postMessage } = await import('../src/db/team.ts')
+  const finishPlanner = setTimeout(() => {
+    db.prepare(`UPDATE team_turns SET ended_at = ?, outcome = 'done' WHERE agent = 'planner' AND ended_at IS NULL`).run(Math.floor(Date.now() / 1000))
+    postMessage(db, { sender: 'planner', recipient: 'taskq', body: 'The nightly export ran at 02:00 and finished in 4 minutes.' })
+  }, 90_000)
 
   const stop = () => {
+    clearTimeout(finishPlanner)
     controller.abort()
     void jobs.stop()
     server.close()

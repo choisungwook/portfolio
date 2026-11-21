@@ -1,6 +1,6 @@
 import type { Hono } from 'hono'
 import {
-  ORCHESTRATOR, USER, createAgent, deleteAgent, getAgent, listAgents, listMessages, listTurns, markRead, openTurnAgents, postMessage,
+  ORCHESTRATOR, SYSTEM, USER, createAgent, deleteAgent, getAgent, listAgents, listMessages, listTurnSteps, listTurns, markRead, openTurnAgents, postMessage,
   queuedCounts, resetAgentSession, seedAgents, updateAgent,
 } from '../db/team.ts'
 import { createCatalog } from '../team/catalog.ts'
@@ -12,6 +12,7 @@ import { releaseBotTasks } from '../team/bot-work.ts'
 import { getMemory, MEMORY_LIMIT, setMemory } from '../team/memory.ts'
 import { sharedRelative } from '../team/shared.ts'
 import { searchMessages } from '../db/message-search.ts'
+import { botActivity } from '../team/activity.ts'
 import { getPage, listPages } from '../db/wiki.ts'
 import { forceClose, listThreads } from '../db/threads.ts'
 import { hybridSearch } from '../team/search.ts'
@@ -168,6 +169,22 @@ export function registerBotsRoutes(api: Hono, { db, config, bots }: ApiDeps): vo
       ORDER BY id DESC LIMIT ?`).all(name, limit))
   })
 
+  // The bot's tool calls since ?since= (unix seconds), oldest first, so its conversation shows what it did. ?limit= (500)
+  // The bot's open pull requests (from links in its conversation and its tasks' summaries, checked with gh) and its
+  // background work: unfinished tasks it owns, how many finished in the last day, and bots working on what it sent.
+  api.get('/bots/:name/activity', async (c) => {
+    const name = c.req.param('name')
+    if (!getAgent(db, name)) throw new HttpError(404, 'no such bot')
+    return c.json(await botActivity(db, name))
+  })
+
+  api.get('/bots/:name/steps', (c) => {
+    const name = c.req.param('name')
+    if (!getAgent(db, name)) throw new HttpError(404, 'no such bot')
+    const limit = Math.min(2000, Math.max(1, Number(c.req.query('limit') ?? 500) || 500))
+    return c.json(listTurnSteps(db, name, Number(c.req.query('since') ?? 0) || 0, limit))
+  })
+
   api.get('/bots/:name', (c) => {
     const agent = getAgent(db, c.req.param('name'))
     if (!agent) throw new HttpError(404, 'no such bot')
@@ -187,6 +204,12 @@ export function registerBotsRoutes(api: Hono, { db, config, bots }: ApiDeps): vo
     if (current.enabled && !parsed.value.enabled) {
       stopTurn(name)
       releaseBotTasks(db, name, 'the bot was disabled', 'ready')
+    }
+    // A model change shows in the conversation, followed by the skill and plugin reload note, so the user sees where the
+    // new model starts.
+    if ((parsed.value.model ?? null) !== (current.model ?? null)) {
+      const id = postMessage(db, { sender: SYSTEM, recipient: name, body: `Model changed: ${current.model ?? 'default'} → ${parsed.value.model ?? 'default'}` })
+      db.prepare('UPDATE team_messages SET read_at = created_at WHERE id = ?').run(id)
     }
     noteReload(db, name, reloadAll(db, config, name))
     teamChanged.notify()

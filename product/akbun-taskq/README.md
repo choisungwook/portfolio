@@ -14,7 +14,7 @@ A personal agent task queue. You add tasks, several Claude sessions work through
 | Path | Content |
 |---|---|
 | [workspace/](./workspace/) | Source, tests, the static UI, the macOS desktop app (`desktop/`) and the [manual](./workspace/manual.md) |
-| [CHANGELOG.md](./CHANGELOG.md) | Versioned changes and the source of GitHub release notes |
+| [changelog/](./changelog/README.md) | One folder per version: `changelog.md` (the release notes GitHub shows) and `learning_changelog.md` (how the code and architecture changed) |
 | [wiki/](./wiki/index.md) | Architecture, development notes, feature map |
 | [knowledge/](./knowledge/index.md) | Decision records |
 

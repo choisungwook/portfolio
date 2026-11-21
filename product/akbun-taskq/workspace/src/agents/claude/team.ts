@@ -148,10 +148,13 @@ function optionsFor(config: Config, request: TurnRequest, abort: AbortController
 function gateHook(config: Config, request: TurnRequest, abort: AbortController, state: { tampered?: string }): HookCallback {
   return async (input) => {
     if (input.hook_event_name !== 'PreToolUse') return {}
+    const toolInput = typeof input.tool_input === 'object' && input.tool_input !== null ? input.tool_input as Record<string, unknown> : {}
+    try {
+      request.onStep?.(input.tool_name, toolInput)
+    } catch { /* showing the step must never stop the call */ }
     if (input.tool_name.startsWith(`mcp__${SERVER}__`)) return {}
     let reason: string
     try {
-      const toolInput = typeof input.tool_input === 'object' && input.tool_input !== null ? input.tool_input as Record<string, unknown> : {}
       const verdict = botGate(config, request.agent, request.cwd, input.tool_name, toolInput, request.approvals)
       if (verdict.action === 'allow') return {}
       if (verdict.action === 'stop') {

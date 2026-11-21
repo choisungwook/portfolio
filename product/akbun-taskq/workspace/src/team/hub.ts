@@ -3,7 +3,7 @@ import { join } from 'node:path'
 import type { Config } from '../config.ts'
 import type { Db } from '../db/open.ts'
 import {
-  SYSTEM, agentsWithMail, endTurn, getAgent, joinTurn, leaveTurn, postMessage, listAgents, nextDelivery, recoverTurns, replaceAgentSession, resetAgentSession, seedAgents, setAgentEnabled,
+  SYSTEM, addTurnStep, agentsWithMail, endTurn, getAgent, joinTurn, leaveTurn, postMessage, listAgents, nextDelivery, recoverTurns, replaceAgentSession, resetAgentSession, seedAgents, setAgentEnabled,
   startTurn, type BotSdk, type TeamMessage, type TurnEnd,
 } from '../db/team.ts'
 import { closeUnconcluded, passStalled, skipDisabledSpeakers } from '../db/threads.ts'
@@ -147,11 +147,12 @@ export function createTeamHub({ db, config, backend: claude, backends = {}, retr
         mcpServers: mcpServersFor(db, agent.mcp_servers ?? []),
         skills: skillsFor(db, config, agent),
         sharedDir: shared,
-        maxTurns: agent.turn_max_turns ?? config.bots.turnMaxTurns,
+        maxTurns: config.bots.turnMaxTurns,
         sessionMaxTokens: SESSION_MAX_TOKENS,
         resume: agent.session_id,
         signal: controller.signal,
         turnId: started.turn.id,
+        onStep: (tool, input) => addTurnStep(db, started.turn.id, name, tool, input),
         approvals: {
           consume: (tool, command) => consumeApproval(db, name, tool, command),
           request: (tool, command, rule) => requestApproval(db, name, tool, command, rule).id,

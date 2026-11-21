@@ -9,6 +9,7 @@ import { currentLanguage, t } from '../core/i18n.js'
 import { contextLabel, contextRing } from './context-ring.js'
 import { icon } from '../core/icons.js'
 import { botsSnapshot } from './bots-sidebar.js'
+import { askConfirm } from '../core/ask.js'
 
 const MODE_LABEL = {
   auto: ['perm.auto', 'Auto'], acceptEdits: ['perm.acceptEdits', 'Accept edits'], default: ['perm.default', 'Ask (refuse)'],
@@ -56,6 +57,16 @@ function select(labelText, value, options, onchange) {
     ...options.map(([v, text]) => el('option', { value: v, text, selected: v === value })))
 }
 
+// A new model gets the whole conversation again on its next turn, so the user confirms first and may compact before.
+async function changeModel(model) {
+  const ok = await askConfirm(t('compose.model_warn', 'Changing the model sends the whole conversation to the new model again on the next turn, which costs more. If the conversation is long, compact it first (/compact). Change the model?'))
+  if (ok) await save({ model })
+  else {
+    drawn = null
+    if (shown) render(shown)
+  }
+}
+
 async function save(change) {
   const ok = await mutate(() => api.put(`/bots/${bot}`, change), `${bot}: ${t('compose.saved', 'saved, applies from the next turn')}`)
   if (ok) emit('bots-changed')
@@ -73,9 +84,11 @@ function render(agent) {
   const key = JSON.stringify([currentLanguage(), agent.name, agent.model, agent.effort, agent.permission_mode, contextLabel(agent), catalog])
   if (key === drawn) return
   drawn = key
-  const models = catalog?.models ?? []
+  // Only real models are offered: no "default model" and no SDK "default" alias. A bot with no model yet shows the first
+  // one; nothing is saved until the user picks.
+  const models = (catalog?.models ?? []).filter((m) => m.id !== 'default')
   const current = models.find((m) => m.id === agent.model)
-  const modelOptions = [['', t('compose.model_default', 'Default model')], ...models.map((m) => [m.id, m.name])]
+  const modelOptions = models.map((m) => [m.id, m.name])
   if (agent.model && !current) modelOptions.push([agent.model, agent.model])
   const efforts = (current ?? models[0])?.efforts ?? []
   const effortOptions = [['', t('compose.effort_default', 'Default effort')], ...efforts.map((e) => [e, e])]
@@ -91,7 +104,7 @@ function render(agent) {
     catalog?.commands?.length ? el('span', { class: 'meta', text: `/ ${catalog.commands.length} ${t('compose.commands', 'commands')}` }) : null,
     el('span', { class: 'compose-spacer' }),
     source ? el('span', { class: 'meta', title: catalog.error ?? '', text: source }) : null,
-    select(t('compose.model', 'Model'), agent.model ?? '', modelOptions, (v) => save({ model: v || null })),
+    select(t('compose.model', 'Model'), agent.model ?? modelOptions[0]?.[0] ?? '', modelOptions, (v) => changeModel(v)),
     efforts.length || agent.effort ? select(t('compose.effort', 'Effort'), agent.effort ?? '', effortOptions, (v) => save({ effort: v || null })) : null,
     select(t('compose.permission', 'Permissions'), agent.permission_mode, modeOptions, (v) => save({ permission_mode: v })),
     // The context ring sits last on the right, as in Claude Desktop; the number is in its tooltip.
