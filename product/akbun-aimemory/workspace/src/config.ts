@@ -18,6 +18,7 @@ export interface Config {
   indexer: IndexerConfig
   contextLimit: number   // memories printed by `aimem context`
   halfLifeDays: number   // recency decay of search scores
+  annThreshold: number   // switch vector search to sqlite-vec ANN once memories reach this count
   caBundle?: string      // extra root CA PEM for TLS-inspecting networks, used by network calls
   connection?: ConnectionConfig
 }
@@ -33,6 +34,7 @@ export function loadConfig(home = process.env.AIMEMORY_HOME || join(homedir(), '
     indexer: { provider: 'claude', model: 'claude-haiku-5-5', effort: 'low', ...user.indexer },
     contextLimit: user.contextLimit ?? 8,
     halfLifeDays: user.halfLifeDays ?? 30,
+    annThreshold: user.annThreshold ?? 100_000,
     caBundle: user.caBundle,
     connection: user.connection,
   }

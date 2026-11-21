@@ -32,8 +32,12 @@ Measured on Apple Silicon (Node 24) with 10,000 synthetic multilingual memories 
 | `hf-json` (Unigram) | ~328 ms |
 | `hf-json` (BPE) | ~338 ms |
 
+## Search benchmark (100k rows)
+
+Run `node bench/benchmark.ts 100000` to verify `sqlite-vec` ANN latency at 100,000 synthetic multilingual memories. Measured on Apple Silicon (Node 24, `sqlite-vec` 0.1.9): p50 91.6 ms, p95 96.6 ms, max 96.9 ms (ANN build ~1.9 s).
+
 ## Caveats
 
-- Vector search scans every row. Past about 100k memories, move to an ANN index such as sqlite-vec.
+- Below `annThreshold` (default 100,000 memories), vector search scans rows in memory. At or above `annThreshold`, `openStore`/`addMemory`/`reindex` automatically switches to the `sqlite-vec` `vec0` virtual table when the optional `sqlite-vec` extension is installed.
 - The hashed vectors are lexical, not semantic: synonyms do not match. A local embedding model is an optional upgrade where models are allowed.
 - `import` merges into the live database instead of replacing it, so a running hook never sees a missing file.

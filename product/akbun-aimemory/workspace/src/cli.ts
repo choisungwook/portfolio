@@ -3,7 +3,7 @@ import { basename } from 'node:path'
 import { parseArgs } from 'node:util'
 import { loadConfig } from './config.ts'
 import { contextText, runHook, searchSpool } from './hook.ts'
-import { addMemory, deleteMemory, deleteSession, exportDb, importDb, listSessions, openStore, recent, reindex, search, sessionMemories } from './store.ts'
+import { addMemory, deleteMemory, deleteSession, exportDb, importDb, invalidateMemory, listSessions, openStore, recent, reindex, search, sessionMemories } from './store.ts'
 import { serve } from './server.ts'
 
 const VERSION = JSON.parse(readFileSync(new URL('../package.json', import.meta.url), 'utf8')).version
@@ -19,14 +19,15 @@ Hook (wire these into the agent's hook config; they read the hook JSON on stdin 
       If the database is unavailable the event is spooled to $AIMEMORY_HOME/spool.jsonl and replayed later.
 
 Read:
-  aimem search <query> [--project P] [--limit N] [--json]   hybrid keyword + vector search, recent first on ties
-  aimem context [--project P] [--query Q]                   the text SessionStart would print
-  aimem recent [--project P] [--limit N] [--json]
-  aimem sessions [--json]                                   sessions with memory counts
-  aimem show <session-id> [--json]                          every memory of one session
+  aimem search <query> [--project P] [--limit N] [--all] [--json]   hybrid keyword + vector search, recent first on ties
+  aimem context [--project P] [--query Q]                           the text SessionStart would print
+  aimem recent [--project P] [--limit N] [--all] [--json]
+  aimem sessions [--json]                                           sessions with memory counts
+  aimem show <session-id> [--json]                                  every memory of one session
 
 Write:
-  aimem add <text> [--project P] [--session S] [--agent A]  store a note by hand
+  aimem add <text> [--project P] [--session S] [--agent A]          store a note by hand
+  aimem invalidate <memory-id>                                      mark a superseded memory invalid without deleting it
   aimem delete <memory-id> | aimem delete --session <id>
 
 Maintenance:
@@ -62,6 +63,7 @@ const { values: o, positionals } = parseArgs({
   options: {
     agent: { type: 'string', default: 'manual' }, project: { type: 'string' }, session: { type: 'string' },
     limit: { type: 'string' }, query: { type: 'string' }, port: { type: 'string', default: '7788' },
+    all: { type: 'boolean', default: false },
     json: { type: 'boolean', default: false }, help: { type: 'boolean', short: 'h', default: false },
   },
 })
@@ -81,7 +83,7 @@ if (cmd === 'config') { console.log(JSON.stringify(config, null, 2)); process.ex
 if (cmd === 'search' && rest.length) {
   try {
     const s = openStore(config)
-    const hits = search(s, rest.join(' '), { project: o.project, limit })
+    const hits = search(s, rest.join(' '), { project: o.project, limit, includeInvalid: o.all })
     out({ degraded: false, hits }, () => hits.map(line).join('') || 'no match\n')
   } catch (error) {
     // Fallback: plain substring search over the spool, so an agent still gets something.
@@ -94,7 +96,7 @@ if (cmd === 'search' && rest.length) {
 
 const commands: Record<string, () => void | Promise<void>> = {
   context: () => { process.stdout.write(contextText(openStore(config), o.project ?? basename(process.cwd()), o.query)) },
-  recent: () => { const r = recent(openStore(config), { project: o.project, limit }); out(r, () => r.map(line).join('')) },
+  recent: () => { const r = recent(openStore(config), { project: o.project, limit, includeInvalid: o.all }); out(r, () => r.map(line).join('')) },
   sessions: () => {
     const r = listSessions(openStore(config)) as { id: string; agent: string; project: string; memories: number; started_at: number }[]
     out(r, () => r.map((x) => `${x.id}\t${x.agent}\t${x.project}\t${x.memories}\t${new Date(x.started_at).toISOString().slice(0, 16)}\n`).join(''))
@@ -104,6 +106,10 @@ const commands: Record<string, () => void | Promise<void>> = {
     if (!rest.length) usage('add needs text')
     const id = addMemory(openStore(config), { session_id: o.session ?? 'manual', agent: o.agent!, project: o.project ?? basename(process.cwd()), kind: 'note', content: rest.join(' ') })
     out({ id }, () => id === null ? 'already stored\n' : `${id}\n`)
+  },
+  invalidate: () => {
+    if (!rest[0]) usage('invalidate needs a memory id')
+    out({ invalidated: invalidateMemory(openStore(config), Number(rest[0])) }, () => 'invalidated\n')
   },
   delete: () => {
     const s = openStore(config)

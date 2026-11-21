@@ -102,7 +102,11 @@ async function handle(s: Store, token: string, req: IncomingMessage, res: Server
   if (resource === 'sessions' && id && method === 'DELETE') { send(res, 200, { deleted: deleteSession(s, decodeURIComponent(id)) }); return }
   if (resource === 'sessions' && id && method === 'GET') { send(res, 200, sessionMemories(s, decodeURIComponent(id))); return }
   if (resource === 'memories' && id && method === 'DELETE') { send(res, 200, { deleted: deleteMemory(s, Number(id)) }); return }
-  if (resource === 'search' && method === 'GET') { send(res, 200, search(s, url.searchParams.get('q') ?? '', { limit: 30 })); return }
+  if (resource === 'search' && method === 'GET') {
+    const includeInvalid = url.searchParams.get('all') === '1' || url.searchParams.get('all') === 'true'
+    send(res, 200, search(s, url.searchParams.get('q') ?? '', { limit: 30, includeInvalid }))
+    return
+  }
   if (resource === 'ca-bundle' && !id) {
     if (method === 'GET') { send(res, 200, caBundleInfo(s.db, s.config)); return }
     if (method === 'DELETE') { send(res, 200, clearCaBundle(s.db, s.config)); return }
