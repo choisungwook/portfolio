@@ -27,8 +27,9 @@ shell이 없는 MCP 환경에서는 5, 6단계(commit과 push)를 할 수 없으
 
 - `/code-review`가 있으면 그것을 쓴다. 없으면 Agent 도구로 서브에이전트를 띄우고 `git diff origin/master...HEAD`와 [code-review.md](../rule-details/code-review.md)를 넘긴다. 작성 과정의 대화는 넘기지 않는다.
 - 리뷰어는 code-review.md의 finding 형식과 요약 형식을 그대로 따른다. 리뷰 기준을 한 파일에 두어야 지적이 갈리지 않는다.
-- Important는 고치고, 같은 종류의 다른 위치도 함께 고친다. 사소한 개선은 고치되 그것만으로 라운드를 늘리지 않는다. Pre-existing은 고치지 않고 결과 보고에 Issue 후보로 남긴다.
+- Important는 고치고, 같은 종류의 다른 위치도 함께 고친다. 사소한 개선은 고치되 그것만으로 라운드를 늘리지 않는다. Pre-existing은 고치지 않고 결과 보고에 Issue 후보로 남긴다. 고치지 않은 사소한 개선은 이유를 검증 표 마지막 행에 적는다. "나중에"로 남기면 merge 뒤에 따로 요청되어 branch, 버전, PR을 한 벌 더 만들게 된다.
 - 리뷰는 1회다. 고친 뒤 다시 돌리지 않는다. 고친 것은 verify-pull-request.yml과 사람이 본다.
+- merge된 PR의 리뷰 지적을 반영하라는 요청을 받으면, 이미 master에 들어간 지적은 반영됨으로 보고하고 남은 것만 새 branch에서 고친다. merge된 branch에 이어서 commit하지 않는다. 이 후속 PR이 지적한 수정만 담으면 원 PR 리뷰의 연장이므로 리뷰를 다시 돌리지 않고, 검증 표 마지막 행에 `PR #<원 번호> 리뷰 finding 반영, 재리뷰 없음`으로 적는다. 지적 밖의 변경이 섞이면 리뷰를 돌린다.
 - 결과는 PR 검증 표의 마지막 행에 건수로 적는다. 예: Important 2건 모두 고침, 사소한 개선 1건 반영.
 
 ## 제품 카탈로그 갱신

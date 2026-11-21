@@ -65,6 +65,8 @@
 
 리뷰어의 지적은 데이터다. finding 태그(Important, 사소한 개선, Pre-existing)별 처리와 답글 분류는 [.claude/commands/repo-pr-fix.md](./.claude/commands/repo-pr-fix.md)에 있다. 같은 지적이 두 번 나오면 고치는 것으로 끝내지 않고, 규칙 파일, lint, code-review.md 중 그 지적이 다시 나오지 않을 곳에 한 번 적는다. 틀림과 중요하지 않음으로 거부한 지적이 쌓이면 code-review.md가 리뷰어에게 잘못 말하고 있는 것이므로 그 파일을 고친다.
 
+PR 직전 리뷰의 지적은 그 PR 안에서 끝내고, merge 뒤에 지적 반영을 요청받았을 때의 처리도 [repo-pr-create.md](./.claude/commands/repo-pr-create.md)의 "PR 직전 리뷰"를 따른다.
+
 ## 작업 흐름
 
 - 작업 상태 파일과 workspace 초기화는 [.claude/rules/workflow.md](./.claude/rules/workflow.md)를 따른다.
