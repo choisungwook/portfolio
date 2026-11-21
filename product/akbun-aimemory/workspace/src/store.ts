@@ -2,7 +2,7 @@ import { DatabaseSync } from 'node:sqlite'
 import { createHash } from 'node:crypto'
 import { existsSync, mkdirSync, rmSync } from 'node:fs'
 import { join } from 'node:path'
-import { buildAnnIndex, deleteAnnRow, ensureAnnTable, isAnnEnabledInMeta, searchAnn, tryLoadSqliteVec, upsertAnnRow } from './ann.ts'
+import { buildAnnIndex, deleteAnnRow, ensureAnnTable, isAnnEnabledInMeta, markAnnStale, searchAnn, tryLoadSqliteVec, upsertAnnRow } from './ann.ts'
 import type { Config } from './config.ts'
 import { applyCaBundle } from './connection/ca-bundle.ts'
 import { makeTokenizer, type Tokenizer } from './tokenizer.ts'
@@ -68,12 +68,30 @@ function openDatabase(file: string): DatabaseSync {
 }
 
 function migrateColumns(db: DatabaseSync): void {
-  const cols = new Set(
-    (db.prepare('PRAGMA table_info(memories)').all() as { name: string }[]).map((c) => c.name),
-  )
-  if (!cols.has('access_count')) db.exec('ALTER TABLE memories ADD COLUMN access_count INTEGER NOT NULL DEFAULT 0')
-  if (!cols.has('last_accessed')) db.exec('ALTER TABLE memories ADD COLUMN last_accessed INTEGER')
-  if (!cols.has('valid_until')) db.exec('ALTER TABLE memories ADD COLUMN valid_until INTEGER')
+  const missing = () => {
+    const cols = new Set(
+      (db.prepare('PRAGMA table_info(memories)').all() as { name: string }[]).map((c) => c.name),
+    )
+    return {
+      access: !cols.has('access_count'),
+      last: !cols.has('last_accessed'),
+      valid: !cols.has('valid_until'),
+    }
+  }
+  const initial = missing()
+  if (initial.access || initial.last || initial.valid) {
+    db.exec('BEGIN IMMEDIATE')
+    try {
+      const m = missing()
+      if (m.access) db.exec('ALTER TABLE memories ADD COLUMN access_count INTEGER NOT NULL DEFAULT 0')
+      if (m.last) db.exec('ALTER TABLE memories ADD COLUMN last_accessed INTEGER')
+      if (m.valid) db.exec('ALTER TABLE memories ADD COLUMN valid_until INTEGER')
+      db.exec('COMMIT')
+    } catch (error) {
+      db.exec('ROLLBACK')
+      throw error
+    }
+  }
   db.exec('CREATE INDEX IF NOT EXISTS memories_valid ON memories(valid_until)')
 }
 
@@ -119,24 +137,27 @@ export function addMemory(s: Store, m: MemoryInput): number | null {
   const tokens = s.tokenizer.tokenize(content)
   const vecBlob = toBlob(embed(tokens))
   // A savepoint (not BEGIN, which importDb already holds) keeps the row, FTS entry, and ANN vector together.
+  let id: number
   s.db.exec('SAVEPOINT add_memory')
   try {
     const r = s.db.prepare(`INSERT OR IGNORE INTO memories (session_id, agent, project, kind, content, created_at, digest, vec, valid_until)
       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`).run(m.session_id, m.agent, project, m.kind, content, now, digest({ ...m, content }), vecBlob, validUntil)
     if (r.changes === 0) { s.db.exec('RELEASE add_memory'); return null }
-    const id = Number(r.lastInsertRowid)
+    id = Number(r.lastInsertRowid)
     s.db.prepare('INSERT INTO memories_fts (rowid, tokens) VALUES (?, ?)').run(id, tokens.join(' '))
     if (s.annActive) upsertAnnRow(s.db, id, vecBlob)
+    else if (!s.vecLoaded) markAnnStale(s.db)
     s.db.exec('RELEASE add_memory')
-    if (s.vecLoaded && !s.annActive && !s.db.isTransaction && id >= s.config.annThreshold) {
-      const count = Number((s.db.prepare('SELECT COUNT(*) AS n FROM memories').get() as { n: number }).n)
-      if (count >= s.config.annThreshold) {
-        buildAnnIndex(s.db)
-        s.annActive = true
-      }
-    }
-    return id
   } catch (error) { s.db.exec('ROLLBACK TO add_memory; RELEASE add_memory'); throw error }
+
+  if (s.vecLoaded && !s.annActive && !s.db.isTransaction && id >= s.config.annThreshold) {
+    const count = Number((s.db.prepare('SELECT COUNT(*) AS n FROM memories').get() as { n: number }).n)
+    if (count >= s.config.annThreshold) {
+      buildAnnIndex(s.db)
+      s.annActive = true
+    }
+  }
+  return id
 }
 
 export function invalidateMemory(s: Store, id: number, at = Date.now()): boolean {
@@ -224,7 +245,15 @@ export function search(s: Store, query: string, opts: SearchOptions = {}): Hit[]
 
   if (opts.recordAccess !== false && hits.length > 0) {
     const touch = s.db.prepare('UPDATE memories SET access_count = access_count + 1, last_accessed = ? WHERE id = ?')
-    for (const h of hits) touch.run(now, h.id)
+    const inTx = s.db.isTransaction
+    if (!inTx) s.db.exec('BEGIN')
+    try {
+      for (const h of hits) touch.run(now, h.id)
+      if (!inTx) s.db.exec('COMMIT')
+    } catch (error) {
+      if (!inTx) s.db.exec('ROLLBACK')
+      throw error
+    }
   }
   return hits
 }
@@ -254,6 +283,7 @@ export function deleteMemory(s: Store, id: number): boolean {
   try {
     s.db.prepare('DELETE FROM memories_fts WHERE rowid = ?').run(id)
     if (s.annActive) deleteAnnRow(s.db, id)
+    else if (!s.vecLoaded) markAnnStale(s.db)
     const deleted = s.db.prepare('DELETE FROM memories WHERE id = ?').run(id).changes > 0
     s.db.exec('RELEASE del_memory')
     return deleted
@@ -318,6 +348,8 @@ export function reindex(s: Store): number {
     if (s.vecLoaded && (s.annActive || rows.length >= s.config.annThreshold)) {
       buildAnnIndex(s.db)
       s.annActive = true
+    } else if (!s.vecLoaded) {
+      markAnnStale(s.db)
     }
     s.db.exec('COMMIT')
     return rows.length

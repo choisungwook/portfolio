@@ -98,7 +98,11 @@ test('sqlite-vec ANN index activates at annThreshold and stays synced across add
     assert.equal(deleteMemory(s, id1), true)
     assert.equal(search(s, 'sqlite wal').length, 0)
     assert.equal(reindex(s), 3)
-    assert.match(search(s, '監視')[0].content, /東京/)
+    addMemory(s, { session_id: 's1', agent: 'claude', project: 'p', kind: 'note', content: '{}' })
+    addMemory(s, { session_id: 's1', agent: 'claude', project: 'p', kind: 'note', content: '---' })
+    const hits = search(s, '監視')
+    assert.match(hits[0].content, /東京/)
+    assert.equal(hits.some((h) => h.content === '{}' || h.content === '---'), false, 'zero-vector rows never pollute ANN results')
   } finally {
     s.db.close()
   }
