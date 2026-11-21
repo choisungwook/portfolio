@@ -90,6 +90,7 @@ function sections(task) {
       el('dt', { text: t('task.stage', 'Stage') }), el('dd', {}, stageOf(task)),
       el('dt', { text: t('task.last_run', 'Last run') }), el('dd', {}, lastRun(task)),
       el('dt', { text: t('owner.label', 'Assigned bot') }), ownerValue(task, refill),
+      el('dt', { text: t('repos.label', 'Repositories') }), reposValue(task),
       el('dt', { text: 'Workflow' }), workflowValue(task, refill),
       el('dt', { text: 'Created' }), el('dd', { text: fmtDateTime(task.created_at) }),
       el('dt', { text: 'Updated' }), el('dd', { text: fmtDateTime(task.updated_at) }),
@@ -143,6 +144,39 @@ function actionButtons(task) {
       onclick: () => mutate(() => api.patch(`/tasks/${task.id}`, { status: 'ready' }), 'Task is ready'),
     }),
   )
+}
+
+// The task's repositories (local folders): each with its worktree under it, read only, marked when a cleanup deleted
+// it (the next run adds it back). Folders are added and removed here, and one checkbox turns worktrees on or off;
+// all of it is locked while a run works on the task.
+function reposValue(task) {
+  const locked = LOCKED_FOR_EDIT.includes(task.status)
+  const views = task.repos_view ?? []
+  const save = (body, ok) => mutate(() => api.patch(`/tasks/${task.id}`, body), ok).then((done) => done && fill(task.id))
+  const sources = views.map((v) => v.source)
+  const input = el('input', { type: 'text', placeholder: t('repos.add_placeholder', '/absolute/path/to/a/repository'), spellcheck: 'false', autocomplete: 'off', 'aria-label': t('repos.add', 'Add a repository') })
+  const add = () => input.value.trim() && save({ repos: [...sources, input.value.trim()] }, t('repos.added', 'Repository added'))
+  input.addEventListener('keydown', (event) => { if (event.key === 'Enter') { event.preventDefault(); add() } })
+  return el('dd', { class: 'repos' },
+    views.length === 0 ? el('p', { class: 'meta', text: t('repos.none', 'None. Add a folder the bot should work in.') }) : null,
+    el('ul', { class: 'repo-list' }, ...views.map((v, i) => el('li', { class: 'repo-item' },
+      el('div', { class: 'repo-head' },
+        icon('folder', 16), el('code', { text: v.source, title: v.source }),
+        i === 0 ? el('span', { class: 'badge', text: t('repos.main', 'main') }) : null,
+        !v.exists ? el('span', { class: 'badge sev-critical', text: t('repos.gone', 'not found') }) : null,
+        locked ? null : el('button', { type: 'button', class: 'quiet repo-remove', title: t('repos.remove', 'Remove'), 'aria-label': `${t('repos.remove', 'Remove')}: ${v.source}`,
+          onclick: () => save({ repos: sources.filter((s) => s !== v.source) }, t('repos.removed', 'Repository removed')) }, icon('close', 14))),
+      v.worktree ? el('div', { class: 'repo-worktree', dataset: { state: v.worktree.state } },
+        el('span', { class: 'meta', text: '└ worktree' }), el('code', { text: v.worktree.path, title: v.worktree.path }),
+        el('span', { class: 'meta', text: v.worktree.branch }),
+        v.worktree.state === 'missing'
+          ? el('span', { class: 'badge sev-critical', text: t('repos.wt_missing', 'deleted · made again on the next run') })
+          : el('span', { class: 'badge', text: t('repos.read_only', 'read only') })) : null))),
+    locked ? null : el('div', { class: 'repo-add' }, input, el('button', { type: 'button', text: t('repos.add_button', 'Add'), onclick: add })),
+    el('label', { class: 'check repo-wt' },
+      el('input', { type: 'checkbox', checked: Boolean(task.data.use_worktree), disabled: locked,
+        onchange: (event) => save({ use_worktree: event.target.checked }, t('repos.saved', 'Saved')) }),
+      ` ${t('repos.use_worktree', 'Work in a worktree of each git repository (your checkout stays as it is)')}`))
 }
 
 // Where the task is on the board, not whether it went well: the pane (inbox, in progress, ended) and, in progress, which

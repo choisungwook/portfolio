@@ -4,6 +4,7 @@ concept를 추가·수정·삭제할 때마다 오늘 날짜 섹션을 맨 위�
 
 ## 2026-11-21
 
+* **Update**: [task worktrees](decisions/2026-11-task-worktrees.md)에 저장소 여러 개, worktree 체크박스, 사라진 worktree 다시 만들기(0.37.0)를 추가.
 * **Creation**: [builtin taskq skill](decisions/2026-11-builtin-taskq-skill.md) - 모든 bot이 실행 중인 버전의 taskq skill과 매뉴얼을 갖는 결정.
 * **Creation**: [task not tied to session](decisions/2026-11-task-not-tied-to-session.md) - 재시도는 새 세션으로 하고 직전 run의 기록을 프롬프트로 넘기는 결정.
 * **Update**: [session handover](decisions/2026-11-session-handover.md)에 Claude 세션의 auto-compact를 항상 켠다(0.32.0)는 내용을 추가.

@@ -6,6 +6,7 @@ import { waitsForRuns } from './waits.ts'
 import { getTask, listDeps } from './tasks.ts'
 import { openApproval } from './approvals.ts'
 import { listHandoffs } from './handoffs.ts'
+import { repoViews } from '../workspace/task-repos.ts'
 
 export function taskDetail(db: Db, id: string) {
   const task = getTask(db, id)
@@ -13,7 +14,7 @@ export function taskDetail(db: Db, id: string) {
   const deps = listDeps(db).filter((dep) => dep.task_id === id)
   return {
     ...task, runs: listRunsOfTask(db, id), deps, alerts: alertsOfTask(db, id), pending_approval: openApproval(db, id),
-    handoffs: listHandoffs(db, id),
+    handoffs: listHandoffs(db, id), repos_view: repoViews(task.data),
   }
 }
 

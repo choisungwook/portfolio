@@ -12,6 +12,7 @@ export interface GateContext {
   cwd: string          // the worker's working directory: relative paths resolve here
   outputs: string      // <home>/outputs
   repo?: string        // the task's repository, for code and security_review
+  extraRepos?: string[] // the task's other repositories (their workspaces), writable like repo for code
   dataDir: string      // <home>/data, which holds the database
   profile?: string     // the target AWS profile of the task
   accessSkill?: string // the registered folder of the task's access skill (realpath)
@@ -22,7 +23,7 @@ export interface GateContext {
 interface Touch { real: string; write: boolean }
 type Input = Record<string, unknown>
 type Check = (tool: string, input: Input, roots: Roots, touches: Touch[], ctx: GateContext) => Decision
-interface Roots { cwd: string; outputs: string; repo?: string }
+interface Roots { cwd: string; outputs: string; repo?: string; extra: string[] }
 
 const READ = new Set(['Read', 'Grep', 'Glob'])
 const EDIT = new Set(['Write', 'Edit', 'MultiEdit'])
@@ -39,7 +40,7 @@ const POLICY: Record<TaskType, Check> = {
     return ['Bash', 'WebFetch', 'WebSearch'].includes(tool) ? 'allow' : 'deny'
   },
   code: (tool, _input, roots, touches) => {
-    const repoRoots = [roots.repo, roots.outputs].filter((root): root is string => root !== undefined)
+    const repoRoots = [roots.repo, roots.outputs, ...roots.extra].filter((root): root is string => root !== undefined)
     if (READ.has(tool) || WRITE_PATH.has(tool)) return inside(touches, repoRoots) ? 'allow' : 'deny'
     return tool === 'Bash' ? 'allow' : 'deny'
   },
@@ -85,6 +86,7 @@ export function decide(type: TaskType, tool: string, input: Input, ctx: GateCont
     cwd: realPath(ctx.cwd),
     outputs: realPath(ctx.outputs),
     repo: ctx.repo === undefined ? undefined : realPath(ctx.repo),
+    extra: (ctx.extraRepos ?? []).map(realPath),
   }
   return POLICY[type](tool, input, roots, touches, ctx)
 }

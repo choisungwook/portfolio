@@ -7,7 +7,7 @@ export type AlertKind = 'approval_required' | 'security_finding' | 'prod_touch' 
   | 'team_message' | 'team_paused'
 export type EventKind = 'claimed' | 'tool_call' | 'tool_result' | 'permission_request' | 'approved' | 'denied'
   | 'auth_required' | 'progress' | 'error' | 'finished' | 'cancel_requested' | 'tamper_blocked'
-  | 'run_requested' | 'handoff_received' | 'handoff_accepted'
+  | 'run_requested' | 'handoff_received' | 'handoff_accepted' | 'worktree_recreated'
 
 export interface TaskData {
   title?: string
@@ -27,7 +27,12 @@ export interface TaskData {
   source_repo?: string       // the repository the user picked, when `repo` is the task's own worktree
   worktree?: { path: string; branch: string; base: string; base_branch: string }
   reviewer?: string          // the bot asked to review; set when the owner finishes
+  repos?: TaskRepo[]         // every repository the task works in, first one = repo/source_repo/worktree above
+  use_worktree?: boolean     // work in a worktree of each git repository (set in the task detail)
 }
+
+// One repository of a task: the folder the user picked and, when worktrees are on, the task's own worktree of it.
+export interface TaskRepo { source: string; worktree: { path: string; branch: string; base: string; base_branch: string } | null }
 
 export interface Task {
   id: string; type: TaskType; status: TaskStatus; priority: number

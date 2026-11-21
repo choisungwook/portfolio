@@ -142,6 +142,18 @@ dialog[data-area="task-detail"].wide > .dialog-body > * { max-width: 1240px; }
 .task-edit { display: grid; gap: 16px; }
 .task-edit label { display: grid; gap: 6px; }
 .task-edit .actions { justify-content: flex-end; }
+/* Task repositories: a folder per line, its worktree indented under it (read only), add and the worktree switch. */
+.repos { display: grid; gap: 6px; min-width: 0; }
+.repo-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+.repo-head, .repo-worktree { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; min-width: 0; }
+.repo-head code, .repo-worktree code { font-family: var(--font-mono); font-size: 0.85em; overflow-wrap: anywhere; }
+.repo-head .icon { color: var(--muted); flex: none; }
+.repo-worktree { padding-left: 22px; }
+.repo-worktree[data-state="missing"] code { text-decoration: line-through; color: var(--muted); }
+.repo-remove { min-height: 24px; padding: 0 6px; color: var(--muted); }
+.repo-add { display: flex; gap: 6px; }
+.repo-add input { flex: 1; min-width: 0; font-family: var(--font-mono); font-size: 0.85em; }
+.repo-wt { font-size: var(--text-small); }
 /* Why a failed task failed: a tinted block with the cause and numbered steps. */
 .failure-help { display: grid; gap: 8px; padding: 16px 20px; border-radius: var(--radius-l); background: var(--error-soft); }
 .failure-help .section-title { margin: 0; padding: 0; border: 0; display: flex; align-items: center; gap: 6px; color: var(--failed); }
