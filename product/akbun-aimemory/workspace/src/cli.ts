@@ -3,6 +3,7 @@ import { basename } from 'node:path'
 import { parseArgs } from 'node:util'
 import { loadConfig } from './config.ts'
 import { contextText, runHook, searchSpool } from './hook.ts'
+import { indexSession } from './indexer/index.ts'
 import { addMemory, deleteMemory, deleteSession, exportDb, importDb, invalidateMemory, listSessions, openStore, recent, reindex, search, sessionMemories } from './store.ts'
 import { serve } from './server.ts'
 
@@ -33,6 +34,7 @@ Write:
 Maintenance:
   aimem export <file.db>      consistent SQLite copy (backup)
   aimem import <file.db>      merge a backup; duplicates are skipped
+  aimem index <session-id>    summarize a session and reconcile memories with the configured indexer
   aimem reindex               rebuild token index and vectors after changing the tokenizer
   aimem serve [--port N]      web UI on 127.0.0.1 (prints a URL with a token)
   aimem config                print the effective config as JSON
@@ -119,6 +121,14 @@ const commands: Record<string, () => void | Promise<void>> = {
   },
   export: () => { if (!rest[0]) usage('export needs a file'); exportDb(openStore(config), rest[0]); out({ file: rest[0] }, () => `${rest[0]}\n`) },
   import: () => { if (!rest[0]) usage('import needs a file'); const r = importDb(openStore(config), rest[0]); out(r, () => `added ${r.added}, skipped ${r.skipped}\n`) },
+  index: async () => {
+    if (!rest[0]) usage('index needs a session id')
+    const s = openStore(config)
+    try {
+      const r = await indexSession(s, rest[0])
+      out(r, () => r.error ? `indexer skipped: ${r.error}\n` : `summary=${r.summaryId ?? 'none'} added=${r.added} updated=${r.updated} noop=${r.noop}\n`)
+    } finally { s.db.close() }
+  },
   reindex: () => { const n = reindex(openStore(config)); out({ reindexed: n }, () => `reindexed ${n}\n`) },
   serve: async () => { console.log(await serve(openStore(config), Number(o.port))) },
 }

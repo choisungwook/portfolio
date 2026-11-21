@@ -51,7 +51,7 @@ test('[critical] a broken database spools the hook event, and the next run repla
   assert.equal(runHook(config, 'claude', prompt), '')
   assert.ok(existsSync(spoolPath(config)))
   rmSync(dbPath(config))
-  runHook(config, 'claude', JSON.stringify({ session_id: 's9', hook_event_name: 'Stop' }))
+  runHook({ ...config, indexer: { ...config.indexer, provider: 'none' } }, 'claude', JSON.stringify({ session_id: 's9', hook_event_name: 'Stop' }))
   assert.equal(existsSync(spoolPath(config)), false)
   assert.match(search(openStore(config), 'canary')[0].content, /canary/)
 })
