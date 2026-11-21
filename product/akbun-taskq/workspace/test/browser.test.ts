@@ -3,7 +3,11 @@ import assert from 'node:assert/strict'
 import { createServer } from 'node:http'
 import { chromePath, closeBrowsers, ownerPid } from '../src/browser/chrome.ts'
 import { browserClick, browserOpen, browserRead, browserScreenshot, browserState, browserType, webUrl } from '../src/browser/actions.ts'
-import { setup } from './helpers.ts'
+import { seedTestBots, setup } from './helpers.ts'
+import { allowedSites } from '../src/browser/sites.ts'
+import { decideApprovalRequest, openApprovals, requestApproval } from '../src/db/bot-requests.ts'
+import { teamTools } from '../src/team/tools.ts'
+import { hybridSearch } from '../src/team/search.ts'
 
 test('only http and https pages open; a bare host becomes https', () => {
   assert.equal(webUrl('example.com'), 'https://example.com')
@@ -46,5 +50,48 @@ test('a one-turn MCP process hands the browser to the taskq server it names', ()
   } finally {
     if (before === undefined) delete process.env.TASKQ_OWNER_PID
     else process.env.TASKQ_OWNER_PID = before
+  }
+})
+
+test('approving a browser site request allows the site for good', async () => {
+  const env = setup()
+  try {
+    await seedTestBots(env.db)
+    const request = requestApproval(env.db, 'coder', 'browser_site', 'shop.example', 'browser site')
+    decideApprovalRequest(env.db, request.id, true)
+    assert.deepEqual(allowedSites(env.db, 'coder'), ['shop.example'])
+    const note = env.db.prepare(`SELECT body FROM team_messages WHERE recipient = 'coder' ORDER BY id DESC LIMIT 1`).get() as { body: string }
+    assert.match(note.body, /allowed you to click and type on shop\.example/)
+  } finally {
+    env.cleanup()
+  }
+})
+
+test('clicks and typing wait for a site approval, irreversible clicks for a one-time one, passwords never', { skip: !chromePath() && 'no Chrome on this machine', timeout: 60_000 }, async () => {
+  const page = `<title>Shop</title><input aria-label="search"><input type=password aria-label="pw"><button onclick="document.title='bought'">Buy now</button><button onclick="document.title='more'">More</button>`
+  const server = createServer((_req, res) => res.end(page)).listen(0, '127.0.0.1')
+  await new Promise((resolve) => server.once('listening', resolve))
+  const env = setup()
+  try {
+    await seedTestBots(env.db)
+    const tools = teamTools({ db: env.db, config: env.config, agent: 'coder', search: hybridSearch(env.db) })
+    const call = (name: string, args: Record<string, unknown>) => tools.find((t) => t.name === name)!.handler(args) as Promise<Record<string, unknown>>
+    await call('browser_open', { url: `http://127.0.0.1:${(server.address() as { port: number }).port}/` })
+    const refs = Object.fromEntries(((await call('browser_read', {})).elements as { ref: string; label: string }[]).map((e) => [e.label, e.ref]))
+    await assert.rejects(call('browser_click', { ref: refs.More }), /needs the user's approval first, as on every new site/)
+    const site = openApprovals(env.db).find((a) => a.tool === 'browser_site')!
+    decideApprovalRequest(env.db, site.id, true)
+    assert.equal((await call('browser_click', { ref: refs.More })).title, 'more', 'an ordinary click runs on an allowed site')
+    await assert.rejects(call('browser_type', { ref: refs.pw, text: 'secret' }), /never type passwords/)
+    await assert.rejects(call('browser_click', { ref: refs['Buy now'] }), /cannot be taken back/)
+    const buy = openApprovals(env.db).find((a) => a.tool === 'browser_action')!
+    assert.match(buy.command, /^click "Buy now" \(button\) on http:\/\/127\.0\.0\.1:\d+\/$/)
+    decideApprovalRequest(env.db, buy.id, true)
+    assert.equal((await call('browser_click', { ref: refs['Buy now'] })).title, 'bought', 'the approved action runs once')
+    await assert.rejects(call('browser_click', { ref: refs['Buy now'] }), /cannot be taken back/, 'and asks again after that')
+  } finally {
+    await closeBrowsers(env.config)
+    server.close()
+    env.cleanup()
   }
 })

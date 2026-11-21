@@ -88,6 +88,21 @@ async function clickAt(page: Page, x: number, y: number): Promise<void> {
   await settle(page)
 }
 
+// What a ref points at, before acting on it, so the approval gate can name the action in words the user recognizes.
+export interface Target { host: string; page: string; label: string; tag: string; type: string; href: string }
+export function browserTarget(config: Config, bot: string, ref: string) {
+  return withPage(config, bot, async (page) => {
+    const target = await page.evaluate<Target | null>(`(() => {
+      const el = document.querySelector('[data-taskq-ref=${JSON.stringify(ref)}]')
+      if (!el) return null
+      const label = (el.getAttribute('aria-label') || el.innerText || el.value || el.placeholder || el.title || el.name || '').trim().replace(/\s+/g, ' ').slice(0, 120)
+      return { host: location.hostname, page: location.origin + location.pathname, label, tag: el.tagName.toLowerCase(), type: (el.type || '').toLowerCase(), href: el.href || '' }
+    })()`)
+    if (!target) throw new Error(`no element ${ref} on this page; call browser_read again, the page may have changed`)
+    return target
+  }, false)
+}
+
 export function browserClick(config: Config, bot: string, ref: string) {
   return withPage(config, bot, async (page) => {
     const { x, y } = await center(page, ref)

@@ -133,8 +133,10 @@ function actionsFor(alert) {
   // A bot's call that waits for approval is answered right here.
   const [refKind, refId] = String(alert.ref ?? '').split(':')
   if (refKind === 'bot-approval') {
+    // A browser site request allows the site for good, as Claude Desktop's "allow on this site".
+    const site = String(alert.message ?? '').includes('(browser site)')
     return [
-      el('button', { type: 'button', text: 'Approve once', onclick: () => mutate(() => api.post(`/bot-approvals/${refId}`, { approve: true }), 'Approved; the bot may run it once') }),
+      el('button', { type: 'button', text: site ? 'Allow this site' : 'Approve once', onclick: () => mutate(() => api.post(`/bot-approvals/${refId}`, { approve: true }), site ? 'Allowed; the bot may click and type on this site' : 'Approved; the bot may run it once') }),
       el('button', { type: 'button', class: 'danger', text: 'Deny', onclick: () => mutate(() => api.post(`/bot-approvals/${refId}`, { approve: false }), 'Denied') }),
     ]
   }
