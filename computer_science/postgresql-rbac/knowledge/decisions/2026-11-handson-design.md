@@ -1,5 +1,7 @@
 ---
+type: Decision
 title: PostgreSQL RBAC 핸즈온 환경 및 Flyway 시나리오 설계 결정
+description: 순수 docker CLI 환경, Flyway 단계별 디렉터리 분리, 보상 마이그레이션 롤백 및 Gemini 이미지 프롬프트 기록 결정
 status: accepted
 date: 2026-11-21
 ---
