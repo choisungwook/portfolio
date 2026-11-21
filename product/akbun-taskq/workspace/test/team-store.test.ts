@@ -9,9 +9,11 @@ import { getPage, writePage, pageHistory } from '../src/db/wiki.ts'
 import { hybridSearch } from '../src/team/search.ts'
 import { ToolError, repoAllowed, teamTools } from '../src/team/tools.ts'
 import { getTask } from '../src/db/tasks.ts'
+import { setOwner } from '../src/team/owner.ts'
 import { listAlerts } from '../src/db/alerts.ts'
 import { createRunner } from '../src/runner/runner.ts'
-import { addTask, fakeWorker, seedTestBots, result, setup, sleep, statusOf, waitFor, type TestEnv } from './helpers.ts'
+import { TOKEN, addTask, fakeWorker, seedTestBots, result, setup, sleep, statusOf, waitFor, type TestEnv } from './helpers.ts'
+import { createApp } from '../src/api/server.ts'
 
 function tool(env: TestEnv, agent: string, name: string) {
   const found = teamTools({ db: env.db, config: env.config, agent, search: hybridSearch(env.db) }).find((t) => t.name === name)
@@ -26,6 +28,28 @@ describe('team mailbox', () => {
     await seedTestBots(env.db)
   })
   test.afterEach(() => env.cleanup())
+
+  test('giving a draft to a bot leaves a note in its conversation without starting a turn', () => {
+    const { db } = env
+    const draft = addTask(db, { type: 'research', status: 'draft' })
+    setOwner(db, draft.id, 'taskq', USER)
+    assert.match(listMessages(db, { agent: 'taskq', limit: 5 })[0].body, /is now yours/)
+    assert.deepEqual(agentsWithMail(db, Math.floor(Date.now() / 1000), 60), [])
+    const ready = addTask(db, { type: 'research' })
+    setOwner(db, ready.id, 'taskq', USER)
+    assert.deepEqual(agentsWithMail(db, Math.floor(Date.now() / 1000), 60), ['taskq'])
+  })
+
+  test('making an owned draft ready wakes its owner', async () => {
+    const { db, config } = env
+    const draft = addTask(db, { type: 'research', status: 'draft' })
+    setOwner(db, draft.id, 'taskq', USER)
+    const app = createApp({ db, config }, TOKEN)
+    const headers = { host: `127.0.0.1:${config.port}`, 'x-taskq-token': TOKEN, 'content-type': 'application/json' }
+    const res = await app.request(`/api/tasks/${draft.id}`, { method: 'PATCH', headers, body: JSON.stringify({ status: 'ready' }) })
+    assert.equal(res.status, 200)
+    assert.deepEqual(agentsWithMail(db, Math.floor(Date.now() / 1000), 60), ['taskq'])
+  })
 
   test('a turn takes every unread message once and blocks a second turn', () => {
     const { db } = env

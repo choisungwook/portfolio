@@ -3,6 +3,8 @@ import { currentLanguage, KO_WORDS } from './i18n.js'
 // The board in three panes: drafts on the left as an inbox, the statuses a task moves through in the middle (two rows),
 // and where it ends on the right: failed above (cancelled folded under it), done below.
 export const BOARD_PANES = { inbox: ['draft'], flow: ['ready', 'running', 'needs_approval', 'needs_auth', 'review'], ends: ['failed', 'cancelled', 'done'] }
+// The middle pane has two columns: running, and one waiting column for every status that waits on the queue or the user.
+export const BOARD_WAITING = ['ready', 'needs_approval', 'needs_auth', 'review']
 export const COLLAPSED_COLUMNS = ['cancelled']
 // Outcomes of a last run that the board marks with an error icon.
 export const ERROR_OUTCOMES = ['failed', 'stale']

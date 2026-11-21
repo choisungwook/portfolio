@@ -3,10 +3,10 @@
 // shows the English text, so a new string never breaks the page.
 const KO = {
   'nav.calendar': '캘린더', 'nav.board': 'task 상태보드',
-  'nav.bots': 'Bots', 'nav.wiki': '위키', 'nav.shared': '공용 폴더', 'nav.search': '통합 검색', 'hero.open': '대화 열기', 'board.inbox': '초안함', 'board.flow': '진행', 'board.ends': '결과',
+  'nav.bots': 'Bots', 'nav.wiki': '위키', 'nav.shared': '공용 폴더', 'nav.search': '통합 검색', 'hero.open': '대화 열기', 'board.inbox': '초안함', 'board.flow': '진행', 'board.waiting': '대기', 'board.ends': '결과',
   'bots.add': 'bot 추가', 'bots.paused': '멈춤', 'bots.pause': '전체 멈추기', 'bots.resume': '전체 다시 켜기',
   'bots.working': '작업 중', 'bots.disabled': '꺼진 bot', 'bots.settings': '설정',
-  'chat.message': '메시지', 'chat.send': '보내기', 'chat.attach': '추가', 'chat.working': '작업 중', 'chat.esc': 'esc로 중단',
+  'chat.message': '메시지', 'chat.send': '보내기', 'chat.copy': '복사', 'chat.copy_failed': '복사하지 못했습니다', 'chat.attach': '추가', 'chat.working': '작업 중', 'chat.esc': 'esc로 중단',
   'chat.stop': '중단', 'chat.find': '대화에서 찾기', 'chat.drop': '여기에 놓으면 첨부됩니다', 'chat.empty': '아직 대화가 없습니다.',
   'chat.cancelled': '취소됨', 'chat.to': '받는 쪽', 'chat.scheduled': '예약', 'chat.queued': '대기', 'chat.queued_idle': '개 메시지가 빈 turn 자리를 기다립니다',
   'compose.saved': '저장됨, 다음 turn부터 적용', 'compose.model_default': '기본 모델', 'effort.low': '낮음', 'effort.medium': '중간', 'effort.high': '높음', 'effort.xhigh': '엑스트라', 'effort.max': '최대', 'effort.minimal': '최소', 'effort.none': '없음', 'effort.recommended': '추천', 'effort.costly': '사용량 많음', 'effort.note': '노력이 높을수록 더 철저하게 답하지만, 시간이 더 걸리고 한도를 더 빨리 씁니다.', 'compose.fallback': '내장 목록',

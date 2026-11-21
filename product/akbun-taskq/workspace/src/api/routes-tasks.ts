@@ -9,6 +9,7 @@ import { HttpError, optionalJson, readJson, requireOk, type ApiDeps } from './ht
 import { planRepos, reposOf } from '../workspace/task-repos.ts'
 import { deleteTask, OperatorError, prepareRun, requestCancel, retryTask } from '../db/operator.ts'
 import { noRunControl } from '../runner/control.ts'
+import { notifyOwner } from '../team/report.ts'
 import { enumParam, TASK_STATUSES } from './params.ts'
 
 const LOCKED_FOR_EDIT = ['running', 'needs_approval']
@@ -41,6 +42,8 @@ export function registerTaskRoutes(api: Hono, { db, config, control = noRunContr
     const edits = 'intent' in patch.data || 'title' in patch.data
     if (edits && LOCKED_FOR_EDIT.includes(task.status)) throw new HttpError(409, `task is ${task.status}; stop it before editing`)
     if (patch.status === 'ready' && !moveStatus(db, id, 'draft', 'ready')) throw new HttpError(409, 'only draft tasks can be made ready')
+    // The owner was only told quietly while it was a draft, and the queue does not run owned tasks: wake the owner now.
+    if (patch.status === 'ready' && task.owner) notifyOwner(db, getTask(db, id)!)
     if (patch.data.workflow_id) {
       try {
         patch.data.workflow_id = workflowIdOf(db, patch.data.workflow_id)
