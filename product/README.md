@@ -7,6 +7,7 @@
 | 디렉터리 | 설명 |
 |---|---|
 | [akbun-keychain](./akbun-keychain/) | AI agent가 값을 보지 않고 쓰도록 비밀 값을 암호화해 로컬 JSON 파일에 보관하는 CLI, MCP, 로컬 페이지 키 관리 도구 |
+| [akbun-aimemory](./akbun-aimemory/) | Claude Code·Codex·Kiro·Antigravity hook이 남긴 대화를 SQLite에 모아 AI 모델 없이 하이브리드 검색하고 CLI와 웹 UI로 관리하는 AI 메모리 |
 | [akbun-taskq](./akbun-taskq/) | Claude 세션이 태스크를 처리하고, 역할을 가진 Claude·OpenAI·Kiro 상주 bot이 태스크와 workflow를 나눠 맡아 대화하듯 일하며, 실행·알림·인계 기록을 화면, CLI, MCP로 관리하는 개인용 에이전트 태스크 큐 |
 | [akbun-storyboard](./akbun-storyboard/) | 씬별 스케치·대본·배경음악·효과음·아이디어·댓글을 웹 UI와 CLI, MCP로 사람과 AI agent가 함께 편집하는 Rust 단일 바이너리 영상 스토리보드 도구 |
 | [akbun-makephoto](./akbun-makephoto/) | 폴더 카탈로그, 태그, 수평·자르기·밝기·색, 필름 룩, 자동 보정 버튼과 AI용 CLI를 갖춘 초보자용 macOS 사진 편집 앱 |

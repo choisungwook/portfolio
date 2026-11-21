@@ -2,6 +2,7 @@
   "release-akbun-ai-useage.yml": { "auto": "workflow가 최신 tag에서 다음 버전을 계산함" },
   "release-akbun-awsviewer.yml": { "auto": "workflow가 최신 tag에서 다음 버전을 계산함" },
   "deploy-slo.yml": { "unversioned": "S3 배포라 tag와 버전이 없음" },
+  "verify-akbun-aimemory.yml": { "unversioned": "테스트만 실행함. release workflow는 아직 없음" },
   "verify-akbun-taskq.yml": { "unversioned": "테스트만 실행함. 바이너리 release는 release-akbun-taskq.yml이 맡음" },
   "verify-akbun-keychain.yml": { "unversioned": "테스트와 바이너리 빌드 확인만 함. release는 release-akbun-keychain.yml이 맡음" },
   "release-akbun-keychain.yml": {

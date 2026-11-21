@@ -1,0 +1,33 @@
+name: verify-akbun-aimemory
+
+# Type check and the critical tests on pull requests. There is no release job yet; see the akbun-aimemory issues.
+on:
+  pull_request:
+    paths:
+      - 'product/akbun-aimemory/**'
+      - '.github/workflows/verify-akbun-aimemory.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+defaults:
+  run:
+    working-directory: product/akbun-aimemory/workspace
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      # Node 24 runs the TypeScript sources directly and bundles node:sqlite with FTS5.
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: product/akbun-aimemory/workspace/package-lock.json
+
+      - run: npm ci
+      - run: npm run build
+      - run: npm test

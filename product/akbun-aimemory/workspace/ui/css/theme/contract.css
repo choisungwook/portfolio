@@ -1,0 +1,73 @@
+/* Token contract: the only custom properties component CSS may read.
+   A theme file implements every token here for light and dark. `initial` makes a token the theme forgot fail visibly.
+   test/ui-tokens.test.ts checks that components use nothing else and that every theme defines all of them. */
+:root {
+  /* Surfaces, from back to front: page, raised panel, nested item, field. */
+  --bg: initial;
+  --panel: initial;
+  --panel-soft: initial;
+  --stage: initial;
+  --field: initial;
+  --chip: initial;
+  --control: initial;
+  --hover: initial;
+
+  /* Text and lines. */
+  --fg: initial;
+  --muted: initial;
+  --border: initial;
+  --border-strong: initial;
+
+  /* Interaction. --accent is the primary action and the selected state; --focus is the keyboard focus ring. */
+  --accent: initial;
+  --accent-hover: initial;
+  --link: initial;          /* text of ghost buttons and links; fills use --accent */
+  --accent-soft: initial;
+  --on-accent: initial;
+  --focus: initial;
+  --secondary: initial;
+  --secondary-hover: initial;
+  --on-secondary: initial;  /* text on a --secondary fill */
+  --on-danger: initial;     /* text on a --danger-fill */
+  --danger: initial;
+  --danger-hover: initial;
+  --danger-fill: initial;
+
+  /* Notification washes, one per support color. */
+  --error-soft: initial;
+  --warning-soft: initial;
+  --success-soft: initial;
+  --info-soft: initial;
+
+  /* Task status and run outcome. Each is always shown with a shape and a word, never color alone. */
+  --done: initial;
+  --failed: initial;
+  --needs-approval: initial;
+  --needs-auth: initial;
+  --review: initial;
+  --running: initial;
+  --stale: initial;
+  --high: initial;
+
+  /* Bot avatars: one fill per bot (by roster order), the user's own avatar, and the eyes drawn on top. */
+  --avatar-1: initial;
+  --avatar-2: initial;
+  --avatar-3: initial;
+  --avatar-4: initial;
+  --avatar-5: initial;
+  --avatar-6: initial;
+  --avatar-user: initial;
+  --avatar-eye: initial;
+
+  /* Shape, depth, motion and type. */
+  --radius: initial;
+  --radius-s: initial;
+  --radius-l: initial;       /* cards, chat bubbles, the sidebar */
+  --shadow-1: initial;
+  --shadow-2: initial;
+  --ease: initial;
+  --font-sans: initial;
+  --font-mono: initial;
+  --text-body: initial;
+  --text-small: initial;
+}
