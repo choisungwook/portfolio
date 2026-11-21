@@ -196,7 +196,7 @@ export function registerBotsRoutes(api: Hono, { db, config, bots }: ApiDeps): vo
   api.get('/bots/:name/browser/screen', async (c) => {
     const name = botOf(c.req.param('name'))
     if (!(await browserState(config, name)).running) throw new HttpError(404, 'the browser is not running')
-    const jpeg = await browserCall(() => browserScreenshot(config, name, 'jpeg'))
+    const jpeg = await browserCall(() => browserScreenshot(config, name, 'jpeg', false))
     return c.body(new Uint8Array(jpeg), 200, { 'content-type': 'image/jpeg', 'cache-control': 'no-store' })
   })
   api.post('/bots/:name/browser/open', async (c) => {

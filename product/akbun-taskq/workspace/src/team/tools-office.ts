@@ -4,6 +4,7 @@ import {
   csvRead, csvWrite, officePath, pptxCreate, pptxDuplicateSlide, pptxRead, pptxReplaceText, sharedRelativeOrAbsolute,
   xlsxRead, xlsxSetCells, xlsxWrite,
 } from '../office/files.ts'
+import { getAgent } from '../db/team.ts'
 import { sharedDir } from './shared.ts'
 import { ToolError, type ScopedTools, type TeamTool } from './tools.ts'
 
@@ -23,7 +24,15 @@ export function officeTools(scope: ScopedTools): TeamTool[] {
       throw new ToolError(error instanceof Error ? error.message : String(error))
     }
   }
-  const path = (args: Record<string, unknown>, ext: string) => officePath(shared(), String(args.path), ext)
+  // These tools write from the taskq process, outside Claude Code's sandbox, so a bot with its sandbox on keeps to the
+  // shared folder here too.
+  const path = (args: Record<string, unknown>, ext: string) => {
+    const full = officePath(shared(), String(args.path), ext)
+    if (getAgent(scope.db, scope.agent)?.sandbox && !full.startsWith(`${shared()}/`)) {
+      throw new Error('this bot runs sandboxed, so its files stay in the shared folder; ask the user to copy the file there')
+    }
+    return full
+  }
   const shown = (full: string) => sharedRelativeOrAbsolute(shared(), full)
   const changed = <T extends Record<string, unknown>>(full: string, out: T) => {
     wrote()

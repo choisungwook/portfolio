@@ -84,7 +84,7 @@ export function agentFile(config: Config, request: TurnRequest): { dir: string; 
   const servers: Record<string, unknown> = {
     taskq: {
       command: self.command, args: [...self.args, 'mcp', '--bot', agent.name],
-      env: { TASKQ_HOME: config.home, ...(request.turnId === undefined ? {} : { TASKQ_TURN_ID: String(request.turnId) }) },
+      env: { TASKQ_HOME: config.home, TASKQ_OWNER_PID: String(process.pid), ...(request.turnId === undefined ? {} : { TASKQ_TURN_ID: String(request.turnId) }) },
     },
   }
   for (const s of request.mcpServers ?? []) servers[s.name] = { command: s.command, args: s.args }

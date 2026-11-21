@@ -34,18 +34,18 @@ flowchart LR
     UI --> API
 ```
 
-- Chrome은 열린 포트를 프로필 폴더의 `DevToolsActivePort`에 쓴다. 그래서 어느 프로세스든 그 파일만 읽으면 같은 브라우저에 붙는다. Kiro bot은 도구가 `taskq mcp --bot`이라는 별도 프로세스에서 돌기 때문에 이 방식이 꼭 필요했다.
+- Chrome은 열린 포트를 프로필 폴더의 `DevToolsActivePort`에 쓴다. 그래서 어느 프로세스든 그 파일만 읽으면 같은 브라우저에 붙는다. Codex(ChatGPT 방식)와 Kiro bot은 도구가 `taskq mcp --bot`이라는 별도 프로세스에서 돌기 때문에 이 방식이 꼭 필요했다.
 - 연결은 호출마다 열고 닫는다. 오래 붙어 있는 연결을 관리하지 않아도 되고, 서버가 재시작해도 상태가 꼬이지 않는다.
 - 페이지 요소는 `browser_read`가 `data-taskq-ref="e1"` 같은 속성을 붙여 돌려주고, 클릭과 입력은 그 ref의 화면 좌표에 실제 마우스·키 입력을 보낸다. DOM의 `click()`을 부르는 것보다 사람이 누르는 것에 가깝다.
 - 보기(`GET /browser`)는 브라우저를 켜지 않는다. 오른쪽 창을 열었다는 이유만으로 Chrome이 뜨면 안 되기 때문이다.
 
-Chrome 수명은 생각보다 까다로웠다. 처음에는 `taskq run`이 끝날 때 `Browser.close`를 보내게 했는데, 데모를 SIGKILL로 끄니 Chrome이 고아로 남았다. macOS에는 부모가 죽으면 자식도 죽이는 장치가 없어서, Chrome을 작은 셸이 띄우고 그 셸이 2초마다 taskq 프로세스가 살아 있는지 확인해 없으면 Chrome을 끝내게 했다. 정상 종료에서는 여전히 `Browser.close`로 프로필을 저장하며 닫는다.
+Chrome 수명은 생각보다 까다로웠다. 처음에는 `taskq run`이 끝날 때 `Browser.close`를 보내게 했는데, 데모를 SIGKILL로 끄니 Chrome이 고아로 남았다. macOS에는 부모가 죽으면 자식도 죽이는 장치가 없어서, Chrome을 작은 셸이 띄우고 그 셸이 2초마다 taskq 프로세스가 살아 있는지 확인해 없으면 Chrome을 끝내게 했다. 정상 종료에서는 여전히 `Browser.close`로 프로필을 저장하며 닫는다. 여기서 한 번 더 걸렸다. Codex와 Kiro의 `taskq mcp --bot`은 turn 하나 동안만 살아서, 그 프로세스가 띄운 Chrome은 turn이 끝나자마자 꺼졌다. 그래서 감시 대상을 "Chrome을 띄운 프로세스"가 아니라 `taskq run` 서버로 바꾸고, 서버가 MCP 프로세스에 자기 pid를 `TASKQ_OWNER_PID`로 넘긴다. 셸 문자열에 들어가는 값은 정수로 검사한 pid뿐이다.
 
 UI는 화면 그림을 토큰과 함께 fetch해 `blob:` URL로 보인다. UI의 CSP가 `default-src 'self'`라 이 그림이 처음에 깨졌고, `img-src 'self' blob:`을 더했다. iframe이 사라졌으니 외부 frame 허용은 지웠다.
 
 ## CSV·Excel·PowerPoint
 
-경로 규칙 하나로 세 형식을 묶었다. 절대 경로는 사용자가 지정한 파일이라 그 파일을 계속 고치고, 상대 경로는 공용 폴더의 파일이라 없으면 새로 만든다(`..`로 공용 폴더를 벗어나면 거부).
+경로 규칙 하나로 세 형식을 묶었다. 절대 경로는 사용자가 지정한 파일이라 그 파일을 계속 고치고, 상대 경로는 공용 폴더의 파일이라 없으면 새로 만든다(`..`로 공용 폴더를 벗어나면 거부). 이 도구들은 Claude Code의 sandbox 밖인 taskq 프로세스에서 파일을 쓰므로, sandbox를 켠 bot은 공용 폴더 안의 파일만 쓰게 막았다.
 
 - CSV는 RFC 4180 파서를 직접 썼다. 따옴표, 쉼표, 줄바꿈이 든 칸만 처리하면 되는 작은 문제라 라이브러리를 넣지 않았다.
 - Excel은 exceljs다. 셀만 바꾸는 `xlsx_set_cells`가 파일을 통째로 다시 쓰지 않고 읽어서 그 셀만 고치므로 서식, 열 너비, 다른 시트가 남는다.

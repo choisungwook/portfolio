@@ -19,7 +19,7 @@ export function browserTools(scope: ScopedTools): TeamTool[] {
   return [
     {
       name: 'browser_open',
-      description: 'Open a web page (http or https) in your browser, the one the user sees beside your conversation. Starts the browser on first use; cookies stay between turns. Then call browser_read to see the page.',
+      description: 'Open a web page (http or https) in your browser, the one the user sees beside your conversation. Starts the browser on first use; the page and cookies stay between turns while taskq runs. Then call browser_read to see the page.',
       input: { url: z.string().min(1).max(2000) },
       readOnly: false,
       handler: (args) => run(() => browserOpen(config, agent, String(args.url))),

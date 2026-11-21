@@ -1,7 +1,7 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { createServer } from 'node:http'
-import { chromePath, closeBrowsers } from '../src/browser/chrome.ts'
+import { chromePath, closeBrowsers, ownerPid } from '../src/browser/chrome.ts'
 import { browserClick, browserOpen, browserRead, browserScreenshot, browserState, browserType, webUrl } from '../src/browser/actions.ts'
 import { setup } from './helpers.ts'
 
@@ -33,5 +33,18 @@ test('a bot opens a page, reads it, types and clicks', { skip: !chromePath() && 
     await closeBrowsers(env.config)
     server.close()
     env.cleanup()
+  }
+})
+
+test('a one-turn MCP process hands the browser to the taskq server it names', () => {
+  const before = process.env.TASKQ_OWNER_PID
+  try {
+    process.env.TASKQ_OWNER_PID = '4242'
+    assert.equal(ownerPid(), 4242)
+    process.env.TASKQ_OWNER_PID = '1; rm -rf /'
+    assert.equal(ownerPid(), process.pid, 'only an integer reaches the watcher shell')
+  } finally {
+    if (before === undefined) delete process.env.TASKQ_OWNER_PID
+    else process.env.TASKQ_OWNER_PID = before
   }
 })

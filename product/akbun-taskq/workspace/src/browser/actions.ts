@@ -8,9 +8,9 @@ const LOAD_MS = 15_000
 const TEXT_LIMIT = 8000
 const ELEMENT_LIMIT = 150
 
-async function withPage<T>(config: Config, bot: string, work: (page: Page) => Promise<T>): Promise<T> {
-  const page = await openPage(config, bot)
-  if (!page) throw new Error('the browser did not start')
+async function withPage<T>(config: Config, bot: string, work: (page: Page) => Promise<T>, launch = true): Promise<T> {
+  const page = await openPage(config, bot, launch)
+  if (!page) throw new Error(launch ? 'the browser did not start' : 'the browser is not running')
   try {
     return await work(page)
   } finally {
@@ -122,11 +122,12 @@ export function browserType(config: Config, bot: string, ref: string, text: stri
   })
 }
 
-export function browserScreenshot(config: Config, bot: string, format: 'png' | 'jpeg' = 'png') {
+// The pane's picture passes launch false: looking at the browser never starts one.
+export function browserScreenshot(config: Config, bot: string, format: 'png' | 'jpeg' = 'png', launch = true) {
   return withPage(config, bot, async (page) => {
     const { data } = await page.send<{ data: string }>('Page.captureScreenshot', format === 'jpeg' ? { format, quality: 70 } : { format })
     return Buffer.from(data, 'base64')
-  })
+  }, launch)
 }
 
 // For the right pane: where the bot's browser is, without starting one.

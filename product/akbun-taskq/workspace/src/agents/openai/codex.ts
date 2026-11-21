@@ -46,6 +46,8 @@ export function codexArgs(config: Config, request: TurnRequest): string[] {
   override('mcp_servers.taskq.command', self.command)
   override('mcp_servers.taskq.args', [...self.args, 'mcp', '--bot', agent.name])
   override('mcp_servers.taskq.env.TASKQ_HOME', config.home)
+  // The bot's browser follows the taskq server, not this one-turn MCP process (src/browser/chrome.ts).
+  override('mcp_servers.taskq.env.TASKQ_OWNER_PID', String(process.pid))
   if (request.turnId !== undefined) override('mcp_servers.taskq.env.TASKQ_TURN_ID', String(request.turnId))
   for (const server of request.mcpServers ?? []) {
     override(`mcp_servers.${server.name}.command`, server.command)

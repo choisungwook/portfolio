@@ -27,6 +27,12 @@ export function chromePath(): string | null {
 
 export const profileDir = (config: Config, bot: string) => join(config.home, 'browser', bot)
 
+// Only digits reach the watcher's shell text.
+export function ownerPid(): number {
+  const owner = Number(process.env.TASKQ_OWNER_PID)
+  return Number.isInteger(owner) && owner > 1 ? owner : process.pid
+}
+
 // The DevTools port of the bot's running Chrome, or null when none answers.
 async function runningPort(config: Config, bot: string): Promise<number | null> {
   const file = join(profileDir(config, bot), 'DevToolsActivePort')
@@ -51,9 +57,11 @@ async function start(config: Config, bot: string): Promise<number> {
     '--headless=new', `--user-data-dir=${dir}`, '--remote-debugging-address=127.0.0.1', '--remote-debugging-port=0',
     '--no-first-run', '--no-default-browser-check', '--window-size=1280,800', 'about:blank',
   ]
-  // Chrome must not outlive the taskq process that started it, even one killed without a chance to close it. A shell
-  // runs Chrome and checks every 2 seconds that this process is alive; when it is gone, the shell ends Chrome.
-  const watch = `"$0" "$@" & c=$!; while kill -0 ${process.pid} 2>/dev/null && kill -0 $c 2>/dev/null; do sleep 2; done; kill $c 2>/dev/null`
+  // Chrome must not outlive taskq, even one killed without a chance to close it. A shell runs Chrome and checks every
+  // 2 seconds that the owner is alive; when it is gone, the shell ends Chrome. The owner is the `taskq run` server: a
+  // Codex or Kiro bot's `taskq mcp --bot` lives for one turn, so it passes the server's pid in TASKQ_OWNER_PID and the
+  // browser outlasts the turn.
+  const watch = `"$0" "$@" & c=$!; while kill -0 ${ownerPid()} 2>/dev/null && kill -0 $c 2>/dev/null; do sleep 2; done; kill $c 2>/dev/null`
   const child = spawn('/bin/sh', ['-c', watch, path, ...args], { detached: true, stdio: 'ignore' })
   child.unref()
   const until = Date.now() + START_MS
