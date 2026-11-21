@@ -90,7 +90,7 @@ export type Runtime = 'claude' | 'openai' | 'kiro'
 const OWN: Record<Runtime, string[]> = {
   claude: [KEYS.claude_provider, KEYS.claude_region, KEYS.claude_profile],
   openai: [KEYS.bedrock_profile, KEYS.bedrock_region],
-  kiro: ['kiro_start_url', 'kiro_region'],
+  kiro: ['kiro_start_url', 'kiro_region', 'kiro_connections', 'kiro_active'],
 }
 export function clearConnectionSettings(db: Db, config: Config, runtime: Runtime): void {
   for (const key of OWN[runtime]) db.prepare('DELETE FROM meta WHERE key = ?').run(key)

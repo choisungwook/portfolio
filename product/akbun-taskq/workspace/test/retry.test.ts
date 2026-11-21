@@ -52,11 +52,11 @@ describe('retry', () => {
     assert.deepEqual(seen, [null])
   })
 
-  test('resume keeps the session; draft puts the task back as a draft; a task that is not failed is 409', async () => {
+  test('a retry never resumes the old session; draft puts the task back as a draft; a task that is not failed is 409', async () => {
     const { db } = env
-    const kept = failedTask(env, 'keep session')
-    assert.equal((await retry(kept, { resume: true })).status, 200)
-    assert.equal(getTask(db, kept)!.session_id, 'sess-old')
+    const fresh = failedTask(env, 'asked to resume')
+    assert.equal((await retry(fresh, { resume: true })).status, 200)
+    assert.equal(getTask(db, fresh)!.session_id, null, 'a task is not tied to a session: resume is ignored')
 
     const draft = failedTask(env, 'as draft')
     assert.equal((await retry(draft, { draft: true })).status, 200)

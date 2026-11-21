@@ -10,6 +10,7 @@
 
 | 버전 | 해설 | 첫 항목 |
 |---|---|---|
+| [0.35.0](0.35.0/changelog.md) | [learning](0.35.0/learning_changelog.md) | 설정 > 연결 맨 위에서 TLS 검사용 루트 인증서를 가져온다. |
 | [0.34.0](0.34.0/changelog.md) | [learning](0.34.0/learning_changelog.md) | bot 대화 오른쪽 맨 위에 컨텍스트가 보인다. |
 | [0.33.0](0.33.0/changelog.md) | [learning](0.33.0/learning_changelog.md) | task 상태보드의 세 칸을 테두리와 제목이 있는 패널로 나눴다. |
 | [0.32.0](0.32.0/changelog.md) | [learning](0.32.0/learning_changelog.md) | 모든 Claude bot과 작업 실행에서 auto compaction이 항상 켜진다. |

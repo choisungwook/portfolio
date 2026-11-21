@@ -7,7 +7,7 @@ import { Client } from '@modelcontextprotocol/sdk/client/index.js'
 import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js'
 import { endRun, insertRun, listRunsOfTask } from '../src/db/runs.ts'
 import { acceptHandoff, listHandoffs, setHandoffMode } from '../src/db/handoffs.ts'
-import { claimTask, moveStatus, patchData } from '../src/db/tasks.ts'
+import { claimTask, getTask, moveStatus, patchData } from '../src/db/tasks.ts'
 import { listAlerts } from '../src/db/alerts.ts'
 import { sendHandoffNotices } from '../src/alerts/handoffs.ts'
 import type { Notice } from '../src/alerts/notify.ts'
@@ -15,6 +15,7 @@ import type { HandoffRecord } from '../src/types.ts'
 import { createApp } from '../src/api/server.ts'
 import { buildPrompt } from '../src/worker/prompt.ts'
 import { addTask, fakeWorker, result, setup, startRunner, stopRunners, waitFor, statusOf, TOKEN } from './helpers.ts'
+import { previousRun } from '../src/runner/context.ts'
 
 test('[critical] a dependent run receives the artifact only after the prerequisite is marked done', async (t) => {
   const env = setup()
@@ -160,5 +161,22 @@ test('CLI accepts a handoff and a stdio MCP client reads the same record and pol
     assert.deepEqual(mode.structuredContent, { task_id: targetId, auto_accept: false })
   } finally {
     await client.close()
+  }
+})
+
+test('a new run of a task is told what its last run did, and never resumes its session', async () => {
+  const env = setup()
+  try {
+    const task = addTask(env.db, { status: 'failed' })
+    env.db.prepare("INSERT INTO runs (id, task_id, started_at, ended_at, outcome, summary) VALUES ('r-prev', ?, 1, 2, 'failed', 'stopped at step 2')").run(task.id)
+    env.db.prepare(`INSERT INTO events (task_id, run_id, ts, kind, payload) VALUES (?, 'r-prev', 1, 'tool_call', '{"tool":"Bash","input":{"command":"ls"}}')`).run(task.id)
+    const previous = previousRun(env.db, task.id, 'r-new')
+    assert.deepEqual(previous, { outcome: 'failed', summary: 'stopped at step 2', tools: ['{"tool":"Bash","input":{"command":"ls"}}'] })
+    const prompt = buildPrompt({ task: getTask(env.db, task.id)!, similar: [], handoffs: [], previous }, '/tmp/out')
+    assert.match(prompt, /last run of this task/)
+    assert.match(prompt, /stopped at step 2/)
+    assert.match(prompt, /"command":"ls"/)
+  } finally {
+    env.cleanup()
   }
 })

@@ -74,12 +74,17 @@ export interface HandoffRecord {
   status: 'pending' | 'accepted' | 'superseded'
 }
 
+// What a new run of a task remembers of the last one: its outcome, its summary and its last tool calls. A run never
+// resumes another's session (the session belongs to whoever ran it); it starts fresh and is told what happened.
+export interface PreviousRun { outcome: string | null; summary: string | null; tools: string[] }
+
 export interface WorkerContext {
   task: Task
   runId: string
   resumeSessionId: string | null
   similar: SimilarTask[]                                          // up to 3, from memory/similar.ts
   handoffs: TaskHandoff[]
+  previous?: PreviousRun | null                                   // the task's last finished run, remembered for a new run
   access_skill_path?: string                                      // registered folder of task.data.access_skill
   signal: AbortSignal
   emit(kind: EventKind, payload: Record<string, unknown>): void   // masked and stored by the runner

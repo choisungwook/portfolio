@@ -6,6 +6,7 @@ import { emit, on } from '../core/bus.js'
 import { area, el, fill } from '../core/dom.js'
 import { icon } from '../core/icons.js'
 import { t } from '../core/i18n.js'
+import { askConfirm } from '../core/ask.js'
 
 // One bot's connection and why it may not answer, for the conversation's "will not answer yet" note.
 export async function botConnection(name) {
@@ -115,7 +116,7 @@ async function load() {
 function body(form) {
   const out = {}
   for (const input of form.querySelectorAll('input[name], select[name]')) {
-    if (input.closest('[data-for]')?.hidden || input.name.endsWith('_method')) continue
+    if (input.closest('[data-for]')?.hidden || input.name.endsWith('_method') || input.name.startsWith('kiro_new_')) continue
     out[input.name] = input.value.trim()
   }
   return out
@@ -138,6 +139,8 @@ export function initConnections() {
     // the current status of its method at once.
     known = {}
     load().then((ok) => ok && loadStatus())
+    loadKiro()
+    loadCa()
   })
   for (const form of forms()) {
     form.querySelector('[data-method]').addEventListener('change', () => {
@@ -147,22 +150,109 @@ export function initConnections() {
     form.querySelector('[data-test]').addEventListener('click', () => test(form))
     form.addEventListener('submit', async (event) => {
       event.preventDefault()
+      // Kiro has no Save: its connections are added and chosen in their own list. Enter in the add form adds one.
+      if (form.dataset.runtime === 'kiro') return addKiro()
       if (await mutate(() => api.put('/connection-settings', body(form)), t('connections.saved', 'Saved; it applies from the next turn'))) {
         await load()
         test(form)
       }
     })
     form.querySelector('[data-clear]').addEventListener('click', async () => {
+      // Kiro's Clear removes every Identity Center connection, so it asks first and redraws the list.
+      if (form.dataset.runtime === 'kiro' && !(await askConfirm(t('kiro.clear_ask', 'Remove every Kiro Identity Center connection?')))) return
       if (await mutate(() => api.del(`/connection-settings/${form.dataset.runtime}`), t('connections.cleared', 'Cleared'))) {
         known = {}
         result(form, null)
         load().then((ok) => ok && loadStatus())
+        if (form.dataset.runtime === 'kiro') loadKiro()
       }
     })
   }
+  // Signs in with the connection in use.
   area('kiro-sign-in').addEventListener('click', async () => {
-    const f = area('kiro-sign-in').form.elements
-    const state = await mutate(() => api.post('/kiro/login', { start_url: f.kiro_start_url.value.trim(), region: f.kiro_region.value.trim() }))
+    const state = await mutate(() => api.post('/kiro/login', {}))
     if (state) renderLogin(state)
   })
+  area('kiro-add-save').addEventListener('click', addKiro)
+  area('ca-import').addEventListener('click', () => area('ca-file').click())
+  area('ca-file').addEventListener('change', async () => {
+    const file = area('ca-file').files?.[0]
+    area('ca-file').value = ''
+    if (!file) return
+    const info = await mutate(async () => api.put('/ca-bundle', { pem: await file.text() }), t('ca.saved', 'Certificate imported; every runtime trusts it from the next call'))
+    if (info) renderCa(info)
+  })
+  area('ca-clear').addEventListener('click', async () => {
+    const info = await mutate(() => api.del('/ca-bundle'), t('ca.cleared', 'Certificate removed'))
+    if (info) renderCa(info)
+  })
+}
+
+// Kiro's Identity Center connections: a row each, the one in use marked and outlined, Use and Remove on the others.
+async function loadKiro() {
+  try {
+    renderKiro(await api.get('/kiro/connections'))
+  } catch (error) {
+    fill(area('kiro-list'), el('li', { class: 'conn-error', text: error.message }))
+  }
+}
+
+function renderKiro(list) {
+  const box = area('kiro-list')
+  if (list.connections.length === 0) {
+    area('kiro-add').open = true
+    return fill(box, el('li', { class: 'meta', text: t('kiro.none', 'No connection yet. Add your Identity Center start URL below.') }))
+  }
+  fill(box, ...list.connections.map((c) => {
+    const active = c.id === list.active
+    return el('li', { class: 'kiro-row', dataset: { active: String(active) }, 'aria-current': active ? 'true' : null },
+      el('span', { class: 'kiro-mark', 'aria-hidden': 'true' }, active ? icon('check', 16) : null),
+      el('span', { class: 'kiro-text' },
+        el('strong', { text: c.name }), active ? el('span', { class: 'badge kiro-active', text: t('kiro.in_use', 'In use') }) : null,
+        el('span', { class: 'meta', text: `${c.start_url} · ${c.region}` })),
+      el('span', { class: 'kiro-actions' },
+        active ? null : el('button', { type: 'button', text: t('kiro.use', 'Use'), onclick: () => useKiro(c.id) }),
+        el('button', { type: 'button', class: 'quiet', text: t('kiro.remove', 'Remove'), onclick: () => removeKiro(c.id) })))
+  }))
+}
+
+async function addKiro() {
+  const f = area('kiro-add').closest('form').elements
+  const list = await mutate(() => api.post('/kiro/connections', { name: f.kiro_new_name.value, start_url: f.kiro_new_start_url.value, region: f.kiro_new_region.value }), t('kiro.added', 'Connection added'))
+  if (!list) return
+  for (const name of ['kiro_new_name', 'kiro_new_start_url', 'kiro_new_region']) f[name].value = ''
+  area('kiro-add').open = false
+  renderKiro(list)
+}
+
+async function useKiro(id) {
+  const list = await mutate(() => api.put(`/kiro/connections/${id}/active`, {}), t('kiro.switched', 'Switched. Sign in with AWS SSO for this connection'))
+  if (list) {
+    renderKiro(list)
+    result(document.querySelector('.conn-runtime[data-runtime="kiro"]'), null)
+  }
+}
+
+async function removeKiro(id) {
+  const list = await mutate(() => api.del(`/kiro/connections/${id}`), t('kiro.removed', 'Connection removed'))
+  if (list) renderKiro(list)
+}
+
+// The imported certificate, or where the config file's caBundle points, with each certificate's subject and expiry.
+async function loadCa() {
+  try {
+    renderCa(await api.get('/ca-bundle'))
+  } catch (error) {
+    fill(area('ca-status'), el('p', { class: 'conn-error', text: error.message }))
+  }
+}
+
+function renderCa(info) {
+  area('ca-clear').hidden = info.source !== 'saved'
+  if (!info.source) return fill(area('ca-status'), el('p', { class: 'meta', text: t('ca.none', 'No certificate imported. Only needed on a network with TLS inspection.') }))
+  fill(area('ca-status'),
+    el('p', { class: 'meta', text: info.source === 'saved' ? t('ca.from_saved', 'Imported here') : `${t('ca.from_config', 'From taskq.config.json')}: ${info.path}` }),
+    info.error ? el('p', { class: 'conn-error', text: info.error }) : null,
+    el('ul', { class: 'ca-certs' }, ...info.certs.map((c) => el('li', {}, icon('check', 14), el('span', { text: c.subject }),
+      el('span', { class: 'meta', text: ` · ${t('ca.until', 'valid until')} ${c.valid_to}` })))))
 }

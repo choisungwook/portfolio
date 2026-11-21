@@ -1,7 +1,8 @@
-// Run dialog: summary, outcome, times, stats, event timeline, related alerts, output path and the resume command.
+// Run dialog: summary, outcome, times, stats, event timeline, related alerts and output path. No resume command: the
+// session belongs to whoever ran the task, not to the task.
 import { api } from '../core/api.js'
 import { area, clear, el } from '../core/dom.js'
-import { emit, on } from '../core/bus.js'
+import { on } from '../core/bus.js'
 import { fmtClock, fmtDateTime, fmtDuration } from '../core/time.js'
 import { label, outcomeOf, parseField, SEVERITY_RANK, TYPE_MARK } from '../core/vocab.js'
 import { statusIndicator } from '../core/status.js'
@@ -60,35 +61,13 @@ function sections(run) {
     el('p', { class: 'pre', text: run.summary ?? 'No summary.' }),
     el('h3', { text: 'Output' }),
     el('p', { text: task.output_path ? task.output_path : 'No output file.' }),
-    resumeBlock(run.session_id),
     el('h3', { text: 'Waits' }),
     waitList(run.waits ?? []),
     el('h3', { text: 'Event timeline' }),
     eventList(run.events ?? []),
     el('h3', { text: 'Related alerts' }),
     alertList(run.alerts ?? []),
-    el('div', { class: 'actions' },
-      el('button', { type: 'button', text: 'Open task', onclick: () => emit('open-task', run.task_id) })),
   ]
-}
-
-function resumeBlock(sessionId) {
-  if (!sessionId) return el('p', { class: 'meta', text: 'No session id recorded for this run.' })
-  const command = `claude --resume ${sessionId}`
-  const status = el('span', { class: 'meta', role: 'status' })
-  const copy = el('button', {
-    type: 'button',
-    text: 'Copy resume command',
-    onclick: async () => {
-      try {
-        await navigator.clipboard.writeText(command)
-        status.textContent = 'Copied.'
-      } catch {
-        status.textContent = 'Clipboard blocked. Copy the command above by hand.'
-      }
-    },
-  })
-  return el('div', { class: 'resume' }, el('code', { text: command }), copy, status)
 }
 
 function waitList(waits) {

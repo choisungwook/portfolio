@@ -10,6 +10,7 @@ import { t } from '../core/i18n.js'
 import { statusIndicator } from '../core/status.js'
 import { runNowButton, RUNNABLE } from '../core/run-now.js'
 import { dropRequest } from '../pure/board-drop.js'
+import { askConfirm } from '../core/ask.js'
 
 let columns
 let active = false
@@ -91,6 +92,8 @@ function acceptDrops(node, status) {
 function card(task) {
   const title = task.data.title ?? task.data.intent
   const failed = failedLast(task)
+  // The drag starts from the card button itself: WebKit (Safari, the desktop app's webview) does not start a drag from a
+  // button inside a draggable parent, so the button is draggable too and the li hears the events as they bubble.
   return el('li', {
     class: 'card-item', draggable: 'true',
     ondragstart: (event) => {
@@ -105,12 +108,37 @@ function card(task) {
       for (const col of columns.querySelectorAll('.drop-target')) col.classList.remove('drop-target')
     },
   },
-    el('button', { type: 'button', class: `card status-${task.status}`, onclick: () => emit('open-task', task.id) },
+    el('button', { type: 'button', class: `card status-${task.status}`, draggable: 'true', onclick: () => emit('open-task', task.id) },
       el('span', { class: 'card-title' },
         failed ? el('span', { class: 'card-error', title: `Last run ${label(task.last_outcome)}`, 'aria-label': `Last run ${label(task.last_outcome)}` }, icon('alert', 16)) : null,
         title),
       el('span', { class: 'meta', text: `${TYPE_MARK[task.type] ?? label(task.type)} · ${task.lock_key ?? 'no account or repo'}` }),
       task.owner ? el('span', { class: 'badge owner', text: `@${task.owner}`, title: `Owned by team agent ${task.owner}` }) : null,
       task.blocked ? el('span', { class: 'badge blocked', text: 'blocked' }) : null),
-    RUNNABLE.includes(task.status) ? runNowButton(task) : null)
+    cardActions(task))
+}
+
+
+// The card's buttons: Run now when it can start (off without an owner bot), Cancel while a run holds it, Delete when no
+// run does. Cancel and Delete ask first; the board redraws from the server's answer, so the card moves to its new column.
+const CANCELLABLE = ['running', 'needs_approval', 'needs_auth']
+const UNDELETABLE = ['running', 'needs_approval']
+
+function cardActions(task) {
+  const title = task.data.title ?? task.data.intent
+  const stop = (fn) => (event) => { event.stopPropagation(); fn() }
+  return el('div', { class: 'card-actions' },
+    RUNNABLE.includes(task.status) ? runNowButton(task) : null,
+    CANCELLABLE.includes(task.status) ? el('button', {
+      type: 'button', class: 'card-cancel', text: t('task.cancel', 'Cancel'),
+      onclick: stop(async () => {
+        if (await askConfirm(t('task.cancel_ask', 'Cancel this task? A running run is stopped.'))) mutate(() => api.post(`/tasks/${task.id}/cancel`, {}), t('task.cancelled', 'Cancelled'))
+      }),
+    }) : null,
+    UNDELETABLE.includes(task.status) ? null : el('button', {
+      type: 'button', class: 'card-delete', title: t('task.delete', 'Delete'), 'aria-label': `${t('task.delete', 'Delete')}: ${title}`,
+      onclick: stop(async () => {
+        if (await askConfirm(t('task.delete_ask', 'Delete this task and its runs? This cannot be undone.'))) mutate(() => api.del(`/tasks/${task.id}`), t('task.deleted', 'Deleted'))
+      }),
+    }, icon('close', 14), t('task.delete', 'Delete')))
 }

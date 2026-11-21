@@ -4,6 +4,7 @@ concept를 추가·수정·삭제할 때마다 오늘 날짜 섹션을 맨 위�
 
 ## 2026-11-21
 
+* **Creation**: [task not tied to session](decisions/2026-11-task-not-tied-to-session.md) - 재시도는 새 세션으로 하고 직전 run의 기록을 프롬프트로 넘기는 결정.
 * **Update**: [session handover](decisions/2026-11-session-handover.md)에 Claude 세션의 auto-compact를 항상 켠다(0.32.0)는 내용을 추가.
 * **Update**: [bots execute tasks](decisions/2026-11-bots-execute-tasks.md)에 시작 버튼은 owner가 있어야 켜진다(0.31.0)는 내용을 추가.
 * **Creation**: [turn steps in conversation](decisions/2026-11-turn-steps-in-conversation.md) - bot의 도구 호출을 `team_turn_steps`에 남기고 대화에 접어 보이는 결정.

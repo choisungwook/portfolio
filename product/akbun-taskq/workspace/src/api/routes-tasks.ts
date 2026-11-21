@@ -6,7 +6,7 @@ import { taskDetail } from '../db/detail.ts'
 import { parseTaskInput, parseTaskPatch } from '../validate.ts'
 import { hasAccessSkill } from '../skills/registry.ts'
 import { HttpError, optionalJson, readJson, requireOk, type ApiDeps } from './http.ts'
-import { OperatorError, prepareRun, requestCancel, retryTask } from '../db/operator.ts'
+import { deleteTask, OperatorError, prepareRun, requestCancel, retryTask } from '../db/operator.ts'
 import { noRunControl } from '../runner/control.ts'
 import { enumParam, TASK_STATUSES } from './params.ts'
 
@@ -50,6 +50,17 @@ export function registerTaskRoutes(api: Hono, { db, config, control = noRunContr
     return c.json(getTask(db, id))
   })
 
+  // Delete a task that no run is working on (cancel a running one first); 409 otherwise.
+  api.delete('/tasks/:id', (c) => {
+    try {
+      deleteTask(db, c.req.param('id'))
+    } catch (error) {
+      if (error instanceof OperatorError) throw new HttpError(error.message === 'task not found' ? 404 : 409, error.message)
+      throw error
+    }
+    return c.json({ deleted: true })
+  })
+
   api.post('/tasks/:id/approve', async (c) => c.json(await decide(c, db, true)))
   api.post('/tasks/:id/deny', async (c) => c.json(await decide(c, db, false)))
 
@@ -91,13 +102,13 @@ export function registerTaskRoutes(api: Hono, { db, config, control = noRunContr
     }
   })
 
-  // Only a failed task can be retried. draft: true puts it back as a draft. resume: true keeps its session.
+  // Only a failed or cancelled task can be retried, always in a new session. draft: true puts it back as a draft.
   api.post('/tasks/:id/retry', async (c) => {
     const id = c.req.param('id')
     if (!getTask(db, id)) return c.json({ error: 'task not found' }, 404)
     const body = await optionalJson(c)
-    const options = { draft: body.draft === true, resume: body.resume === true }
-    if (!retryTask(db, id, options)) throw new HttpError(409, 'only failed tasks can be retried')
+    const options = { draft: body.draft === true }
+    if (!retryTask(db, id, options)) throw new HttpError(409, 'only failed or cancelled tasks can be retried')
     return c.json(getTask(db, id))
   })
 }

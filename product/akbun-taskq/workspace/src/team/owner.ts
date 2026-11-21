@@ -7,7 +7,8 @@ import { teamChanged } from '../wake.ts'
 export function setOwner(db: Db, taskId: string, owner: string | null, by: string): void {
   const task = getTask(db, taskId)
   if (!task) throw new Error('task not found')
-  if (task.status === 'done' || task.status === 'failed' || task.status === 'cancelled') throw new Error(`task is ${task.status}`)
+  // A failed or cancelled task can get a bot, so it can be run again (a run needs one); a done task is finished.
+  if (task.status === 'done') throw new Error(`task is ${task.status}`)
   if (task.status === 'running') throw new Error('task is running; change the owner after it finishes or cancel it')
   if (owner !== null && !getAgent(db, owner)?.enabled) throw new Error(`no enabled agent named ${owner}`)
   db.prepare('UPDATE tasks SET owner = ?, owner_since = unixepoch() WHERE id = ?').run(owner, taskId)

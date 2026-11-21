@@ -1,4 +1,5 @@
 import { applyConnectionSettings } from '../team/connection-settings.ts'
+import { applyCaBundle } from '../ca-bundle.ts'
 import { execFileSync } from 'node:child_process'
 import { loadConfig } from '../config.ts'
 import { claudeExecutable } from '../resources.ts'
@@ -46,7 +47,7 @@ const USAGE = `usage: taskq <command> [options]
   alerts               log [--date YYYY-MM-DD]    search QUERY    run    version
   skills list | add PATH | remove NAME | discover
   handoffs [--task TASK]    handoff accept ID    handoff mode TASK [auto|manual]    mcp [--bot NAME]
-  pause [--reason TEXT]    unpause    cancel ID    retry ID [--draft] [--resume]
+  pause [--reason TEXT]    unpause    cancel ID    retry ID [--draft]
   bots list | say [--to NAME] TEXT | inbox | log | turns | threads | wiki [SLUG] | search | export | assign | pause | resume | enable | disable | reset
   workflows list | show | create FILE | update | delete | run ID --bot NAME | runs | run-show | cancel | approve
   api [OPERATION key=value... | --json JSON]   every API route by name; taskq api lists them (the MCP server offers the same as taskq_<name>)`
@@ -65,6 +66,7 @@ export async function main(argv: string[]): Promise<void> {
   const db = openDb(config.home)
   // Sign-in saved in Settings > Connections wins over taskq.config.json, in the CLI and MCP server as in the server.
   applyConnectionSettings(db, config)
+  applyCaBundle(db, config)
   if (name === 'run') {
     await runCommand(config, db)
     return

@@ -96,6 +96,9 @@ fn open_window(app: &tauri::App) -> tauri::Result<()> {
         .min_inner_size(900.0, 600.0)
         // Cmd +/- and Cmd 0 zoom the page, as in a browser; the webview leaves them off unless asked.
         .zoom_hotkeys_enabled(true)
+        // The page handles drag and drop itself (board cards, files dropped on a chat). Tauri's own file-drop handler
+        // would take those events away from the page.
+        .disable_drag_drop_handler()
         .on_new_window(|url, _| {
             if matches!(url.scheme(), "http" | "https") {
                 let _ = Command::new("open").arg(url.as_str()).status();
