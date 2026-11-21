@@ -1,6 +1,9 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { createServer } from 'node:http'
+import { join } from 'node:path'
+import { getAgent } from '../src/db/team.ts'
+import { botGate } from '../src/team/bot-gate.ts'
 import { chromePath, closeBrowsers, ownerPid } from '../src/browser/chrome.ts'
 import { browserClick, browserOpen, browserRead, browserScreenshot, browserState, browserType, webUrl } from '../src/browser/actions.ts'
 import { seedTestBots, setup } from './helpers.ts'
@@ -112,6 +115,34 @@ test('a web action approved longer ago than allowed is not used', async () => {
     env.db.prepare('UPDATE bot_approvals SET decided_at = decided_at - 3600 WHERE id = ?').run(request.id)
     assert.equal(consumeApproval(env.db, 'coder', 'browser_action', 'click "Delete" (button) on https://x/', 15 * 60), false)
     assert.equal(consumeApproval(env.db, 'coder', 'browser_action', 'click "Delete" (button) on https://x/'), true, 'without a limit it still counts')
+  } finally {
+    env.cleanup()
+  }
+})
+
+test('a bot cannot reach its browser around the gate: the profile stops the turn, DevTools commands are refused', async () => {
+  const env = setup()
+  try {
+    await seedTestBots(env.db)
+    const coder = getAgent(env.db, 'coder')!
+    const gate = (tool: string, input: Record<string, unknown>) => botGate(env.config, coder, env.home, tool, input)
+    const profile = join(env.config.home, 'browser', 'coder')
+    assert.equal(gate('Bash', { command: `cat ${profile}/DevToolsActivePort` }).action, 'stop')
+    assert.equal(gate('Read', { file_path: join(profile, 'DevToolsActivePort') }).action, 'stop')
+    assert.equal(gate('Grep', { pattern: 'x', path: join(env.config.home, 'browser') }).action, 'stop')
+    assert.equal(gate('Glob', { pattern: join(env.config.home, 'browser', '*', 'DevToolsActivePort') }).action, 'stop', 'a pattern is a path')
+    assert.equal(gate('Bash', { command: 'cat $TASKQ_HOME/browser/coder/DevToolsActivePort' }).action, 'stop')
+    for (const command of [
+      'curl -s http://127.0.0.1:9222/json/version',
+      'find / -name DevToolsActivePort',
+      `node -e "ws.send(JSON.stringify({method:'Input.dispatchMouseEvent'}))"`,
+      'curl http://127.0.0.1:53111/json',
+      `node -e "require('playwright').chromium.connectOverCDP('http://127.0.0.1:53111')"`,
+    ]) assert.equal(gate('Bash', { command }).action, 'deny', command)
+    for (const command of ['grep -rn remote-debugging src/', `curl -H 'content-type: application/json' https://api.example.com`]) {
+      assert.equal(gate('Bash', { command }).action, 'allow', `not a DevTools call: ${command}`)
+    }
+    assert.equal(gate('Bash', { command: 'curl -s https://example.com/api/list' }).action, 'allow', 'ordinary requests still run')
   } finally {
     env.cleanup()
   }
