@@ -3,6 +3,7 @@ import { createHash } from 'node:crypto'
 import { existsSync, mkdirSync, rmSync } from 'node:fs'
 import { join } from 'node:path'
 import type { Config } from './config.ts'
+import { applyCaBundle } from './connection/ca-bundle.ts'
 import { makeTokenizer, type Tokenizer } from './tokenizer.ts'
 import { dot, embed, fromBlob, toBlob } from './vector.ts'
 
@@ -36,6 +37,7 @@ export function openStore(config: Config): Store {
   const db = new DatabaseSync(dbPath(config), { timeout: 5000 })
   db.exec('PRAGMA journal_mode = WAL')
   db.exec(SCHEMA)
+  applyCaBundle(db, config)
   const row = db.prepare("SELECT value FROM meta WHERE key = 'tokenizer'").get() as { value: string } | undefined
   if (!row) db.prepare("INSERT INTO meta VALUES ('tokenizer', ?)").run(tokenizer.id)
   else if (row.value !== tokenizer.id) process.stderr.write(`aimem: index was built with ${row.value}; run \`aimem reindex\`\n`)
