@@ -13,6 +13,17 @@ pub fn ready_url(line: &str) -> Option<&str> {
     (after.contains('/') && !port.is_empty() && port.bytes().all(|b| b.is_ascii_digit())).then_some(url)
 }
 
+/// `taskq run` prints `taskq starting <percent> <what>` before its ready line (src/cli/run.ts), for the start page.
+const STARTING: &str = "taskq starting ";
+
+/// The percent and the step from a starting line, or None for any other line.
+pub fn progress_line(line: &str) -> Option<(u8, String)> {
+    let rest = line.trim().strip_prefix(STARTING)?;
+    let (percent, what) = rest.split_once(' ').unwrap_or((rest, ""));
+    let percent: u8 = percent.parse().ok()?;
+    (percent <= 100).then(|| (percent, what.trim().to_string()))
+}
+
 /// The login shell that starts taskq. An app opened from Finder has a bare PATH, so the bots would not find `aws`,
 /// `git`, `codex` or `kiro-cli`; the user's interactive login shell has the PATH their terminal has.
 // ponytail: zsh and bash only, other shells (fish) fall back to zsh; read their syntax if someone needs it.
@@ -33,6 +44,14 @@ pub const SCRIPT: &str =
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn reads_the_starting_lines_only() {
+        assert_eq!(progress_line("taskq starting 40 opening the database"), Some((40, "opening the database".to_string())));
+        assert_eq!(progress_line("taskq starting 100"), Some((100, String::new())));
+        assert_eq!(progress_line("taskq starting 140 too much"), None);
+        assert_eq!(progress_line("hello from .zshrc"), None);
+    }
 
     #[test]
     fn ready_url_takes_only_the_loopback_address() {

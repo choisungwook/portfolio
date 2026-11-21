@@ -7,7 +7,7 @@ import pkg from '../../package.json' with { type: 'json' }
 import { openDb } from '../db/open.ts'
 import * as tasks from './commands.ts'
 import * as info from './info.ts'
-import { runCommand } from './run.ts'
+import { runCommand, starting } from './run.ts'
 import { manualText } from '../team/builtin-skill.ts'
 import { applyPendingImport, undoImport } from '../db/backup.ts'
 import { db as dbCommand } from './db.ts'
@@ -73,7 +73,9 @@ export async function main(argv: string[]): Promise<void> {
     console.log(manualFor(args))
     return
   }
+  if (name === 'run') starting(10, 'reading the config')
   const config = loadConfig()
+  if (name === 'run') starting(25, 'opening the database')
   // A database restored in Settings > Database is swapped in by the server's start, before anything opens the file.
   const kept = name === 'run' ? applyPendingImport(config.home) : null
   let db

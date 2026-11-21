@@ -9,8 +9,19 @@
 <body>
   <main>
     <h1>taskq</h1>
-    <p id="status" role="status">Starting taskq…</p>
-    <pre id="error" hidden></pre>
+    <section id="starting" aria-live="polite">
+      <p id="status" role="status">Starting taskq…</p>
+      <div class="bar" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"><span id="fill"></span></div>
+      <p id="step" class="muted"><span id="percent">0%</span> <span id="what"></span></p>
+    </section>
+    <section id="failed" role="alert" hidden>
+      <p class="error" id="failed-title">taskq did not start.</p>
+      <p class="muted" id="failed-hint">The log below is what taskq printed last. Copy it to look for the cause or to report it.</p>
+      <div class="log">
+        <button type="button" id="copy">Copy log</button>
+        <pre><code id="log"></code></pre>
+      </div>
+    </section>
   </main>
   <script src="main.js"></script>
 </body>
