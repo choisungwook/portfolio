@@ -132,8 +132,8 @@
 118. AI 도구는 브라우저를 어떻게 조작하는가: Claude desktop·Claude in Chrome(CLI --chrome)·Codex·Aside가 CDP에 도달하는 경로, raw CDP 8개 명령으로 클릭·읽기·캡처 재현, Playwright가 같은 작업에 CDP 36개를 보내는 이유, (이론) CDP로 블로그 글과 사진을 업로드하는 원리 (26.11.14) - [링크](./computer_science/ai/cdp-browser-access/)
 119. (아직 실습안함) LiteLLM Proxy 확장 지점: Router 내부 동작, pre_call 훅, 로컬 소형 모델(gemma2) 판정 라우팅, complexity_router, custom provider 스트리밍 중계, websearch_interception 비교 (26.11.13) - [링크](./computer_science/ai/litellm-customization/)
 120. (아직 실습안함) Amazon Bedrock AgentCore Memory: Ollama 로컬 모델과 OpenAI 호환 backend로 채팅창 여러 개의 단기·장기 메모리, 추출 지연과 병합, SQL처럼 CLI 조회, IngestData·episode·사용자 기억 삭제, 비용 계산 (26.11.14) - [링크](./aws/bedrock/agentcore-memory/)
-121. (아직 실습안함) claude-mem 원리 핸즈온: hook 캡처, observer 압축, SQLite FTS5 한국어 검색, SessionStart 주입(10,000자 한도), MCP progressive disclosure를 Python(minimem)으로 재현하고 Claude Code 세션으로 메모리 유무 비교 (26.11.18) - [링크](./computer_science/ai/claude-mem-agent-memory/)
-122. LiteLLM Chat SSE 부하테스트 핸즈온: 5~10분 HTTP vs SSE 비교, 기본 k6/http 왜곡 5가지 재현, xk6-sse 보완, NVIDIA AIPerf·GuideLLM 실측 비교 (26.11.20) - [링크](./computer_science/ai/litellm-sse-load-test/)
+121. claude-mem 원리 핸즈온: hook 캡처, observer 압축, SQLite FTS5 한국어 검색, SessionStart 주입(10,000자 한도), MCP progressive disclosure를 Python(minimem)으로 재현하고 Claude Code 세션으로 메모리 유무 비교 (26.11.18) - [링크](./computer_science/ai/claude-mem-agent-memory/)
+122. (아직 실습안함) LiteLLM Chat SSE 부하테스트 핸즈온: 5~10분 HTTP vs SSE 비교, 기본 k6/http 왜곡 5가지 재현, xk6-sse 보완, NVIDIA AIPerf·GuideLLM 실측 비교 (26.11.20) - [링크](./computer_science/ai/litellm-sse-load-test/)
 123. (실습안함) PostgreSQL RBAC 인증·인가 핸즈온: MySQL vs PostgreSQL 권한 비교, Flyway 소유권 장애·롤백(`SET ROLE app_owner`), 비밀번호 로테이션 `DROP ROLE` 장애와 Blue/Green Role 패턴, HTML 슬라이드 학습지 (26.11.21) - [링크](./computer_science/postgresql-rbac/)
 
 ## 직접 만든 제품
