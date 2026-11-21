@@ -10,6 +10,7 @@
 
 | 버전 | 해설 | 첫 항목 |
 |---|---|---|
+| [0.29.0](0.29.0/changelog.md) | [learning](0.29.0/learning_changelog.md) | bot이 자기 브라우저를 조종하고, CSV·Excel·PowerPoint 파일을 다룬다. |
 | [0.28.1](0.28.1/changelog.md) | [learning](0.28.1/learning_changelog.md) | 설정 > 연결을 열 때마다 절마다의 연결 상태가 비고 OpenAI 방식 선택이 처음 값으로 돌아가던 문제. |
 | [0.28.0](0.28.0/changelog.md) | [learning](0.28.0/learning_changelog.md) | bot 대화에 작업 과정을 보인다. |
 | [0.27.0](0.27.0/changelog.md) |  | 설정 > 연결을 Claude, OpenAI, Kiro 절로 나눴다. |

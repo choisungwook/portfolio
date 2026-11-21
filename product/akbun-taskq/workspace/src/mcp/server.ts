@@ -103,11 +103,11 @@ export async function serveBotMcp(db: Db, config: Config, bot: string, version: 
       return { name: t.name, description: t.description, inputSchema: inputSchema as Tool['inputSchema'], annotations: { readOnlyHint: t.readOnly } }
     }),
   }))
-  server.setRequestHandler(CallToolRequestSchema, ({ params }) => {
+  server.setRequestHandler(CallToolRequestSchema, async ({ params }) => {
     const found = tools.find((t) => t.name === params.name)
     if (!found) return error('unknown tool')
     try {
-      return result(found.handler(params.arguments ?? {}))
+      return result(await found.handler(params.arguments ?? {}))
     } catch (failure) {
       if (failure instanceof ToolError) return error(failure.message)
       throw failure

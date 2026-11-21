@@ -321,3 +321,8 @@ mark.find.current { background: var(--accent); color: var(--on-accent); }
 /* The slash and @ list and the + menu line up with the input box, which sits inside the compose gutter. */
 .chat .slash-list { left: var(--gutter, 16px); right: var(--gutter, 16px); }
 .chat .attach-menu { left: var(--gutter, 16px); }
+
+/* The bot's browser: the page picture fills the pane width; clicking it clicks the page. */
+.browser-body { display: grid; align-content: start; gap: 8px; overflow: auto; }
+.browser-status { margin: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.browser-screen { width: 100%; height: auto; border-radius: 8px; box-shadow: inset 0 0 0 1px var(--border), 0 1px 3px rgb(0 0 0 / 8%); cursor: pointer; }

@@ -181,7 +181,7 @@ function serverFor(tools: TeamTool[]) {
 
 export async function call(t: TeamTool, args: Record<string, unknown>): Promise<CallToolResult> {
   try {
-    return { content: [{ type: 'text', text: JSON.stringify(t.handler(args)) }] }
+    return { content: [{ type: 'text', text: JSON.stringify(await t.handler(args)) }] }
   } catch (error) {
     const message = error instanceof ToolError ? error.message : `tool failed: ${error instanceof Error ? error.message : String(error)}`
     return { isError: true, content: [{ type: 'text', text: message }] }

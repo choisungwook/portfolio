@@ -24,7 +24,7 @@ import { seedTestBots, setup, sleep, waitFor, type TestEnv } from './helpers.ts'
 function tool(env: TestEnv, agent: string, name: string) {
   const found = teamTools({ db: env.db, config: env.config, agent, search: hybridSearch(env.db) }).find((t) => t.name === name)
   assert.ok(found, name)
-  return (args: Record<string, unknown>) => found.handler(args)
+  return (args: Record<string, unknown>) => found.handler(args) as Record<string, unknown>
 }
 
 function fakeBackend(script: (request: TurnRequest, call: (name: string, args: Record<string, unknown>) => Record<string, unknown>) => TurnResult) {
@@ -32,7 +32,7 @@ function fakeBackend(script: (request: TurnRequest, call: (name: string, args: R
   const backend: TeamBackend = {
     async runTurn(_config, request) {
       requests.push(request)
-      return script(request, (name, args) => request.tools.find((t) => t.name === name)!.handler(args))
+      return script(request, (name, args) => request.tools.find((t) => t.name === name)!.handler(args) as Record<string, unknown>)
     },
   }
   return { backend, requests }
