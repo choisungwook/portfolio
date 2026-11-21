@@ -10,6 +10,7 @@
 
 | 버전 | 해설 | 첫 항목 |
 |---|---|---|
+| [0.30.2](0.30.2/changelog.md) | [learning](0.30.2/learning_changelog.md) | 작업 상세 창을 설정 창처럼 창 가장자리만 남기고 화면을 채우도록 키웠다. |
 | [0.30.1](0.30.1/changelog.md) | [learning](0.30.1/learning_changelog.md) | 셸을 쓰는 bot이 Chrome의 DevTools 포트로 자기 브라우저를 직접 조종해 클릭·입력 승인을 건너뛸 수 있던 문제. |
 | [0.30.0](0.30.0/changelog.md) | [learning](0.30.0/learning_changelog.md) | bot 브라우저의 클릭과 입력에 승인 게이트를 넣었다. |
 | [0.29.0](0.29.0/changelog.md) | [learning](0.29.0/learning_changelog.md) | bot이 자기 브라우저를 조종하고, CSV·Excel·PowerPoint 파일을 다룬다. |

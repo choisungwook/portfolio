@@ -70,24 +70,25 @@ function sections(task) {
   const data = task.data
   const refill = () => { if (dialog.open && currentId === task.id) fill(task.id) }
   return [
-    el('h2', { text: data.title ?? data.intent }),
+    el('h1', { class: 'page-title', text: data.title ?? data.intent }),
     el('dl', { class: 'facts' },
       el('dt', { text: 'Status' }), el('dd', {}, statusIndicator(task.status)),
       el('dt', { text: 'Owner' }), ownerValue(task, refill),
       el('dt', { text: 'Workflow' }), workflowValue(task, refill),
+      el('dt', { text: 'Created' }), el('dd', { text: fmtDateTime(task.created_at) }),
       el('dt', { text: 'Updated' }), el('dd', { text: fmtDateTime(task.updated_at) }),
     ),
     actionButtons(task),
     operatorControls(task, refill),
     task.pending_approval ? approvalPanel(task, task.pending_approval) : null,
-    el('h3', { text: 'Intent' }),
+    el('h2', { class: 'section-title', text: 'Intent' }),
     el('p', { class: 'pre', text: data.intent }),
-    ...(data.attachments?.length ? [el('h3', { text: 'Files' }), el('div', { class: 'msg-files' }, ...data.attachments.map((path) => el('button', {
+    ...(data.attachments?.length ? [el('h2', { class: 'section-title', text: 'Files' }), el('div', { class: 'msg-files' }, ...data.attachments.map((path) => el('button', {
       type: 'button', class: 'file-chip', text: path.split('/').pop(), title: path, onclick: () => download(path),
     })))] : []),
-    el('h3', { text: 'Runs' }),
+    el('h2', { class: 'section-title', text: 'Runs' }),
     runList(task.runs ?? []),
-    ...(task.alerts?.length ? [el('h3', { text: 'Alerts' }), el('ul', {}, ...task.alerts.map((a) => el('li', { class: `sev-${a.severity}` },
+    ...(task.alerts?.length ? [el('h2', { class: 'section-title', text: 'Alerts' }), el('ul', {}, ...task.alerts.map((a) => el('li', { class: `sev-${a.severity}` },
       el('strong', { text: `${label(a.severity)} · ${label(a.kind)}` }), ` ${a.message}`)))] : []),
   ]
 }

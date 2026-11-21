@@ -119,6 +119,23 @@ dialog.wide { width: min(1180px, calc(100vw - 32px)); }
 .ws-count .del, .ws-diff .del { color: var(--failed); }
 .ws-diff .hunk { color: var(--link); }
 .ws-diff { max-height: 360px; overflow: auto; background: var(--panel); border-radius: var(--radius); padding: 8px; white-space: pre; margin-top: 8px; }
+/* Task detail is laid out like Settings: it nearly fills the window, and the task reads like a settings page (H1 title,
+   H2 sections with a hairline, even gaps in a centred column). */
+dialog[data-area="task-detail"][open] {
+  width: min(1440px, calc(100vw - 96px)); height: calc(100vh - 96px); max-height: none; max-width: none;
+  display: flex; flex-direction: column; border-radius: var(--radius-l);
+}
+dialog[data-area="task-detail"] > .dialog-body { flex: 1; min-height: 0; max-height: none; padding: 44px clamp(24px, 6vw, 88px) 56px; }
+dialog[data-area="task-detail"] > .dialog-body > * { max-width: 820px; margin: 0 auto; }
+dialog[data-area="task-detail"].wide > .dialog-body > * { max-width: 1240px; }
+.task-main { display: grid; gap: 20px; align-content: start; line-height: 1.6; }
+.task-main > * { margin-top: 0; margin-bottom: 0; }
+.task-main > .section-title { margin-top: 12px; }
+.task-main > .facts { gap: 6px 24px; }
+@media (max-width: 700px) {
+  dialog[data-area="task-detail"][open] { width: calc(100vw - 32px); height: calc(100vh - 32px); }
+  dialog[data-area="task-detail"] > .dialog-body { padding: 20px 16px 32px; }
+}
 @media (max-width: 900px) {
   .task-detail-grid { grid-template-columns: 1fr; }
   .task-aside { position: static; }
