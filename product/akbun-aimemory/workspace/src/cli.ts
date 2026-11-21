@@ -4,6 +4,7 @@ import { parseArgs } from 'node:util'
 import { loadConfig } from './config.ts'
 import { contextText, runHook, searchSpool } from './hook.ts'
 import { indexSession } from './indexer/index.ts'
+import { serveMcp } from './mcp/server.ts'
 import { addMemory, deleteMemory, deleteSession, exportDb, importDb, invalidateMemory, listSessions, openStore, recent, reindex, search, sessionMemories } from './store.ts'
 import { serve } from './server.ts'
 
@@ -36,6 +37,7 @@ Maintenance:
   aimem import <file.db>      merge a backup; duplicates are skipped
   aimem index <session-id>    summarize a session and reconcile memories with the configured indexer
   aimem reindex               rebuild token index and vectors after changing the tokenizer
+  aimem mcp                   run stdio MCP server (search, recent, show_session, add_note; responses match --json)
   aimem serve [--port N]      web UI on 127.0.0.1 (prints a URL with a token)
   aimem config                print the effective config as JSON
 
@@ -130,6 +132,7 @@ const commands: Record<string, () => void | Promise<void>> = {
     } finally { s.db.close() }
   },
   reindex: () => { const n = reindex(openStore(config)); out({ reindexed: n }, () => `reindexed ${n}\n`) },
+  mcp: async () => { await serveMcp(config, VERSION) },
   serve: async () => { console.log(await serve(openStore(config), Number(o.port))) },
 }
 
