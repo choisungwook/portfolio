@@ -47,6 +47,8 @@ export function initBotChat() {
   initComposeMenus(nodes.input, { onPickFile: (path) => files.addExisting(path) })
   nodes.form.addEventListener('submit', send)
   document.addEventListener('keydown', onShortcut)
+  // Editing a recalled message makes it the draft: Up then walks history again from the newest, and Down returns the edit.
+  nodes.input.addEventListener('input', () => { historyAt = -1 })
   nodes.input.addEventListener('keydown', (event) => {
     // Enter sends, Shift+Enter breaks the line. IME composition (Korean) must not send.
     if (event.key === 'Enter' && !event.shiftKey && !event.isComposing) {
