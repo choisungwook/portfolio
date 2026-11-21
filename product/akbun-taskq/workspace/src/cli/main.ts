@@ -8,6 +8,7 @@ import { openDb } from '../db/open.ts'
 import * as tasks from './commands.ts'
 import * as info from './info.ts'
 import { runCommand } from './run.ts'
+import { manualText } from '../team/builtin-skill.ts'
 import { skills } from './skills.ts'
 import * as operator from './operator.ts'
 import { handoff, handoffs } from './handoffs.ts'
@@ -44,7 +45,7 @@ const USAGE = `usage: taskq <command> [options]
       [--repo] [--output] [--priority N] [--depends-on ID]... [--manual-handoffs] [--draft]   (ready unless --draft)
   list [--status S]    show ID     resume ID    done ID
   approve ID [--request REQUEST_ID --yes]    deny ID [--request REQUEST_ID --yes]
-  alerts               log [--date YYYY-MM-DD]    search QUERY    run    version
+  alerts               log [--date YYYY-MM-DD]    search QUERY    run    version    manual [--search WORD]
   skills list | add PATH | remove NAME | discover
   handoffs [--task TASK]    handoff accept ID    handoff mode TASK [auto|manual]    mcp [--bot NAME]
   pause [--reason TEXT]    unpause    cancel ID    retry ID [--draft]
@@ -60,6 +61,12 @@ export async function main(argv: string[]): Promise<void> {
   }
   if (name === 'version') {
     printVersion()
+    return
+  }
+  // The manual of this binary's version, the same one the taskq skill gives every bot. --search WORD keeps the
+  // sections that mention it.
+  if (name === 'manual') {
+    console.log(manualFor(args))
     return
   }
   const config = loadConfig()
@@ -98,6 +105,16 @@ export async function main(argv: string[]): Promise<void> {
   } finally {
     db.close()
   }
+}
+
+function manualFor(args: string[]): string {
+  const text = manualText()
+  const at = args.indexOf('--search')
+  const word = at >= 0 ? args[at + 1]?.toLowerCase() : undefined
+  if (!word) return text
+  const sections = text.split(/\n(?=## )/)
+  const hits = sections.filter((section) => section.toLowerCase().includes(word))
+  return hits.length ? hits.join('\n\n') : `no section of the manual mentions "${word}"`
 }
 
 // The binary also runs its embedded Claude Code, so a broken extraction shows up here and not at the first session.

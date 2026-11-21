@@ -215,3 +215,14 @@ dialog[data-area="settings-dialog"][open] {
 .kiro-add { grid-column: 1 / -1; display: grid; gap: 8px; }
 .kiro-add > summary { cursor: pointer; color: var(--link); width: fit-content; }
 .kiro-add[open] { display: grid; gap: 8px; padding: 12px; border-radius: var(--radius-l); background: var(--panel-soft); }
+
+/* Plugins: the built-in taskq skill, read only, above the shared registry. */
+.builtin-skill { display: grid; gap: 8px; padding: 16px 18px; border-radius: var(--radius-l); background: var(--panel-soft); }
+.builtin-head { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; }
+.builtin-head .section-title { margin: 0; padding: 0; border: 0; }
+.builtin-row { display: flex; align-items: center; gap: 12px; }
+.builtin-mark { flex: none; display: grid; place-items: center; width: 32px; height: 32px; border-radius: 8px; background: #111; color: #fff; font-weight: 700; }
+.builtin-text { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 8px; min-width: 0; }
+.builtin-text .meta { flex-basis: 100%; overflow-wrap: anywhere; }
+.builtin-content > summary { cursor: pointer; color: var(--link); width: fit-content; }
+.builtin-content pre { max-height: 360px; overflow: auto; white-space: pre-wrap; padding: 12px; border-radius: var(--radius); background: var(--panel); font-size: var(--text-small); }

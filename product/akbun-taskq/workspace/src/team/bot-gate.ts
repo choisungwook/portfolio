@@ -112,6 +112,8 @@ export function botGate(config: Config, agent: TeamAgent, cwd: string, tool: str
     const target = typeof input.file_path === 'string' ? input.file_path : typeof input.notebook_path === 'string' ? input.notebook_path : null
     const plugins = realPath(join(config.home, 'bot-plugins'))
     if (target && under(realPath(resolve(cwd, target)), plugins)) return { action: 'stop', reason: `${tool} tried to change a bot's plugin copy` }
+    // The built-in taskq skill is copied into every bot on reload; bots read it (and its manual) but never write it.
+    if (target && under(realPath(resolve(cwd, target)), realPath(join(config.home, 'builtin-skills')))) return { action: 'stop', reason: `${tool} tried to change the built-in taskq skill` }
   }
   if (tool === 'Bash' && typeof input.command === 'string') {
     const names = protectedNames(config)

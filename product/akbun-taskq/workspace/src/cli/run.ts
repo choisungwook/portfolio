@@ -13,10 +13,14 @@ import { createKiroTeamBackend } from '../agents/kiro/team.ts'
 import { createJobRunner } from '../jobs/runner.ts'
 import { JOB_HANDLERS } from '../jobs/handlers.ts'
 import { relaunch, takeRestartToken } from '../relaunch.ts'
+import { installBuiltinSkill } from '../team/builtin-skill.ts'
 
 // Runs the loop and the API in this process until SIGINT or SIGTERM. The API token lives in memory only: a new start
 // issues a new token, and the UI gets it from the URL fragment printed below. Settings > Update's restart keeps it.
 export async function runCommand(config: Config, db: Db): Promise<void> {
+  // The taskq skill and this version's manual are written fresh on every start; hub.start() then reloads every bot's
+  // skill copy (one bot at a time, a failing one only logged), so each bot carries the running version's.
+  installBuiltinSkill(config)
   const agent = agentFor(config)
   const runner = createRunner({
     db, config, worker: agent.createWorker(config), preflight: () => agent.preflight(config),

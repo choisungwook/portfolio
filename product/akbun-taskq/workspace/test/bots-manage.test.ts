@@ -84,7 +84,8 @@ describe('bot management api', () => {
     writeFileSync(join(skill, 'SKILL.md'), '---\nname: release-notes\ndescription: Writes release notes\n---\nversion 2\n')
     assert.match(readFileSync(copy, 'utf8'), /version 1/, 'a turn keeps the snapshot until reload')
     const reloaded = await (await call('POST', '/bots/writer/reload', { kind: 'skill' })).json() as { note: string }
-    assert.match(reloaded.note, /Skills reloaded: release-notes/)
+    assert.match(reloaded.note, /Skills reloaded: taskq, release-notes/, 'the built-in taskq skill always comes first')
+    assert.match(readFileSync(join(skillsPluginDir(env.config, 'writer'), 'skills', 'taskq', 'SKILL.md'), 'utf8'), /akbun-taskq \d+\.\d+\.\d+/, 'the bot carries the taskq skill with the running version')
     assert.match(readFileSync(copy, 'utf8'), /version 2/)
     assert.deepEqual(pluginPaths(env.db, env.config, 'writer'), [skillsPluginDir(env.config, 'writer')])
     const note = listMessages(env.db, { agent: 'writer', limit: 5 }).find((m) => m.body.startsWith('Skills reloaded'))

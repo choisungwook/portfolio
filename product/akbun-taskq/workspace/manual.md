@@ -217,6 +217,7 @@ taskq bots list | say | inbox | log | ...      bot과 대화, 설정, wiki (10�
 taskq workflows list | create FILE | run ID --bot NAME | runs | run-show RUN_ID | approve RUN_ID STEP
 taskq api [OPERATION key=value...]            화면에서 할 수 있는 모든 일. taskq api로 목록을 본다
 taskq mcp                                     같은 operation을 MCP 도구 taskq_<operation>으로 제공
+taskq manual [--search WORD]                  지금 버전의 이 매뉴얼. --search는 그 단어가 나오는 절만
 taskq run
 ```
 
@@ -227,6 +228,8 @@ taskq run
 ## 10. bot에게 맡기기
 
 bot은 역할을 가진 상주 세션이다. bot마다 Claude Agent SDK와 OpenAI Agents SDK 중 하나를 고르고, 왼쪽 목록에서 아바타 오른쪽 아래 표시(✻ Claude, ◎ OpenAI)로 구별한다. 태스크는 내 작업 노트이고, bot이 자기가 맡은(owner) 태스크를 가져가 직접 처리한 뒤 결과를 남긴다. 처음에는 오케스트레이터 bot `taskq` 하나만 있다. taskq에게 목표를 말하면 태스크로 나눠 알맞은 bot에게 맡기고, 끝나면 결과를 알려준다. 다른 bot은 내가 만든다.
+
+모든 bot은 taskq 기본 skill을 갖고 있다. 자기가 taskq 안에서 돈다는 것, 지금 버전, 그 버전의 이 매뉴얼 위치, 워크플로를 만드는 형식이 들어 있고, taskq가 시작할 때마다 실행 중인 버전으로 다시 쓴다. 그래서 bot에게 "이 기능 어떻게 써?"라고 물으면 지금 버전의 매뉴얼을 읽고 답하고, "배포 절차를 워크플로로 만들어 줘"라고 하면 `create_workflow` 도구로 워크플로를 만든다. Plugins 메뉴 맨 위에서 이 skill의 버전과 내용을 볼 수 있고, 지우거나 고칠 수는 없다.
 
 화면 왼쪽 메뉴의 Bots에서 bot을 누르면 그 bot과의 대화를 메신저처럼 본다. `+`로 bot을 만들고, bot의 톱니나 오른쪽 버튼 메뉴로 설정, skill·plugin 다시 불러오기, 새 세션, 끄기, 지우기를 한다. taskq는 맨 위에 고정되고 지우거나 끌 수 없다.
 
