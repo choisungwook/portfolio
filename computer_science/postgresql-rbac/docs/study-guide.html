@@ -409,7 +409,7 @@
       <span class="badge blue">Part 1 · Core Concept</span>
       <h2>계정 중심(MySQL) vs 역할 기반(PostgreSQL RBAC)</h2>
       <div class="img-frame">
-        <img src="../imgs/mysql-vs-postgres-auth.png" alt="MySQL vs PostgreSQL 인증 인가 비교" />
+        <img src="../imgs/haru-mysql-vs-postgres-auth.png" alt="MySQL vs PostgreSQL 인증 인가 비교" />
         <div class="img-caption">그림 1. MySQL의 shop.* 와일드카드 권한과 PostgreSQL의 계층적 RBAC 권한 비교</div>
       </div>
       <table>
@@ -488,7 +488,7 @@
       <span class="badge blue">Part 1 · Architecture</span>
       <h2>PostgreSQL RBAC 4단계 관문과 Object Owner</h2>
       <div class="img-frame">
-        <img src="../imgs/postgres-rbac-hierarchy.png" alt="PostgreSQL RBAC 권한 계층" />
+        <img src="../imgs/haru-postgres-rbac-hierarchy.png" alt="PostgreSQL RBAC 권한 계층" />
         <div class="img-caption">그림 2. Role 멤버십, 4단계 권한 계층, Object Owner, ALTER DEFAULT PRIVILEGES 관계</div>
       </div>
       <div class="grid-2">
@@ -517,7 +517,7 @@
       <span class="badge red">Part 2 · Incident</span>
       <h2>Flyway 마이그레이션에서 터지는 두 가지 RBAC 장애</h2>
       <div class="img-frame">
-        <img src="../imgs/flyway-ownership-incident.png" alt="Flyway 소유권 장애와 SET ROLE 해결 구조" />
+        <img src="../imgs/haru-flyway-ownership-incident.png" alt="Flyway 소유권 장애와 SET ROLE 해결 구조" />
         <div class="img-caption">그림 3. 로그인 계정 직접 소유 안티패턴(상단)과 SET ROLE app_owner 정석(하단)</div>
       </div>
       <div class="grid-2">
@@ -611,7 +611,7 @@ DROP TABLE IF EXISTS orders;</code></pre>
       <span class="badge red">Part 3 · Password Rotation</span>
       <h2>비밀번호 로테이션 후 옛 계정이 삭제되지 않는 이유</h2>
       <div class="img-frame">
-        <img src="../imgs/password-rotation-blue-green.png" alt="Blue/Green 무중단 비밀번호 로테이션" />
+        <img src="../imgs/haru-password-rotation-blue-green.png" alt="Blue/Green 무중단 비밀번호 로테이션" />
         <div class="img-caption">그림 4. NOLOGIN 그룹 Role을 사이에 두면 Blue/Green 로그인 계정을 의존성 0개 상태로 즉시 교체·삭제 가능</div>
       </div>
       <div class="grid-2">

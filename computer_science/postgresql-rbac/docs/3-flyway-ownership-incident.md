@@ -16,7 +16,7 @@ PostgreSQL에서 테이블을 `CREATE TABLE`로 생성하면, 그 명령을 실�
 
 CI/CD 파이프라인에서 Flyway를 실행할 때 로그인 계정(`migrator_v1`)이 그대로 테이블을 만들면 두 가지 문제가 시간차를 두고 터집니다. 첫째, 새 테이블을 만든 직후 앱 계정(`app_user`)이 그 테이블을 읽지 못합니다. 둘째, 보안 정책으로 마이그레이션 계정을 `migrator_v2`로 교체하거나 다른 팀원이 배포를 실행하면 기존 테이블에 `ALTER TABLE`을 걸지 못해 배포가 중단됩니다.
 
-![Flyway 계정 직접 소유 안티패턴과 SET ROLE app_owner 해결 구조](../imgs/flyway-ownership-incident.png)
+![Flyway 계정 직접 소유 안티패턴과 SET ROLE app_owner 해결 구조](../imgs/haru-flyway-ownership-incident.png)
 
 ### 용어
 

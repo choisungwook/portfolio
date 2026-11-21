@@ -16,7 +16,7 @@ MySQL은 전통적으로 **계정(`'user'@'host'`) 중심**으로 권한을 관�
 
 반면 PostgreSQL은 **User와 Group을 구분하지 않고 모든 주체를 `ROLE`로 통합한 RBAC 모델**입니다. 로그인 가능한 계정(`LOGIN`)과 권한 묶음용 그룹(`NOLOGIN`)이 모두 `pg_roles` 카탈로그의 같은 Role 객체이며, 그룹 Role에 권한을 모으고 로그인 Role에 `GRANT <그룹 Role> TO <로그인 Role>`로 멤버십을 부여해 권한을 상속합니다.
 
-![MySQL 계정 중심 모델과 PostgreSQL RBAC 모델 비교](../imgs/mysql-vs-postgres-auth.png)
+![MySQL 계정 중심 모델과 PostgreSQL RBAC 모델 비교](../imgs/haru-mysql-vs-postgres-auth.png)
 
 오해하기 쉬운 경계가 하나 있습니다. PostgreSQL의 `GRANT SELECT ON ALL TABLES IN SCHEMA public TO app_read`는 MySQL의 `ON shop.*`처럼 "앞으로 생길 모든 테이블"을 뜻하지 않습니다. 이 명령은 **실행하는 그 순간 `public` 스키마에 존재하는 테이블 목록을 순회하며 개별 테이블 ACL(Access Control List)에 `SELECT`를 기록하는 일회성 매크로**입니다. 따라서 명령 실행 직후에 새로 만든 테이블에는 권한이 전혀 붙지 않습니다.
 

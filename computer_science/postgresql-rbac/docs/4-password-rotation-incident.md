@@ -16,7 +16,7 @@
 
 MySQL에서는 이 방식이 비교적 수월하지만, PostgreSQL에서는 로그인 계정에 권한이나 객체 소유권이 직접 묶여 있으면 마지막 단계인 **`DROP ROLE`이 의존성 오류로 거부**됩니다.
 
-![NOLOGIN 그룹 Role 기반 Blue/Green 무중단 비밀번호 로테이션](../imgs/password-rotation-blue-green.png)
+![NOLOGIN 그룹 Role 기반 Blue/Green 무중단 비밀번호 로테이션](../imgs/haru-password-rotation-blue-green.png)
 
 ### 용어
 

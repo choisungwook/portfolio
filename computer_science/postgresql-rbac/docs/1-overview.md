@@ -24,7 +24,7 @@ flowchart LR
 
 PostgreSQL RBAC의 네 가지 권한 계층(Cluster → Database → Schema → Table)과 객체 소유권, 미래 객체 기본 권한(`ALTER DEFAULT PRIVILEGES`)의 전체 구조는 아래 그림과 같습니다.
 
-![PostgreSQL RBAC 권한 계층과 객체 소유권 구조](../imgs/postgres-rbac-hierarchy.png)
+![PostgreSQL RBAC 권한 계층과 객체 소유권 구조](../imgs/haru-postgres-rbac-hierarchy.png)
 
 ## 시나리오별 목표와 도구
 
