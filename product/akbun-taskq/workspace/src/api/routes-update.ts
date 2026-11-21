@@ -22,4 +22,11 @@ export function registerUpdateRoutes(api: Hono, deps: ApiDeps): void {
       throw new HttpError(409, error instanceof Error ? error.message : String(error))
     }
   })
+  // Restart after an install: the answer goes out first, then taskq stops and starts the installed binary in its place.
+  api.post('/update/restart', (c) => {
+    const restart = deps.restart
+    if (!restart) throw new HttpError(409, 'only the running taskq (taskq run) can restart itself')
+    setTimeout(restart, 100)
+    return c.json({ restarting: true }, 202)
+  })
 }

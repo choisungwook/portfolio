@@ -95,6 +95,8 @@ export function prepareRun(db: Db, id: string): Task {
   const task = getTask(db, id)
   if (!task) throw new OperatorError('task not found')
   if (!RUNNABLE.includes(task.status)) throw new OperatorError(`task is ${task.status}; it is already running`)
+  // Every run has an agent behind it: a task nobody owns waits until the user gives it to a bot.
+  if (!task.owner) throw new OperatorError('task has no agent; give it to a bot (owner) before running it')
   if (isQueuePaused(db)) throw new OperatorError('the queue is paused; resume the queue to run tasks')
   if (isBlocked(db, id)) throw new OperatorError('task waits for a dependency to finish or for a handoff to be accepted')
   // A one-off run has no bot session to report the workflow's steps, so it would skip them all.

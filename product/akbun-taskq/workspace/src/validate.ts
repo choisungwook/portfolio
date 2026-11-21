@@ -170,6 +170,10 @@ export function parseTaskPatch(body: unknown, known: SkillLookup): Parsed<TaskPa
     // null or '' removes the workflow from the task.
     if (o.workflow_id !== undefined) data.workflow_id = optText(o.workflow_id, 'workflow_id', 100) ?? ''
     checkPaths(data)
+    // Only the fields the body names change; an unnamed field must not reach the merge as undefined, which would erase
+    // it. A named field sent as null (or an empty title) is removed.
+    for (const key of Object.keys(data) as (keyof TaskData)[]) if (!(key in o)) delete data[key]
+    if (data.title === '') data.title = undefined
     return {
       ok: true,
       value: {

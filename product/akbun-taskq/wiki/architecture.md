@@ -266,7 +266,7 @@ The exact input is stored unmasked and unclipped, and only while the request is 
 
 ### Run now
 
-`POST /tasks/:id/run` (`prepareRun` in `src/db/operator.ts`) makes the task `ready`, writes a `run_requested` event, and calls `runNow` on the runner of this process, which claims it before other ready tasks as soon as a slot is free.
+`POST /tasks/:id/run` (`prepareRun` in `src/db/operator.ts`) refuses a task with no owner (every run has an agent behind it), makes the task `ready`, writes a `run_requested` event, and calls `runNow` on the runner of this process, which claims it before other ready tasks as soon as a slot is free.
 
 | From | Session | Alerts acknowledged |
 |---|---|---|
@@ -627,15 +627,15 @@ Writes (any non-GET under `/api`) must send `Content-Type: application/json`, op
 
 | Method and path | Purpose |
 |---|---|
-| `GET /tasks?status=` `POST /tasks` | list with computed `blocked`, create. A POST is a draft unless the body says `"status":"ready"`. `access_skill` must name a registered skill (400 otherwise) |
-| `GET /tasks/:id` `PATCH /tasks/:id` | task with runs, deps, alerts and `pending_approval` (`{ request_id, tool, input, bytes, created_at }`, or null); edit data, priority, draft to ready. `access_skill` is checked as on create |
+| `GET /tasks?status=` `POST /tasks` | list with computed `blocked` and `last_outcome` (the latest run's outcome, for the board's error icon), create. A POST is a draft unless the body says `"status":"ready"`. `access_skill` must name a registered skill (400 otherwise) |
+| `GET /tasks/:id` `PATCH /tasks/:id` | task with runs, deps, alerts and `pending_approval` (`{ request_id, tool, input, bytes, created_at }`, or null); edit data, priority, draft to ready. `access_skill` is checked as on create. Title and intent edits are 409 while `running` or `needs_approval` |
 | `POST /tasks/:id/approve` `POST /tasks/:id/deny` | body `{ "request_id": "…" }`. 400 when missing, 409 when it is not the task's open request. Returns the task |
 | `GET /approvals` | open requests across tasks: `[{ task_id, task_title, request_id, tool, input, bytes, created_at }]` |
 | `GET /handoffs?task_id=` | up to 50 handoff records, pending first, optionally filtered by sender or receiver |
 | `POST /handoffs/:id/accept` | accept a current pending handoff and record the timestamp and manual method |
 | `POST /tasks/:id/handoff-mode` | set the receiving mode with `{"auto_accept":true}` or `{"auto_accept":false}` |
 | `POST /tasks/:id/resume` `POST /tasks/:id/done` | state transitions |
-| `POST /tasks/:id/run` | run now, from any status but `running` and `needs_approval`. 409 while the queue is paused or a `blocks` dependency is not done. See "Run now" |
+| `POST /tasks/:id/run` | run now, from any status but `running` and `needs_approval`. 409 when the task has no owner bot, while the queue is paused or a `blocks` dependency is not done. See "Run now" |
 | `GET /runs?from=&to=&type=&lock_key=&outcome=` | runs that overlap the range (started before `to`, not ended before `from`). Each row has `task_title`, `task_type`, `lock_key` and `waits`. Returns `{ runs, truncated }`, newest first, capped at 500 |
 | `GET /runs/:id` | run with events, alerts and waits |
 | `GET /stats/daily?from=&to=&type=&lock_key=&outcome=` | per day, keyed by start day: runs, done, failed, critical, by type, cost, top 3 summaries. Filters as `/runs` |
@@ -662,6 +662,7 @@ Writes (any non-GET under `/api`) must send `Content-Type: application/json`, op
 | `GET /update` | `{ current, latest, update_available, can_install, reason?, release_url? }`: the newest non-draft `akbun-taskq-v*` release on GitHub. `can_install` only for the single-file binary on darwin-arm64, the only build the release has |
 | `GET /update/progress` | `{ phase, received, total }`: the running install, phase `idle`, `download`, `unpack`, `done` or `failed`; `total` is null when GitHub sends no length. The Install button polls it every 250 ms to fill its bar |
 | `POST /update` | downloads that release's `taskq-<os>-<arch>.tar.gz` from github.com, unpacks it and renames it over the running executable; `{ installed, restart: true }`. 409 from a checkout, when up to date, or on a failed download (the binary stays as it was) |
+| `POST /update/restart` | 202 `{ restarting: true }`, then `taskq run` stops its bots, runs and server and replaces itself with the installed binary (`process.execve`, same pid and stdout) under the same token (handed over in a 0600 `data/restart-token` file, read once), so the page reloads once `GET /update/progress` answers `idle` from the new process. 409 when called from the CLI or MCP, which have no running server to restart |
 | `POST /settings/appearance` | any of `font_family` (listed in `font_families`), `font_size` (12 to 20), `language` (`ko`, the default, or `en`), `theme` (`system`, `dark`, `light`) |
 | `POST /bot-skills` `DELETE /bot-skills/:name` `POST /bot-skills/:name/update` `POST /bot-plugins` `DELETE /bot-plugins/:name` `POST /bot-plugins/:name/update` | register `{ "path": "/abs/dir" }` (201, 400 with the reason, 409 when taken), remove (204), or update a skill or plugin for bots. Update runs `git pull --ff-only` when the folder is a git checkout (else re-reads the description); a plugin installed from the marketplace is installed again at the marketplace's current commit instead (`method: marketplace`). Then it reloads every bot that uses it; returns `{ method, output, reloaded }`. Removing an installed plugin also deletes its folder under `TASKQ_HOME/plugins`; a folder registered by path is never deleted |
 | `GET /skills/discover` | `[{ name, path, description, registered }]` found one level deep under `$CLAUDE_CONFIG_DIR/skills` (or `~/.claude/skills`) and `skillsDir`. Capped at 200 |

@@ -1,8 +1,9 @@
 import { api, mutate } from './api.js'
 import { el } from './dom.js'
 
-// Statuses the server lets a user start by hand (POST /tasks/:id/run). running and needs_approval are already running.
-export const RUNNABLE = ['draft', 'ready', 'failed', 'cancelled', 'needs_auth', 'review', 'done']
+import { RUNNABLE } from '../pure/board-drop.js'
+
+export { RUNNABLE }
 
 // The word says what happens: a finished task starts a new session, a login wait resumes its session.
 const LABEL = {
@@ -10,13 +11,15 @@ const LABEL = {
 }
 
 // primary: the one primary action of a view (task detail). Elsewhere it is a ghost button.
+// A task with no agent (owner) does not run: the server refuses it too.
 export function runNowButton(task, { primary = false } = {}) {
   const runnable = RUNNABLE.includes(task.status)
+  const reason = !runnable ? 'Already running' : task.owner ? undefined : 'Give the task to a bot first'
   return el('button', {
     type: 'button',
     class: primary ? 'run-now primary' : 'run-now',
-    disabled: !runnable,
-    title: runnable ? undefined : 'Already running',
+    disabled: Boolean(reason),
+    title: reason,
     'aria-label': `${runnable ? LABEL[task.status] : 'Run now'}: ${task.data.title ?? task.data.intent}`,
     text: runnable ? LABEL[task.status] : 'Run now',
     onclick: (event) => {

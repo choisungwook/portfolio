@@ -20,7 +20,7 @@ export interface NewTask {
   deps?: DepInput[]
 }
 
-export type TaskView = Task & { blocked: boolean }
+export type TaskView = Task & { blocked: boolean; last_outcome: string | null }
 
 interface TaskRow extends Omit<Task, 'data'> { data: string }
 
@@ -55,12 +55,14 @@ export function getTask(db: Db, id: string): Task | undefined {
 }
 
 export function listTasks(db: Db, status?: string): TaskView[] {
-  const rows = db.prepare(`SELECT t.*, ${BLOCKED_SQL} AS blocked FROM tasks t
+  // last_outcome: the latest run's outcome, so the board can mark a task whose last run failed.
+  const rows = db.prepare(`SELECT t.*, ${BLOCKED_SQL} AS blocked,
+    (SELECT r.outcome FROM runs r WHERE r.task_id = t.id ORDER BY r.started_at DESC LIMIT 1) AS last_outcome FROM tasks t
     WHERE (? IS NULL OR t.status = ?) ORDER BY t.priority DESC, t.created_at ASC`)
     .all(status ?? null, status ?? null)
   return rows.map((row) => {
-    const { blocked, ...rest } = row as unknown as TaskRow & { blocked: number }
-    return { ...toTask(rest), blocked: blocked === 1 }
+    const { blocked, last_outcome, ...rest } = row as unknown as TaskRow & { blocked: number; last_outcome: string | null }
+    return { ...toTask(rest), blocked: blocked === 1, last_outcome }
   })
 }
 

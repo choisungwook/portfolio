@@ -1,8 +1,11 @@
 import { currentLanguage, KO_WORDS } from './i18n.js'
 // Shared names for statuses, outcomes, types and alert kinds, plus helpers that read JSON text fields.
-// The board's flow in order; the window width decides how many columns fit in a row. Failed and cancelled sit collapsed at the end.
-export const BOARD_COLUMNS = ['draft', 'ready', 'running', 'needs_approval', 'needs_auth', 'review', 'done']
-export const COLLAPSED_COLUMNS = ['failed', 'cancelled']
+// The board in three panes: drafts on the left as an inbox, the statuses a task moves through in the middle (two rows),
+// and where it ends on the right: failed above (cancelled folded under it), done below.
+export const BOARD_PANES = { inbox: ['draft'], flow: ['ready', 'running', 'needs_approval', 'needs_auth', 'review'], ends: ['failed', 'cancelled', 'done'] }
+export const COLLAPSED_COLUMNS = ['cancelled']
+// Outcomes of a last run that the board marks with an error icon.
+export const ERROR_OUTCOMES = ['failed', 'stale']
 export const TASK_TYPES = ['ops_read', 'ops_change', 'code', 'research', 'security_review']
 export const OUTCOMES = ['done', 'failed', 'needs_approval', 'needs_auth', 'review', 'stale']
 export const SEVERITY_RANK = { critical: 0, high: 1, normal: 2 }

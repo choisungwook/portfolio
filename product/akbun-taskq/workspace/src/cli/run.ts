@@ -1,4 +1,5 @@
 import { randomBytes } from 'node:crypto'
+import { join } from 'node:path'
 import { closeBrowsers } from '../browser/chrome.ts'
 import type { Config } from '../config.ts'
 import type { Db } from '../db/open.ts'
@@ -11,31 +12,46 @@ import { createOpenAITeamBackend } from '../agents/openai/team.ts'
 import { createKiroTeamBackend } from '../agents/kiro/team.ts'
 import { createJobRunner } from '../jobs/runner.ts'
 import { JOB_HANDLERS } from '../jobs/handlers.ts'
+import { relaunch, takeRestartToken } from '../relaunch.ts'
 
 // Runs the loop and the API in this process until SIGINT or SIGTERM. The API token lives in memory only: a new start
-// issues a new token, and the UI gets it from the URL fragment printed below.
+// issues a new token, and the UI gets it from the URL fragment printed below. Settings > Update's restart keeps it.
 export async function runCommand(config: Config, db: Db): Promise<void> {
   const agent = agentFor(config)
   const runner = createRunner({
     db, config, worker: agent.createWorker(config), preflight: () => agent.preflight(config),
     retrospect: config.retrospect ? createRetrospector({ db, config, ask: (request) => agent.ask(config, request) }) : undefined,
   })
-  const token = randomBytes(32).toString('hex')
+  const dataDir = join(config.home, 'data')
+  const token = takeRestartToken(dataDir) ?? randomBytes(32).toString('hex')
   const hub = teamHub(config, db, agent)
-  const server = await startServer({ db, config, control: runner, bots: hub }, token)
+  const server = await startServer({ db, config, control: runner, bots: hub, restart: () => void restart() }, token)
   await runner.start()
   await hub?.start()
   const jobs = createJobRunner(db, config, JOB_HANDLERS)
   jobs.start()
   console.log(`taskq running at http://127.0.0.1:${config.port}/#token=${token}`)
-  const shutdown = async () => {
+  const stop = async () => {
     await hub?.stop()
     await closeBrowsers(config)
     await jobs.stop()
     await runner.stop()
     server.close()
     db.close()
+  }
+  const shutdown = async () => {
+    await stop()
     process.exit(0)
+  }
+  // A failure halfway leaves bots and the database half closed, so the process ends instead of limping on.
+  async function restart() {
+    try {
+      await stop()
+      relaunch(dataDir, token)
+    } catch (error) {
+      console.error(`taskq: restart failed: ${String(error)}`)
+      process.exit(1)
+    }
   }
   process.once('SIGINT', () => void shutdown())
   process.once('SIGTERM', () => void shutdown())

@@ -13,6 +13,7 @@ export interface ApiDeps {
   fetcher?: typeof fetch                                       // tests replace GitHub for the update check
   binary?: boolean                                             // tests say whether taskq runs as the single-file binary
   updateTarget?: string                                        // tests install the update over a scratch file
+  restart?: () => void                                         // `taskq run` restarts itself; absent in CLI and MCP calls
 }
 
 export class HttpError extends Error {

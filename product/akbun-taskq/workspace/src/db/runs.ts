@@ -94,6 +94,6 @@ export function runsInRange(db: Db, from: number, to: number) {
 }
 
 export function listRunsOfTask(db: Db, taskId: string) {
-  return db.prepare('SELECT id, session_id, started_at, ended_at, outcome, summary, stats FROM runs WHERE task_id = ? ORDER BY started_at DESC')
+  return db.prepare('SELECT id, session_id, started_at, ended_at, outcome, summary, stats, bot FROM runs WHERE task_id = ? ORDER BY started_at DESC')
     .all(taskId)
 }

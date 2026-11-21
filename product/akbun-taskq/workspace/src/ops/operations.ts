@@ -111,6 +111,7 @@ export const OPERATIONS: Operation[] = [
   op('update_check', 'GET', '/update', 'Whether a newer akbun-taskq release exists (current, latest, update_available, can_install and why not).'),
   op('update_progress', 'GET', '/update/progress', 'The running install: phase (idle, download, unpack, done, failed), received bytes and total bytes (null when unknown).'),
   op('update_install', 'POST', '/update', 'Download the latest release build for this machine and replace the running binary; restart taskq to use it. Only for the single-file binary.'),
+  op('update_restart', 'POST', '/update/restart', 'Restart the running taskq so an installed update takes effect. Only the running server can do this; a CLI or MCP call answers 409.'),
   op('settings_get', 'GET', '/settings', 'Settings: appearance, folders, registered skills and plugins.'),
   op('settings_appearance', 'POST', '/settings/appearance', 'Change appearance. Fields: font_family, font_size, language (ko|en), theme (system|dark|light).'),
   op('settings_queue_autorun', 'POST', '/settings/queue-autorun', 'Whether the queue runs unowned ready tasks on its own. Fields: enabled.'),

@@ -43,7 +43,7 @@ describe('run now', () => {
   test.afterEach(() => env.cleanup())
 
   const withSession = (status: TaskStatus) => {
-    const task = addTask(env.db, { status })
+    const task = addTask(env.db, { owner: 'coder', status })
     env.db.prepare('UPDATE tasks SET session_id = ? WHERE id = ?').run('sess-old', task.id)
     return task.id
   }
@@ -61,11 +61,38 @@ describe('run now', () => {
     }
   })
 
+  test('a task with no agent (owner) is refused without a change', () => {
+    const task = addTask(env.db, { status: 'draft' })
+    assert.throws(() => prepareRun(env.db, task.id), /no agent/)
+    assert.equal(statusOf(env.db, task.id), 'draft')
+  })
+
+  test('PATCH refuses to edit title or intent while running and allows it once the task failed', async () => {
+    const app = createApp({ db: env.db, config: env.config }, TOKEN)
+    const task = addTask(env.db, { owner: 'coder', status: 'running' })
+    const edit = () => app.request(`/api/tasks/${task.id}`, { method: 'PATCH', headers: headers(env), body: JSON.stringify({ intent: 'new' }) })
+    assert.equal((await edit()).status, 409)
+    env.db.prepare("UPDATE tasks SET status = 'failed' WHERE id = ?").run(task.id)
+    assert.equal((await edit()).status, 200)
+    assert.equal(getTask(env.db, task.id)!.data.intent, 'new')
+  })
+
+  test('PATCH changes only the fields it names, and an empty title removes the title', async () => {
+    const app = createApp({ db: env.db, config: env.config }, TOKEN)
+    const task = addTask(env.db, { data: { intent: 'do it', title: 'Keep me', cautions: 'careful' } })
+    const patch = (body: object) => app.request(`/api/tasks/${task.id}`, { method: 'PATCH', headers: headers(env), body: JSON.stringify(body) })
+    assert.equal((await patch({ priority: 5 })).status, 200)
+    assert.deepEqual([getTask(env.db, task.id)!.data.title, getTask(env.db, task.id)!.data.cautions], ['Keep me', 'careful'])
+    assert.equal((await patch({ title: '' })).status, 200)
+    assert.equal(getTask(env.db, task.id)!.data.title, undefined)
+    assert.equal(getTask(env.db, task.id)!.data.cautions, 'careful')
+  })
+
   test('a running task, a paused queue and an unfinished dependency are refused without a change', () => {
-    const running = addTask(env.db, { status: 'running' })
+    const running = addTask(env.db, { owner: 'coder', status: 'running' })
     assert.throws(() => prepareRun(env.db, running.id), OperatorError)
-    const first = addTask(env.db, { status: 'draft' })
-    const second = addTask(env.db, { status: 'draft', deps: [{ depends_on: first.id, kind: 'blocks' }] })
+    const first = addTask(env.db, { owner: 'coder', status: 'draft' })
+    const second = addTask(env.db, { owner: 'coder', status: 'draft', deps: [{ depends_on: first.id, kind: 'blocks' }] })
     assert.throws(() => prepareRun(env.db, second.id), /dependency/)
     assert.equal(statusOf(env.db, second.id), 'draft')
     pauseQueue(env.db, 'paused by user', 'user')
@@ -76,12 +103,12 @@ describe('run now', () => {
   test('POST /tasks/:id/run readies the task and asks the runner; a running task is 409', async () => {
     const asked: string[] = []
     const app = createApp({ db: env.db, config: env.config, control: { runNow: (id) => asked.push(id) } }, TOKEN)
-    const draft = addTask(env.db, { status: 'draft' })
+    const draft = addTask(env.db, { owner: 'coder', status: 'draft' })
     const res = await app.request(`/api/tasks/${draft.id}/run`, { method: 'POST', headers: headers(env) })
     assert.equal(res.status, 200)
     assert.equal((await res.json()).status, 'ready')
     assert.deepEqual(asked, [draft.id])
-    const running = addTask(env.db, { status: 'running' })
+    const running = addTask(env.db, { owner: 'coder', status: 'running' })
     assert.equal((await app.request(`/api/tasks/${running.id}/run`, { method: 'POST', headers: headers(env) })).status, 409)
   })
 
@@ -94,7 +121,7 @@ describe('run now', () => {
       await new Promise<void>((resolve) => { release = resolve })
       return result('done')
     })
-    const urgent = addTask(env.db, { status: 'draft', priority: 0 })
+    const urgent = addTask(env.db, { owner: 'coder', status: 'draft', priority: 0 })
     addTask(env.db, { status: 'ready', priority: 90 })
     addTask(env.db, { status: 'ready', priority: 80 })
     const runner = createRunner({ db: env.db, config, worker })
@@ -123,7 +150,7 @@ describe('run now', () => {
       return result('done')
     })
     const parent = addTask(env.db, { status: 'done', type: 'code', data: { intent: 'parent', repo: '/tmp/x' } })
-    const child = addTask(env.db, { status: 'draft', deps: [{ depends_on: parent.id, kind: 'blocks' }] })
+    const child = addTask(env.db, { owner: 'coder', status: 'draft', deps: [{ depends_on: parent.id, kind: 'blocks' }] })
     const busy = addTask(env.db, { status: 'ready', priority: 90 })
     const runner = createRunner({ db: env.db, config, worker })
     try {
@@ -150,7 +177,7 @@ describe('run now', () => {
       await runner.start()
       await sleep(20)
       const app = createApp({ db: env.db, config, control: runner }, TOKEN)
-      const draft = addTask(env.db, { status: 'draft', type: 'code', data: { intent: 'x', repo: '/tmp/x' } })
+      const draft = addTask(env.db, { owner: 'coder', status: 'draft', type: 'code', data: { intent: 'x', repo: '/tmp/x' } })
       const res = await app.request(`/api/tasks/${draft.id}/run`, { method: 'POST', headers: headers(env) })
       assert.equal(res.status, 200)
       await waitFor(() => getTask(env.db, draft.id)!.status === 'done', 2000)

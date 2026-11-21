@@ -10,6 +10,8 @@ import { OperatorError, prepareRun, requestCancel, retryTask } from '../db/opera
 import { noRunControl } from '../runner/control.ts'
 import { enumParam, TASK_STATUSES } from './params.ts'
 
+const LOCKED_FOR_EDIT = ['running', 'needs_approval']
+
 export function registerTaskRoutes(api: Hono, { db, config, control = noRunControl }: ApiDeps): void {
   api.get('/tasks', (c) => c.json(listTasks(db, enumParam(c.req.query('status'), 'status', TASK_STATUSES))))
 
@@ -32,6 +34,9 @@ export function registerTaskRoutes(api: Hono, { db, config, control = noRunContr
     const patch = requireOk(parseTaskPatch(await readJson(c), (name) => hasAccessSkill(db, name)))
     const task = getTask(db, id)
     if (!task) return c.json({ error: 'task not found' }, 404)
+    // Editing what the task asks for is locked while a run is working on it; stopped or failed tasks can be edited.
+    const edits = 'intent' in patch.data || 'title' in patch.data
+    if (edits && LOCKED_FOR_EDIT.includes(task.status)) throw new HttpError(409, `task is ${task.status}; stop it before editing`)
     if (patch.status === 'ready' && !moveStatus(db, id, 'draft', 'ready')) throw new HttpError(409, 'only draft tasks can be made ready')
     if (patch.data.workflow_id) {
       try {
