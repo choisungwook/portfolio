@@ -3,7 +3,7 @@ type: Decision
 title: A conversation over a token limit is handed over to a new session by the bot itself
 description: Past 100,000 tokens the hub asks the bot once for a handover note, resets the session after that turn, and delivers the note as the first message; Codex compacts itself at the same limit.
 tags: [bots, sessions, tokens, cost]
-generated: { by: claude-code/claude-opus-5-5, at: 2026-11-20T00:00:00Z }
+generated: { by: claude-code/claude-opus-5-5, at: 2026-11-21T10:00:00Z }
 ---
 
 ## 결정
@@ -13,6 +13,7 @@ generated: { by: claude-code/claude-opus-5-5, at: 2026-11-20T00:00:00Z }
 - 요청을 읽은 turn은 함께 온 다른 메시지를 평소대로 처리하고 메모를 마지막에 쓴다. 요청은 따로 배달하지 않는다.
 - 세션의 첫 turn에는 요청하지 않는다. 요청 표시(`team_handover:<bot>`)에는 요청한 세션 id를 함께 적고, turn을 시작하기 전에 그 세션이 아니거나 요청 메시지가 inbox에 없으면 요청과 메모를 거둔다.
 - 기준은 항목 수가 아니라 토큰 수다. 모든 SDK 경로(Claude, OpenAI API key·Bedrock, Kiro)에 hub 한 곳에서 건다. Kiro는 비율만 알려 주므로 80%가 기준이다.
+- 0.32.0부터 Claude 세션(bot turn과 task worker)은 `Options.settings`로 auto-compact를 항상 켠다. handover는 turn이 끝난 뒤에만 판단하므로, 한 turn 안에서 window를 넘는 경우의 안전망이다. 압축 시점은 Claude Code의 모델별 window에 맡긴다.
 - Codex CLI bot은 hub가 넘기지 않고 같은 한도를 `model_auto_compact_token_limit`으로 전달해 Codex가 자기 thread를 요약하게 한다.
 
 ## 이유
