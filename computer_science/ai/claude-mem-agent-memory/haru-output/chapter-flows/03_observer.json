@@ -1,0 +1,76 @@
+{
+  "palette": "ink-blue",
+  "layout": "columns",
+  "subject": "A background observer reads recorded inputs sends a prompt to Haiku and saves structured memory",
+  "nodes": [
+    {
+      "id": "stop",
+      "label": [
+        "Stop hook"
+      ],
+      "shape": "box",
+      "col": 1
+    },
+    {
+      "id": "obs",
+      "label": [
+        "Observer"
+      ],
+      "shape": "box",
+      "col": 2
+    },
+    {
+      "id": "model",
+      "label": [
+        "Haiku"
+      ],
+      "shape": "box",
+      "col": 3
+    },
+    {
+      "id": "db",
+      "label": [
+        "SQLite"
+      ],
+      "shape": "cylinder",
+      "col": 3
+    }
+  ],
+  "edges": [
+    {
+      "from": "stop",
+      "to": "obs",
+      "kind": "call",
+      "label": "Popen",
+      "step": 1
+    },
+    {
+      "from": "db",
+      "to": "obs",
+      "kind": "sync",
+      "label": "Read records",
+      "step": 2
+    },
+    {
+      "from": "obs",
+      "to": "model",
+      "kind": "call",
+      "label": "Send prompt",
+      "step": 3
+    },
+    {
+      "from": "model",
+      "to": "obs",
+      "kind": "sync",
+      "label": "Return XML",
+      "step": 4
+    },
+    {
+      "from": "obs",
+      "to": "db",
+      "kind": "call",
+      "label": "Save summary",
+      "step": 5
+    }
+  ]
+}

@@ -1,8 +1,8 @@
 # 시나리오 2. 캡처: lifecycle hook으로 도구 호출 모으기
 
-메모리 파이프라인의 첫 번째 단계는 에이전트가 세션 동안 무엇을 했는지 빠짐없이 수집하는 일입니다. 이 시나리오에서는 Claude Code의 lifecycle hook과 `minimem/hook.py`가 도구 호출을 LLM 호출 없이 원본 그대로 SQLite에 기록하는 구조를 살펴봅니다. 시나리오 1에서 실행한 세션 A의 이벤트가 실제로 어떻게 저장되었는지 확인하고, hook 1회 실행에 걸리는 시간과 hook이 실패했을 때 세션이 안전하게 계속 도는지도 직접 측정해 봅니다.
+메모리 파이프라인의 첫 번째 단계는 세션의 첫 요청과 작업에 쓰인 도구 호출을 기록하는 일입니다. 이 시나리오에서는 Claude Code의 lifecycle hook과 `minimem/hook.py`가 도구 입력과 결과를 길이 제한 후 LLM 호출 없이 SQLite에 기록하는 구조를 살펴봅니다. 시나리오 1에서 실행한 세션 A의 이벤트가 실제로 어떻게 저장되었는지 확인하고, hook 1회 실행에 걸리는 시간과 hook이 실패했을 때 세션이 안전하게 계속 도는지도 직접 측정해 봅니다.
 
-## 캡처는 에이전트 판단과 무관하게 모든 활동을 받아 적는 단계
+## 등록된 이벤트가 발생하면 Claude Code가 hook 실행
 
 Claude Code hook은 세션의 특정 lifecycle 시점에 Claude Code 프로세스가 자동으로 실행하는 셸 명령입니다. 이벤트가 발생하면 Claude Code가 관련 정보를 JSON 형태로 명령의 stdin에 넘겨주고, `SessionStart`처럼 모델에게 돌려줄 내용이 있는 이벤트라면 stdout을 읽어 컨텍스트에 반영합니다.
 
@@ -12,10 +12,10 @@ Claude Code hook은 세션의 특정 lifecycle 시점에 Claude Code 프로세�
 | --- | --- | --- | --- |
 | `SessionStart` | 새 세션 시작 | `session_id`, `cwd`, `source` | 지난 세션 요약과 관찰 인덱스를 출력해 컨텍스트에 주입 ([시나리오 5](5-context-injection.md)) |
 | `UserPromptSubmit` | 사용자가 프롬프트를 전송할 때 | `prompt` | 세션의 첫 프롬프트와 `cwd`를 DB에 저장 |
-| `PostToolUse` | 도구 호출이 성공적으로 끝난 직후 | `tool_name`, `tool_input`, `tool_response` | 도구 호출 이벤트 1건을 원본 그대로 저장 |
+| `PostToolUse` | 도구 호출이 성공적으로 끝난 직후 | `tool_name`, `tool_input`, `tool_response` | 도구 입력·결과를 길이 제한 후 저장 |
 | `Stop` | 에이전트가 응답을 마칠 때 | `session_id` | observer를 별도 분리 프로세스로 백그라운드 실행 ([시나리오 3](3-observer.md)) |
 
-물론 hook이 모든 것을 다 받는 것은 아닙니다. 모델의 내부 추론 과정이나 일반 응답 텍스트는 hook으로 전달되지 않습니다. 또한 권한이 거부되어 실패한 도구 호출은 `PostToolUse`가 아니라 `PostToolUseFailure` 이벤트로 빠지는데, `minimem`은 단순화를 위해 `PostToolUse`만 구독합니다. 반면 원본 `claude-mem`은 두 이벤트를 모두 받아 실패한 시도까지 기록합니다.
+이 실습의 네 이벤트는 세션의 첫 요청과 성공한 도구 호출을 기록합니다. 일반 답변 텍스트는 저장 대상에 포함되지 않습니다. 실패한 호출을 수집하려면 `PostToolUseFailure`를 별도로 등록합니다. 원본 `claude-mem`은 두 종류의 도구 이벤트를 모두 구독합니다.
 
 ### 핵심 용어 정리
 
@@ -38,7 +38,7 @@ Claude Code가 등록된 이벤트에서 hook을 직접 호출하므로, 모델�
 
 | 방식 | 장점 | 단점 |
 | --- | --- | --- |
-| lifecycle hook (`claude-mem`, `minimem`) | 실시간으로 도구 호출 단위 캡처 가능, 에이전트 판단과 무관하게 누락 없음 | 동기 hook이 느리면 에이전트 응답 전체가 함께 느려짐 |
+| lifecycle hook (`claude-mem`, `minimem`) | 등록한 이벤트를 에이전트 판단에 맡기지 않고 캡처 | 동기 hook이 느리면 에이전트 응답 전체가 함께 느려짐 |
 | transcript 파일 감시 | Claude Code hook 설정을 따로 건드리지 않아도 됨 | 파일 포맷이 공개 API가 아니라 버전업 시 깨질 수 있음 (`claude-mem`도 보조 수단으로만 사용) |
 | 에이전트 자기 기록 (auto memory) | 별도 프로세스나 설정 없이 가볍게 동작 | 무엇을 남길지 모델 판단에 달려 있어 기록이 누락될 수 있음 |
 
@@ -60,9 +60,39 @@ Claude Code가 등록된 이벤트에서 hook을 직접 호출하므로, 모델�
 | `should_skip()` | `mcp__minimem__*`, `ToolSearch` 같은 메모리 조회 도구 호출은 캡처 대상에서 제외 ([시나리오 6](6-mcp-search.md)) |
 | `events` 테이블 | 도구 호출 원본과 observer 처리 여부(`processed` 플래그) 저장 |
 
+## 구현 코드
+
+`minimem-hook tool`을 실행하면 `main()`이 표준 입력을 JSON으로 읽습니다. `HANDLERS`에서 `tool`에 연결된 함수는 `on_tool()`입니다. [hook.py 74–82줄](../minimem/minimem/hook.py#L74-L82)
+
+```python
+HANDLERS[sys.argv[1]](json.load(sys.stdin))
+```
+
+`matcher: "*"`로 들어온 도구 호출 중 메모리 조회는 `should_skip()`을 통과하지 않습니다. 나머지는 입력과 결과의 길이를 제한한 뒤 `events`에 저장합니다. 이 INSERT에는 `processed`가 없으므로 기본값인 `0`으로 시작합니다. [hook.py 39–59줄](../minimem/minimem/hook.py#L39-L59) · [db.py 19–28줄](../minimem/minimem/db.py#L19-L28)
+
+```python
+if should_skip(event["tool_name"]):
+  return
+conn = db.connect()
+db.insert_event(
+  conn,
+  event["session_id"],
+  project_name(event["cwd"]),
+  event["tool_name"],
+  truncate(event.get("tool_input", "")),
+  truncate(event.get("tool_response", "")),
+)
+```
+
 ## 도구 호출 캡처 흐름
 
 에이전트가 도구를 한 번 호출했을 때 `events` 테이블에 행 하나가 쌓이기까지의 흐름입니다.
+
+![성공한 Write 호출이 JSON으로 hook에 전달되어 SQLite 이벤트 한 행으로 저장되는 과정](../haru-output/chapter-flows/02_capture.png)
+
+<!-- markdownlint-disable MD033 -->
+<details>
+<summary>메시지와 분기를 포함한 상세 흐름</summary>
 
 ```mermaid
 sequenceDiagram
@@ -78,6 +108,9 @@ sequenceDiagram
   H-->>CC: exit 0
   CC->>M: tool_result
 ```
+
+</details>
+<!-- markdownlint-enable MD033 -->
 
 ## 실습: 숫자 파일을 만든 기록 확인
 

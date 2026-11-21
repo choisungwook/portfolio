@@ -64,9 +64,38 @@
 | `search.search_ids()` | 단어별 결과를 합산해 일치 단어 수 점수를 매기고 AND/OR 조건 적용 |
 | `search.search()` | 최종 결과를 `#id [type] 제목 (파일)` 형태의 한 줄 인덱스로 포맷해 반환 |
 
+## 구현 코드
+
+SQLite는 새 관찰을 넣을 때 INSERT 트리거로 제목과 본문을 FTS5 색인에도 등록합니다. [db.py 53–62줄](../minimem/minimem/db.py#L53-L62)
+
+```sql
+CREATE TRIGGER IF NOT EXISTS observations_ai AFTER INSERT ON observations BEGIN
+  INSERT INTO observations_fts(rowid, title, facts, narrative)
+  VALUES (new.id, new.title, new.facts, new.narrative);
+END;
+```
+
+`term_ids()`는 단어마다 검색 방식을 정합니다. 실습의 ‘방문객’은 세 글자라 `MATCH`로, ‘직원’은 두 글자라 `LIKE`로 조회합니다. `search_ids()`는 단어별 결과를 모아 AND 또는 OR 조건을 적용합니다. [search.py 9–20줄](../minimem/minimem/search.py#L9-L20) · [search.py 29–36줄](../minimem/minimem/search.py#L29-L36)
+
+```python
+if len(term) >= TRIGRAM_MIN_CHARS:
+  sql = "SELECT o.id FROM observations o JOIN observations_fts f ON f.rowid = o.id WHERE o.project = ? AND observations_fts MATCH ?"
+  param = '"' + term.replace('"', '""') + '"'
+else:
+  sql = "SELECT id FROM observations WHERE project = ? AND (title || facts || narrative) LIKE ?"
+  param = f"%{term}%"
+return {row[0] for row in conn.execute(sql, (project, param))}
+```
+
 ## 키워드 검색 처리 흐름
 
 에이전트가 보낸 다중 단어 검색어가 관찰 인덱스로 변환되기까지의 처리 경로입니다.
+
+![검색어 길이에 따라 FTS5 trigram과 LIKE로 나뉘고 결과 ID를 AND 또는 OR 조건으로 정렬하는 과정](../haru-output/chapter-flows/04_search.png)
+
+<!-- markdownlint-disable MD033 -->
+<details>
+<summary>메시지와 분기를 포함한 상세 흐름</summary>
 
 ```mermaid
 flowchart TD
@@ -80,6 +109,9 @@ flowchart TD
   M -- "and: 3개 모두 일치" --> R1["0건"]
   M -- "or: 1개 이상 일치" --> R2["일치 수, 최신순 정렬 후 인덱스"]
 ```
+
+</details>
+<!-- markdownlint-enable MD033 -->
 
 ## 실습: 한국어 검색 결과 비교
 

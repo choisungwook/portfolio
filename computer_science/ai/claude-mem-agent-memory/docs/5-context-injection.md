@@ -56,9 +56,35 @@
 | `index_row()` | 관찰 1건을 한 줄 인덱스로 포맷하며 관련 파일은 최대 2개까지만 표시 |
 | `summary_lines()` | 내용이 비어 있는 요약 항목은 출력에서 생략 |
 
+## 구현 코드
+
+`build_context()`는 직전 요약과 최근 관찰을 읽습니다. 출력이 예산을 넘고 관찰이 두 건 이상이면 오래된 것부터 빼고 다시 렌더링합니다. [context.py 33–47줄](../minimem/minimem/context.py#L33-L47)
+
+```python
+text = render(project, summary, observations)
+while len(text) > max_chars and len(observations) > 1:
+  observations.pop()
+  text = render(project, summary, observations)
+return text
+```
+
+`on_session_start()`는 텍스트가 있을 때만 `additionalContext`를 담은 JSON을 표준 출력으로 돌려줍니다. 세션 실행기는 그 값을 stream-json에서 찾아 길이를 `injected_context_chars`에 표시합니다. [hook.py 25–30줄](../minimem/minimem/hook.py#L25-L30) · [run_session.py 59–76줄](../scripts/run_session.py#L59-L76)
+
+```python
+context = build_context(conn, project_name(event["cwd"]))
+if context:
+  print(json.dumps({"hookSpecificOutput": {"hookEventName": "SessionStart", "additionalContext": context}}, ensure_ascii=False))
+```
+
 ## 세션 시작 컨텍스트 주입 흐름
 
 새 세션이 열렸을 때 SQLite에서 꺼낸 기록이 모델의 입력 프롬프트에 합쳐지기까지의 순서입니다.
+
+![SQLite에서 만든 요약과 제목 목록이 SessionStart의 JSON 출력으로 Claude Code 모델 입력에 들어가는 과정](../haru-output/chapter-flows/05_injection.png)
+
+<!-- markdownlint-disable MD033 -->
+<details>
+<summary>메시지와 분기를 포함한 상세 흐름</summary>
 
 ```mermaid
 sequenceDiagram
@@ -72,6 +98,9 @@ sequenceDiagram
   H-->>CC: stdout JSON additionalContext
   CC->>M: 시스템 프롬프트 + additionalContext + 사용자 프롬프트
 ```
+
+</details>
+<!-- markdownlint-enable MD033 -->
 
 ## 실습: 주입될 텍스트 확인
 

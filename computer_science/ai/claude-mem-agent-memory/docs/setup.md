@@ -7,7 +7,7 @@
 | Claude Code CLI | `claude --version` | 실제 모델 호출을 하려면 로그인합니다 |
 | uv | `uv --version` | minimem 의존성 설치에 사용합니다 |
 | Python 3.11 이상 | `python3 --version` | 세션 실행 스크립트에 사용합니다 |
-| SQLite CLI (선택) | `sqlite3 --version` | 시나리오 2에서 원본 이벤트를 직접 조회할 때 사용합니다 |
+| SQLite CLI (선택) | `sqlite3 --version` | 시나리오 1·2에서 원본 이벤트를 직접 조회할 때 사용합니다 |
 
 ## 실습 프로젝트 생성
 

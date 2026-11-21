@@ -59,9 +59,31 @@
 | 컨텍스트 빌더 | `src/services/context/` | `minimem/context.py` |
 | MCP 서버 | `src/servers/mcp-server.ts` | `minimem/mcp_server.py` |
 
+## 구현 코드
+
+claude-mem v16.0.0은 `PostToolUse`의 관찰 명령을 `async: true`로 등록합니다. 반면 `SessionStart`에서 컨텍스트를 돌려주는 명령에는 이 옵션이 없습니다. 기록을 넘기는 명령과 결과를 즉시 전달해야 하는 명령의 대기 방식이 다릅니다. [원본 관찰 hook](https://github.com/thedotmack/claude-mem/blob/v16.0.0/plugin/hooks/hooks.json#L81-L98) · [원본 컨텍스트 hook](https://github.com/thedotmack/claude-mem/blob/v16.0.0/plugin/hooks/hooks.json#L36-L49)
+
+```json
+{
+  "type": "command",
+  "command": "claude-mem",
+  "args": ["hook", "claude-code", "observation"],
+  "timeout": 120,
+  "async": true
+}
+```
+
+`minimem`에서는 이벤트가 hook에서 바로 SQLite에 들어갑니다. 아래 그림의 원본 구현에서는 hook이 상주 worker에 보내고, 전송에 실패했을 때 spool 파일을 거칩니다. [minimem의 SQLite INSERT](../minimem/minimem/db.py#L91-L97)
+
 ## claude-mem 전체 데이터 흐름
 
 [시나리오 1](1-memory-map.md)의 `minimem` 흐름에 상주 worker(Bun), spool fallback, Chroma 벡터 DB, 웹 viewer가 더해진 구조입니다.
+
+![원본 claude-mem의 hook은 worker에 HTTP로 보내고 실패할 경우 spool에 기록해 나중에 다시 넘기는 과정](../haru-output/chapter-flows/07_worker.png)
+
+<!-- markdownlint-disable MD033 -->
+<details>
+<summary>메시지와 분기를 포함한 상세 흐름</summary>
 
 ```mermaid
 flowchart LR
@@ -78,6 +100,9 @@ flowchart LR
   CTX --> A
   MCP --> A
 ```
+
+</details>
+<!-- markdownlint-enable MD033 -->
 
 ## 실습: claude-mem 소스에서 설계 흔적 확인하기
 

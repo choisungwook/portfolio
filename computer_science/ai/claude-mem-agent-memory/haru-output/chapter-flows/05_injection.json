@@ -1,0 +1,68 @@
+{
+  "palette": "ink-blue",
+  "layout": "row",
+  "subject": "Session startup turns saved summaries and observation titles into context for the next model",
+  "nodes": [
+    {
+      "id": "db",
+      "label": [
+        "SQLite"
+      ],
+      "shape": "cylinder"
+    },
+    {
+      "id": "hook",
+      "label": [
+        "SessionStart"
+      ],
+      "shape": "box"
+    },
+    {
+      "id": "cli",
+      "label": [
+        "Claude Code"
+      ],
+      "shape": "box"
+    },
+    {
+      "id": "model",
+      "label": [
+        "Model input"
+      ],
+      "shape": "box"
+    }
+  ],
+  "edges": [
+    {
+      "from": "db",
+      "to": "hook",
+      "kind": "sync",
+      "label": "Read memory",
+      "step": 1
+    },
+    {
+      "from": "hook",
+      "to": "cli",
+      "kind": "sync",
+      "label": "JSON stdout",
+      "step": 2
+    },
+    {
+      "from": "cli",
+      "to": "model",
+      "kind": "call",
+      "label": "Add context",
+      "step": 3
+    }
+  ],
+  "notes": [
+    {
+      "node": "hook",
+      "text": "Summary and titles"
+    },
+    {
+      "node": "cli",
+      "text": "additionalContext"
+    }
+  ]
+}

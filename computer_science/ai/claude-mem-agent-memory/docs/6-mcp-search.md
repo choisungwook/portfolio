@@ -47,9 +47,28 @@
 | `current_project()` | Claude Code가 전달한 `CLAUDE_PROJECT_DIR` 환경 변수로 현재 프로젝트 식별 |
 | `hook.should_skip()` | 메모리 조회 도구와 `ToolSearch` 호출을 이벤트 캡처에서 제외 |
 
+## 구현 코드
+
+`.mcp.json`이 띄우는 `minimem-mcp`는 `@server.tool()`로 두 함수를 등록합니다. `search()`는 프로젝트 안에서 ID와 제목을 찾고, `get_observations()`는 고른 ID의 사실·설명·관련 파일을 읽습니다. [실행 설정](../lab-template/.mcp.json#L1-L7) · [mcp_server.py 18–30줄](../minimem/minimem/mcp_server.py#L18-L30) · [본문 구성](../minimem/minimem/search.py#L46-L55)
+
+```python
+@server.tool()
+def get_observations(ids: list[int]) -> str:
+  """search나 SessionStart 인덱스에서 고른 관찰 id의 사실, 서술, 파일 목록을 반환한다. 여러 id를 한 번에 넘긴다."""
+  return memsearch.get_observations(db.connect(), ids)
+```
+
+`PostToolUse`가 이 도구의 결과를 받아도 `should_skip()`이 `mcp__minimem__`과 `ToolSearch`를 걸러냅니다. 그래서 실습에서 조회 전후의 이벤트 수가 같습니다. [hook.py 39–52줄](../minimem/minimem/hook.py#L39-L52)
+
 ## MCP 기반 2단계 조회 흐름
 
 아래는 모델이 인덱스를 검색한 뒤 관찰 하나의 본문을 꺼내 오는 순서입니다. 관찰 ID는 실행마다 달라집니다.
+
+![검색어로 관찰의 제목과 ID를 알아낸 뒤 선택한 ID로 관찰 본문을 받는 두 단계](../haru-output/chapter-flows/06_mcp.png)
+
+<!-- markdownlint-disable MD033 -->
+<details>
+<summary>메시지와 분기를 포함한 상세 흐름</summary>
 
 ```mermaid
 sequenceDiagram
@@ -66,6 +85,9 @@ sequenceDiagram
   S-->>M: 선택한 관찰 본문
   Note over CC: PostToolUse hook은 should_skip으로 기록하지 않음
 ```
+
+</details>
+<!-- markdownlint-enable MD033 -->
 
 ## 실습: 제목과 본문 비교
 

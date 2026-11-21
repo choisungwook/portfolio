@@ -68,9 +68,34 @@ observer 역시 `claude -p`로 띄우는 또 하나의 Claude Code 세션입니�
 | `parse_observations()` | 정규식으로 XML을 파싱하며, 지정되지 않은 관찰 타입은 안전하게 `change`로 정규화 |
 | `mark_processed()` | 처리가 끝난 이벤트에 `processed=1`을 표시해 중복 압축 방지 |
 
+## 구현 코드
+
+`on_stop()`은 `Popen()`으로 observer를 띄우고 기다리지 않습니다. observer가 넘겨받은 `session_id`로 현재 세션의 첫 요청과 미처리 이벤트를 찾습니다. [hook.py 62–71줄](../minimem/minimem/hook.py#L62-L71) · [observer.py 108–122줄](../minimem/minimem/observer.py#L108-L122)
+
+```python
+user_prompt, project_root = db.session_info(conn, session_id)
+response = call_llm(build_prompt(user_prompt, project_root, events))
+```
+
+Haiku 응답을 파싱해 관찰과 요약을 DB에 기록한 다음에야 `mark_processed()`를 호출합니다. 실습의 `processed=1`은 이 마지막 단계의 결과입니다. [observer.py 117–121줄](../minimem/minimem/observer.py#L117-L121) · [db.py 105–108줄](../minimem/minimem/db.py#L105-L108)
+
+```python
+observations = parse_observations(response)
+for obs in observations:
+  db.insert_observation(conn, session_id, project, obs)
+db.upsert_summary(conn, session_id, project, parse_summary(response))
+db.mark_processed(conn, [e["id"] for e in events])
+```
+
 ## observer 실행 및 압축 흐름
 
 `Stop` hook이 백그라운드 observer를 띄운 뒤 관찰과 요약이 SQLite에 기록되기까지의 순서입니다.
+
+![Stop hook이 observer를 띄우고 observer가 SQLite 원본을 읽어 Haiku로 요약한 뒤 저장하는 과정](../haru-output/chapter-flows/03_observer.png)
+
+<!-- markdownlint-disable MD033 -->
+<details>
+<summary>메시지와 분기를 포함한 상세 흐름</summary>
 
 ```mermaid
 sequenceDiagram
@@ -81,13 +106,16 @@ sequenceDiagram
   participant DB as SQLite
   CC->>H: Stop
   H->>O: Popen (MINIMEM_DISABLE=1)
-  H-->>CC: exit 0 (43 ms)
+  H-->>CC: exit 0
   O->>DB: pending_events, session_info
   O->>L: system prompt + events
   L-->>O: observation XML, summary XML
   O->>DB: insert_observation, upsert_summary
   O->>DB: mark_processed
 ```
+
+</details>
+<!-- markdownlint-enable MD033 -->
 
 ## 실습: 관찰과 요약 확인
 
