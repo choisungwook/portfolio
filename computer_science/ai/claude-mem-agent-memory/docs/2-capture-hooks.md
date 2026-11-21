@@ -120,7 +120,7 @@ sequenceDiagram
 minimem/.venv/bin/minimem events park
 ```
 
-원본 입력과 결과를 보려면 아래를 실행합니다. 입력에 숫자 137은 있지만 직원 제외나 오후 6시라는 집계 지시는 없습니다. 이 두 정보의 출처는 `UserPromptSubmit`으로 저장한 첫 요청입니다.
+SQLite CLI가 있으면 아래 쿼리로 원본 입력과 결과를 확인합니다. CLI가 없으면 위의 `Write` 행을 사용하세요. 숫자 137은 도구 입력에 들어가고, 직원 제외와 오후 6시는 `UserPromptSubmit`으로 저장한 첫 요청에 남습니다.
 
 ```bash
 sqlite3 "$MINIMEM_HOME/memory.db" "SELECT tool_input, tool_output FROM events WHERE project='park' AND tool_name='Write';"

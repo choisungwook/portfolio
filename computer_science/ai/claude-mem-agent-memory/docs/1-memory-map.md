@@ -54,7 +54,7 @@ if options.tools is not None:
 HANDLERS[sys.argv[1]](json.load(sys.stdin))
 ```
 
-SQLite에서 `Write`에 전달된 경로와 내용, 도구가 반환한 결과를 확인합니다.
+SQLite CLI가 있으면 아래 쿼리로 `Write`의 입력과 결과를 확인합니다. CLI가 없으면 1단계의 `minimem events park` 출력에서 `Write` 행을 확인하고 다음 단계로 진행하세요.
 
 ```bash
 sqlite3 -line "$MINIMEM_HOME/memory.db" \

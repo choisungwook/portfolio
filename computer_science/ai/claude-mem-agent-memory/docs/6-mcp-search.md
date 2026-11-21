@@ -76,8 +76,7 @@ sequenceDiagram
   participant CC as Claude Code
   participant S as minimem-mcp
   participant DB as SQLite
-  CC->>M: additionalContext (최근 관찰 제목)
-  M->>CC: ToolSearch select:mcp__minimem__search,get_observations
+  CC->>M: additionalContext 및 MCP 도구 정의
   M->>S: search("방문객 직원")
   S->>DB: 키워드별 조회, 점수 정렬
   S-->>M: 제목과 ID 목록

@@ -120,7 +120,7 @@ DO NOT: no colored fills, no 3D, no drop shadows, no gradients, no real product 
 
 ## MCP 조회
 
-배치 `split`. 조회 두 단계를 나누고, SQLite 조회와 ToolSearch는 상세 흐름에 표시.
+배치 `split`. 조회 두 단계를 나누고, SQLite 조회와 hook의 기록 제외는 상세 흐름에 표시.
 
 [PNG](06_mcp.png) · [Spec](06_mcp.json) · [프롬프트](06_mcp.txt)
 
