@@ -51,17 +51,31 @@ function result(form, state) {
 
 async function test(form) {
   result(form, 'busy')
+  const id = connectionId(form)
   try {
-    result(form, await api.post('/connections/test', { id: connectionId(form) }))
+    known[id] = await api.post('/connections/test', { id })
+    result(form, known[id])
     // A pass can turn a bot back on; the bot list and the open conversation read it now.
     emit('bots-changed')
     emit('connections-changed')
   } catch (error) {
-    result(form, { status: 'error', reason: error.message })
+    known[id] = { status: 'error', reason: error.message }
+    result(form, known[id])
   }
 }
 
 let keys = {}
+// The last known status of every connection, from GET /connections (its checks are cached on the server for a minute)
+// and from tests run here. Opening the page or switching a method shows it instead of a blank result.
+let known = {}
+
+async function loadStatus() {
+  try {
+    const report = await api.get('/connections')
+    for (const c of report.connections) known[c.id] ??= { status: c.status, reason: c.reason }
+  } catch { /* the sections stay without a result */ }
+  for (const form of forms()) result(form, known[connectionId(form)] ?? null)
+}
 
 // Fills every section from what is saved. Keys are never sent back: an empty key field keeps the saved key.
 async function load() {
@@ -112,14 +126,14 @@ function renderLogin(state) {
 export function initConnections() {
   on('settings-page', (page) => {
     if (page !== 'connections') return
-    for (const form of forms()) result(form, null)
-    delete document.querySelector('.conn-runtime[data-runtime="openai"]').dataset.loaded
-    load()
+    // The method each section shows and its last status stay as they were; only the saved values are read again.
+    known = {}
+    load().then(loadStatus)
   })
   for (const form of forms()) {
     form.querySelector('[data-method]').addEventListener('change', () => {
       showFields(form)
-      result(form, null)
+      result(form, known[connectionId(form)] ?? null)
     })
     form.querySelector('[data-test]').addEventListener('click', () => test(form))
     form.addEventListener('submit', async (event) => {
@@ -131,8 +145,9 @@ export function initConnections() {
     })
     form.querySelector('[data-clear]').addEventListener('click', async () => {
       if (await mutate(() => api.del(`/connection-settings/${form.dataset.runtime}`), t('connections.cleared', 'Cleared'))) {
+        known = {}
         result(form, null)
-        load()
+        load().then(loadStatus)
       }
     })
   }

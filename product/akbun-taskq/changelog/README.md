@@ -10,6 +10,7 @@
 
 | 버전 | 해설 | 첫 항목 |
 |---|---|---|
+| [0.28.1](0.28.1/changelog.md) | [learning](0.28.1/learning_changelog.md) | 설정 > 연결을 열 때마다 절마다의 연결 상태가 비고 OpenAI 방식 선택이 처음 값으로 돌아가던 문제. |
 | [0.28.0](0.28.0/changelog.md) | [learning](0.28.0/learning_changelog.md) | bot 대화에 작업 과정을 보인다. |
 | [0.27.0](0.27.0/changelog.md) |  | 설정 > 연결을 Claude, OpenAI, Kiro 절로 나눴다. |
 | [0.26.0](0.26.0/changelog.md) |  | 설정의 사용량 제한 메뉴와 기능을 없앴다. |
