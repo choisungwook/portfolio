@@ -1,7 +1,8 @@
 import { appendFileSync, existsSync, mkdirSync, readdirSync, readFileSync, renameSync, rmSync } from 'node:fs'
 import { basename, dirname, join } from 'node:path'
 import type { Config } from './config.ts'
-import { addMemory, endSession, openStore, recent, search, type Kind, type MemoryInput, type Store } from './store.ts'
+import { spawnBackgroundIndex } from './indexer/index.ts'
+import { addMemory, endSession, openStore, recent, search, type Kind, type Memory, type MemoryInput, type Store } from './store.ts'
 
 // Hook payloads differ per agent (Claude Code, Codex, Kiro, Antigravity), but all send JSON on stdin with a session id,
 // a working directory and an event name. Unknown agents fall back to the same field guesses.
@@ -40,9 +41,64 @@ export function toMemory(agent: string, p: HookPayload): MemoryInput | null {
   return kindContent ? { ...base, kind: kindContent[0], content: kindContent[1] } : null
 }
 
-// Context printed on session start: the most recent memories of this project. Hooks put stdout into the agent context.
+const RAW_KINDS = new Set<Kind>(['prompt', 'tool', 'response'])
+
+function projectSummaries(s: Store, project: string, limit: number): Memory[] {
+  const now = Date.now()
+  const clauses = ["kind = 'summary'", '(valid_until IS NULL OR valid_until > ?)']
+  const params: (string | number)[] = [now]
+  if (project) { clauses.push('project = ?'); params.push(project) }
+  return s.db.prepare(
+    `SELECT id, session_id, agent, project, kind, content, created_at, access_count, last_accessed, valid_until
+     FROM memories WHERE ${clauses.join(' AND ')} ORDER BY created_at DESC LIMIT ?`,
+  ).all(...params, limit) as unknown as Memory[]
+}
+
+// Context printed on session start: summaries first for sessions that have one (replacing noisy raw observations),
+// then recent memories of unsummarized sessions. Hooks put stdout into the agent context.
 export function contextText(s: Store, project: string, query?: string): string {
-  const items = query ? search(s, query, { project, limit: s.config.contextLimit }) : recent(s, { project, limit: s.config.contextLimit })
+  const limit = s.config.contextLimit
+  const summaries = projectSummaries(s, project, Math.max(limit * 4, 32))
+  const summarizedSessions = new Set(summaries.map((m) => m.session_id))
+  const summaryBySession = new Map<string, Memory>()
+  for (const m of summaries) if (!summaryBySession.has(m.session_id)) summaryBySession.set(m.session_id, m)
+
+  let items: Memory[]
+  if (query) {
+    const rawHits = search(s, query, { project, limit: limit * 3 })
+    const out: Memory[] = []
+    const seen = new Set<number>()
+    for (const h of rawHits) {
+      const chosen = RAW_KINDS.has(h.kind) && summaryBySession.has(h.session_id)
+        ? summaryBySession.get(h.session_id)
+        : h
+      if (!chosen || seen.has(chosen.id)) continue
+      seen.add(chosen.id)
+      out.push(chosen)
+      if (out.length >= limit) break
+    }
+    items = out
+  } else {
+    const out: Memory[] = []
+    const seen = new Set<number>()
+    for (const m of summaries) {
+      if (seen.has(m.id)) continue
+      seen.add(m.id)
+      out.push(m)
+      if (out.length >= limit) break
+    }
+    if (out.length < limit) {
+      for (const m of recent(s, { project, limit: limit * 6 })) {
+        if (seen.has(m.id)) continue
+        if (RAW_KINDS.has(m.kind) && summarizedSessions.has(m.session_id)) continue
+        seen.add(m.id)
+        out.push(m)
+        if (out.length >= limit) break
+      }
+    }
+    items = out
+  }
+
   if (items.length === 0) return ''
   const lines = items.map((m) => `- [${new Date(m.created_at).toISOString().slice(0, 16)} ${m.kind}] ${m.content.replace(/\s+/g, ' ').slice(0, 300)}`)
   return `# Memory from earlier sessions (${project || 'all projects'})\n\n${lines.join('\n')}\n\nSearch more with: aimem search "<words>" --project ${JSON.stringify(project)}\n`
@@ -102,6 +158,7 @@ export function runHook(config: Config, agent: string, raw: string): string {
   let payload: HookPayload
   try { payload = raw.trim() ? JSON.parse(raw) : {} } catch { process.stderr.write('aimem: hook input is not JSON, ignored\n'); return '' }
   let s: Store | undefined
+  let shouldIndexSession: string | undefined
   try {
     s = openStore(config)
     drainSpool(s)
@@ -111,9 +168,13 @@ export function runHook(config: Config, agent: string, raw: string): string {
     if (event === 'end' && id) endSession(s, id)
     const m = toMemory(agent, payload)
     if (m) addMemory(s, m)
+    if ((event === 'stop' || event === 'end') && id) shouldIndexSession = id
     return ''
   } catch (error) {
     spool(config, agent, payload, error)
     return ''
-  } finally { try { s?.db.close() } catch { /* already broken */ } }
+  } finally {
+    try { s?.db.close() } catch { /* already broken */ }
+    if (shouldIndexSession) spawnBackgroundIndex(config, shouldIndexSession)
+  }
 }

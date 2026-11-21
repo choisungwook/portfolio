@@ -9,7 +9,7 @@ There is no daemon. Every hook runs `aimem hook`, which opens the SQLite file, d
 `aimem hook --agent <name>` reads the hook JSON on stdin (`src/hook.ts`).
 
 1. Open the store and replay `spool.jsonl` if it exists.
-2. Normalise the event name: `SessionStart`/`agentSpawn` print context, `*Prompt*` stores the prompt, `PostToolUse` stores tool name, input and response (truncated to 2000 chars), `Stop` stores `last_assistant_message`, `SessionEnd` marks the session ended.
+2. Normalise the event name: `SessionStart`/`agentSpawn` print context (preferring `summary` memories over raw observations for summarized sessions), `*Prompt*` stores the prompt, `PostToolUse` stores tool name, input and response (truncated to 2000 chars), `Stop` stores `last_assistant_message`, `SessionEnd` marks the session ended. After `Stop`/`SessionEnd`, `aimem index <session-id>` is spawned detached in the background when an indexer provider is configured (`src/indexer/`).
 3. On any error, append the payload to `spool.jsonl`, warn on stderr and exit 0.
 
 ## Storage
@@ -57,5 +57,4 @@ Each directory holds only a README until its issue is done.
 | `workspace/desktop/` | Tauri desktop app (#1592) |
 | `workspace/scripts/` | Binary build for release (#1593) |
 | `workspace/src/mcp/` | MCP server (#1594) |
-| `workspace/src/indexer/` | LLM summaries and memory updates (#1595) |
 | `workspace/src/install/` | Hook installation and akbun-taskq integration (#1598) |
