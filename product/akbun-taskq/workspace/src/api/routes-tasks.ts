@@ -6,6 +6,7 @@ import { taskDetail } from '../db/detail.ts'
 import { parseTaskInput, parseTaskPatch } from '../validate.ts'
 import { hasAccessSkill } from '../skills/registry.ts'
 import { HttpError, optionalJson, readJson, requireOk, type ApiDeps } from './http.ts'
+import { planRepos, reposOf } from '../workspace/task-repos.ts'
 import { deleteTask, OperatorError, prepareRun, requestCancel, retryTask } from '../db/operator.ts'
 import { noRunControl } from '../runner/control.ts'
 import { enumParam, TASK_STATUSES } from './params.ts'
@@ -31,7 +32,9 @@ export function registerTaskRoutes(api: Hono, { db, config, control = noRunContr
 
   api.patch('/tasks/:id', async (c) => {
     const id = c.req.param('id')
-    const patch = requireOk(parseTaskPatch(await readJson(c), (name) => hasAccessSkill(db, name)))
+    const body = await readJson(c)
+    const bodyOf = async (_c: unknown) => (typeof body === 'object' && body !== null ? body : {}) as Record<string, unknown>
+    const patch = requireOk(parseTaskPatch(body, (name) => hasAccessSkill(db, name)))
     const task = getTask(db, id)
     if (!task) return c.json({ error: 'task not found' }, 404)
     // Editing what the task asks for is locked while a run is working on it; stopped or failed tasks can be edited.
@@ -41,6 +44,19 @@ export function registerTaskRoutes(api: Hono, { db, config, control = noRunContr
     if (patch.data.workflow_id) {
       try {
         patch.data.workflow_id = workflowIdOf(db, patch.data.workflow_id)
+      } catch (error) {
+        throw new HttpError(400, error instanceof Error ? error.message : String(error))
+      }
+    }
+    // repos (absolute folders) and use_worktree: the task's repositories and whether each git one gets a worktree.
+    const raw = await bodyOf(c)
+    if (raw.repos !== undefined || raw.use_worktree !== undefined) {
+      if (LOCKED_FOR_EDIT.includes(task.status)) throw new HttpError(409, `task is ${task.status}; stop it before changing its repositories`)
+      if (raw.repos !== undefined && (!Array.isArray(raw.repos) || raw.repos.some((r: unknown) => typeof r !== 'string'))) throw new HttpError(400, 'repos must be a list of folder paths')
+      const sources = (raw.repos as string[] | undefined) ?? reposOf(task.data).map((r) => r.source)
+      const use = typeof raw.use_worktree === 'boolean' ? raw.use_worktree : task.data.use_worktree ?? false
+      try {
+        patchData(db, id, planRepos(config, id, getTask(db, id)!.data, sources, use))
       } catch (error) {
         throw new HttpError(400, error instanceof Error ? error.message : String(error))
       }

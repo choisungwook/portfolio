@@ -16,6 +16,7 @@ import { buildPrompt, systemAppend } from '../../worker/prompt.ts'
 import { RESULT_SCHEMA, failed } from '../../worker/result-schema.ts'
 import { toWorkerResult } from './result.ts'
 import { COMPACTION_SETTINGS } from './compaction.ts'
+import { repoViews } from '../../workspace/task-repos.ts'
 
 export type QueryFn = (params: { prompt: string; options: Options }) => AsyncIterable<SDKMessage>
 
@@ -63,7 +64,7 @@ async function runTask(config: Config, runQuery: QueryFn, head: (repo: string) =
   ctx.signal.addEventListener('abort', onAbort, { once: true })
   const state: RunState = { toolCalls: 0, expired: false }
   const gate: GateContext = {
-    cwd: profile.cwd, outputs, repo: task.data.repo, dataDir: join(config.home, 'data'), browserDir: join(config.home, 'browser'), profile: task.data.target_profile,
+    cwd: profile.cwd, outputs, repo: task.data.repo, extraRepos: task.type === 'code' ? repoViews(task.data).slice(1).map((r) => r.workspace) : [], dataDir: join(config.home, 'data'), browserDir: join(config.home, 'browser'), profile: task.data.target_profile,
     accessSkill: ctx.access_skill_path,
     shared: join(config.home, 'shared'),
   }

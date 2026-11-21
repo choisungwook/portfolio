@@ -48,16 +48,38 @@ export function worktreesDir(config: Config): string {
   return join(config.home, 'worktrees')
 }
 
-export function createWorktree(config: Config, repo: string, taskId: string): Worktree {
+// index: the task's nth repository; a second repository with the same folder name gets its own path. The task's
+// branch may already exist (worktrees turned off and on again, or the folder removed and added back): then the
+// worktree that holds it is reused, or the branch is attached to a new folder, instead of failing on `-b`.
+export function createWorktree(config: Config, repo: string, taskId: string, index = 0): Worktree {
   const info = pathInfo(repo)
   if (!info.git || !info.top) throw new Error(`${repo} is not a git repository`)
-  const base = tryGit(info.top, ['rev-parse', 'HEAD'])
-  if (!base) throw new Error(`${repo} has no commit to start a worktree from`)
-  mkdirSync(worktreesDir(config), { recursive: true })
-  const path = join(worktreesDir(config), `${basename(info.top)}-${taskId}`)
+  const head = tryGit(info.top, ['rev-parse', 'HEAD'])
+  if (!head) throw new Error(`${repo} has no commit to start a worktree from`)
   const branch = `taskq/${taskId}`
-  git(info.top, ['worktree', 'add', '-b', branch, path, base])
-  return { path, branch, base, base_branch: info.branch && info.branch !== 'HEAD' ? info.branch : 'main' }
+  const baseBranch = info.branch && info.branch !== 'HEAD' ? info.branch : 'main'
+  const held = heldBy(info.top, branch)
+  if (held && existsSync(held)) return { path: held, branch, base: tryGit(info.top, ['merge-base', branch, head]) ?? head, base_branch: baseBranch }
+  mkdirSync(worktreesDir(config), { recursive: true })
+  const plain = join(worktreesDir(config), `${basename(info.top)}-${taskId}`)
+  const path = index > 0 && existsSync(plain) ? `${plain}-${index + 1}` : plain
+  if (tryGit(info.top, ['rev-parse', '--verify', '--quiet', `refs/heads/${branch}`])) {
+    git(info.top, ['worktree', 'prune'])
+    git(info.top, ['worktree', 'add', path, branch])
+    return { path, branch, base: tryGit(info.top, ['merge-base', branch, head]) ?? head, base_branch: baseBranch }
+  }
+  git(info.top, ['worktree', 'add', '-b', branch, path, head])
+  return { path, branch, base: head, base_branch: baseBranch }
+}
+
+// The folder of the worktree that has this branch checked out, if any (git worktree list --porcelain).
+function heldBy(top: string, branch: string): string | undefined {
+  const list = tryGit(top, ['worktree', 'list', '--porcelain']) ?? ''
+  for (const block of list.split('\n\n')) {
+    const path = /^worktree (.+)$/m.exec(block)?.[1]
+    if (path && block.includes(`branch refs/heads/${branch}`)) return path
+  }
+  return undefined
 }
 
 // Uncommitted edits and new files in the worktree; removing it would lose them (the branch keeps commits only).

@@ -3,6 +3,7 @@ import { join } from 'node:path'
 import type { PermissionMode, SandboxSettings } from '@anthropic-ai/claude-agent-sdk'
 import type { Config } from '../../config.ts'
 import type { Task } from '../../types.ts'
+import { repoViews } from '../../workspace/task-repos.ts'
 
 export interface Profile {
   permissionMode: PermissionMode
@@ -38,7 +39,9 @@ export function profileFor(task: Task, config: Config): Profile {
       const allowed = config.autoMode ? undefined : [
         ...READ_TOOLS, 'Edit', 'Write', 'Bash(git diff *)', 'Bash(git status)', 'Bash(git log *)', 'Bash(npm test)', 'Bash(npm run *)',
       ]
-      const profile = plain(mode, allowed, repo, [repo, ...config.sandbox.allowWrite])
+      // The task's other repositories are reachable and writable too (each is its worktree when worktrees are on).
+      const extra = repoViews(task.data).slice(1).map((r) => r.workspace)
+      const profile = { ...plain(mode, allowed, repo, [repo, ...extra, ...config.sandbox.allowWrite]), additionalDirectories: extra }
       // A task in its own worktree is trusted when the repository the user picked is.
       const trusted = config.trustedRepos.includes(task.data.source_repo ?? repo)
       return trusted ? { ...profile, settingSources: ['user', 'project'] } : profile

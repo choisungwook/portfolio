@@ -11,6 +11,7 @@ import { raiseAlert } from '../alerts/rules.ts'
 import type { Task, TaskType } from '../types.ts'
 import { ToolError, repoAllowed, type ScopedTools, type TeamTool } from './tools.ts'
 import { finishBotTask, startBotTask, type BotOutcome } from './bot-work.ts'
+import { ensureWorktrees, repoViews } from '../workspace/task-repos.ts'
 
 // A task has exactly one owner. The owner works on it (start_task, finish_task) and is the only bot that hands it on,
 // besides the coordinators (orchestrator and planner). Before a task is created it is compared with every open task, so two agents told
@@ -130,19 +131,31 @@ export function taskTools(scope: ScopedTools): TeamTool[] {
       input: { task_id: TASK_ID },
       readOnly: false,
       handler(args) {
+        // A worktree a cleanup deleted is added back from the task's branch first, so a git failure leaves the task
+        // untouched and the bot can try again.
+        const before = getTask(db, String(args.task_id))
+        let recreated: string[] = []
+        try {
+          recreated = before && before.owner === agent ? ensureWorktrees(before) : []
+        } catch (error) {
+          throw new ToolError(`could not add back the task's worktree: ${error instanceof Error ? error.message : String(error)}`)
+        }
         const started = startBotTask(db, agent, String(args.task_id), self().session_id)
         if (!started.ok) throw new ToolError(started.error)
         wrote()
         const task = getTask(db, String(args.task_id))!
-        // A code task in a repository has its own worktree: the bot works and commits there, never in the user's checkout.
-        const where = task.data.worktree
-          ? {
-            workspace: task.data.repo, branch: task.data.worktree.branch,
-            note: self().sandbox
-              ? `Work in ${task.data.repo} (branch ${task.data.worktree.branch}), not in ${task.data.source_repo}. Your sandbox cannot write the repository's .git, so leave the changes uncommitted; the user sees them in the task.`
-              : `Work and commit in ${task.data.repo} (branch ${task.data.worktree.branch}), not in ${task.data.source_repo}. If you open a pull request, put its URL in the finish_task summary.`,
-          }
-          : task.data.repo ? { workspace: task.data.repo } : {}
+        // Each repository: where to work. With a worktree the bot works and commits there, never in the user's checkout.
+        const repos = repoViews(task.data).map((r) => ({ repository: r.source, workspace: r.workspace, ...(r.worktree ? { branch: r.worktree.branch } : {}) }))
+        const first = repos[0]
+        const where = !first ? {} : {
+          workspace: first.workspace, repos,
+          ...(recreated.length ? { recreated_worktrees: recreated } : {}),
+          note: !task.data.worktree
+            ? `Work in the repositories listed in repos (workspace is the folder to use for each).`
+            : self().sandbox
+              ? `Work in each repository's workspace (its worktree, branch shown), not in the repository itself. Your sandbox cannot write a repository's .git, so leave changes uncommitted; the user sees them in the task.`
+              : `Work and commit in each repository's workspace (its worktree, branch shown), not in the repository itself. If you open a pull request, put its URL in the finish_task summary.`,
+        }
         if (!started.workflow) return { task_id: args.task_id, status: 'running', run_id: started.runId, ...where }
         return {
           task_id: args.task_id, status: 'running', run_id: started.runId, ...where, workflow_run_id: started.workflow.id,

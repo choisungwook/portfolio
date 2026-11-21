@@ -10,6 +10,7 @@
 
 | 버전 | 해설 | 첫 항목 |
 |---|---|---|
+| [0.37.0](0.37.0/changelog.md) | [learning](0.37.0/learning_changelog.md) | 작업에 저장소를 여러 개 지정한다. |
 | [0.36.0](0.36.0/changelog.md) | [learning](0.36.0/learning_changelog.md) | 모든 bot이 taskq 기본 skill을 갖는다. |
 | [0.35.0](0.35.0/changelog.md) | [learning](0.35.0/learning_changelog.md) | 설정 > 연결 맨 위에서 TLS 검사용 루트 인증서를 가져온다. |
 | [0.34.0](0.34.0/changelog.md) | [learning](0.34.0/learning_changelog.md) | bot 대화 오른쪽 맨 위에 컨텍스트가 보인다. |

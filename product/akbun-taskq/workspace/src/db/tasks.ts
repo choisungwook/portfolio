@@ -151,7 +151,10 @@ export function createFromInput(db: Db, input: TaskInput, owner: string | null =
   let data = input.data
   if (config && data.repo && input.type === 'code' && input.worktree !== false && pathInfo(data.repo).git) {
     const worktree = createWorktree(config, data.repo, id)
-    data = { ...data, source_repo: data.repo, repo: worktreeFolder(worktree, data.repo), worktree, base_commit: worktree.base }
+    data = { ...data, source_repo: data.repo, repo: worktreeFolder(worktree, data.repo), worktree, base_commit: worktree.base, repos: [{ source: data.repo, worktree }], use_worktree: true }
+  } else if (data.repo) {
+    // The repository list (src/workspace/task-repos.ts) starts with the folder the user picked.
+    data = { ...data, repos: [{ source: data.repo, worktree: null }], use_worktree: input.type === 'code' && input.worktree !== false }
   }
   return inTransaction(db, () => insertTask(db, {
     id, type: input.type, status: input.status, priority: input.priority, lock_key: input.lock_key, owner, data,

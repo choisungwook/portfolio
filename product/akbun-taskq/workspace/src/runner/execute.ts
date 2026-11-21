@@ -9,6 +9,7 @@ import type { Retrospect } from '../memory/retrospect.ts'
 import { finishRun } from './finish.ts'
 import { buildContext } from './context.ts'
 import { resolveAccessSkill } from '../skills/registry.ts'
+import { ensureWorktrees } from '../workspace/task-repos.ts'
 
 export interface ExecuteDeps {
   db: Db
@@ -33,6 +34,9 @@ export async function executeRun(deps: ExecuteDeps, task: Task, runId: string, s
     } else {
       const ctx = buildContext(db, config, task, runId, signal, { similar: similarFor(db, task), handoffs, access_skill_path: access.path })
       try {
+        // A worktree a cleanup deleted comes back from the task's branch before the session starts.
+        const recreated = ensureWorktrees(task)
+        if (recreated.length) ctx.emit('worktree_recreated', { paths: recreated })
         result = await worker(ctx)
       } catch (error) {
         result = {

@@ -89,8 +89,8 @@ export function registerWorkspaceRoutes(api: Hono, { db, config }: ApiDeps): voi
   })
 
   // Removes the worktree folder. The branch stays with its commits; uncommitted edits and new files would be lost, so a
-  // worktree that has them is removed only with { "discard": true }. The task keeps pointing at the removed folder, so
-  // a later run fails instead of writing into the user's own checkout.
+  // worktree that has them is removed only with { "discard": true }. The task keeps pointing at the removed folder; the
+  // next run adds the worktree back from the branch (src/workspace/task-repos.ts), never writing into the user's checkout.
   api.post('/tasks/:id/workspace/remove', async (c) => {
     const task = getTask(db, c.req.param('id'))
     if (!task?.data.worktree || !task.data.source_repo) throw new HttpError(404, 'this task has no worktree')
