@@ -16,7 +16,7 @@ import { addTask, fakeWorker, seedTestBots, result, setup, sleep, statusOf, wait
 function tool(env: TestEnv, agent: string, name: string) {
   const found = teamTools({ db: env.db, config: env.config, agent, search: hybridSearch(env.db) }).find((t) => t.name === name)
   assert.ok(found, name)
-  return (args: Record<string, unknown>) => found.handler(args)
+  return (args: Record<string, unknown>) => found.handler(args) as Record<string, unknown>
 }
 
 describe('team mailbox', () => {

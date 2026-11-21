@@ -464,6 +464,7 @@ let paneMode = null
 let browserUrl = ''
 
 function setPane(mode) {
+  if (mode !== 'browser') stopScreen()
   paneMode = mode
   const pane = area('bot-file')
   pane.hidden = mode === null
@@ -494,32 +495,70 @@ function showFiles() {
       : el('div', { class: 'file-list' }, ...conversationFiles.map(fileCard))))
 }
 
-// Any page a bot built (a local dev server, a report) without leaving the conversation. Sites that forbid framing stay blank;
-// "Open in a new tab" covers them.
+// The bot's own browser (src/browser/), as Claude Desktop shows the browser its session drives: a picture of what the
+// bot's headless Chrome shows, refreshed every second while the pane is open. The address bar opens a page in that same
+// browser and a click on the picture clicks the page there, so the user and the bot take turns in one browser.
+const SCREEN_MS = 1000
+let screenTimer = null
+
+function stopScreen() {
+  clearTimeout(screenTimer)
+  screenTimer = null
+}
+
 function showBrowser() {
   const pane = setPane('browser')
-  const input = el('input', { type: 'url', value: browserUrl, placeholder: 'http://localhost:3000', 'aria-label': 'URL' })
-  const frame = el('iframe', { class: 'file-frame', sandbox: 'allow-scripts allow-forms allow-same-origin allow-popups', referrerpolicy: 'no-referrer', title: t('chat.browser', 'Browser'), src: browserUrl || 'about:blank' })
-  const go = (event) => {
+  const name = bot
+  const input = el('input', { type: 'text', value: browserUrl, placeholder: 'https://example.com', 'aria-label': 'URL', spellcheck: 'false' })
+  const status = el('p', { class: 'meta browser-status', role: 'status' })
+  const img = el('img', { class: 'browser-screen', alt: t('chat.browser_alt', "The bot's browser"), hidden: true })
+  let url = null
+  const open = async (event) => {
     event.preventDefault()
-    let url = input.value.trim()
-    if (!url) return
-    if (!/^https?:\/\//i.test(url)) url = `http://${url}`
-    // taskq's own origin never loads here: with allow-same-origin it could read the access token.
-    if (URL.canParse(url) && new URL(url).origin === location.origin) {
-      notify(t('chat.own_origin', 'taskq itself does not open in this pane'), true)
-      return
+    const target = input.value.trim()
+    if (!target) return
+    status.textContent = t('chat.browser_opening', 'Opening…')
+    const done = await mutate(() => api.post(`/bots/${encodeURIComponent(name)}/browser/open`, { url: target }))
+    if (done) browserUrl = input.value = done.url
+    refresh()
+  }
+  // The picture is the page at 1280 CSS pixels wide, shown scaled; a click is mapped back to page pixels.
+  img.addEventListener('click', async (event) => {
+    const box = img.getBoundingClientRect()
+    const scale = img.naturalWidth / box.width
+    await mutate(() => api.post(`/bots/${encodeURIComponent(name)}/browser/click`, { x: (event.clientX - box.left) * scale, y: (event.clientY - box.top) * scale }))
+    refresh()
+  })
+  const refresh = async () => {
+    stopScreen()
+    if (paneMode !== 'browser' || bot !== name) return
+    try {
+      const state = await api.get(`/bots/${encodeURIComponent(name)}/browser`)
+      if (state.running) {
+        const blob = await api.blob(`/bots/${encodeURIComponent(name)}/browser/screen`)
+        if (paneMode !== 'browser' || bot !== name) return
+        if (url) URL.revokeObjectURL(url)
+        url = URL.createObjectURL(blob)
+        img.src = url
+        img.hidden = false
+        status.textContent = state.title || state.url
+        if (document.activeElement !== input) browserUrl = input.value = state.url
+      } else {
+        img.hidden = true
+        status.textContent = t('chat.browser_none', 'No browser yet. Open an address here, or ask the bot to use its browser.')
+      }
+    } catch (error) {
+      status.textContent = error.message
     }
-    browserUrl = input.value = url
-    frame.src = url
+    screenTimer = setTimeout(refresh, SCREEN_MS)
   }
   fill(pane,
-    el('form', { class: 'file-head browser-bar', onsubmit: go }, input,
+    el('form', { class: 'file-head browser-bar', onsubmit: open }, input,
       el('button', { type: 'submit', text: t('chat.go', 'Go') }),
       el('button', { type: 'button', class: 'quiet', text: t('chat.new_tab', 'New tab'), onclick: () => browserUrl && window.open(browserUrl, '_blank', 'noopener') }),
       el('button', { type: 'button', class: 'quiet file-close', 'aria-label': t('file.close', 'Close'), onclick: () => setPane(null) }, icon('close', 18))),
-    el('div', { class: 'file-body' }, frame))
-  if (!browserUrl) input.focus()
+    el('div', { class: 'file-body browser-body' }, status, img))
+  refresh()
 }
 
 // Enabled bots named with @ in the text, other than the one this conversation is with.

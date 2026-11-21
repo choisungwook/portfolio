@@ -56,8 +56,11 @@ async function main(): Promise<void> {
     postMessage(db, { sender: 'planner', recipient: 'taskq', body: 'The nightly export ran at 02:00 and finished in 4 minutes.' })
   }, 90_000)
 
-  const stop = () => {
+  const { closeBrowsers } = await import('../src/browser/chrome.ts')
+  const stop = async () => {
     clearTimeout(finishPlanner)
+    // A bot's Chrome outlives taskq unless closed, and its profile is inside the temporary home removed below.
+    await closeBrowsers(config)
     controller.abort()
     void jobs.stop()
     server.close()
@@ -67,19 +70,18 @@ async function main(): Promise<void> {
   }
 
   if (!isQueuePaused(db)) {
-    stop()
+    await stop()
     refuse('assertion failed: the queue is not paused')
   }
   if (listTasks(db, 'ready').length > 0) {
-    stop()
+    await stop()
     refuse('assertion failed: the database holds a task in status ready')
   }
 
   console.log(`taskq demo: http://127.0.0.1:${port}/#token=${token}`)
   console.log('taskq demo: the queue is paused and no session will start; press Ctrl-C to stop and remove the temporary home')
   const shutdown = () => {
-    stop()
-    process.exit(0)
+    void stop().then(() => process.exit(0))
   }
   process.once('SIGINT', shutdown)
   process.once('SIGTERM', shutdown)

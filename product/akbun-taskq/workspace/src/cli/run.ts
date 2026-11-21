@@ -1,4 +1,5 @@
 import { randomBytes } from 'node:crypto'
+import { closeBrowsers } from '../browser/chrome.ts'
 import type { Config } from '../config.ts'
 import type { Db } from '../db/open.ts'
 import { createRunner } from '../runner/runner.ts'
@@ -29,6 +30,7 @@ export async function runCommand(config: Config, db: Db): Promise<void> {
   console.log(`taskq running at http://127.0.0.1:${config.port}/#token=${token}`)
   const shutdown = async () => {
     await hub?.stop()
+    await closeBrowsers(config)
     await jobs.stop()
     await runner.stop()
     server.close()

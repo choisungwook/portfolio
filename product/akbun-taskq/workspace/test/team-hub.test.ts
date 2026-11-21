@@ -14,7 +14,7 @@ function fakeBackend(script: Script): { backend: TeamBackend; requests: TurnRequ
   const backend: TeamBackend = {
     async runTurn(_config, request) {
       requests.push(request)
-      const call = (name: string, args: Record<string, unknown>) => request.tools.find((t) => t.name === name)!.handler(args)
+      const call = (name: string, args: Record<string, unknown>) => request.tools.find((t) => t.name === name)!.handler(args) as Record<string, unknown>
       return script(request, call)
     },
   }

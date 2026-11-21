@@ -10,6 +10,8 @@ import { wikiTools } from './tools-wiki.ts'
 import { memoryTools } from './tools-memory.ts'
 import { workflowTools } from './tools-workflows.ts'
 import { autonomyTools } from './tools-autonomy.ts'
+import { browserTools } from './tools-browser.ts'
+import { officeTools } from './tools-office.ts'
 
 // The tools every agent session gets, independent of the agent SDK. A backend wraps each one in its own tool format.
 // A handler returns a JSON object, or throws ToolError with a message the model can act on.
@@ -21,7 +23,8 @@ export interface TeamTool {
   description: string
   input: z.ZodRawShape
   readOnly: boolean
-  handler(args: Record<string, unknown>): Record<string, unknown>
+  // Most tools answer at once; the browser and office tools wait on Chrome or a file, so a handler may return a Promise.
+  handler(args: Record<string, unknown>): Record<string, unknown> | Promise<Record<string, unknown>>
 }
 
 export interface ToolScope {
@@ -43,7 +46,7 @@ export function teamTools(scope: ToolScope): TeamTool[] {
       if (scope.turnId !== undefined) noteWrite(scope.db, scope.turnId)
     },
   }
-  return [...talkTools(scoped), ...taskTools(scoped), ...wikiTools(scoped), ...memoryTools(scoped), ...workflowTools(scoped), ...autonomyTools(scoped)].map(validated)
+  return [...talkTools(scoped), ...taskTools(scoped), ...wikiTools(scoped), ...memoryTools(scoped), ...workflowTools(scoped), ...autonomyTools(scoped), ...browserTools(scoped), ...officeTools(scoped)].map(validated)
 }
 
 // The input schema is checked here as well as by the SDK, so a backend that skips it, or a test, cannot pass an

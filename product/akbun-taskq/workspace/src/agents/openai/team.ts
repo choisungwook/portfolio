@@ -181,7 +181,7 @@ function teamTool(t: TeamTool): NeutralTool {
     name: t.name, description: t.description, parameters,
     async run(args) {
       try {
-        return JSON.stringify(t.handler(args))
+        return JSON.stringify(await t.handler(args))
       } catch (error) {
         if (error instanceof ToolError) return `error: ${error.message}`
         throw error
