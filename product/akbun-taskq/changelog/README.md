@@ -10,6 +10,7 @@
 
 | 버전 | 해설 | 첫 항목 |
 |---|---|---|
+| [0.40.1](0.40.1/changelog.md) | [learning](0.40.1/learning_changelog.md) | ↑로 불러온 메시지를 고친 뒤 다시 ↑를 눌러도 고친 내용이 사라지지 않는다. |
 | [0.40.0](0.40.0/changelog.md) | [learning](0.40.0/learning_changelog.md) | 초안에 담당 bot을 정해도 bot이 일하지 않고, 대화에 할당 알림만 남는다. |
 | [0.39.1](0.39.1/changelog.md) | [learning](0.39.1/learning_changelog.md) | 사용자에게 보이는 동작은 바뀌지 않았다. |
 | [0.39.0](0.39.0/changelog.md) | [learning](0.39.0/learning_changelog.md) | 데스크톱 앱의 시작 화면 글씨를 키우고 진행 막대와 퍼센트를 보인다. |
