@@ -51,6 +51,7 @@ function result(form, state) {
 
 async function test(form) {
   result(form, 'busy')
+  testing.add(form)
   const id = connectionId(form)
   try {
     known[id] = await api.post('/connections/test', { id })
@@ -61,6 +62,8 @@ async function test(form) {
   } catch (error) {
     known[id] = { status: 'error', reason: error.message }
     result(form, known[id])
+  } finally {
+    testing.delete(form)
   }
 }
 
@@ -68,16 +71,19 @@ let keys = {}
 // The last known status of every connection, from GET /connections (its checks are cached on the server for a minute)
 // and from tests run here. Opening the page or switching a method shows it instead of a blank result.
 let known = {}
+const testing = new Set()
 
 async function loadStatus() {
   try {
     const report = await api.get('/connections')
     for (const c of report.connections) known[c.id] ??= { status: c.status, reason: c.reason }
   } catch { /* the sections stay without a result */ }
-  for (const form of forms()) result(form, known[connectionId(form)] ?? null)
+  // A test started meanwhile keeps its "Testing…" until its own answer arrives.
+  for (const form of forms()) if (!testing.has(form)) result(form, known[connectionId(form)] ?? null)
 }
 
-// Fills every section from what is saved. Keys are never sent back: an empty key field keeps the saved key.
+// Fills every section from what is saved. Keys are never sent back: an empty key field keeps the saved key. Returns
+// false when it could not, after showing why in every section, so the status read does not paint over the error.
 async function load() {
   try {
     const [settings, profiles, bots] = await Promise.all([api.get('/connection-settings'), api.get('/aws/profiles'), api.get('/bots').catch(() => ({ agents: [] }))])
@@ -98,8 +104,10 @@ async function load() {
     }
     fill(area('aws-profile-list'), ...profiles.map((p) => el('option', { value: p.name, label: `${p.name} (${p.kind}${p.region ? `, ${p.region}` : ''})` })))
     for (const form of forms()) showFields(form)
+    return true
   } catch (error) {
     for (const form of forms()) result(form, { status: 'error', reason: error.message })
+    return false
   }
 }
 
@@ -126,9 +134,10 @@ function renderLogin(state) {
 export function initConnections() {
   on('settings-page', (page) => {
     if (page !== 'connections') return
-    // The method each section shows and its last status stay as they were; only the saved values are read again.
+    // The OpenAI method stays as picked (it is not saved anywhere); Claude shows its saved method. Each section shows
+    // the current status of its method at once.
     known = {}
-    load().then(loadStatus)
+    load().then((ok) => ok && loadStatus())
   })
   for (const form of forms()) {
     form.querySelector('[data-method]').addEventListener('change', () => {
@@ -147,7 +156,7 @@ export function initConnections() {
       if (await mutate(() => api.del(`/connection-settings/${form.dataset.runtime}`), t('connections.cleared', 'Cleared'))) {
         known = {}
         result(form, null)
-        load().then(loadStatus)
+        load().then((ok) => ok && loadStatus())
       }
     })
   }
