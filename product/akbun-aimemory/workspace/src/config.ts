@@ -7,6 +7,11 @@ import type { TokenizerConfig } from './tokenizer.ts'
 // reasoning setting; OpenAI is the other expected provider.
 export interface IndexerConfig { provider: 'claude' | 'openai' | 'none'; model: string; effort: 'low' | 'medium' | 'high' }
 
+export interface ConnectionConfig {
+  // Reserved slot for future certificate pinning enforcement.
+  pinnedFingerprints?: string[]
+}
+
 export interface Config {
   home: string
   tokenizer: TokenizerConfig
@@ -14,6 +19,7 @@ export interface Config {
   contextLimit: number   // memories printed by `aimem context`
   halfLifeDays: number   // recency decay of search scores
   caBundle?: string      // extra root CA PEM for TLS-inspecting networks, used by network calls
+  connection?: ConnectionConfig
 }
 
 export const CONFIG_FILE = 'aimemory.config.json'
@@ -28,5 +34,6 @@ export function loadConfig(home = process.env.AIMEMORY_HOME || join(homedir(), '
     contextLimit: user.contextLimit ?? 8,
     halfLifeDays: user.halfLifeDays ?? 30,
     caBundle: user.caBundle,
+    connection: user.connection,
   }
 }

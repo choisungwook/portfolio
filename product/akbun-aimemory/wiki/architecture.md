@@ -21,7 +21,7 @@ One file, `$AIMEMORY_HOME/data/aimemory.db` (`src/store.ts`).
 | `sessions` | id, agent, project (basename of cwd), start and end time |
 | `memories` | session, kind (`prompt`, `tool`, `response`, `note`, `summary`), content, `digest` (unique, dedups double hook calls), `vec` (512 float32) |
 | `memories_fts` | FTS5 over the tokenizer output, rowid = memory id |
-| `meta` | `tokenizer`: id of the tokenizer that built the index |
+| `meta` | `tokenizer`: id of the tokenizer that built the index; `ca_bundle_saved`: `'1'` when an imported CA bundle is active |
 
 ## Search
 
@@ -42,6 +42,9 @@ One file, `$AIMEMORY_HOME/data/aimemory.db` (`src/store.ts`).
 | `DELETE /api/sessions/:id` | Delete a session and its memories |
 | `DELETE /api/memories/:id` | Delete one memory |
 | `GET /api/search?q=` | Hybrid search, 30 hits |
+| `GET /api/ca-bundle` | Read active CA bundle status and parsed certificates |
+| `PUT /api/ca-bundle` | Validate and import a PEM CA bundle (`{ pem }`) |
+| `DELETE /api/ca-bundle` | Remove the imported CA bundle |
 | `GET /api/export` | Download a backup |
 
 ## Planned directories
@@ -54,6 +57,5 @@ Each directory holds only a README until its issue is done.
 | `workspace/scripts/` | Binary build for release (#1593) |
 | `workspace/src/mcp/` | MCP server (#1594) |
 | `workspace/src/indexer/` | LLM summaries and memory updates (#1595) |
-| `workspace/src/connection/` | Connection settings and CA bundle (#1596) |
 | `workspace/src/install/` | Hook installation and akbun-taskq integration (#1598) |
 | `workspace/bench/` | Search benchmark, decay and ANN (#1599) |

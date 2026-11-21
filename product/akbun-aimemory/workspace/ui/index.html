@@ -12,12 +12,28 @@
 <header class="app-header">
   <h1>aimemory</h1>
   <form id="search-form" role="search"><input id="search-input" type="search" placeholder="Search memories" aria-label="Search memories"></form>
+  <button id="connections-btn" type="button">Connections</button>
   <a id="export-link" class="btn" href="#">Export</a>
 </header>
 <div class="layout">
   <nav id="session-list" aria-label="Sessions"></nav>
   <main id="memory-pane"><p class="meta">Pick a session or search.</p></main>
 </div>
+<dialog id="connections-dialog" aria-labelledby="connections-title">
+  <div class="dialog-header">
+    <h2 id="connections-title">Connections &amp; CA Bundle</h2>
+    <button id="connections-close" type="button">Close</button>
+  </div>
+  <p class="meta">Import a PEM root CA bundle for TLS-inspecting networks. It applies to <code>NODE_EXTRA_CA_CERTS</code> and this process.</p>
+  <div class="ca-actions">
+    <input id="ca-file" type="file" accept=".pem,.crt,.cer,application/x-pem-file,application/pkix-cert" hidden>
+    <button id="ca-import-btn" type="button">Import PEM…</button>
+    <button id="ca-clear-btn" type="button">Clear</button>
+  </div>
+  <p id="ca-status" class="meta"></p>
+  <p id="ca-error" class="error" role="alert" hidden></p>
+  <div id="ca-cert-list"></div>
+</dialog>
 <script type="module" src="app.js"></script>
 </body>
 </html>
