@@ -45,6 +45,7 @@ export function initBotChat() {
   initChatFind(nodes.log)
   initComposeMenus(nodes.input, { onPickFile: (path) => files.addExisting(path) })
   nodes.form.addEventListener('submit', send)
+  document.addEventListener('keydown', onShortcut)
   nodes.input.addEventListener('keydown', (event) => {
     // Enter sends, Shift+Enter breaks the line. IME composition (Korean) must not send.
     if (event.key === 'Enter' && !event.shiftKey && !event.isComposing) {
@@ -150,16 +151,36 @@ function renderHead() {
             el('span', { text: task.task_title }), el('span', { class: 'meta', text: ` · ${label(task.status)}` }))))),
     ),
     el('div', { class: 'chat-tools' },
-      el('button', { type: 'button', class: 'chat-gear', dataset: { pane: 'files' }, 'aria-pressed': String(paneMode === 'files'), 'aria-label': t('chat.files', 'Files in this conversation'), title: t('chat.files', 'Files in this conversation'), onclick: () => togglePane('files') }, icon('files', 20)),
-      el('button', { type: 'button', class: 'chat-gear', dataset: { pane: 'browser' }, 'aria-pressed': String(paneMode === 'browser'), 'aria-label': t('chat.browser', 'Browser'), title: t('chat.browser', 'Browser'), onclick: () => togglePane('browser') }, icon('globe', 20)),
-    el('button', {
-      type: 'button', class: 'chat-gear', 'aria-label': `${agent.name} ${t('bots.settings', 'settings')}`, title: t('bots.settings', 'Settings'),
-      onclick: () => openBotSettings(agent.name),
-    }, icon('settings', 20))),
+      headButton({ pane: 'files', label: t('chat.files_short', 'Files'), keys: 'F', iconName: 'folder', onclick: () => togglePane('files') }),
+      headButton({ pane: 'browser', label: t('chat.browser', 'Browser'), keys: 'B', iconName: 'globe', onclick: () => togglePane('browser') }),
+      headButton({ label: t('bots.settings', 'Settings'), keys: ',', iconName: 'settings', aria: `${agent.name} ${t('bots.settings', 'settings')}`, onclick: () => openBotSettings(agent.name) })),
   )
   showComposeMenus(agent)
   nodes.input.placeholder = `${t('chat.message', 'Message')} ${agent.name} · ${t('chat.at_hint', '@ for bots and files')}`
   nodes.input.disabled = !agent.enabled
+}
+
+// A round header button with a dark tooltip under it: what it does and its shortcut (Shift+Cmd, or Shift+Ctrl off a Mac).
+const MAC = /Mac|iPhone|iPad/.test(navigator.platform)
+const SHORTCUTS = { F: () => togglePane('files'), B: () => togglePane('browser'), ',': () => bot && openBotSettings(bot) }
+
+function headButton({ pane, label: text, keys, iconName, aria, onclick }) {
+  return el('button', {
+    type: 'button', class: 'chat-gear', onclick,
+    dataset: { ...(pane ? { pane } : {}), tip: text, keys: MAC ? `⇧⌘${keys}` : `Shift+Ctrl+${keys}` },
+    'aria-pressed': pane ? String(paneMode === pane) : undefined,
+    'aria-label': aria ?? text,
+    'aria-keyshortcuts': `${MAC ? 'Meta' : 'Control'}+Shift+${keys === ',' ? 'Comma' : keys}`,
+  }, icon(iconName, 20))
+}
+
+function onShortcut(event) {
+  if (!event.shiftKey || !(MAC ? event.metaKey : event.ctrlKey) || currentView().view !== 'bot' || !bot) return
+  // With Shift held, a comma arrives as "<" on many layouts; event.code names the key itself.
+  const key = event.code === 'Comma' ? ',' : event.code.startsWith('Key') ? event.code.slice(3) : null
+  if (!key || !SHORTCUTS[key] || document.querySelector('dialog[open]')) return
+  event.preventDefault()
+  SHORTCUTS[key]()
 }
 
 // The working bar: a pulsing dot, the elapsed time, the task being worked on, and how to stop.
@@ -179,6 +200,7 @@ function renderWorking() {
     return
   }
   const draw = () => {
+    for (const node of nodes.log.querySelectorAll('.step-time[data-since]')) node.textContent = elapsed(Number(node.dataset.since))
     const seconds = Math.max(0, Math.floor(Date.now() / 1000) - agent.working_since)
     const time = seconds < 60 ? `${seconds}s` : `${Math.floor(seconds / 60)}m ${seconds % 60}s`
     const task = agent.running_tasks?.length ? ` · task ${agent.running_tasks.join(', ')}` : ''
@@ -213,23 +235,25 @@ async function load() {
       api.get(`/bots/${encodeURIComponent(name)}/turn-errors?limit=50`).catch(() => []),
     ])
     const messages = list.reverse()
+    const steps = await api.get(`/bots/${encodeURIComponent(name)}/steps?since=${messages[0]?.created_at ?? 0}`).catch(() => [])
     if (bot !== name) return
     conversationFiles = [...new Set(messages.flatMap((m) => parseFiles(m.attachments)))].reverse()
     if (paneMode === 'files') showFiles()
     const oldest = messages[0]?.created_at ?? 0
     const failures = errors.filter((turn) => turn.ended_at >= oldest).map((turn) => ({ at: turn.ended_at, node: () => turnError(turn) }))
-    const items = [...messages.map((m) => ({ at: m.created_at, node: () => bubble(m, name) })), ...failures]
-      .sort((a, b) => a.at - b.at)
+    const items = groupSteps([...messages.map((m) => ({ at: m.created_at, node: () => bubble(m, name) })), ...failures,
+      ...steps.map((step) => ({ at: step.at, step }))].sort((a, b) => a.at - b.at))
     if (sendError && sendError.bot === name) items.push({ at: sendError.at, node: () => refused(sendError) })
     // My last message is still unanswered and the bot cannot answer now: say why under it.
     else if (blocker && messages.at(-1)?.sender === 'user') items.push({ at: Infinity, node: () => wontAnswer(blocker) })
-    const key = `${messages.at(-1)?.id ?? 0}:${messages.length}:${errors[0]?.id ?? 0}:${sendError?.at ?? 0}:${blocker ?? ''}`
+    const running = Boolean(agentNow()?.busy)
+    const key = `${messages.at(-1)?.id ?? 0}:${messages.length}:${errors[0]?.id ?? 0}:${steps.at(-1)?.id ?? 0}:${running}:${sendError?.at ?? 0}:${blocker ?? ''}`
     if (key === lastKey && nodes.log.childElementCount > 0) return
     const atBottom = nodes.log.scrollHeight - nodes.log.scrollTop - nodes.log.clientHeight < 40
     lastKey = key
     clear(nodes.log).append(...(items.length === 0
       ? [el('p', { class: 'empty chat-empty', text: t('chat.empty', 'No messages yet.') })]
-      : items.map((item) => item.node())))
+      : items.map((item, i) => item.node(running && i === items.length - 1))))
     if (atBottom || nodes.log.dataset.first !== name) nodes.log.scrollTop = nodes.log.scrollHeight
     nodes.log.dataset.first = name
     refreshFind()
@@ -260,6 +284,45 @@ function parseFiles(value) {
   } catch {
     return []
   }
+}
+
+// Tool calls in a row, with nothing said between them, fold into one line as in Claude Code: "Ran Bash git fetch…"
+// for one call, "Ran 6 tools" for more. The line opens into the list. While the bot is still on the last group, the line
+// shows the call it is making now with spinning dots and how long it has been at it.
+const openSteps = new Set()
+
+function groupSteps(items) {
+  const out = []
+  for (const item of items) {
+    const last = out.at(-1)
+    if (item.step && last?.steps) last.steps.push(item.step)
+    else if (item.step) out.push({ at: item.at, steps: [item.step] })
+    else out.push(item)
+  }
+  return out.map((item) => item.steps ? { at: item.at, node: (live) => stepGroup(item.steps, live) } : item)
+}
+
+function stepGroup(steps, live) {
+  const first = steps[0].id
+  const now = steps.at(-1)
+  const summary = live
+    ? [el('span', { class: 'step-spinner', 'aria-hidden': 'true' }, el('i'), el('i'), el('i'), el('i')),
+        el('span', { class: 'step-tool', text: now.tool }), el('span', { class: 'step-detail', text: now.detail }),
+        el('span', { class: 'step-time', dataset: { since: String(now.at) }, text: elapsed(now.at) })]
+    : steps.length === 1
+      ? [el('span', { class: 'step-verb', text: t('chat.ran', 'Ran') }), el('span', { class: 'step-tool', text: now.tool }), el('span', { class: 'step-detail', text: now.detail })]
+      : [el('span', { class: 'step-verb', text: t('chat.ran_tools', 'Ran {n} tools').replace('{n}', steps.length) })]
+  const details = el('details', { class: 'steps', dataset: { live: String(live) }, open: openSteps.has(first) || undefined },
+    el('summary', {}, ...summary, icon('chevron-right', 16)),
+    el('ol', { class: 'step-list' }, ...steps.map((step) => el('li', {},
+      el('span', { class: 'step-tool', text: step.tool }), el('span', { class: 'step-detail', text: step.detail })))))
+  details.addEventListener('toggle', () => (details.open ? openSteps.add(first) : openSteps.delete(first)))
+  return details
+}
+
+function elapsed(at) {
+  const seconds = Math.max(0, Math.floor(Date.now() / 1000) - at)
+  return seconds < 60 ? `${seconds}s` : `${Math.floor(seconds / 60)}m ${seconds % 60}s`
 }
 
 // A failed turn: the bot did not answer the messages it was given, and this says why.

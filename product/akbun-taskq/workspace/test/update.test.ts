@@ -4,7 +4,7 @@ import { execFileSync } from 'node:child_process'
 import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { assetName, checkUpdate, installUpdate, newer } from '../src/update.ts'
+import { assetName, checkUpdate, installProgress, installUpdate, newer } from '../src/update.ts'
 import pkg from '../package.json' with { type: 'json' }
 
 // Settings > Update against a fake GitHub: no network call runs here.
@@ -47,6 +47,10 @@ describe('update from Settings', () => {
       const version = await installUpdate(fakeGitHub('99.0.0', readFileSync(join(dir, 'build.tar.gz'))), target, true)
       assert.equal(version, '99.0.0')
       assert.equal(readFileSync(target, 'utf8'), 'new build')
+      // The progress bar reads every downloaded byte; without a content-length the total stays unknown.
+      const p = installProgress()
+      assert.equal(p.phase, 'done')
+      assert.equal(p.received, readFileSync(join(dir, 'build.tar.gz')).length)
       writeFileSync(target, 'old build')
       await assert.rejects(installUpdate(fakeGitHub('99.0.0', null), target, true), /HTTP 404/)
       assert.equal(readFileSync(target, 'utf8'), 'old build', 'a failed download leaves the binary as it was')

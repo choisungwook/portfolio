@@ -1,5 +1,5 @@
 import type { Db } from '../src/db/open.ts'
-import { USER, createAgent, postMessage, seedAgents, setAgentSession } from '../src/db/team.ts'
+import { USER, addTurnStep, createAgent, postMessage, seedAgents, setAgentSession } from '../src/db/team.ts'
 import { writePage } from '../src/db/wiki.ts'
 import { BOT_DEFAULTS, PRESETS, ROSTER } from '../src/team/roster.ts'
 import { openThread, takeTurn } from '../src/db/threads.ts'
@@ -43,5 +43,14 @@ export function seedTeam(db: Db, taskId: string, openTaskIds: string[]): void {
   db.prepare('UPDATE team_messages SET read_at = created_at WHERE thread_id = ?').run(thread.id)
   postMessage(db, { sender: 'planner', recipient: 'planner', body: 'Check whether the nightly export ran.', deliver_at: Math.floor(Date.now() / 1000) + 8 * 3600 })
   // One bot is shown working: an open turn that started 42 seconds ago. The demo runs no hub, so it stays open.
-  db.prepare('INSERT INTO team_turns (agent, session_id, started_at) VALUES (?, ?, ?)').run('planner', 'demo-planner', Math.floor(Date.now() / 1000) - 42)
+  const now = Math.floor(Date.now() / 1000)
+  const planning = Number(db.prepare('INSERT INTO team_turns (agent, session_id, started_at) VALUES (?, ?, ?)').run('planner', 'demo-planner', now - 42).lastInsertRowid)
+  // The tool calls each conversation folds into a line: coder's finished turn, and planner's turn still running.
+  const coding = Number(db.prepare(`INSERT INTO team_turns (agent, session_id, started_at, ended_at, outcome) VALUES ('coder', 'demo-coder', ?, ?, 'done')`).run(now - 300, now - 200).lastInsertRowid)
+  addTurnStep(db, coding, 'coder', 'Bash', { command: 'git fetch origin master && git rebase origin/master' })
+  addTurnStep(db, coding, 'coder', 'Read', { file_path: 'src/export/job.ts' })
+  addTurnStep(db, coding, 'coder', 'Edit', { file_path: 'src/export/job.ts' })
+  addTurnStep(db, coding, 'coder', 'Bash', { command: 'npm test' })
+  addTurnStep(db, planning, 'planner', 'mcp__team__list_tasks', {})
+  addTurnStep(db, planning, 'planner', 'Bash', { command: 'ls -la exports/nightly' })
 }

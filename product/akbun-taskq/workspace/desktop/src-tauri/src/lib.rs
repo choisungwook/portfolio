@@ -94,6 +94,8 @@ fn open_window(app: &tauri::App) -> tauri::Result<()> {
         .title("taskq")
         .inner_size(1400.0, 900.0)
         .min_inner_size(900.0, 600.0)
+        // Cmd +/- and Cmd 0 zoom the page, as in a browser; the webview leaves them off unless asked.
+        .zoom_hotkeys_enabled(true)
         .on_new_window(|url, _| {
             if matches!(url.scheme(), "http" | "https") {
                 let _ = Command::new("open").arg(url.as_str()).status();

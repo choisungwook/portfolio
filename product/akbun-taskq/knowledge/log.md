@@ -2,6 +2,11 @@
 
 concept를 추가·수정·삭제할 때마다 오늘 날짜 섹션을 맨 위에 만들고 한 줄 남긴다. 구분은 `**Creation**`, `**Update**`, `**Deletion**`이다.
 
+## 2026-11-21
+
+* **Creation**: [turn steps in conversation](decisions/2026-11-turn-steps-in-conversation.md) - bot의 도구 호출을 `team_turn_steps`에 남기고 대화에 접어 보이는 결정.
+* **Update**: [no usage limits](decisions/2026-11-no-usage-limits.md)에 0.28.0에서 bot별 Limits를 없앤 내용을 추가.
+
 ## 2026-11-20
 
 * **Creation**: [no usage limits](decisions/2026-11-no-usage-limits.md) - 시간당 turn 상한과 설정의 사용량 제한 페이지를 없앤 결정.

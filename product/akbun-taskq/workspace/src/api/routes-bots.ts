@@ -1,6 +1,6 @@
 import type { Hono } from 'hono'
 import {
-  ORCHESTRATOR, USER, createAgent, deleteAgent, getAgent, listAgents, listMessages, listTurns, markRead, openTurnAgents, postMessage,
+  ORCHESTRATOR, USER, createAgent, deleteAgent, getAgent, listAgents, listMessages, listTurnSteps, listTurns, markRead, openTurnAgents, postMessage,
   queuedCounts, resetAgentSession, seedAgents, updateAgent,
 } from '../db/team.ts'
 import { createCatalog } from '../team/catalog.ts'
@@ -166,6 +166,14 @@ export function registerBotsRoutes(api: Hono, { db, config, bots }: ApiDeps): vo
     const limit = Math.min(200, Math.max(1, Number(c.req.query('limit') ?? 50) || 50))
     return c.json(db.prepare(`SELECT id, outcome, error, ended_at FROM team_turns WHERE agent = ? AND outcome = 'failed' AND ended_at IS NOT NULL
       ORDER BY id DESC LIMIT ?`).all(name, limit))
+  })
+
+  // The bot's tool calls since ?since= (unix seconds), oldest first, so its conversation shows what it did. ?limit= (500)
+  api.get('/bots/:name/steps', (c) => {
+    const name = c.req.param('name')
+    if (!getAgent(db, name)) throw new HttpError(404, 'no such bot')
+    const limit = Math.min(2000, Math.max(1, Number(c.req.query('limit') ?? 500) || 500))
+    return c.json(listTurnSteps(db, name, Number(c.req.query('since') ?? 0) || 0, limit))
   })
 
   api.get('/bots/:name', (c) => {

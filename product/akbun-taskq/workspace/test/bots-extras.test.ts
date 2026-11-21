@@ -80,7 +80,7 @@ describe('files, search, memory and settings', () => {
   test('[critical] appearance, bots and memory survive closing and reopening the database', async () => {
     assert.equal((await call('POST', '/settings/appearance', { language: 'en', theme: 'dark' })).status, 200)
     assert.equal((await call('POST', '/settings/appearance', { theme: 'blue' })).status, 400)
-    await call('PUT', '/bots/coder', { sandbox: true, turn_max_turns: 3 })
+    await call('PUT', '/bots/coder', { sandbox: true })
     await call('PUT', '/bots/coder/memory', { memory: 'remember me' })
     // A second connection to the same file is what a restarted (or upgraded) taskq sees.
     const reopened = openDb(env.home)
@@ -88,7 +88,6 @@ describe('files, search, memory and settings', () => {
       assert.deepEqual({ ...appearance(reopened) }, { font_family: 'system', font_size: 15, language: 'en', theme: 'dark' })
       const coder = getAgent(reopened, 'coder')!
       assert.equal(coder.sandbox, true)
-      assert.equal(coder.turn_max_turns, 3)
       assert.equal(coder.memory, 'remember me')
     } finally {
       reopened.close()

@@ -217,9 +217,12 @@ mark.find.current { background: var(--accent); color: var(--on-accent); }
 .chat-compose .compose-row textarea { min-height: 40px; padding: 9px 6px; background: transparent; border: 0; box-shadow: none; resize: none; }
 .chat-compose .compose-row textarea:focus-visible { outline: none; }
 .chat-compose .send-button { width: 40px; min-height: 40px; padding: 0; border-radius: 50%; flex: none; }
-.compose-tools { padding: 0 8px; color: var(--muted); }
-.compose-tools select { background: transparent; border-color: transparent; color: var(--muted); }
-.compose-tools select:hover { background: var(--hover); }
+/* The menus under the box read as plain text with a chevron, lined up with the box's own edges, as in Claude Desktop. */
+.compose-tools { padding: 0 6px; margin-top: -2px; color: var(--muted); gap: 4px; }
+.compose-tools select { background-color: transparent; border-color: transparent; box-shadow: none; color: var(--fg); min-height: 30px; border-radius: 8px; width: auto; field-sizing: content; }
+.compose-tools select:hover, .compose-tools select:focus-visible { background-color: var(--hover); }
+.compose-tools .icon-button { background: transparent; color: var(--muted); }
+.compose-tools .icon-button:hover { background: var(--hover); }
 .chat-compose .stop-button { width: 40px; min-height: 40px; padding: 0; border-radius: 50%; flex: none; background: transparent; display: inline-flex; align-items: center; justify-content: center; }
 .chat-compose .stop-button[hidden] { display: none; }
 .chat-compose .stop-button:hover { background: var(--hover); }
@@ -260,3 +263,34 @@ mark.find.current { background: var(--accent); color: var(--on-accent); }
 .msg[data-side="error"] { max-width: none; }
 .msg-meta { padding: 0 6px; }
 .chat-head { padding: 18px var(--gutter); }
+
+/* Tool calls between messages: one quiet line that opens into the list. While running, four dots spin. */
+.steps { margin: 2px 0 2px 44px; color: var(--muted); font-size: 14px; max-width: calc(100% - 44px); }
+.steps summary { display: flex; align-items: center; gap: 8px; cursor: pointer; list-style: none; min-height: 28px; width: fit-content; max-width: 100%; border-radius: 6px; padding: 0 6px; }
+.steps summary::-webkit-details-marker { display: none; }
+.steps summary:hover { background: var(--hover); }
+.steps summary svg { flex: none; transition: transform 0.15s; }
+.steps[open] summary svg { transform: rotate(90deg); }
+.steps .step-tool { font-family: var(--font-mono); color: var(--fg); }
+.steps .step-detail { font-family: var(--font-mono); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+.steps summary .step-detail { max-width: 48ch; }
+.steps .step-time { font-variant-numeric: tabular-nums; flex: none; }
+.step-list { margin: 4px 0 6px 6px; padding: 0 0 0 14px; border-left: 2px solid var(--border); list-style: none; display: grid; gap: 4px; }
+.step-list li { display: flex; gap: 8px; min-width: 0; }
+.step-spinner { position: relative; width: 14px; height: 14px; flex: none; animation: step-spin 1.2s linear infinite; }
+.step-spinner i { position: absolute; width: 4px; height: 4px; border-radius: 50%; background: var(--accent); }
+.step-spinner i:nth-child(1) { top: 0; left: 0; }
+.step-spinner i:nth-child(2) { top: 0; right: 0; opacity: 0.8; }
+.step-spinner i:nth-child(3) { bottom: 0; right: 0; opacity: 0.6; }
+.step-spinner i:nth-child(4) { bottom: 0; left: 0; opacity: 0.4; }
+@keyframes step-spin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { .step-spinner { animation: pulse 1.6s ease-in-out infinite; } }
+
+/* Header buttons: a dark tooltip under the button with what it does and its shortcut, on hover or keyboard focus. */
+.chat-gear[data-tip] { position: relative; }
+.chat-gear[data-tip]::after {
+  content: attr(data-tip) "   " attr(data-keys); position: absolute; top: calc(100% + 6px); right: 0; z-index: 20;
+  padding: 5px 10px; border-radius: 8px; background: #1c1c1c; color: #fff; font-size: 13px; line-height: 1.3; white-space: pre;
+  opacity: 0; pointer-events: none; transition: opacity 0.12s 0.25s;
+}
+.chat-gear[data-tip]:hover::after, .chat-gear[data-tip]:focus-visible::after { opacity: 1; }

@@ -316,7 +316,7 @@
       <p class="meta wide" data-area="bot-sdk-hint" hidden></p>
       <label data-edit-only>Role <input name="role" type="text" maxlength="40" autocomplete="off"></label>
       <label class="wide">Description <span class="meta">What this bot does. Other bots hand work to it by this text.</span><textarea name="description" rows="2" maxlength="500" required placeholder="Developer. Takes code tasks, changes the repository and runs the tests."></textarea></label>
-      <p class="meta wide" data-create-only>Role, instructions, permissions and limits start with defaults; change them later with the gear next to the bot. Skills, plugins and MCP servers come from the Plugins menu and every bot of the type uses them.</p>
+      <p class="meta wide" data-create-only>Role, instructions and permissions start with defaults; change them later with the gear next to the bot. Skills, plugins and MCP servers come from the Plugins menu and every bot of the type uses them.</p>
       <label class="wide" data-edit-only>Instructions <textarea name="instructions" rows="5" maxlength="8000"></textarea></label>
       <label class="wide" data-edit-only>Working directory <input name="workdir" type="text" maxlength="500" autocomplete="off" spellcheck="false" placeholder="its own folder: shared/bots/<name>"></label>
     </div>
@@ -337,17 +337,10 @@
       <p class="meta">taskq's own data and config are always off limits; a call that reaches them stops the turn and pauses the bots.</p>
     </fieldset>
     <fieldset data-edit-only>
-      <legend>Limits</legend>
-      <p class="meta">Empty uses turnMaxTurns in taskq.config.json.</p>
-      <div class="bot-form-grid">
-        <label>Model turns per turn <input name="turn_max_turns" type="number" min="1" max="500" step="1"></label>
-      </div>
-      <button type="button" data-area="bot-session-folder">Open session folder</button>
-    </fieldset>
-    <fieldset data-edit-only>
       <legend>Behavior</legend>
       <label class="check"><input type="checkbox" name="enabled"> Enabled</label>
       <label class="check"><input type="checkbox" name="may_message_user"> May start a conversation with me <span class="meta">(it always answers when I write to it)</span></label>
+      <button type="button" data-area="bot-session-folder">Open session folder</button>
     </fieldset>
     <p class="error" data-area="bot-form-error" role="alert"></p>
     <div class="dialog-actions">
