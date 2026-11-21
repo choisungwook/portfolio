@@ -1,0 +1,935 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>PostgreSQL RBAC 인증·인가 슬라이드 학습지</title>
+  <style>
+    :root {
+      --bg: #0f172a;
+      --surface: #1e293b;
+      --surface-light: #334155;
+      --card: #f8fafc;
+      --text: #f1f5f9;
+      --text-muted: #94a3b8;
+      --accent: #38bdf8;
+      --indigo: #818cf8;
+      --green: #34d399;
+      --red: #fb7185;
+      --amber: #fbbf24;
+      --border: #334155;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Pretendard", "Apple SD Gothic Neo", "Segoe UI", Roboto, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      height: 100vh;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+    }
+
+    /* Top Navigation Bar */
+    .topbar {
+      height: 54px;
+      padding: 0 24px;
+      background: rgba(15, 23, 42, 0.92);
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      z-index: 20;
+    }
+    .topbar-title {
+      font-weight: 700;
+      font-size: 0.95rem;
+      color: var(--accent);
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .topbar-controls {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .btn {
+      background: var(--surface);
+      color: var(--text);
+      border: 1px solid var(--border);
+      padding: 6px 14px;
+      border-radius: 8px;
+      font-size: 0.85rem;
+      cursor: pointer;
+      transition: all 0.15s ease;
+    }
+    .btn:hover { background: var(--surface-light); border-color: var(--accent); }
+    .btn.primary { background: #0284c7; border-color: #38bdf8; font-weight: 600; }
+    .btn.primary:hover { background: #0369a1; }
+    .btn.active { background: #4f46e5; border-color: #818cf8; font-weight: 600; }
+    .slide-counter {
+      font-variant-numeric: tabular-nums;
+      font-size: 0.85rem;
+      color: var(--text-muted);
+      min-width: 56px;
+      text-align: center;
+    }
+
+    /* Progress Bar */
+    .progress-track {
+      height: 3px;
+      background: var(--surface);
+      width: 100%;
+    }
+    .progress-fill {
+      height: 100%;
+      background: linear-gradient(90deg, var(--accent), var(--indigo));
+      transition: width 0.25s ease;
+    }
+
+    /* Slide Stage */
+    .stage {
+      flex: 1;
+      position: relative;
+      overflow: hidden;
+    }
+    .slide {
+      position: absolute;
+      inset: 0;
+      padding: 28px 48px 36px;
+      overflow-y: auto;
+      opacity: 0;
+      transform: translateX(30px);
+      pointer-events: none;
+      transition: opacity 0.28s ease, transform 0.28s ease;
+      display: flex;
+      flex-direction: column;
+      max-width: 1280px;
+      margin: 0 auto;
+    }
+    .slide.active {
+      opacity: 1;
+      transform: translateX(0);
+      pointer-events: auto;
+    }
+
+    .badge {
+      display: inline-block;
+      padding: 4px 10px;
+      border-radius: 999px;
+      font-size: 0.75rem;
+      font-weight: 700;
+      letter-spacing: 0.03em;
+      text-transform: uppercase;
+      margin-bottom: 10px;
+      width: fit-content;
+    }
+    .badge.blue { background: rgba(56, 189, 248, 0.16); color: var(--accent); }
+    .badge.indigo { background: rgba(129, 140, 248, 0.16); color: var(--indigo); }
+    .badge.amber { background: rgba(251, 191, 36, 0.16); color: var(--amber); }
+    .badge.green { background: rgba(52, 211, 153, 0.16); color: var(--green); }
+    .badge.red { background: rgba(251, 113, 133, 0.16); color: var(--red); }
+
+    h1 { font-size: 2.5rem; line-height: 1.25; margin-bottom: 16px; }
+    h2 { font-size: 1.7rem; line-height: 1.3; margin-bottom: 14px; }
+    h3 { font-size: 1.05rem; margin-bottom: 8px; color: var(--accent); }
+    p { line-height: 1.65; color: #cbd5e1; margin-bottom: 12px; font-size: 0.98rem; }
+
+    .grid-2 {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 20px;
+      align-items: start;
+      margin-top: 8px;
+    }
+    .grid-3 {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 16px;
+      margin-top: 12px;
+    }
+
+    .panel {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 18px 20px;
+    }
+    .panel.red-border { border-color: rgba(251, 113, 133, 0.5); background: rgba(251, 113, 133, 0.06); }
+    .panel.green-border { border-color: rgba(52, 211, 153, 0.5); background: rgba(52, 211, 153, 0.06); }
+    .panel.amber-border { border-color: rgba(251, 191, 36, 0.5); background: rgba(251, 191, 36, 0.06); }
+
+    .img-frame {
+      background: #ffffff;
+      border-radius: 12px;
+      padding: 10px;
+      border: 1px solid var(--border);
+      text-align: center;
+      margin: 10px 0;
+    }
+    .img-frame img {
+      max-width: 100%;
+      max-height: 360px;
+      object-fit: contain;
+      border-radius: 6px;
+      display: block;
+      margin: 0 auto;
+    }
+    .img-caption {
+      font-size: 0.8rem;
+      color: #475569;
+      margin-top: 6px;
+    }
+
+    code {
+      font-family: "JetBrains Mono", "SFMono-Regular", Menlo, Consolas, monospace;
+      background: rgba(15, 23, 42, 0.75);
+      color: #7dd3fc;
+      padding: 2px 6px;
+      border-radius: 5px;
+      font-size: 0.88em;
+    }
+    pre {
+      background: #020617;
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 12px 14px;
+      overflow-x: auto;
+      font-size: 0.84rem;
+      line-height: 1.55;
+      color: #e2e8f0;
+      margin: 8px 0;
+    }
+    pre code { background: none; padding: 0; color: inherit; }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 10px 0;
+      font-size: 0.9rem;
+    }
+    th, td {
+      border: 1px solid var(--border);
+      padding: 9px 12px;
+      text-align: left;
+    }
+    th { background: rgba(56, 189, 248, 0.1); color: var(--accent); font-weight: 600; }
+    td { color: #e2e8f0; }
+
+    ul { padding-left: 20px; line-height: 1.7; color: #cbd5e1; font-size: 0.95rem; }
+    li { margin-bottom: 6px; }
+
+    /* Interactive Animation Boxes */
+    .anim-stage {
+      background: #0b1220;
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 18px;
+      margin-top: 10px;
+    }
+    .anim-controls {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-bottom: 16px;
+      align-items: center;
+    }
+    .node {
+      background: var(--surface);
+      border: 2px solid var(--border);
+      border-radius: 10px;
+      padding: 10px 14px;
+      text-align: center;
+      font-size: 0.88rem;
+      font-weight: 600;
+      transition: all 0.35s ease;
+      position: relative;
+    }
+    .node small {
+      display: block;
+      font-weight: 400;
+      font-size: 0.76rem;
+      color: var(--text-muted);
+      margin-top: 3px;
+    }
+    .node.ok { border-color: var(--green); background: rgba(52, 211, 153, 0.14); color: #d1fae5; }
+    .node.err { border-color: var(--red); background: rgba(251, 113, 133, 0.16); color: #ffe4e6; animation: shake 0.4s ease; }
+    .node.gold { border-color: var(--amber); background: rgba(251, 191, 36, 0.15); color: #fef3c7; }
+    .node.dim { opacity: 0.35; border-style: dashed; }
+    .node.pulse { box-shadow: 0 0 0 4px rgba(56, 189, 248, 0.3); border-color: var(--accent); }
+
+    @keyframes shake {
+      0%, 100% { transform: translateX(0); }
+      25% { transform: translateX(-5px); }
+      75% { transform: translateX(5px); }
+    }
+
+    .arrow-bar {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 0.8rem;
+      color: var(--text-muted);
+      padding: 6px 0;
+      transition: all 0.3s ease;
+    }
+    .arrow-bar.ok { color: var(--green); font-weight: 700; }
+    .arrow-bar.err { color: var(--red); font-weight: 700; }
+
+    .status-log {
+      margin-top: 12px;
+      padding: 10px 14px;
+      border-radius: 8px;
+      background: #020617;
+      border-left: 4px solid var(--accent);
+      font-size: 0.88rem;
+      line-height: 1.55;
+      color: #e2e8f0;
+    }
+    .status-log.err { border-left-color: var(--red); color: #fecdd3; }
+    .status-log.ok { border-left-color: var(--green); color: #a7f3d0; }
+
+    /* Quiz styles */
+    .quiz-item {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 14px 16px;
+      margin-bottom: 12px;
+    }
+    .quiz-options {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-top: 8px;
+    }
+    .quiz-feedback {
+      margin-top: 8px;
+      font-size: 0.86rem;
+      display: none;
+    }
+
+    /* Slide Index Drawer */
+    .drawer {
+      position: fixed;
+      top: 54px;
+      right: -320px;
+      width: 300px;
+      bottom: 0;
+      background: #0b1220;
+      border-left: 1px solid var(--border);
+      padding: 16px;
+      overflow-y: auto;
+      transition: right 0.25s ease;
+      z-index: 30;
+    }
+    .drawer.open { right: 0; }
+    .drawer-item {
+      padding: 9px 12px;
+      border-radius: 8px;
+      cursor: pointer;
+      font-size: 0.86rem;
+      color: var(--text-muted);
+      margin-bottom: 4px;
+    }
+    .drawer-item:hover { background: var(--surface); color: var(--text); }
+    .drawer-item.active { background: rgba(56, 189, 248, 0.16); color: var(--accent); font-weight: 600; }
+
+    /* Hero Slide */
+    .hero {
+      justify-content: center;
+      text-align: center;
+      align-items: center;
+    }
+    .hero p { max-width: 760px; font-size: 1.1rem; }
+
+    @media (max-width: 900px) {
+      .slide { padding: 18px 18px 28px; }
+      .grid-2, .grid-3 { grid-template-columns: 1fr; }
+      h1 { font-size: 1.8rem; }
+      h2 { font-size: 1.35rem; }
+    }
+  </style>
+</head>
+<body>
+  <header class="topbar">
+    <div class="topbar-title">
+      <span>PostgreSQL RBAC 인증·인가 학습지</span>
+    </div>
+    <div class="topbar-controls">
+      <button class="btn" id="btnPrev" title="이전 슬라이드 (←)">← 이전</button>
+      <span class="slide-counter" id="slideCounter">1 / 10</span>
+      <button class="btn primary" id="btnNext" title="다음 슬라이드 (→)">다음 →</button>
+      <button class="btn" id="btnMenu">목차</button>
+    </div>
+  </header>
+  <div class="progress-track"><div class="progress-fill" id="progressFill"></div></div>
+
+  <aside class="drawer" id="drawer">
+    <h3>슬라이드 목차</h3>
+    <div id="drawerList"></div>
+  </aside>
+
+  <main class="stage">
+    <!-- SLIDE 1: Hero -->
+    <section class="slide hero active" data-title="1. 표지: PostgreSQL RBAC 학습 목표">
+      <span class="badge blue">Hands-on Study Guide</span>
+      <h1>PostgreSQL 인증·인가는<br />왜 RBAC으로 이해해야 할까?</h1>
+      <p>
+        MySQL과 같은 감각으로 PostgreSQL을 운영하다가 마주치는
+        <code>permission denied</code>, <code>must be owner of table</code>,
+        <code>role cannot be dropped</code> 장애의 뿌리는 모두 하나입니다.
+        PostgreSQL의 <strong>Role 기반 접근 제어(RBAC)</strong>와 <strong>객체 소유권(Ownership)</strong> 원리를
+        그림과 인터랙티브 애니메이션으로 익힙니다.
+      </p>
+      <div class="grid-3" style="width: 100%; max-width: 960px; margin-top: 24px; text-align: left;">
+        <div class="panel">
+          <h3>Part 1. MySQL vs PostgreSQL</h3>
+          <p><code>shop.*</code> 와일드카드와 <code>ALTER DEFAULT PRIVILEGES</code>의 결정적 차이</p>
+        </div>
+        <div class="panel">
+          <h3>Part 2. Flyway 소유권과 롤백</h3>
+          <p>계정 교체 시 <code>must be owner</code> 장애, 트랜잭션 DDL 롤백, <code>SET ROLE app_owner</code></p>
+        </div>
+        <div class="panel">
+          <h3>Part 3. 비밀번호 로테이션</h3>
+          <p><code>DROP ROLE</code> 의존성 장애와 <code>NOLOGIN</code> 그룹 Role 기반 Blue/Green 교체</p>
+        </div>
+      </div>
+      <p style="margin-top: 24px; font-size: 0.85rem; color: var(--text-muted);">
+        키보드 <code>←</code> / <code>→</code> 방향키 또는 상단 버튼으로 이동합니다.
+      </p>
+    </section>
+
+    <!-- SLIDE 2: MySQL vs PostgreSQL Comparison -->
+    <section class="slide" data-title="2. MySQL vs PostgreSQL 인증·인가 모델">
+      <span class="badge blue">Part 1 · Core Concept</span>
+      <h2>계정 중심(MySQL) vs 역할 기반(PostgreSQL RBAC)</h2>
+      <div class="img-frame">
+        <img src="../imgs/mysql-vs-postgres-auth.png" alt="MySQL vs PostgreSQL 인증 인가 비교" />
+        <div class="img-caption">그림 1. MySQL의 shop.* 와일드카드 권한과 PostgreSQL의 계층적 RBAC 권한 비교</div>
+      </div>
+      <table>
+        <thead>
+          <tr>
+            <th>구분</th>
+            <th>MySQL 8.4</th>
+            <th>PostgreSQL 16</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>주체 모델</td>
+            <td><code>'user'@'host'</code> 계정 중심</td>
+            <td>모든 주체가 <code>ROLE</code> (<code>LOGIN</code> 속성으로 사용자·그룹 구분)</td>
+          </tr>
+          <tr>
+            <td>신규 테이블 권한</td>
+            <td><code>GRANT SELECT ON shop.*</code>가 미래 테이블에도 자동 적용</td>
+            <td><code>ON ALL TABLES</code>는 현재 시점만 적용 → <code>ALTER DEFAULT PRIVILEGES</code> 필수</td>
+          </tr>
+          <tr>
+            <td>DDL 권한 (<code>ALTER</code>)</td>
+            <td><code>GRANT ALTER</code>로 타 계정에 위임 가능</td>
+            <td><code>GRANT ALL</code>이 있어도 오직 <strong>Owner</strong>(또는 멤버)만 실행 가능</td>
+          </tr>
+        </tbody>
+      </table>
+    </section>
+
+    <!-- SLIDE 3: Interactive Animation 1 -->
+    <section class="slide" data-title="3. [애니메이션] 신규 테이블 권한 전파 비교">
+      <span class="badge indigo">Interactive Animation 1</span>
+      <h2>신규 테이블이 생겼을 때 MySQL과 PostgreSQL은 어떻게 다를까?</h2>
+      <p>아래 단계 버튼을 순서대로 눌러 같은 DDL을 실행했을 때 두 DB의 인가 결과가 어떻게 갈리는지 확인합니다.</p>
+
+      <div class="anim-stage">
+        <div class="anim-controls">
+          <button class="btn active" onclick="setAnim1(1)" id="a1-btn-1">1단계: products 생성 &amp; GRANT</button>
+          <button class="btn" onclick="setAnim1(2)" id="a1-btn-2">2단계: 새 테이블 orders 추가</button>
+          <button class="btn" onclick="setAnim1(3)" id="a1-btn-3">3단계: ALTER DEFAULT PRIVILEGES + shipments 추가</button>
+        </div>
+
+        <div class="grid-2">
+          <div class="panel">
+            <h3>MySQL 8.4 (<code>GRANT SELECT ON shop.*</code>)</h3>
+            <div class="node ok" id="a1-my-user">app_user@% <small>와일드카드 규칙: shop.*</small></div>
+            <div class="arrow-bar ok" id="a1-my-arrow">↓ shop.* 패턴으로 모든 테이블 평가 ↓</div>
+            <div class="grid-3" style="margin-top: 6px;">
+              <div class="node ok" id="a1-my-t1">products<small>✅ SELECT 성공</small></div>
+              <div class="node dim" id="a1-my-t2">orders<small>아직 없음</small></div>
+              <div class="node dim" id="a1-my-t3">shipments<small>아직 없음</small></div>
+            </div>
+          </div>
+
+          <div class="panel">
+            <h3>PostgreSQL 16 (<code>GRANT SELECT ON ALL TABLES</code>)</h3>
+            <div class="node ok" id="a1-pg-user">app_user (LOGIN) → app_read (NOLOGIN) <small>현재 테이블 ACL에만 기록됨</small></div>
+            <div class="arrow-bar ok" id="a1-pg-arrow">↓ Database(CONNECT) → Schema(USAGE) → Table ACL ↓</div>
+            <div class="grid-3" style="margin-top: 6px;">
+              <div class="node ok" id="a1-pg-t1">products<small>✅ SELECT 성공</small></div>
+              <div class="node dim" id="a1-pg-t2">orders<small>아직 없음</small></div>
+              <div class="node dim" id="a1-pg-t3">shipments<small>아직 없음</small></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="status-log" id="a1-log">
+          <strong>1단계:</strong> 두 DB 모두 <code>products</code>가 있는 상태에서 권한을 부여했습니다. 양쪽 모두 <code>SELECT * FROM products;</code>에 성공합니다.
+        </div>
+      </div>
+    </section>
+
+    <!-- SLIDE 4: PostgreSQL RBAC Hierarchy -->
+    <section class="slide" data-title="4. PostgreSQL RBAC 4단계 계층과 Object Owner">
+      <span class="badge blue">Part 1 · Architecture</span>
+      <h2>PostgreSQL RBAC 4단계 관문과 Object Owner</h2>
+      <div class="img-frame">
+        <img src="../imgs/postgres-rbac-hierarchy.png" alt="PostgreSQL RBAC 권한 계층" />
+        <div class="img-caption">그림 2. Role 멤버십, 4단계 권한 계층, Object Owner, ALTER DEFAULT PRIVILEGES 관계</div>
+      </div>
+      <div class="grid-2">
+        <div class="panel">
+          <h3>일반 쿼리(DML)는 4개 관문을 모두 통과해야 합니다</h3>
+          <ul>
+            <li><strong>1. Cluster / Role:</strong> <code>LOGIN</code> 속성으로 인증 통과</li>
+            <li><strong>2. Database:</strong> <code>CONNECT ON DATABASE shop</code></li>
+            <li><strong>3. Schema:</strong> <code>USAGE ON SCHEMA public</code></li>
+            <li><strong>4. Table &amp; Sequence:</strong> <code>SELECT/INSERT</code> + <code>SERIAL</code>용 시퀀스 <code>USAGE</code></li>
+          </ul>
+        </div>
+        <div class="panel amber-border">
+          <h3 style="color: var(--amber);">DDL은 오직 Object Owner만 가능합니다</h3>
+          <ul>
+            <li>테이블 생성 시점의 <code>current_user</code>가 자동으로 Owner가 됩니다.</li>
+            <li><code>ALTER TABLE</code>, <code>DROP TABLE</code>, <code>GRANT</code>는 <code>GRANT ALL</code>로 위임되지 않습니다.</li>
+            <li>따라서 소유권은 개인 계정이 아니라 <strong>공유 <code>NOLOGIN</code> Role(<code>app_owner</code>)</strong>이 가져야 합니다.</li>
+          </ul>
+        </div>
+      </div>
+    </section>
+
+    <!-- SLIDE 5: Flyway Ownership Incident -->
+    <section class="slide" data-title="5. Flyway 소유권 장애: 왜 터지는가?">
+      <span class="badge red">Part 2 · Incident</span>
+      <h2>Flyway 마이그레이션에서 터지는 두 가지 RBAC 장애</h2>
+      <div class="img-frame">
+        <img src="../imgs/flyway-ownership-incident.png" alt="Flyway 소유권 장애와 SET ROLE 해결 구조" />
+        <div class="img-caption">그림 3. 로그인 계정 직접 소유 안티패턴(상단)과 SET ROLE app_owner 정석(하단)</div>
+      </div>
+      <div class="grid-2">
+        <div class="panel red-border">
+          <h3 style="color: var(--red);">장애 1: 신규 테이블 배포 직후 앱 조회 실패</h3>
+          <pre><code>ERROR: permission denied for table orders</code></pre>
+          <p><code>migrator_v1</code>이 V2로 <code>orders</code>를 만들었지만, <code>ALTER DEFAULT PRIVILEGES</code>가 없어 <code>app_user</code>가 즉시 차단됩니다.</p>
+        </div>
+        <div class="panel red-border">
+          <h3 style="color: var(--red);">장애 2: 마이그레이션 계정 교체 후 ALTER 실패</h3>
+          <pre><code>ERROR: must be owner of table products</code></pre>
+          <p><code>migrator_v2</code>에게 <code>GRANT ALL</code>을 줘도 <code>products</code> 소유자가 <code>migrator_v1</code>이라 V3의 <code>ALTER TABLE</code>이 거부됩니다.</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- SLIDE 6: Interactive Animation 2 (Flyway SET ROLE) -->
+    <section class="slide" data-title="6. [애니메이션] Flyway SET ROLE app_owner 동작 원리">
+      <span class="badge indigo">Interactive Animation 2</span>
+      <h2><code>SET ROLE app_owner</code>가 Flyway 소유권 문제를 해결하는 원리</h2>
+      <p>모드를 전환하고 V1 → V2 → V3 실행 버튼을 눌러 소유자와 앱 권한이 어떻게 달라지는지 비교합니다.</p>
+
+      <div class="anim-stage">
+        <div class="anim-controls">
+          <button class="btn active" id="a2-mode-bad" onclick="setAnim2Mode('bad')">❌ 안티패턴 (직접 소유)</button>
+          <button class="btn" id="a2-mode-good" onclick="setAnim2Mode('good')">✅ 정석 (SET ROLE app_owner)</button>
+          <span style="width: 16px;"></span>
+          <button class="btn primary" onclick="runAnim2Step(1)">V1 실행 (migrator_v1)</button>
+          <button class="btn primary" onclick="runAnim2Step(2)">V2 실행 + app_user 조회</button>
+          <button class="btn primary" onclick="runAnim2Step(3)">V3 ALTER TABLE (migrator_v2)</button>
+        </div>
+
+        <div class="grid-3" style="align-items: center;">
+          <div style="display: flex; flex-direction: column; gap: 10px;">
+            <div class="node" id="a2-m1">migrator_v1 (LOGIN)<small>V1 실행 계정</small></div>
+            <div class="node" id="a2-m2">migrator_v2 (LOGIN)<small>V3 실행 계정 (교체됨)</small></div>
+            <div class="node" id="a2-app">app_user (LOGIN)<small>애플리케이션 계정</small></div>
+          </div>
+
+          <div style="display: flex; flex-direction: column; gap: 10px;">
+            <div class="node dim" id="a2-owner-role">app_owner (NOLOGIN)<small>-initSql="SET ROLE app_owner;"</small></div>
+            <div class="node dim" id="a2-rw-role">app_rw (NOLOGIN)<small>ALTER DEFAULT PRIVILEGES 대상</small></div>
+          </div>
+
+          <div style="display: flex; flex-direction: column; gap: 10px;">
+            <div class="node dim" id="a2-t-prod">products 테이블<small id="a2-t-prod-sub">미생성</small></div>
+            <div class="node dim" id="a2-t-ord">orders 테이블<small id="a2-t-ord-sub">미생성</small></div>
+            <div class="node dim" id="a2-t-inv">inventory_logs + stock<small id="a2-t-inv-sub">미생성</small></div>
+          </div>
+        </div>
+
+        <div class="status-log" id="a2-log">
+          모드를 선택한 뒤 <strong>V1 → V2 → V3</strong> 버튼을 순서대로 눌러 결과를 확인하세요.
+        </div>
+      </div>
+    </section>
+
+    <!-- SLIDE 7: Flyway Rollback -->
+    <section class="slide" data-title="7. Flyway 장애 시 롤백 2가지 방법">
+      <span class="badge amber">Part 2 · Recovery &amp; Rollback</span>
+      <h2>마이그레이션 장애가 났을 때 롤백하는 두 가지 경로</h2>
+      <div class="grid-2" style="margin-top: 12px;">
+        <div class="panel green-border">
+          <h3 style="color: var(--green);">경로 1: 실행 도중 실패 → 트랜잭션 DDL 자동 롤백</h3>
+          <p>PostgreSQL은 <code>CREATE TABLE</code>, <code>ALTER TABLE</code> 같은 DDL도 트랜잭션 안에서 실행합니다.</p>
+          <pre><code>-- V3__add_stock_to_products.sql
+CREATE TABLE inventory_logs (...);     -- 1) 성공
+ALTER TABLE products ADD COLUMN stock; -- 2) 실패!
+-- → PostgreSQL이 1) inventory_logs까지 원자적으로 롤백</code></pre>
+          <ul>
+            <li>MySQL과 달리 테이블이 절반만 적용된 깨진 상태가 남지 않습니다.</li>
+            <li>예외: <code>CREATE INDEX CONCURRENTLY</code>처럼 트랜잭션 밖에서 실행되는 DDL이 실패해 <code>success = f</code> 행이 남았다면 원인 수정 후 <code>flyway repair</code>로 실패 이력을 정리합니다.</li>
+          </ul>
+        </div>
+
+        <div class="panel amber-border">
+          <h3 style="color: var(--amber);">경로 2: 이미 커밋된 V2 되돌리기 → 보상 마이그레이션</h3>
+          <p>Flyway OSS(Community Edition)에는 유료 <code>undo</code> 명령이 없고, 실무에서도 이력 삭제보다 새 버전으로 되돌리는 <strong>전진 롤백(Forward-Fix)</strong>을 권장합니다.</p>
+          <pre><code>-- flyway/rollback/V4__rollback_orders.sql
+DROP TABLE IF EXISTS orders;</code></pre>
+          <ul>
+            <li><code>flyway_schema_history</code>에 <code>V1 → V2 → V4(rollback orders)</code>가 감사 이력으로 투명하게 남습니다.</li>
+            <li>주의: <code>DROP TABLE orders</code> 역시 <strong>소유자(<code>app_owner</code>)</strong> 권한으로 실행해야 합니다.</li>
+          </ul>
+        </div>
+      </div>
+    </section>
+
+    <!-- SLIDE 8: Password Rotation Incident -->
+    <section class="slide" data-title="8. 비밀번호 로테이션 장애와 REASSIGN OWNED">
+      <span class="badge red">Part 3 · Password Rotation</span>
+      <h2>비밀번호 로테이션 후 옛 계정이 삭제되지 않는 이유</h2>
+      <div class="img-frame">
+        <img src="../imgs/password-rotation-blue-green.png" alt="Blue/Green 무중단 비밀번호 로테이션" />
+        <div class="img-caption">그림 4. NOLOGIN 그룹 Role을 사이에 두면 Blue/Green 로그인 계정을 의존성 0개 상태로 즉시 교체·삭제 가능</div>
+      </div>
+      <div class="grid-2">
+        <div class="panel red-border">
+          <h3 style="color: var(--red);">직접 소유 계정의 DROP ROLE 실패</h3>
+          <pre><code>ERROR: role "migrator_v1" cannot be dropped
+because some objects depend on it
+DETAIL: privileges for schema public
+privileges for database shop
+owner of sequence products_id_seq
+owner of table products</code></pre>
+        </div>
+        <div class="panel amber-border">
+          <h3 style="color: var(--amber);">복구 순서 주의 (치명적 함정!)</h3>
+          <pre><code>-- 1) 반드시 소유권 먼저 이전!
+REASSIGN OWNED BY migrator_v1 TO app_owner;
+-- 2) 그 다음 잔여 권한만 회수
+DROP OWNED BY migrator_v1;
+-- 3) 이제 안전하게 계정 삭제
+DROP ROLE migrator_v1;</code></pre>
+          <p style="font-size: 0.85rem; color: #fde68a;">※ <code>REASSIGN OWNED</code> 없이 <code>DROP OWNED</code>를 먼저 치면 테이블과 데이터가 영구 삭제됩니다.</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- SLIDE 9: Interactive Animation 3 (Blue/Green Rotation) -->
+    <section class="slide" data-title="9. [애니메이션] Blue/Green 무중단 로테이션">
+      <span class="badge indigo">Interactive Animation 3</span>
+      <h2>Blue/Green 로그인 계정 무중단 비밀번호 로테이션 시뮬레이터</h2>
+      <p>권한과 소유권을 <code>NOLOGIN</code> 그룹 Role에 분리해 두었을 때, 4단계 무중단 교체가 어떻게 진행되는지 단계별로 눌러 확인합니다.</p>
+
+      <div class="anim-stage">
+        <div class="anim-controls">
+          <button class="btn active" id="a3-b1" onclick="setAnim3(1)">1. Blue 운영 중</button>
+          <button class="btn" id="a3-b2" onclick="setAnim3(2)">2. Green 생성 &amp; GRANT app_rw</button>
+          <button class="btn" id="a3-b3" onclick="setAnim3(3)">3. 앱 트래픽 Green 전환</button>
+          <button class="btn" id="a3-b4" onclick="setAnim3(4)">4. DROP ROLE app_blue</button>
+        </div>
+
+        <div class="grid-3" style="align-items: center;">
+          <div class="node pulse" id="a3-app">Application Server<small id="a3-app-sub">접속 계정: app_blue</small></div>
+
+          <div style="display: flex; flex-direction: column; gap: 12px;">
+            <div class="node ok" id="a3-blue">app_blue (LOGIN)<small id="a3-blue-sub">구 비밀번호 · 소유 객체 0개</small></div>
+            <div class="node dim" id="a3-green">app_green (LOGIN)<small id="a3-green-sub">아직 미생성</small></div>
+          </div>
+
+          <div style="display: flex; flex-direction: column; gap: 12px;">
+            <div class="node gold" id="a3-owner">app_owner (NOLOGIN)<small>테이블 소유권 영구 보유</small></div>
+            <div class="node ok" id="a3-rw">app_rw (NOLOGIN)<small>SELECT / INSERT / UPDATE / DELETE</small></div>
+          </div>
+        </div>
+
+        <div class="status-log ok" id="a3-log">
+          <strong>1단계:</strong> <code>app_blue</code>가 <code>app_rw</code> 권한을 상속받아 서비스를 처리 중입니다. <code>app_blue</code> 자체에는 직접 <code>GRANT</code>나 소유 테이블이 하나도 없습니다.
+        </div>
+      </div>
+    </section>
+
+    <!-- SLIDE 10: Checklist & Quiz -->
+    <section class="slide" data-title="10. 핵심 요약과 자가 점검 퀴즈">
+      <span class="badge green">Summary &amp; Self-Check</span>
+      <h2>PostgreSQL RBAC 실무 체크리스트 &amp; 자가 점검 퀴즈</h2>
+
+      <div class="grid-2">
+        <div>
+          <div class="quiz-item">
+            <strong>Q1.</strong> <code>GRANT SELECT ON ALL TABLES IN SCHEMA public TO app_read;</code>를 실행한 뒤 새 테이블 <code>orders</code>를 만들었습니다. <code>app_user</code>가 조회하면?
+            <div class="quiz-options">
+              <button class="btn" onclick="checkQuiz(1, false, this)">성공한다</button>
+              <button class="btn" onclick="checkQuiz(1, true, this)">permission denied 오류가 난다</button>
+            </div>
+            <div class="quiz-feedback" id="qf-1"></div>
+          </div>
+
+          <div class="quiz-item">
+            <strong>Q2.</strong> <code>migrator_v2</code>에게 <code>GRANT ALL ON ALL TABLES</code>를 부여했습니다. <code>migrator_v1</code>이 만든 <code>products</code>에 <code>ALTER TABLE</code>을 실행하면?
+            <div class="quiz-options">
+              <button class="btn" onclick="checkQuiz(2, false, this)">ALL 권한이 있으므로 성공한다</button>
+              <button class="btn" onclick="checkQuiz(2, true, this)">must be owner of table 오류가 난다</button>
+            </div>
+            <div class="quiz-feedback" id="qf-2"></div>
+          </div>
+
+          <div class="quiz-item">
+            <strong>Q3.</strong> 테이블을 직접 소유한 옛 계정 <code>migrator_v1</code>을 안전하게 삭제할 때 올바른 순서는?
+            <div class="quiz-options">
+              <button class="btn" onclick="checkQuiz(3, false, this)">DROP OWNED → REASSIGN OWNED → DROP ROLE</button>
+              <button class="btn" onclick="checkQuiz(3, true, this)">REASSIGN OWNED → DROP OWNED → DROP ROLE</button>
+            </div>
+            <div class="quiz-feedback" id="qf-3"></div>
+          </div>
+        </div>
+
+        <div class="panel green-border">
+          <h3 style="color: var(--green);">실무 설계 5원칙 체크리스트</h3>
+          <ul>
+            <li>권한과 소유권은 <strong><code>NOLOGIN</code> 그룹 Role</strong>(<code>app_owner</code>, <code>app_rw</code>, <code>app_ro</code>)에만 부여합니다.</li>
+            <li>로그인 계정(<code>LOGIN</code>)은 비밀번호와 그룹 멤버십(<code>GRANT role TO user</code>)만 가집니다.</li>
+            <li>Flyway 등 마이그레이션 도구는 반드시 <code>-initSql="SET ROLE app_owner;"</code>로 소유자를 통일합니다.</li>
+            <li><code>ALTER DEFAULT PRIVILEGES FOR ROLE app_owner</code>로 테이블과 <strong>시퀀스</strong> 기본 권한을 함께 설정합니다.</li>
+            <li>비밀번호 로테이션은 Blue/Green 로그인 계정을 교체하고 구 계정을 <code>ALTER ROLE ... NOLOGIN</code> 후 <code>DROP ROLE</code>합니다.</li>
+          </ul>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <script>
+    const slides = Array.from(document.querySelectorAll('.slide'));
+    let current = 0;
+
+    const counterEl = document.getElementById('slideCounter');
+    const progressEl = document.getElementById('progressFill');
+    const drawerEl = document.getElementById('drawer');
+    const drawerListEl = document.getElementById('drawerList');
+
+    // Build drawer items
+    slides.forEach((s, idx) => {
+      const item = document.createElement('div');
+      item.className = 'drawer-item';
+      item.textContent = s.dataset.title || `슬라이드 ${idx + 1}`;
+      item.onclick = () => { goTo(idx); drawerEl.classList.remove('open'); };
+      drawerListEl.appendChild(item);
+    });
+
+    function goTo(idx) {
+      if (idx < 0 || idx >= slides.length) return;
+      slides[current].classList.remove('active');
+      current = idx;
+      slides[current].classList.add('active');
+      counterEl.textContent = `${current + 1} / ${slides.length}`;
+      progressEl.style.width = `${((current + 1) / slides.length) * 100}%`;
+      Array.from(drawerListEl.children).forEach((el, i) => {
+        el.classList.toggle('active', i === current);
+      });
+    }
+
+    document.getElementById('btnPrev').onclick = () => goTo(current - 1);
+    document.getElementById('btnNext').onclick = () => goTo(current + 1);
+    document.getElementById('btnMenu').onclick = () => drawerEl.classList.toggle('open');
+
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'ArrowRight' || e.key === 'PageDown') goTo(current + 1);
+      if (e.key === 'ArrowLeft' || e.key === 'PageUp') goTo(current - 1);
+      if (e.key === 'Escape') drawerEl.classList.remove('open');
+    });
+
+    goTo(0);
+
+    /* Animation 1: MySQL vs PostgreSQL new table privileges */
+    function setAnim1(step) {
+      [1, 2, 3].forEach(i => document.getElementById(`a1-btn-${i}`).classList.toggle('active', i === step));
+      const myT2 = document.getElementById('a1-my-t2');
+      const myT3 = document.getElementById('a1-my-t3');
+      const pgT2 = document.getElementById('a1-pg-t2');
+      const pgT3 = document.getElementById('a1-pg-t3');
+      const log = document.getElementById('a1-log');
+
+      if (step === 1) {
+        myT2.className = 'node dim'; myT2.innerHTML = 'orders<small>아직 없음</small>';
+        myT3.className = 'node dim'; myT3.innerHTML = 'shipments<small>아직 없음</small>';
+        pgT2.className = 'node dim'; pgT2.innerHTML = 'orders<small>아직 없음</small>';
+        pgT3.className = 'node dim'; pgT3.innerHTML = 'shipments<small>아직 없음</small>';
+        log.className = 'status-log ok';
+        log.innerHTML = '<strong>1단계:</strong> 두 DB 모두 <code>products</code>가 있는 상태에서 권한을 부여했습니다. 양쪽 모두 <code>SELECT * FROM products;</code>에 성공합니다.';
+      } else if (step === 2) {
+        myT2.className = 'node ok'; myT2.innerHTML = 'orders<small>✅ SELECT 성공 (shop.*)</small>';
+        myT3.className = 'node dim'; myT3.innerHTML = 'shipments<small>아직 없음</small>';
+        pgT2.className = 'node err'; pgT2.innerHTML = 'orders<small>❌ permission denied</small>';
+        pgT3.className = 'node dim'; pgT3.innerHTML = 'shipments<small>아직 없음</small>';
+        log.className = 'status-log err';
+        log.innerHTML = '<strong>2단계:</strong> <code>orders</code>를 새로 만들었습니다. MySQL은 <code>shop.*</code> 와일드카드 덕분에 바로 조회되지만, PostgreSQL은 <code>ON ALL TABLES</code>가 과거 시점에만 적용되어 <code>ERROR: permission denied for table orders</code>가 발생합니다.';
+      } else {
+        myT2.className = 'node ok'; myT2.innerHTML = 'orders<small>✅ SELECT 성공</small>';
+        myT3.className = 'node ok'; myT3.innerHTML = 'shipments<small>✅ SELECT 성공</small>';
+        pgT2.className = 'node err'; pgT2.innerHTML = 'orders<small>❌ 여전히 실패 (소급 불가)</small>';
+        pgT3.className = 'node ok'; pgT3.innerHTML = 'shipments<small>✅ SELECT 성공 (DEFAULT)</small>';
+        log.className = 'status-log';
+        log.innerHTML = '<strong>3단계:</strong> PostgreSQL에 <code>ALTER DEFAULT PRIVILEGES</code>를 걸고 <code>shipments</code>를 만들었습니다. 이후 생긴 <code>shipments</code>는 자동 허용되지만, 그전에 만든 <code>orders</code>는 소급되지 않아 여전히 실패합니다.';
+      }
+    }
+
+    /* Animation 2: Flyway Ownership & SET ROLE */
+    let a2Mode = 'bad';
+    function setAnim2Mode(mode) {
+      a2Mode = mode;
+      document.getElementById('a2-mode-bad').classList.toggle('active', mode === 'bad');
+      document.getElementById('a2-mode-good').classList.toggle('active', mode === 'good');
+
+      const ownerRole = document.getElementById('a2-owner-role');
+      const rwRole = document.getElementById('a2-rw-role');
+      if (mode === 'bad') {
+        ownerRole.className = 'node dim';
+        rwRole.className = 'node dim';
+      } else {
+        ownerRole.className = 'node gold';
+        rwRole.className = 'node ok';
+      }
+
+      ['a2-t-prod', 'a2-t-ord', 'a2-t-inv'].forEach(id => {
+        document.getElementById(id).className = 'node dim';
+      });
+      document.getElementById('a2-t-prod-sub').textContent = '미생성';
+      document.getElementById('a2-t-ord-sub').textContent = '미생성';
+      document.getElementById('a2-t-inv-sub').textContent = '미생성';
+      ['a2-m1', 'a2-m2', 'a2-app'].forEach(id => document.getElementById(id).className = 'node');
+
+      const log = document.getElementById('a2-log');
+      log.className = 'status-log';
+      log.innerHTML = mode === 'bad'
+        ? '<strong>안티패턴 선택:</strong> 공유 Role 없이 로그인 계정 <code>migrator_v1</code>, <code>migrator_v2</code>가 직접 Flyway를 실행합니다. V1부터 눌러 보세요.'
+        : '<strong>정석 모드 선택:</strong> 두 계정 모두 <code>-initSql="SET ROLE app_owner;"</code>로 실행하며 <code>ALTER DEFAULT PRIVILEGES FOR ROLE app_owner</code>가 설정되어 있습니다. V1부터 눌러 보세요.';
+    }
+
+    function runAnim2Step(step) {
+      const m1 = document.getElementById('a2-m1');
+      const m2 = document.getElementById('a2-m2');
+      const app = document.getElementById('a2-app');
+      const tProd = document.getElementById('a2-t-prod');
+      const tOrd = document.getElementById('a2-t-ord');
+      const tInv = document.getElementById('a2-t-inv');
+      const log = document.getElementById('a2-log');
+
+      m1.className = 'node'; m2.className = 'node'; app.className = 'node';
+
+      if (step === 1) {
+        m1.className = 'node pulse';
+        tProd.className = 'node ok';
+        document.getElementById('a2-t-prod-sub').textContent = a2Mode === 'bad' ? 'Owner: migrator_v1' : 'Owner: app_owner';
+        log.className = 'status-log ok';
+        log.innerHTML = a2Mode === 'bad'
+          ? '<strong>V1 완료:</strong> <code>products</code>가 생성되었지만 소유자가 개인 계정 <code>migrator_v1</code>으로 고정되었습니다.'
+          : '<strong>V1 완료:</strong> <code>SET ROLE app_owner;</code> 덕분에 <code>products</code> 소유자가 <code>app_owner</code>로 통일되었습니다.';
+      } else if (step === 2) {
+        m1.className = 'node ok';
+        app.className = a2Mode === 'bad' ? 'node err' : 'node ok';
+        tProd.className = 'node ok';
+        document.getElementById('a2-t-prod-sub').textContent = a2Mode === 'bad' ? 'Owner: migrator_v1' : 'Owner: app_owner';
+        tOrd.className = a2Mode === 'bad' ? 'node err' : 'node ok';
+        document.getElementById('a2-t-ord-sub').textContent = a2Mode === 'bad'
+          ? 'Owner: migrator_v1 · app_user ❌ permission denied'
+          : 'Owner: app_owner · app_user ✅ SELECT/INSERT 성공';
+        log.className = a2Mode === 'bad' ? 'status-log err' : 'status-log ok';
+        log.innerHTML = a2Mode === 'bad'
+          ? '<strong>V2 장애 발생:</strong> <code>orders</code>가 생성되었지만 기본 권한이 없어 <code>app_user</code>가 <code>ERROR: permission denied for table orders</code>를 만납니다.'
+          : '<strong>V2 성공:</strong> <code>ALTER DEFAULT PRIVILEGES FOR ROLE app_owner</code>가 자동 작동해 <code>app_user</code>가 즉시 <code>orders</code>를 읽고 씁니다.';
+      } else {
+        m2.className = a2Mode === 'bad' ? 'node err' : 'node ok';
+        tProd.className = a2Mode === 'bad' ? 'node err' : 'node ok';
+        document.getElementById('a2-t-prod-sub').textContent = a2Mode === 'bad'
+          ? 'Owner: migrator_v1 (migrator_v2 거부!)'
+          : 'Owner: app_owner (+ stock 컬럼 추가됨)';
+        tInv.className = a2Mode === 'bad' ? 'node err' : 'node ok';
+        document.getElementById('a2-t-inv-sub').textContent = a2Mode === 'bad'
+          ? '❌ 트랜잭션 DDL 롤백으로 취소됨'
+          : '✅ Owner: app_owner (성공)';
+        log.className = a2Mode === 'bad' ? 'status-log err' : 'status-log ok';
+        log.innerHTML = a2Mode === 'bad'
+          ? '<strong>V3 장애 &amp; 자동 롤백:</strong> <code>migrator_v2</code>가 <code>ALTER TABLE products</code>를 시도하다 <code>ERROR: must be owner of table products</code>로 실패했고, 앞선 <code>CREATE TABLE inventory_logs</code>도 원자적으로 롤백되었습니다.'
+          : '<strong>V3 성공:</strong> <code>migrator_v2</code>도 <code>SET ROLE app_owner;</code>로 동작하므로 <code>products</code> 소유권 검사를 통과해 <code>inventory_logs</code>와 <code>stock</code> 컬럼이 모두 정상 반영되었습니다.';
+      }
+    }
+
+    /* Animation 3: Blue/Green Password Rotation */
+    function setAnim3(step) {
+      [1, 2, 3, 4].forEach(i => document.getElementById(`a3-b${i}`).classList.toggle('active', i === step));
+      const appSub = document.getElementById('a3-app-sub');
+      const blue = document.getElementById('a3-blue');
+      const blueSub = document.getElementById('a3-blue-sub');
+      const green = document.getElementById('a3-green');
+      const greenSub = document.getElementById('a3-green-sub');
+      const log = document.getElementById('a3-log');
+
+      if (step === 1) {
+        appSub.textContent = '접속 계정: app_blue';
+        blue.className = 'node ok'; blueSub.textContent = '구 비밀번호 · 소유 객체 0개';
+        green.className = 'node dim'; greenSub.textContent = '아직 미생성';
+        log.className = 'status-log ok';
+        log.innerHTML = '<strong>1단계:</strong> <code>app_blue</code>가 <code>app_rw</code> 권한을 상속받아 서비스를 처리 중입니다. <code>app_blue</code> 자체에는 직접 <code>GRANT</code>나 소유 테이블이 하나도 없습니다.';
+      } else if (step === 2) {
+        appSub.textContent = '접속 계정: app_blue (유지 중)';
+        blue.className = 'node ok'; blueSub.textContent = '구 비밀번호 · 정상 동작';
+        green.className = 'node pulse'; greenSub.textContent = '신 비밀번호 · GRANT app_rw 완료';
+        log.className = 'status-log';
+        log.innerHTML = '<strong>2단계:</strong> <code>CREATE ROLE app_green LOGIN PASSWORD ...; GRANT app_rw TO app_green;</code> 두 줄로 새 계정이 기존과 100% 동일한 권한을 갖습니다.';
+      } else if (step === 3) {
+        appSub.textContent = '접속 계정: app_green (무중단 전환 완료)';
+        blue.className = 'node gold'; blueSub.textContent = 'ALTER ROLE app_blue NOLOGIN (대기)';
+        green.className = 'node ok'; greenSub.textContent = '신 비밀번호 · 트래픽 정상 처리 중';
+        log.className = 'status-log ok';
+        log.innerHTML = '<strong>3단계:</strong> 애플리케이션 시크릿을 <code>app_green</code>으로 롤링 배포합니다. 전환 중에도 <code>app_blue</code> 기존 세션이 끊기지 않아 무중단으로 넘어갑니다.';
+      } else {
+        appSub.textContent = '접속 계정: app_green (정상 운영)';
+        blue.className = 'node dim'; blueSub.textContent = '✅ DROP ROLE app_blue 즉시 삭제됨';
+        green.className = 'node ok'; greenSub.textContent = '신 비밀번호 · 소유 객체 0개';
+        log.className = 'status-log ok';
+        log.innerHTML = '<strong>4단계:</strong> <code>DROP ROLE app_blue;</code>가 <code>REASSIGN OWNED</code>나 <code>DROP OWNED</code> 없이 <strong>한 번에 성공</strong>합니다. 다음 로테이션 때는 반대로 <code>app_blue</code>를 다시 생성합니다.';
+      }
+    }
+
+    /* Self-check quiz */
+    const quizExplanations = {
+      1: '정답입니다! PostgreSQL의 GRANT ... ON ALL TABLES는 실행 시점에 존재하는 테이블에만 적용됩니다. 미래 테이블은 ALTER DEFAULT PRIVILEGES로 따로 설정해야 합니다.',
+      2: '정답입니다! PostgreSQL에서 ALTER TABLE과 DROP TABLE은 GRANT ALL로 위임할 수 없으며, 오직 객체 소유자(또는 소유자 Role 멤버)만 실행할 수 있습니다.',
+      3: '정답입니다! REASSIGN OWNED로 소유권을 먼저 안전한 그룹 Role에 넘긴 뒤 DROP OWNED로 잔여 권한만 회수해야 데이터 손실 없이 DROP ROLE할 수 있습니다.'
+    };
+    function checkQuiz(qNum, isCorrect, btnEl) {
+      const fb = document.getElementById(`qf-${qNum}`);
+      fb.style.display = 'block';
+      if (isCorrect) {
+        fb.style.color = '#34d399';
+        fb.textContent = '✅ ' + quizExplanations[qNum];
+      } else {
+        fb.style.color = '#fb7185';
+        fb.textContent = '❌ 다시 생각해 보세요. PostgreSQL RBAC의 시점 고정 권한과 소유권 규칙을 떠올려 보세요.';
+      }
+    }
+  </script>
+</body>
+</html>
