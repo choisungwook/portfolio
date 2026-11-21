@@ -57,7 +57,22 @@ test('LLM indexer stores session summary and applies ADD, UPDATE, and NOOP witho
     assert.equal(search(s, 'us-east-1', { project: 'app' }).length, 0)
     assert.equal(search(s, 'us-east-1', { project: 'app', includeInvalid: true }).length, 1)
     assert.match(search(s, 'ap-northeast-2', { project: 'app' })[0].content, /ap-northeast-2/)
-    assert.equal(search(s, 'Other project secret', { project: 'other' }).length, 1)
+    // Re-running without force skips even after ADD/UPDATE notes were inserted.
+    let calls = 0
+    const skipped = await indexSession(s, 's1', { callModel: async () => { calls++; return '{}' } })
+    assert.equal(skipped.skipped, true)
+    assert.equal(calls, 0)
+
+    // Forced re-indexing with identical summary keeps the summary valid (no digest collision loss).
+    const same = await indexSession(s, 's1', {
+      force: true,
+      callModel: async () => JSON.stringify({
+        summary: 'Moved app deployment region to ap-northeast-2 and scheduled daily WAL backups.',
+        actions: [],
+      }),
+    })
+    assert.equal(same.summaryId, result.summaryId)
+    assert.equal(sessionMemories(s, 's1').filter((m) => m.kind === 'summary' && m.valid_until === null).length, 1)
   } finally {
     s.db.close()
   }

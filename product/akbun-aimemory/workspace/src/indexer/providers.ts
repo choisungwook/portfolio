@@ -19,17 +19,22 @@ const EFFORT_BUDGET: Record<IndexerConfig['effort'], number> = {
   high: 4096,
 }
 
+function apiEndpoint(baseUrl: string, path: string): string {
+  const clean = baseUrl.replace(/\/+$/, '')
+  return clean.endsWith('/v1') ? `${clean}${path}` : `${clean}/v1${path}`
+}
+
 export async function callClaude(prompt: string, config: IndexerConfig): Promise<string> {
   const apiKey = process.env.ANTHROPIC_API_KEY
   if (!apiKey) throw new Error('ANTHROPIC_API_KEY is not set')
-  const base = (process.env.ANTHROPIC_BASE_URL || 'https://api.anthropic.com').replace(/\/+$/, '')
+  const url = apiEndpoint(process.env.ANTHROPIC_BASE_URL || 'https://api.anthropic.com', '/messages')
   const body: Record<string, unknown> = {
     model: config.model,
     max_tokens: EFFORT_BUDGET[config.effort] ?? 1024,
     system: SYSTEM_PROMPT,
     messages: [{ role: 'user', content: prompt }],
   }
-  const res = await fetch(`${base}/v1/messages`, {
+  const res = await fetch(url, {
     method: 'POST',
     headers: {
       'content-type': 'application/json',
@@ -49,7 +54,7 @@ export async function callClaude(prompt: string, config: IndexerConfig): Promise
 export async function callOpenAI(prompt: string, config: IndexerConfig): Promise<string> {
   const apiKey = process.env.OPENAI_API_KEY
   if (!apiKey) throw new Error('OPENAI_API_KEY is not set')
-  const base = (process.env.OPENAI_BASE_URL || 'https://api.openai.com').replace(/\/+$/, '')
+  const url = apiEndpoint(process.env.OPENAI_BASE_URL || 'https://api.openai.com', '/chat/completions')
   const body: Record<string, unknown> = {
     model: config.model,
     response_format: { type: 'json_object' },
@@ -59,7 +64,7 @@ export async function callOpenAI(prompt: string, config: IndexerConfig): Promise
     ],
   }
   if (/^(o[1-9]|gpt-5)/i.test(config.model)) body.reasoning_effort = config.effort
-  const res = await fetch(`${base}/v1/chat/completions`, {
+  const res = await fetch(url, {
     method: 'POST',
     headers: {
       'content-type': 'application/json',

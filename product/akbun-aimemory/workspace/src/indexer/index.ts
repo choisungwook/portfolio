@@ -2,7 +2,7 @@ import { spawn } from 'node:child_process'
 import { createHash } from 'node:crypto'
 import { basename, join } from 'node:path'
 import type { Config } from '../config.ts'
-import { addMemory, invalidateMemory, recent, search, sessionMemories, type Memory, type Store } from '../store.ts'
+import { addMemory, invalidateMemory, recent, search, sessionMemories, type Kind, type Memory, type Store } from '../store.ts'
 import { defaultModelCaller, type ModelCaller } from './providers.ts'
 
 export type IndexerAction =
@@ -26,18 +26,27 @@ export interface IndexSessionResult {
 
 const MAX_OBSERVATION_CHARS = 8000
 const MAX_CANDIDATES = 20
+const RAW_OBSERVATION_KINDS = new Set<Kind>(['prompt', 'tool', 'response'])
+
+function parseJsonObject(raw: string): Record<string, unknown> {
+  const trimmed = raw.trim()
+  try {
+    const direct = JSON.parse(trimmed) as unknown
+    if (direct && typeof direct === 'object' && !Array.isArray(direct)) return direct as Record<string, unknown>
+  } catch { /* try stripping outer code fence or extracting outermost JSON object */ }
+  const unfenced = trimmed.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/, '').trim()
+  const firstBrace = unfenced.indexOf('{')
+  const lastBrace = unfenced.lastIndexOf('}')
+  if (firstBrace < 0 || lastBrace <= firstBrace) throw new Error('indexer output did not contain a JSON object')
+  const parsed = JSON.parse(unfenced.slice(firstBrace, lastBrace + 1)) as unknown
+  if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
+    throw new Error('indexer output must be a JSON object')
+  }
+  return parsed as Record<string, unknown>
+}
 
 export function parseIndexerOutput(raw: string): IndexerOutput {
-  const trimmed = raw.trim()
-  const fenced = trimmed.match(/```(?:json)?\s*([\s\S]*?)```/i)
-  const candidate = fenced ? fenced[1].trim() : trimmed
-  const firstBrace = candidate.indexOf('{')
-  const lastBrace = candidate.lastIndexOf('}')
-  if (firstBrace < 0 || lastBrace <= firstBrace) throw new Error('indexer output did not contain a JSON object')
-  const parsed = JSON.parse(candidate.slice(firstBrace, lastBrace + 1)) as {
-    summary?: unknown
-    actions?: unknown
-  }
+  const parsed = parseJsonObject(raw)
   const summary = typeof parsed.summary === 'string' ? parsed.summary.trim() : ''
   const actions: IndexerAction[] = []
   if (Array.isArray(parsed.actions)) {
@@ -76,22 +85,27 @@ function buildPrompt(observations: Memory[], existing: Memory[]): string {
   ].join('\n')
 }
 
+// Prioritize semantic/lexical search hits first so relevant older facts are never crowded out by recent items.
 function gatherExisting(s: Store, sessionId: string, project: string, observations: Memory[]): Memory[] {
   const seen = new Map<number, Memory>()
-  for (const m of recent(s, { project: project || undefined, limit: MAX_CANDIDATES })) {
-    if (m.session_id !== sessionId) seen.set(m.id, m)
-  }
   const seedQuery = observations
-    .filter((m) => m.kind === 'prompt' || m.kind === 'response' || m.kind === 'note')
+    .filter((m) => m.kind === 'prompt' || m.kind === 'response')
     .slice(-3)
     .map((m) => m.content.slice(0, 120))
     .join(' ')
   if (seedQuery.trim()) {
     for (const h of search(s, seedQuery, { project: project || undefined, limit: MAX_CANDIDATES, recordAccess: false })) {
       if (h.session_id !== sessionId && !seen.has(h.id)) seen.set(h.id, h)
+      if (seen.size >= MAX_CANDIDATES) break
     }
   }
-  return [...seen.values()].slice(0, MAX_CANDIDATES)
+  if (seen.size < MAX_CANDIDATES) {
+    for (const m of recent(s, { project: project || undefined, limit: MAX_CANDIDATES })) {
+      if (m.session_id !== sessionId && !seen.has(m.id)) seen.set(m.id, m)
+      if (seen.size >= MAX_CANDIDATES) break
+    }
+  }
+  return [...seen.values()]
 }
 
 export async function indexSession(
@@ -103,7 +117,8 @@ export async function indexSession(
     return { skipped: true, summaryId: null, added: 0, updated: 0, noop: 0 }
   }
   const allRows = sessionMemories(s, sessionId)
-  const observations = allRows.filter((m) => m.kind !== 'summary')
+  // Only raw observations feed the summarizer and fingerprint; indexer-created notes and summaries must not re-trigger it.
+  const observations = allRows.filter((m) => RAW_OBSERVATION_KINDS.has(m.kind))
   if (observations.length === 0) {
     return { skipped: true, summaryId: null, added: 0, updated: 0, noop: 0 }
   }
@@ -143,34 +158,65 @@ export async function indexSession(
   let updated = 0
   let noop = 0
 
-  if (output.summary) {
-    // Supersede any earlier summary for the same session without deleting raw observations.
-    const oldSummaries = allRows.filter((m) => m.kind === 'summary' && m.valid_until === null)
-    const now = Date.now()
-    for (const old of oldSummaries) invalidateMemory(s, old.id, now)
-    summaryId = addMemory(s, {
-      session_id: sessionId,
-      agent,
-      project,
-      kind: 'summary',
-      content: output.summary,
-    })
-  }
-
-  for (const action of output.actions) {
-    if (action.op === 'ADD') {
-      if (addMemory(s, { session_id: sessionId, agent, project, kind: 'note', content: action.content }) !== null) added++
-    } else if (action.op === 'UPDATE') {
-      if (!allowedTargets.has(action.target_id)) continue
-      invalidateMemory(s, action.target_id)
-      addMemory(s, { session_id: sessionId, agent, project, kind: 'note', content: action.content })
-      updated++
-    } else if (action.op === 'NOOP') {
-      noop++
+  // Commit summary and actions inside BEGIN IMMEDIATE so overlapping Stop/SessionEnd workers cannot leave duplicate valid summaries.
+  s.db.exec('BEGIN IMMEDIATE')
+  try {
+    if (!opts.force) {
+      const prev = s.db.prepare('SELECT value FROM meta WHERE key = ?').get(metaKey) as { value: string } | undefined
+      if (prev?.value === fingerprint) {
+        s.db.exec('COMMIT')
+        return { skipped: true, summaryId: null, added: 0, updated: 0, noop: 0 }
+      }
     }
+
+    if (output.summary) {
+      const now = Date.now()
+      const currentSummaries = sessionMemories(s, sessionId).filter((m) => m.kind === 'summary')
+      const exactExisting = currentSummaries.find((m) => m.content === output.summary)
+      for (const old of currentSummaries) {
+        if (exactExisting && old.id === exactExisting.id) continue
+        if (old.valid_until === null) invalidateMemory(s, old.id, now)
+      }
+      if (exactExisting) {
+        // Keep or re-activate the existing identical summary rather than colliding on unique digest.
+        if (exactExisting.valid_until !== null) {
+          s.db.prepare('UPDATE memories SET valid_until = NULL, created_at = ? WHERE id = ?').run(now, exactExisting.id)
+        }
+        summaryId = exactExisting.id
+      } else {
+        summaryId = addMemory(s, {
+          session_id: sessionId,
+          agent,
+          project,
+          kind: 'summary',
+          content: output.summary,
+        })
+      }
+    }
+
+    for (const action of output.actions) {
+      if (action.op === 'ADD') {
+        if (addMemory(s, { session_id: sessionId, agent, project, kind: 'note', content: action.content }) !== null) added++
+      } else if (action.op === 'UPDATE') {
+        if (!allowedTargets.has(action.target_id)) continue
+        const inserted = addMemory(s, { session_id: sessionId, agent, project, kind: 'note', content: action.content })
+        if (inserted !== null) {
+          invalidateMemory(s, action.target_id)
+          allowedTargets.delete(action.target_id)
+          updated++
+        }
+      } else if (action.op === 'NOOP') {
+        noop++
+      }
+    }
+
+    s.db.prepare('INSERT OR REPLACE INTO meta (key, value) VALUES (?, ?)').run(metaKey, fingerprint)
+    s.db.exec('COMMIT')
+  } catch (error) {
+    s.db.exec('ROLLBACK')
+    throw error
   }
 
-  s.db.prepare('INSERT OR REPLACE INTO meta (key, value) VALUES (?, ?)').run(metaKey, fingerprint)
   return { summaryId, added, updated, noop }
 }
 
