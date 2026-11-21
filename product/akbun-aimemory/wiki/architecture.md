@@ -48,6 +48,10 @@ One file, `$AIMEMORY_HOME/data/aimemory.db` (`src/store.ts`).
 | `DELETE /api/ca-bundle` | Remove the imported CA bundle |
 | `GET /api/export` | Download a backup |
 
+## MCP server
+
+`src/mcp/server.ts`, started with `aimem mcp` over stdio (`@modelcontextprotocol/sdk`). Exposes `search`, `recent`, `show_session`, and `add_note` with responses matching CLI `--json` (including `degraded: true` spool fallback on `search`). Delete is omitted so only humans delete memories.
+
 ## Planned directories
 
 Each directory holds only a README until its issue is done.
@@ -56,5 +60,4 @@ Each directory holds only a README until its issue is done.
 |---|---|
 | `workspace/desktop/` | Tauri desktop app (#1592) |
 | `workspace/scripts/` | Binary build for release (#1593) |
-| `workspace/src/mcp/` | MCP server (#1594) |
 | `workspace/src/install/` | Hook installation and akbun-taskq integration (#1598) |
