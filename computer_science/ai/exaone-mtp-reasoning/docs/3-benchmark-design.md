@@ -104,19 +104,21 @@ reasoning off라면 응답에 추론 과정 없이 바로 답이 나와야 합�
 
 ### 3. 자연 프롬프트로 수용률 측정
 
-`data/natural-prompts.jsonl`은 블로그 실험과 같은 다섯 범주(한국어 대화, 영어 대화, 코드 리뷰, 문서 요약, 코드 생성)의 프롬프트입니다. 출력 길이를 고정하지 않고 모델이 EOS에서 멈추게 합니다.
+`data/natural-prompts.jsonl`은 블로그 실험과 같은 다섯 범주(한국어 대화, 영어 대화, 코드 리뷰, 문서 요약, 코드 생성)의 프롬프트입니다. 블로그와 같이 요청당 최대 400토큰으로 자르고, 그 안에서는 모델이 EOS에서 멈추게 합니다.
 
 ```bash
 guidellm run \
-  --backend '{"kind":"openai_http","target":"http://localhost:8001","model":"LGAI-EXAONE/EXAONE-4.5-33B-FP8","extras":{"body":{"ignore_eos":false,"chat_template_kwargs":{"enable_thinking":false}}}}' \
+  --backend '{"kind":"openai_http","target":"http://localhost:8001","model":"LGAI-EXAONE/EXAONE-4.5-33B-FP8","extras":{"body":{"max_tokens":400,"ignore_eos":false,"chat_template_kwargs":{"enable_thinking":false}}}}' \
   --profile kind=synchronous \
   --data kind=json_file,path=data/natural-prompts.jsonl \
-  --constraint kind=max_requests,count=20 \
+  --constraint kind=max_requests,count=5 \
   --output kind=json,path=results/mtp-on-think-off-natural.json
 ```
 
 - `--profile kind=synchronous`는 요청을 하나씩 보냅니다. batch 효과를 빼고 수용률만 보려는 설정입니다.
+- GuideLLM은 데이터셋을 반복하지 않으므로 5줄 파일은 `count`를 크게 줘도 5건에서 멈춥니다. 프롬프트마다 여러 번 재려면 파일을 이어 붙여 늘립니다(`cat data/natural-prompts.jsonl{,,,} > data/natural-x4.jsonl`).
 - `ignore_eos`는 GuideLLM이 출력 길이를 지정할 때 기본으로 `true`를 붙입니다. EOS 뒤에 억지로 생성한 토큰은 실제 답변과 분포가 달라 수용률을 왜곡하므로, 수용률 측정에서는 `false`로 덮어씁니다.
+- reasoning on에서는 400토큰 대부분이 think 블록에 쓰일 수 있습니다. 블로그 조건과 맞추려는 상한이므로, 답변 구간의 수용률을 따로 보려면 상한을 늘립니다.
 
 측정 전후로 MTP 서버의 `/metrics`를 저장하고, speculative decoding의 accepted tokens 카운터 증가량을 draft tokens 카운터 증가량으로 나누면 이 구간의 수용률입니다. 카운터 이름은 vLLM 버전마다 다르므로 `spec_decode`로 찾습니다.
 
