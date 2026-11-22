@@ -11,6 +11,13 @@ export interface SandboxConfig {
   allowWrite: string[]
 }
 
+export interface AimemoryConfig {
+  enabled: boolean
+  command: string
+  args?: string[]
+  home?: string
+}
+
 // The resident bots (the code calls them the team). They always run with taskq; Pause in the menu is what
 // stops them. An old config's bots.enabled is ignored.
 export interface BotsConfig {
@@ -28,6 +35,7 @@ export interface BotsConfig {
   bedrockProfile: string       // OpenAI bots on Amazon Bedrock: an AWS profile (SSO works) whose short-term credentials sign a token; '' uses AWS_BEARER_TOKEN_BEDROCK
   codexPath: string            // OpenAI bots on the ChatGPT plan: the Codex CLI to run
   kiroPath: string             // Kiro bots: the kiro-cli to run
+  aimemory: AimemoryConfig     // optional akbun-aimemory CLI integration for bot memory tools
 }
 
 export interface Config {
@@ -75,6 +83,7 @@ export const DEFAULTS: Omit<Config, 'home'> = {
     maxConcurrentTurns: 2, turnMaxTurns: 30,
     maxOpenTasks: 10, maxAttempts: 3, readRoots: [],
     openaiInputPerMTok: 1.25, openaiOutputPerMTok: 10, bedrockRegion: 'us-west-2', bedrockProfile: '', codexPath: 'codex', kiroPath: 'kiro-cli',
+    aimemory: { enabled: false, command: 'aimem' },
   },
 }
 
@@ -85,7 +94,11 @@ export function resolveConfig(home: string, overrides: Partial<Config> = {}): Co
   return {
     ...DEFAULTS, home, ...overrides,
     sandbox: { ...DEFAULTS.sandbox, ...overrides.sandbox },
-    bots: { ...DEFAULTS.bots, ...overrides.bots },
+    bots: {
+      ...DEFAULTS.bots,
+      ...overrides.bots,
+      aimemory: { ...DEFAULTS.bots.aimemory, ...overrides.bots?.aimemory },
+    },
   }
 }
 

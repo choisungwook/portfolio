@@ -378,6 +378,7 @@ user --bot chat / taskq bots say--> team_messages --hub--> bot turn (resumed Cla
 | `list_tasks`, `get_task` | read tasks and their last run |
 | `wiki_list`, `wiki_search`, `wiki_read`, `wiki_write` | the shared wiki |
 | `memory_write` | replace or append to the bot's own memory, which is appended to its system prompt every turn (16,000 characters at most) |
+| `aimemory_search`, `aimemory_add` | optional when `bots.aimemory.enabled` is true: call `aimem search --json` and `aimem add --json` to read and store cross-session memory |
 | `write_handover` | only after taskq said the conversation is ending: save the note the bot's next session starts from (7,500 characters at most) |
 | `taskq_info` | which taskq the bot runs inside: app, version, home, the manual path of this version and the built-in skill folder |
 | `list_workflows` | the workflows (name, steps) and the bot's own runs still going |

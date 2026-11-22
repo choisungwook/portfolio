@@ -10,6 +10,7 @@
 
 | 버전 | 해설 | 첫 항목 |
 |---|---|---|
+| [0.41.0](0.41.0/changelog.md) | [learning](0.41.0/learning_changelog.md) | `bots.aimemory` 옵션으로 bot이 `aimem search`/`aimem add`를 호출해 장기 메모리를 조회·기록한다. |
 | [0.40.1](0.40.1/changelog.md) | [learning](0.40.1/learning_changelog.md) | ↑로 불러온 메시지를 고친 뒤 다시 ↑를 눌러도 고친 내용이 사라지지 않는다. |
 | [0.40.0](0.40.0/changelog.md) | [learning](0.40.0/learning_changelog.md) | 초안에 담당 bot을 정해도 bot이 일하지 않고, 대화에 할당 알림만 남는다. |
 | [0.39.1](0.39.1/changelog.md) | [learning](0.39.1/learning_changelog.md) | 사용자에게 보이는 동작은 바뀌지 않았다. |

@@ -4,13 +4,35 @@ import type { Config } from './config.ts'
 import { spawnBackgroundIndex } from './indexer/index.ts'
 import { addMemory, endSession, openStore, search, type Kind, type Memory, type MemoryInput, type Store } from './store.ts'
 
-// Hook payloads differ per agent (Claude Code, Codex, Kiro, Antigravity), but all send JSON on stdin with a session id,
-// a working directory and an event name. Unknown agents fall back to the same field guesses.
+// Hook payloads differ per agent:
+// - Claude Code / Codex / Kiro: snake_case (`session_id`, `hook_event_name`, `cwd`, `prompt`, `tool_name`, `tool_input`, `tool_response`, `last_assistant_message`).
+// - Antigravity: camelCase (`conversationId`, `hookEventName`, `cwd`/`workspacePaths`, `lastUserInput`, `toolCall: { id, name, args }`, `error`).
 export interface HookPayload {
-  session_id?: string; sessionId?: string; conversation_id?: string
-  cwd?: string; hook_event_name?: string; event?: string
-  prompt?: string; message?: string; last_assistant_message?: string
-  tool_name?: string; tool_input?: unknown; tool_response?: unknown
+  session_id?: string
+  sessionId?: string
+  conversation_id?: string
+  conversationId?: string
+  cwd?: string
+  workspacePaths?: string[]
+  hook_event_name?: string
+  hookEventName?: string
+  event?: string
+  prompt?: string
+  message?: string
+  lastUserInput?: string
+  last_assistant_message?: string
+  tool_name?: string
+  tool_input?: unknown
+  tool_response?: unknown
+  toolCall?: { id?: string; name?: string; args?: unknown }
+  error?: string
+  turn_id?: string
+  tool_use_id?: string
+  model?: string
+  modelName?: string
+  transcript_path?: string | null
+  transcriptPath?: string
+  terminationReason?: string
 }
 
 export type HookEvent = 'start' | 'prompt' | 'tool' | 'stop' | 'end' | 'other'
@@ -19,23 +41,50 @@ const TOOL_LIMIT = 2000
 export function normalizeEvent(name = ''): HookEvent {
   const n = name.toLowerCase().replace(/[^a-z]/g, '')
   if (n === 'sessionstart' || n === 'agentspawn') return 'start'
-  if (n.includes('prompt')) return 'prompt'
+  if (n.includes('prompt') || n === 'preinvocation') return 'prompt'
   if (n === 'posttooluse' || n === 'aftertool') return 'tool'
   if (n === 'stop' || n === 'subagentstop') return 'stop'
   if (n === 'sessionend') return 'end'
   return 'other'
 }
 
+export function extractSessionId(p: HookPayload): string | undefined {
+  return p.session_id ?? p.sessionId ?? p.conversation_id ?? p.conversationId
+}
+
+export function extractCwd(p: HookPayload): string | undefined {
+  return p.cwd ?? p.workspacePaths?.[0]
+}
+
+export function extractEventName(p: HookPayload): string | undefined {
+  return p.hook_event_name ?? p.hookEventName ?? p.event
+}
+
 export function toMemory(agent: string, p: HookPayload): MemoryInput | null {
-  const session_id = p.session_id ?? p.sessionId ?? p.conversation_id ?? 'unknown'
-  const project = p.cwd ? basename(p.cwd) : ''
+  const session_id = extractSessionId(p) ?? 'unknown'
+  const cwd = extractCwd(p)
+  const project = cwd ? basename(cwd) : ''
   const base = { session_id, agent, project }
   const kindContent = ((): [Kind, string] | null => {
-    switch (normalizeEvent(p.hook_event_name ?? p.event)) {
-      case 'prompt': return p.prompt ?? p.message ? ['prompt', p.prompt ?? p.message!] : null
-      case 'tool': return p.tool_name ? ['tool', `${p.tool_name}: ${JSON.stringify(p.tool_input ?? {})}\n${JSON.stringify(p.tool_response ?? '')}`.slice(0, TOOL_LIMIT)] : null
-      case 'stop': return p.last_assistant_message ? ['response', p.last_assistant_message] : null
-      default: return null
+    switch (normalizeEvent(extractEventName(p))) {
+      case 'prompt': {
+        const text = p.prompt ?? p.message ?? p.lastUserInput
+        return text ? ['prompt', text] : null
+      }
+      case 'tool': {
+        const toolName = p.tool_name ?? p.toolCall?.name
+        if (!toolName) return null
+        const toolInput = p.tool_input ?? p.toolCall?.args ?? {}
+        const toolResponse = p.tool_response !== undefined
+          ? p.tool_response
+          : (p.error ? { error: p.error } : '')
+        const responseStr = typeof toolResponse === 'string' ? toolResponse : JSON.stringify(toolResponse)
+        return ['tool', `${toolName}: ${JSON.stringify(toolInput)}\n${responseStr}`.slice(0, TOOL_LIMIT)]
+      }
+      case 'stop':
+        return p.last_assistant_message ? ['response', p.last_assistant_message] : null
+      default:
+        return null
     }
   })()
   return kindContent ? { ...base, kind: kindContent[0], content: kindContent[1] } : null
@@ -123,7 +172,7 @@ export const spoolPath = (config: Config) => join(config.home, 'spool.jsonl')
 export function spool(config: Config, agent: string, payload: HookPayload, error: unknown): void {
   try {
     mkdirSync(config.home, { recursive: true })
-    appendFileSync(spoolPath(config), JSON.stringify({ agent, payload, at: Date.now() }) + '\n')
+    appendFileSync(spoolPath(config), `${JSON.stringify({ agent, payload, at: Date.now() })}\n`)
   } catch { /* nowhere left to write; stderr below is the last resort */ }
   process.stderr.write(`aimem: memory store unavailable, spooled (${error instanceof Error ? error.message : String(error)})\n`)
 }
@@ -144,7 +193,7 @@ export function drainSpool(s: Store): number {
       try {
         const m = toMemory(entry.agent, entry.payload)
         if (m && addMemory(s, { ...m, created_at: entry.at }) !== null) n++
-      } catch { appendFileSync(file, line + '\n') }
+      } catch { appendFileSync(file, `${line}\n`) }
     }
     rmSync(path)
   }
@@ -165,26 +214,42 @@ export function searchSpool(config: Config, query: string): { content: string; k
   })
 }
 
+function formatHookOutput(agent: string, event: HookEvent, ctx: string): string {
+  if (agent === 'antigravity') {
+    if (event === 'start' && ctx) {
+      return `${JSON.stringify({ injectSteps: [{ systemMessage: { systemMessage: ctx } }] })}\n`
+    }
+    return '{}\n'
+  }
+  return event === 'start' ? ctx : ''
+}
+
 // Returns what to print on stdout. Never throws.
 export function runHook(config: Config, agent: string, raw: string): string {
   let payload: HookPayload
-  try { payload = raw.trim() ? JSON.parse(raw) : {} } catch { process.stderr.write('aimem: hook input is not JSON, ignored\n'); return '' }
+  try { payload = raw.trim() ? JSON.parse(raw) : {} } catch {
+    process.stderr.write('aimem: hook input is not JSON, ignored\n')
+    return agent === 'antigravity' ? '{}\n' : ''
+  }
   let s: Store | undefined
   let shouldIndexSession: string | undefined
   try {
     s = openStore(config)
     drainSpool(s)
-    const event = normalizeEvent(payload.hook_event_name ?? payload.event)
-    const id = payload.session_id ?? payload.sessionId ?? payload.conversation_id
-    if (event === 'start') return contextText(s, payload.cwd ? basename(payload.cwd) : '')
+    const event = normalizeEvent(extractEventName(payload))
+    const id = extractSessionId(payload)
+    if (event === 'start') {
+      const cwd = extractCwd(payload)
+      return formatHookOutput(agent, event, contextText(s, cwd ? basename(cwd) : ''))
+    }
     if (event === 'end' && id) endSession(s, id)
     const m = toMemory(agent, payload)
     if (m) addMemory(s, m)
     if ((event === 'stop' || event === 'end') && id) shouldIndexSession = id
-    return ''
+    return formatHookOutput(agent, event, '')
   } catch (error) {
     spool(config, agent, payload, error)
-    return ''
+    return agent === 'antigravity' ? '{}\n' : ''
   } finally {
     try { s?.db.close() } catch { /* already broken */ }
     if (shouldIndexSession) spawnBackgroundIndex(config, shouldIndexSession)

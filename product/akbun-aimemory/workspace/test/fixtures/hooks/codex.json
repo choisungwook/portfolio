@@ -1,0 +1,40 @@
+[
+  {
+    "session_id": "codex-thread-001",
+    "transcript_path": "/Users/dev/.codex/sessions/codex-thread-001.json",
+    "cwd": "/workspace/payments",
+    "hook_event_name": "SessionStart",
+    "model": "gpt-5.5",
+    "source": "startup"
+  },
+  {
+    "session_id": "codex-thread-001",
+    "transcript_path": "/Users/dev/.codex/sessions/codex-thread-001.json",
+    "cwd": "/workspace/payments",
+    "hook_event_name": "UserPromptSubmit",
+    "model": "gpt-5.5",
+    "turn_id": "turn-1",
+    "prompt": "Fix the idempotency key header validation in checkout"
+  },
+  {
+    "session_id": "codex-thread-001",
+    "transcript_path": "/Users/dev/.codex/sessions/codex-thread-001.json",
+    "cwd": "/workspace/payments",
+    "hook_event_name": "PostToolUse",
+    "model": "gpt-5.5",
+    "turn_id": "turn-1",
+    "tool_name": "Bash",
+    "tool_use_id": "tuse_9981",
+    "tool_input": { "command": "npm test" },
+    "tool_response": "All 42 tests passed successfully."
+  },
+  {
+    "session_id": "codex-thread-001",
+    "transcript_path": "/Users/dev/.codex/sessions/codex-thread-001.json",
+    "cwd": "/workspace/payments",
+    "hook_event_name": "Stop",
+    "model": "gpt-5.5",
+    "turn_id": "turn-1",
+    "last_assistant_message": "Validated idempotency keys as UUID v4 and added unit tests."
+  }
+]
