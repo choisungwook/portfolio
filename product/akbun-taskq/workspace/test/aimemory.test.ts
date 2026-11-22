@@ -1,6 +1,6 @@
 import { test, describe } from 'node:test'
 import assert from 'node:assert/strict'
-import { mkdtempSync, rmSync } from 'node:fs'
+import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { DEFAULTS } from '../src/config.ts'
@@ -8,7 +8,39 @@ import { hybridSearch } from '../src/team/search.ts'
 import { teamTools } from '../src/team/tools.ts'
 import { setup } from './helpers.ts'
 
-const AIMEM_CLI = join(import.meta.dirname, '..', '..', '..', 'akbun-aimemory', 'workspace', 'src', 'cli.ts')
+// Self-contained stub CLI so taskq tests run without requiring node_modules in any sibling product workspace.
+function writeFakeAimem(dir: string): string {
+  const script = join(dir, 'fake-aimem.mjs')
+  writeFileSync(script, `
+import { existsSync, readFileSync, writeFileSync } from 'node:fs'
+import { join } from 'node:path'
+import { parseArgs } from 'node:util'
+
+const { values, positionals } = parseArgs({
+  allowPositionals: true,
+  options: {
+    json: { type: 'boolean', default: false },
+    agent: { type: 'string' },
+    project: { type: 'string' },
+    limit: { type: 'string' },
+  },
+})
+const [cmd, ...rest] = positionals
+const dbFile = join(process.env.AIMEMORY_HOME, 'items.json')
+const items = existsSync(dbFile) ? JSON.parse(readFileSync(dbFile, 'utf8')) : []
+if (cmd === 'add') {
+  const item = { id: items.length + 1, agent: values.agent, project: values.project ?? '', content: rest.join(' ') }
+  items.push(item)
+  writeFileSync(dbFile, JSON.stringify(items))
+  process.stdout.write(JSON.stringify({ id: item.id }) + '\\n')
+} else if (cmd === 'search') {
+  const q = rest.join(' ').toLowerCase()
+  const hits = items.filter((m) => (!values.project || m.project === values.project) && m.content.toLowerCase().includes(q))
+  process.stdout.write(JSON.stringify({ degraded: false, hits }) + '\\n')
+}
+`, 'utf8')
+  return script
+}
 
 describe('aimemory integration in taskq bot memory tools', () => {
   test('omits aimemory tools when bots.aimemory.enabled is false (default)', () => {
@@ -22,12 +54,13 @@ describe('aimemory integration in taskq bot memory tools', () => {
     }
   })
 
-  test('calls aimem add and aimem search when bots.aimemory.enabled is true', async () => {
+  test('calls aimem add and aimem search cleanly, including inputs starting with dashes', async () => {
     const aimemHome = mkdtempSync(join(tmpdir(), 'taskq-aimem-'))
+    const fakeCli = writeFakeAimem(aimemHome)
     const env = setup({
       bots: {
         ...DEFAULTS.bots,
-        aimemory: { enabled: true, command: process.execPath, args: [AIMEM_CLI], home: aimemHome },
+        aimemory: { enabled: true, command: process.execPath, args: [fakeCli], home: aimemHome },
       },
     })
     try {
@@ -36,14 +69,14 @@ describe('aimemory integration in taskq bot memory tools', () => {
       const searchTool = tools.find((t) => t.name === 'aimemory_search')
       assert.ok(addTool && searchTool)
 
-      const added = await addTool.handler({ text: 'Taskq bot shared decision: deploy on Tuesday', project: 'ops' })
+      const added = await addTool.handler({ text: '- deploy on Tuesday with --noEmit', project: 'ops' })
       assert.equal(typeof added.id, 'number')
 
-      const found = await searchTool.handler({ query: 'deploy Tuesday', project: 'ops' })
+      const found = await searchTool.handler({ query: '--noEmit', project: 'ops' })
       assert.equal(found.degraded, false)
       const hits = found.hits as { content: string }[]
       assert.equal(hits.length, 1)
-      assert.match(hits[0].content, /deploy on Tuesday/)
+      assert.match(hits[0].content, /--noEmit/)
     } finally {
       env.cleanup()
       rmSync(aimemHome, { recursive: true, force: true })

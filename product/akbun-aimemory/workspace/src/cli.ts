@@ -5,7 +5,6 @@ import { loadConfig } from './config.ts'
 import { contextText, runHook, searchSpool } from './hook.ts'
 import { indexSession } from './indexer/index.ts'
 import { installAgent, isSupportedAgent, SUPPORTED_AGENTS } from './install/index.ts'
-import { serveMcp } from './mcp/server.ts'
 import { addMemory, deleteMemory, deleteSession, exportDb, importDb, invalidateMemory, listSessions, openStore, recent, reindex, search, sessionMemories } from './store.ts'
 import { serve } from './server.ts'
 
@@ -134,7 +133,7 @@ const commands: Record<string, () => void | Promise<void>> = {
     } finally { s.db.close() }
   },
   reindex: () => { const n = reindex(openStore(config)); out({ reindexed: n }, () => `reindexed ${n}\n`) },
-  mcp: async () => { await serveMcp(config, VERSION) },
+  mcp: async () => { const { serveMcp } = await import('./mcp/server.ts'); await serveMcp(config, VERSION) },
   install: () => {
     const target = o.agent ?? ''
     if (!isSupportedAgent(target)) return usage(`install requires --agent <${SUPPORTED_AGENTS.join('|')}>`)

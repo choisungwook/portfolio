@@ -1,17 +1,20 @@
-import { execFileSync } from 'node:child_process'
+import { execFile } from 'node:child_process'
+import { promisify } from 'node:util'
 import { z } from 'zod'
 import type { AimemoryConfig } from '../config.ts'
 import { getMeta, setMeta } from '../db/meta.ts'
 import { getMemory, MEMORY_LIMIT, setMemory } from './memory.ts'
 import { ToolError, type ScopedTools, type TeamTool } from './tools.ts'
 
-function runAimem(cfg: AimemoryConfig, cliArgs: string[]): unknown {
+const execFileAsync = promisify(execFile)
+
+async function runAimem(cfg: AimemoryConfig, cliArgs: string[]): Promise<unknown> {
   const env = cfg.home ? { ...process.env, AIMEMORY_HOME: cfg.home } : process.env
-  const stdout = execFileSync(cfg.command, [...(cfg.args ?? []), ...cliArgs], {
+  const { stdout } = await execFileAsync(cfg.command, [...(cfg.args ?? []), ...cliArgs], {
     env,
     encoding: 'utf8',
     timeout: 15_000,
-    stdio: ['ignore', 'pipe', 'pipe'],
+    maxBuffer: 2 * 1024 * 1024,
   })
   return JSON.parse(stdout) as unknown
 }
@@ -59,12 +62,14 @@ export function memoryTools(scope: ScopedTools): TeamTool[] {
           limit: z.number().int().min(1).max(50).optional(),
         },
         readOnly: true,
-        handler(args) {
-          const cliArgs = ['search', String(args.query), '--json']
+        async handler(args) {
+          // Place all flags before `--` so queries starting with `-` (e.g. `--noEmit`) are parsed as positionals.
+          const cliArgs = ['search', '--json']
           if (args.project) cliArgs.push('--project', String(args.project))
           if (args.limit !== undefined) cliArgs.push('--limit', String(args.limit))
+          cliArgs.push('--', String(args.query))
           try {
-            const parsed = runAimem(aimem, cliArgs)
+            const parsed = await runAimem(aimem, cliArgs)
             return (parsed && typeof parsed === 'object' && !Array.isArray(parsed))
               ? parsed as Record<string, unknown>
               : { degraded: true, hits: [] }
@@ -81,11 +86,12 @@ export function memoryTools(scope: ScopedTools): TeamTool[] {
           project: z.string().optional(),
         },
         readOnly: false,
-        handler(args) {
-          const cliArgs = ['add', String(args.text), '--agent', agent, '--json']
+        async handler(args) {
+          const cliArgs = ['add', '--agent', agent, '--json']
           if (args.project) cliArgs.push('--project', String(args.project))
+          cliArgs.push('--', String(args.text))
           try {
-            const parsed = runAimem(aimem, cliArgs)
+            const parsed = await runAimem(aimem, cliArgs)
             wrote()
             return (parsed && typeof parsed === 'object' && !Array.isArray(parsed))
               ? parsed as Record<string, unknown>
