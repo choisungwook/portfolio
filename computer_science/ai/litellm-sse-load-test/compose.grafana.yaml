@@ -1,0 +1,29 @@
+services:
+  litellm:
+    environment:
+      PROMETHEUS_METRICS_PORT: "4001"
+      PROMETHEUS_MULTIPROC_DIR: /dev/shm
+  pushgateway:
+    image: prom/pushgateway:v1.11.3
+    ports:
+      - "127.0.0.1:9091:9091"
+  prometheus:
+    image: prom/prometheus:v3.5.3
+    volumes:
+      - ./observability/prometheus.yaml:/etc/prometheus/prometheus.yml:ro
+      - prometheus-data:/prometheus
+  grafana:
+    image: grafana/grafana:12.4.15
+    ports:
+      - "127.0.0.1:3100:3000"
+    environment:
+      GF_AUTH_ANONYMOUS_ENABLED: "true"
+      GF_AUTH_ANONYMOUS_ORG_ROLE: Viewer
+    volumes:
+      - ./observability/provisioning:/etc/grafana/provisioning:ro
+      - ./observability/dashboards:/etc/grafana/dashboards:ro
+      - grafana-data:/var/lib/grafana
+
+volumes:
+  prometheus-data:
+  grafana-data:

@@ -51,3 +51,9 @@ httpx.HTTPStatusError: Client error '401 Unauthorized' for url 'http://localhost
 **원인**: LiteLLM Proxy에 등록한 논리적 모델 이름(`local-qwen`)은 HuggingFace 모델 ID가 아니기 때문입니다.
 
 **해결**: `--tokenizer kind=huggingface_auto,model=Qwen/Qwen2.5-1.5B-Instruct`처럼 실제 백엔드 모델에 대응하는 공개 HuggingFace 토크나이저를 명시합니다.
+
+## 5. Logs에서 Python 비교 요청을 찾을 수 없는 경우
+
+이전 Compose 구성에서 LiteLLM을 이미 실행 중이면 [환경 준비](setup.md#2-litellm-proxy-기동)의 `docker compose up -d --wait`로 PostgreSQL 연결을 적용합니다. 새로 보낸 요청부터 PostgreSQL에 저장되므로 [비교 스크립트](2.3-sse-vs-http.md#2-첫-텍스트와-완료-시간-측정)를 다시 실행합니다.
+
+**Request Logs**에서 최근 시간 범위를 선택하고 **Refresh**를 누릅니다. 터미널에 출력된 Call ID를 검색하면 `sse-lab-non-stream` 또는 `sse-lab-stream` 태그가 표시됩니다.

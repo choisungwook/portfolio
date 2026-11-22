@@ -42,7 +42,9 @@ qwen2.5:1.5b    65ec06548149    986 MB    ...
 
 LiteLLM Proxy 이미지는 2026년 10월 공급망 보안 사고(`v1.107.0` 및 당시 floating 태그) 이후 키 로테이션과 서명 검증이 적용된 안전한 고정 버전 **`ghcr.io/berriai/litellm:v1.110.2`**를 사용합니다.
 
-저장소 루트에서 핸즈온 디렉터리로 이동해 LiteLLM Proxy를 기동합니다.
+Admin UI의 **Logs**는 PostgreSQL에 저장된 요청 기록을 조회합니다. [Compose 설정](../compose.yaml#L3-L28)은 DB와 LiteLLM을 함께 기동하고, PostgreSQL이 연결을 받을 수 있게 된 뒤 LiteLLM을 시작합니다. 이전에 이 실습의 Proxy를 실행했다면 같은 명령으로 DB가 연결된 새 설정을 적용합니다. [LiteLLM Admin UI 요구 사항](https://docs.litellm.ai/docs/proxy/ui#quick-start)
+
+저장소 루트에서 핸즈온 디렉터리로 이동해 두 서비스를 기동합니다.
 
 ```bash
 cd computer_science/ai/litellm-sse-load-test
@@ -56,7 +58,7 @@ curl -sS http://localhost:4000/v1/models \
   -H "Authorization: Bearer sk-local-litellm-test"
 ```
 
-아래와 같이 `local-qwen`이 반환되면 LiteLLM Proxy와 설정 파일 연결이 정상입니다.
+응답의 `data`에 `local-qwen`이 있으면 LiteLLM이 모델 매핑을 읽은 상태입니다. 실제 추론은 [SSE 실습](2.3-sse-vs-http.md#실습)에서 확인합니다.
 
 ```json
 {"data":[{"id":"local-qwen","object":"model","created":1677610602,"owned_by":"openai"}],"object":"list"}
@@ -81,11 +83,27 @@ xk6 build v0.54.0 --with github.com/phymbert/xk6-sse@v0.1.3 --output ./k6-sse
 
 ## 4. 실습 종료 및 환경 정리
 
-실습을 모두 마친 뒤에는 아래 명령으로 LiteLLM 컨테이너와 볼륨을 정리합니다. 호스트에 내려받은 Ollama 모델은 그대로 유지됩니다.
+로그를 보관하면서 컨테이너를 내리려면 `docker compose down`을 사용합니다. 로그까지 지울 때는 아래 명령으로 PostgreSQL 볼륨도 삭제합니다.
 
 ```bash
 cd computer_science/ai/litellm-sse-load-test
 docker compose down -v
+```
+
+## Grafana 확장 실습 준비
+
+핸즈온 디렉터리에서 기존 Compose 구성에 Grafana 구성을 추가해 실행합니다. LiteLLM, Prometheus, Pushgateway, Grafana는 같은 Compose 네트워크에 연결됩니다. macOS에서 Ollama를 실행한 상태로 시작합니다.
+
+```bash
+docker compose -f compose.yaml -f compose.grafana.yaml up -d --wait
+```
+
+Prometheus는 Compose 네트워크에서만 열리는 `litellm:4001/metrics`를 수집합니다. [부록 B의 Grafana 비교 실습](appendix-b-grafana-dashboard.md)에서 재는 클라이언트 지연은 Pushgateway로 보냅니다.
+
+Grafana 실습을 끝내면 두 Compose 파일을 함께 지정해 컨테이너와 데이터 볼륨을 삭제합니다. 이 명령은 PostgreSQL 요청 로그, Prometheus 메트릭, Grafana 저장 데이터를 지웁니다. 대시보드 정의와 설정은 저장소 파일에 남아 다음 실행 때 다시 불러옵니다.
+
+```bash
+docker compose -f compose.yaml -f compose.grafana.yaml down -v
 ```
 
 ## 장비 재부팅 후 환경 복구 점검표
@@ -96,5 +114,6 @@ docker compose down -v
 | --- | --- | --- |
 | Ollama 모델(`qwen2.5:1.5b`) | 디스크에 유지 | Ollama 앱 실행 또는 `ollama serve` |
 | LiteLLM Proxy 컨테이너 | 중지됨 | `docker compose up -d --wait` |
+| PostgreSQL 요청 로그 | `spend-logs` 볼륨에 유지 | `docker compose up -d --wait` |
 | `./k6-sse` 바이너리 | 디렉터리에 유지 | 파일이 없으면 3단계 빌드 재실행 |
 | `uv` 캐시(AIPerf·GuideLLM) | 로컬 캐시에 유지 | 별도 복구 불필요 |

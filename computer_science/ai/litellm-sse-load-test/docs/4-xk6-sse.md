@@ -16,7 +16,7 @@
 
 `xk6-sse`는 k6의 확장 빌드 도구(`xk6`)로 Go 기반 SSE 클라이언트를 내장한 커스텀 바이너리입니다. 기본 `k6/http`와 달리 `sse.open()`이 연결을 연 상태에서 `client.on('event', ...)` 콜백으로 서버가 보내는 `data:` 이벤트를 실시간으로 하나씩 받습니다.
 
-첫 번째 텍스트 델타(`delta.content`)가 도착한 시각에서 요청 시작 시각을 빼면 **TTFT(`llm_ttft`)**가 나오고, 마지막 토큰 시각과 첫 토큰 시각의 차이를 `(청크 수 - 1)`로 나누면 **평균 TPOT(`llm_tpot`)**를 k6 커스텀 `Trend` 메트릭으로 집계할 수 있습니다.
+첫 번째 텍스트 조각(`delta.content`)이 도착한 시각에서 요청 시작 시각을 빼면 **TTFT(`llm_ttft`)**가 나옵니다. 이 코드에서 **`llm_tpot`**은 첫 텍스트와 마지막 텍스트 사이의 시간을 `(텍스트 조각 수 - 1)`로 나눈 값입니다. 두 값은 k6의 `Trend` 메트릭으로 집계됩니다.
 
 ![기본 k6/http와 xk6-sse 측정 지점 비교](../imgs/xk6-sse-measurement-points.png)
 
@@ -61,9 +61,9 @@ sequenceDiagram
 
   Note over K: reqStart = Date.now()
   K->>L: sse.open(POST /v1/chat/completions, stream: true)
-  L-->>K: event 1 (첫 delta.content)
+  L-->>K: 첫 텍스트가 있는 이벤트 (delta.content)
   Note over K: llm_ttft.add(now - reqStart)
-  loop 후속 토큰 청크 수신
+  loop 후속 텍스트 조각 수신
     L-->>K: event N (delta.content)
     Note over K: tokenCount += 1, lastTokenTime = now
   end
@@ -75,9 +75,17 @@ sequenceDiagram
 
 [setup.md](setup.md)의 3단계에서 `./k6-sse` 바이너리를 빌드해 두어야 합니다.
 
+부하 전에 [2.3의 SSE curl 응답](2.3-sse-vs-http.md#1-curl로-sse-응답-한-건-확인)에서 첫 `delta.content`와 `[DONE]`을 확인합니다. 두 지점이 아래 스크립트의 첫 텍스트 측정과 이벤트 수신 종료에 어떻게 연결되는지 읽어 보세요. [xk6-sse 이벤트 처리](../k6/04-xk6-sse-ttft.js#L50-L89)
+
 ### 1. xk6-sse로 개방 루프 TTFT·TPOT 측정 실행
 
-[04-xk6-sse-ttft.js](../k6/04-xk6-sse-ttft.js)는 `constant-arrival-rate`로 2초에 1건(`0.5 req/s`)씩 12초 동안 SSE 요청을 보내고 `llm_ttft`, `llm_tpot`, `llm_e2e`, `llm_token_chunks`를 집계합니다.
+**`curl -N`으로 확인한 것과 같은 API에 k6도 HTTP `POST` 한 건을 보냅니다.** `stream: true`를 JSON 본문에 넣어 SSE 응답을 요청하고, `sse.open()`으로 그 응답을 읽습니다. 여러 `data:` 이벤트가 와도 모두 같은 `POST`의 응답입니다. [요청 본문과 `sse.open()`](../k6/04-xk6-sse-ttft.js#L27-L56)
+
+1. **요청을 시작합니다.** k6는 12초 동안 2초마다 다음 `POST`의 시작을 예약합니다. 이전 응답을 읽는 중이라도 가용 VU가 있으면 그 VU가 새 요청을 시작합니다. [Open loop 설정](../k6/04-xk6-sse-ttft.js#L14-L25)
+2. **텍스트가 도착할 때 시간을 잽니다.** `client.on('event', ...)`는 SSE 이벤트를 하나 받을 때마다 실행됩니다. `curl -N`에서 `data:` 뒤에 보였던 내용이 코드의 `event.data`입니다. 요청 시작 후 첫 번째 비어 있지 않은 `delta.content`를 받을 때까지의 시간이 `llm_ttft`입니다. [이벤트 읽기와 TTFT 기록](../k6/04-xk6-sse-ttft.js#L50-L73)
+3. **스트림을 닫고 지표를 기록합니다.** 정상 응답에서는 `[DONE]`을 받으면 스트림을 닫습니다. 텍스트 조각이 두 개 이상 있었다면, 첫 조각부터 마지막 조각까지 걸린 시간을 조각 사이 간격 수로 나눠 `llm_tpot`으로 기록합니다. 예를 들어 요청 후 `200ms`, `220ms`, `250ms`에 텍스트가 왔다면 TTFT는 `200ms`, 평균 조각 간격은 `(250 - 200) ÷ 2 = 25ms`입니다. [스트림 종료](../k6/04-xk6-sse-ttft.js#L55-L60) · [평균 조각 간격 계산](../k6/04-xk6-sse-ttft.js#L85-L89)
+
+아래 명령으로 SSE 부하테스트를 실행합니다.
 
 ```bash
 cd computer_science/ai/litellm-sse-load-test

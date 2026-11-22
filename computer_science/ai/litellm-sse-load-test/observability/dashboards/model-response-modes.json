@@ -1,0 +1,854 @@
+{
+  "uid": "model-response-modes",
+  "title": "모델 응답 비교 · HTTP JSON vs SSE",
+  "schemaVersion": 41,
+  "version": 3,
+  "editable": false,
+  "tags": [
+    "model-performance",
+    "sse"
+  ],
+  "refresh": "5s",
+  "time": {
+    "from": "now-15m",
+    "to": "now"
+  },
+  "panels": [
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "model-performance-prometheus"
+      },
+      "id": 10,
+      "type": "bargauge",
+      "title": "부하 · P95 첫 텍스트",
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 0
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "min": 0,
+          "color": {
+            "mode": "continuous-BlYlRd"
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byRegexp",
+              "options": "/HTTP JSON/"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "#E0B400"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byRegexp",
+              "options": "/HTTP SSE/"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "#5794F2"
+                }
+              }
+            ]
+          }
+        ]
+      },
+      "options": {
+        "orientation": "horizontal",
+        "displayMode": "basic",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "values": false
+        }
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "model-performance-prometheus"
+          },
+          "refId": "A",
+          "expr": "sse_lab_load_first_text_p95_seconds{job=\"model_response_load\"}",
+          "legendFormat": "{{vus}} VUs · {{requests}}건 · {{mode}}",
+          "instant": true,
+          "range": false
+        }
+      ]
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "model-performance-prometheus"
+      },
+      "id": 11,
+      "type": "bargauge",
+      "title": "부하 · P95 응답 완료",
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 0
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "min": 0,
+          "color": {
+            "mode": "continuous-BlYlRd"
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byRegexp",
+              "options": "/HTTP JSON/"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "#E0B400"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byRegexp",
+              "options": "/HTTP SSE/"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "#5794F2"
+                }
+              }
+            ]
+          }
+        ]
+      },
+      "options": {
+        "orientation": "horizontal",
+        "displayMode": "basic",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "values": false
+        }
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "model-performance-prometheus"
+          },
+          "refId": "A",
+          "expr": "sse_lab_load_complete_p95_seconds{job=\"model_response_load\"}",
+          "legendFormat": "{{vus}} VUs · {{requests}}건 · {{mode}}",
+          "instant": true,
+          "range": false
+        }
+      ]
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "model-performance-prometheus"
+      },
+      "id": 12,
+      "type": "bargauge",
+      "title": "부하 · 요청 처리량",
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 8
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "suffix: req/s",
+          "min": 0,
+          "color": {
+            "mode": "continuous-BlYlRd"
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byRegexp",
+              "options": "/HTTP JSON/"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "#E0B400"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byRegexp",
+              "options": "/HTTP SSE/"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "#5794F2"
+                }
+              }
+            ]
+          }
+        ]
+      },
+      "options": {
+        "orientation": "horizontal",
+        "displayMode": "basic",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "values": false
+        }
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "model-performance-prometheus"
+          },
+          "refId": "A",
+          "expr": "sse_lab_load_requests_per_second{job=\"model_response_load\"}",
+          "legendFormat": "{{vus}} VUs · {{requests}}건 · {{mode}}",
+          "instant": true,
+          "range": false
+        }
+      ]
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "model-performance-prometheus"
+      },
+      "id": 13,
+      "type": "bargauge",
+      "title": "부하 · 실패율",
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 8
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percentunit",
+          "min": 0,
+          "color": {
+            "mode": "continuous-BlYlRd"
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byRegexp",
+              "options": "/HTTP JSON/"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "#E0B400"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byRegexp",
+              "options": "/HTTP SSE/"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "#5794F2"
+                }
+              }
+            ]
+          }
+        ]
+      },
+      "options": {
+        "orientation": "horizontal",
+        "displayMode": "basic",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "values": false
+        }
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "model-performance-prometheus"
+          },
+          "refId": "A",
+          "expr": "sse_lab_load_failed_ratio{job=\"model_response_load\"}",
+          "legendFormat": "{{vus}} VUs · {{requests}}건 · {{mode}}",
+          "instant": true,
+          "range": false
+        }
+      ]
+    },
+    {
+      "id": 1,
+      "type": "bargauge",
+      "title": "단건 · 첫 텍스트까지",
+      "description": "비스트리밍은 전체 본문을 읽어야 첫 텍스트를 사용할 수 있습니다. SSE는 첫 텍스트 이벤트 도착 시각을 기록합니다.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "model-performance-prometheus"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 16
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "min": 0,
+          "color": {
+            "mode": "fixed",
+            "fixedColor": "#5794F2"
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "HTTP JSON"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "#E0B400"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "HTTP SSE"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "#5794F2"
+                }
+              }
+            ]
+          }
+        ]
+      },
+      "options": {
+        "orientation": "horizontal",
+        "displayMode": "basic",
+        "showUnfilled": true,
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "values": false
+        }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "model-performance-prometheus"
+          },
+          "expr": "sse_lab_response_first_text_seconds{job=\"model_response_comparison\"}",
+          "legendFormat": "{{mode}}",
+          "instant": true,
+          "range": false
+        }
+      ]
+    },
+    {
+      "id": 2,
+      "type": "bargauge",
+      "title": "단건 · 응답 완료까지",
+      "description": "두 모드 모두 클라이언트가 응답 본문을 끝까지 읽은 시각입니다.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "model-performance-prometheus"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 16
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "min": 0,
+          "color": {
+            "mode": "fixed",
+            "fixedColor": "#5794F2"
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "HTTP JSON"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "#E0B400"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "HTTP SSE"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "#5794F2"
+                }
+              }
+            ]
+          }
+        ]
+      },
+      "options": {
+        "orientation": "horizontal",
+        "displayMode": "basic",
+        "showUnfilled": true,
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "values": false
+        }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "model-performance-prometheus"
+          },
+          "expr": "sse_lab_response_complete_seconds{job=\"model_response_comparison\"}",
+          "legendFormat": "{{mode}}",
+          "instant": true,
+          "range": false
+        }
+      ]
+    },
+    {
+      "id": 3,
+      "type": "bargauge",
+      "title": "단건 · 헤더 도착까지",
+      "description": "HTTP 클라이언트에서 응답 헤더를 사용할 수 있게 된 시각입니다.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "model-performance-prometheus"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 24
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "min": 0,
+          "color": {
+            "mode": "fixed",
+            "fixedColor": "#5794F2"
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "HTTP JSON"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "#E0B400"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "HTTP SSE"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "#5794F2"
+                }
+              }
+            ]
+          }
+        ]
+      },
+      "options": {
+        "orientation": "horizontal",
+        "displayMode": "basic",
+        "showUnfilled": true,
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "values": false
+        }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "model-performance-prometheus"
+          },
+          "expr": "sse_lab_response_header_seconds{job=\"model_response_comparison\"}",
+          "legendFormat": "{{mode}}",
+          "instant": true,
+          "range": false
+        }
+      ]
+    },
+    {
+      "id": 4,
+      "type": "bargauge",
+      "title": "단건 · 평균 텍스트 청크 간격",
+      "description": "SSE의 텍스트 청크 간격입니다. 텍스트 청크가 두 개 이상일 때 값이 있습니다.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "model-performance-prometheus"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 24
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "min": 0,
+          "color": {
+            "mode": "fixed",
+            "fixedColor": "#5794F2"
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "HTTP JSON"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "#E0B400"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "HTTP SSE"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "#5794F2"
+                }
+              }
+            ]
+          }
+        ]
+      },
+      "options": {
+        "orientation": "horizontal",
+        "displayMode": "basic",
+        "showUnfilled": true,
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "values": false
+        }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "model-performance-prometheus"
+          },
+          "expr": "sse_lab_response_chunk_gap_seconds{job=\"model_response_comparison\"}",
+          "legendFormat": "{{mode}}",
+          "instant": true,
+          "range": false
+        }
+      ]
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "model-performance-prometheus"
+      },
+      "id": 20,
+      "type": "timeseries",
+      "title": "LiteLLM · 요청 처리량",
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 32
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "suffix: req/s",
+          "min": 0
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "model-performance-prometheus"
+          },
+          "expr": "sum(rate(litellm_proxy_total_requests_metric_total{job=\"litellm\",route=\"/v1/chat/completions\",stream=~\"False|None\"}[1m]))",
+          "legendFormat": "HTTP JSON"
+        },
+        {
+          "refId": "B",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "model-performance-prometheus"
+          },
+          "expr": "sum(rate(litellm_proxy_total_requests_metric_total{job=\"litellm\",route=\"/v1/chat/completions\",stream=\"True\"}[1m]))",
+          "legendFormat": "HTTP SSE"
+        }
+      ],
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        }
+      }
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "model-performance-prometheus"
+      },
+      "id": 21,
+      "type": "timeseries",
+      "title": "LiteLLM · 실패 요청",
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 32
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "suffix: req/s",
+          "min": 0
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "model-performance-prometheus"
+          },
+          "expr": "sum(rate(litellm_proxy_failed_requests_metric_total{job=\"litellm\",route=\"/v1/chat/completions\",stream=~\"False|None\"}[1m])) or (0 * sum(rate(litellm_proxy_total_requests_metric_total{job=\"litellm\",route=\"/v1/chat/completions\",stream=~\"False|None\"}[1m])))",
+          "legendFormat": "HTTP JSON"
+        },
+        {
+          "refId": "B",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "model-performance-prometheus"
+          },
+          "expr": "sum(rate(litellm_proxy_failed_requests_metric_total{job=\"litellm\",route=\"/v1/chat/completions\",stream=\"True\"}[1m])) or (0 * sum(rate(litellm_proxy_total_requests_metric_total{job=\"litellm\",route=\"/v1/chat/completions\",stream=\"True\"}[1m])))",
+          "legendFormat": "HTTP SSE"
+        }
+      ],
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        }
+      }
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "model-performance-prometheus"
+      },
+      "id": 22,
+      "type": "timeseries",
+      "title": "LiteLLM · 입력과 출력 토큰 처리량",
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 40
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "suffix: tokens/s",
+          "min": 0
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "model-performance-prometheus"
+          },
+          "refId": "A",
+          "expr": "sum(rate(litellm_input_tokens_metric_total{job=\"litellm\"}[1m]))",
+          "legendFormat": "입력"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "model-performance-prometheus"
+          },
+          "refId": "B",
+          "expr": "sum(rate(litellm_output_tokens_metric_total{job=\"litellm\"}[1m]))",
+          "legendFormat": "출력"
+        }
+      ],
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        }
+      }
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "model-performance-prometheus"
+      },
+      "id": 23,
+      "type": "timeseries",
+      "title": "LiteLLM · 재시작 후 누적 요청 수",
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 40
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "min": 0
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "model-performance-prometheus"
+          },
+          "expr": "sum(litellm_proxy_total_requests_metric_total{job=\"litellm\",route=\"/v1/chat/completions\",stream=~\"False|None\"})",
+          "legendFormat": "HTTP JSON"
+        },
+        {
+          "refId": "B",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "model-performance-prometheus"
+          },
+          "expr": "sum(litellm_proxy_total_requests_metric_total{job=\"litellm\",route=\"/v1/chat/completions\",stream=\"True\"})",
+          "legendFormat": "HTTP SSE"
+        }
+      ],
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        }
+      }
+    }
+  ]
+}

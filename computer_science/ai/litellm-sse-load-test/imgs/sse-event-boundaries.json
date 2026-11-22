@@ -1,0 +1,100 @@
+{
+  "palette": "ink-blue",
+  "layout": "split",
+  "subject": "Three raw event blocks in one HTTP response map to three vertically aligned parsed events, with blank lines as delimiters.",
+  "titles": {
+    "left": "Raw SSE body",
+    "right": "SSE events"
+  },
+  "nodes": [
+    {
+      "id": "raw1",
+      "label": [
+        "data: hello",
+        "data: world"
+      ],
+      "shape": "box",
+      "half": "left"
+    },
+    {
+      "id": "raw2",
+      "label": [
+        "data: next"
+      ],
+      "shape": "box",
+      "half": "left"
+    },
+    {
+      "id": "raw3",
+      "label": [
+        "data: last"
+      ],
+      "shape": "box",
+      "half": "left"
+    },
+    {
+      "id": "event1",
+      "label": [
+        "hello",
+        "world"
+      ],
+      "shape": "box",
+      "half": "right"
+    },
+    {
+      "id": "event2",
+      "label": [
+        "next"
+      ],
+      "shape": "box",
+      "half": "right"
+    },
+    {
+      "id": "event3",
+      "label": [
+        "last"
+      ],
+      "shape": "box",
+      "half": "right"
+    }
+  ],
+  "groups": [
+    {
+      "id": "body",
+      "label": [
+        "One HTTP response"
+      ],
+      "members": [
+        "raw1",
+        "raw2",
+        "raw3"
+      ]
+    }
+  ],
+  "edges": [
+    {
+      "from": "raw1",
+      "to": "event1",
+      "kind": "sync",
+      "label": "Blank line"
+    },
+    {
+      "from": "raw2",
+      "to": "event2",
+      "kind": "sync",
+      "label": "Blank line"
+    },
+    {
+      "from": "raw3",
+      "to": "event3",
+      "kind": "sync",
+      "label": "Blank line"
+    }
+  ],
+  "notes": [
+    {
+      "node": "event1",
+      "text": "One value with a line break"
+    }
+  ]
+}

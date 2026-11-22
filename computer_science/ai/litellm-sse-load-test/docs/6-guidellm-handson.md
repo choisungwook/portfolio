@@ -64,9 +64,11 @@ flowchart LR
 
 [setup.md](setup.md)의 1~2단계를 마쳐 LiteLLM Proxy가 `localhost:4000`에서 실행 중이어야 합니다.
 
+동시성 스윕이나 트레이스 리플레이 전에 [2.3의 SSE curl 요청 한 건](2.3-sse-vs-http.md#1-curl로-sse-응답-한-건-확인)을 확인합니다. 두 실험은 같은 Chat Completions API와 SSE 응답 형식을 사용합니다. 스윕은 합성 토큰 길이를 지정하고, 리플레이는 트레이스에서 요청별 길이와 도착 시각을 가져옵니다. 앞서 수동 응답을 확인했다면 그 결과를 사용합니다.
+
 ### 1. 동시성 단계별 스윕(1→2→4)과 HTML·JSON 리포트 생성
 
-[run-guidellm-sweep.sh](../benchmarks/run-guidellm-sweep.sh)는 동시성을 `1 → 2 → 4`로 올려가며 각 단계에서 6건씩 측정하고, 콘솔 표와 함께 `benchmarks/output/guidellm/report.html`·`report.json`을 저장합니다.
+GuideLLM은 Qwen 토크나이저로 길이를 맞춘 합성 요청을 쓰고, `profile.streams`의 동시성 `1 → 2 → 4`를 순서대로 적용합니다. 각 단계에서 6건씩 측정하고 콘솔 표와 함께 HTML·JSON 보고서를 저장합니다. [요청 조건](../benchmarks/run-guidellm-sweep.sh#L8-L14) · [보고서 출력 설정](../benchmarks/run-guidellm-sweep.sh#L15-L18)
 
 ```bash
 cd computer_science/ai/litellm-sse-load-test
@@ -81,7 +83,7 @@ cd computer_science/ai/litellm-sse-load-test
 | `concurrent@2` | `2.1s` | **`1262.3 ms`** | `18.2 ms` | `47.8 tokens/s` | 불합격 (1초 초과) |
 | `concurrent@4` | `4.1s` | **`3227.7 ms`** | `18.2 ms` | `48.1 tokens/s` | 불합격 (처리량 포화) |
 
-동시성 2에서 이미 TTFT P95가 1초를 넘고, 동시성 4에서는 Output TPS가 `47.8 → 48.1 tokens/s`로 정체된 채 대기 시간만 3.2초로 늘어납니다. 따라서 이 로컬 장비의 실시간 챗봇 정격 용량은 **동시성 1**로 확정합니다. 생성된 HTML 리포트는 브라우저로 열어 사업팀에 그대로 공유할 수 있습니다.
+이 실행에서는 동시성 2에서 처음으로 TTFT P95가 1초를 넘었습니다. 동시성 4의 처리량은 2와 비슷하지만 TTFT P95는 3.2초까지 늘어납니다. PostgreSQL을 연결한 M3 Pro 재측정에서도 동시성 1→2→4의 TTFT P95는 각각 320.7, 1,223.1, 2,732.6ms였고, 출력 처리량은 44~46 tokens/s에 머물렀습니다. 단계당 6건은 동시성을 올릴 때의 경향을 보는 데 쓰고, 정격 용량을 정할 때는 더 많은 요청으로 측정합니다.
 
 ![GuideLLM 동시성 스윕 TTFT P95와 Output TPS 포화 그래프](../imgs/guidellm-concurrency-sweep.png)
 
@@ -102,7 +104,7 @@ open benchmarks/output/guidellm/report.html
 {"timestamp": 1.0, "input_length": 1100, "output_length": 64, "hash_ids": [1, 2, 3]}
 ```
 
-[run-guidellm-mooncake.sh](../benchmarks/run-guidellm-mooncake.sh)를 실행해 트레이스를 그대로 리플레이합니다.
+스크립트의 `replay` 프로파일은 JSONL에 기록된 요청 시각을 따릅니다. `max_requests`는 실행을 샘플 6건으로 제한합니다. [리플레이 코드](../benchmarks/run-guidellm-mooncake.sh#L6-L13)
 
 ```bash
 cd computer_science/ai/litellm-sse-load-test

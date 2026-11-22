@@ -1,0 +1,23 @@
+{
+  "layout": "sequence (project-local extension)",
+  "palette": "sequence-pastel (project-local extension)",
+  "reason": "A client and server exchange ordered messages over time, so use two lifelines. A vertical wait gap conveys latency.",
+  "roles": [
+    [
+      "Request",
+      "#B7DDF8"
+    ],
+    [
+      "Response headers",
+      "#F8E9A7"
+    ],
+    [
+      "Stream event",
+      "#F6C5CE"
+    ]
+  ],
+  "notes": [
+    "2 seconds with no event after headers",
+    "one HTTP response includes headers and all three SSE events"
+  ]
+}

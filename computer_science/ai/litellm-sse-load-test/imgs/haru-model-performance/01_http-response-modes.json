@@ -1,0 +1,90 @@
+{
+  "palette": "ink-blue",
+  "layout": "stack",
+  "subject": "One HTTP request to a model server returns either complete JSON after generation or incremental SSE events in the same response.",
+  "titles": {
+    "top": "HTTP full response",
+    "bottom": "HTTP SSE stream"
+  },
+  "nodes": [
+    {
+      "id": "c1",
+      "label": [
+        "Client"
+      ],
+      "shape": "box",
+      "panel": "top"
+    },
+    {
+      "id": "m1",
+      "label": [
+        "Model server"
+      ],
+      "shape": "box",
+      "panel": "top"
+    },
+    {
+      "id": "c2",
+      "label": [
+        "Client"
+      ],
+      "shape": "box",
+      "panel": "bottom"
+    },
+    {
+      "id": "m2",
+      "label": [
+        "Model server"
+      ],
+      "shape": "box",
+      "panel": "bottom"
+    }
+  ],
+  "edges": [
+    {
+      "from": "c1",
+      "to": "m1",
+      "kind": "call",
+      "label": "POST",
+      "step": 1
+    },
+    {
+      "from": "m1",
+      "to": "c1",
+      "kind": "sync",
+      "label": "Full JSON",
+      "step": 2
+    },
+    {
+      "from": "c2",
+      "to": "m2",
+      "kind": "call",
+      "label": "POST",
+      "step": 1
+    },
+    {
+      "from": "m2",
+      "to": "c2",
+      "kind": "sync",
+      "label": "First data",
+      "step": 2
+    },
+    {
+      "from": "m2",
+      "to": "c2",
+      "kind": "sync",
+      "label": "More data",
+      "step": 3
+    }
+  ],
+  "notes": [
+    {
+      "node": "m1",
+      "text": "Send after generation"
+    },
+    {
+      "node": "m2",
+      "text": "Send as generated"
+    }
+  ]
+}
