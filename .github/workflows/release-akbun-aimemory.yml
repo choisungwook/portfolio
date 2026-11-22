@@ -37,7 +37,7 @@ jobs:
 
       - uses: actions/setup-node@v7
         with:
-          node-version: '24'
+          node-version: '26'
           cache: npm
           cache-dependency-path: product/akbun-aimemory/workspace/package-lock.json
 
@@ -121,7 +121,7 @@ jobs:
 
       - uses: actions/setup-node@v7
         with:
-          node-version: '24'
+          node-version: '26'
 
       - uses: actions/download-artifact@v8
         with:
@@ -137,6 +137,7 @@ jobs:
 
       - name: Prepare release notes
         env:
+          GH_TOKEN: ${{ github.token }}
           TAG: ${{ steps.version.outputs.tag }}
         run: |
           cat > release-notes.md <<EOF
