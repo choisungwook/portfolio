@@ -1,0 +1,5 @@
+{"prompt": "주말에 서울 근교로 당일치기 여행을 가려고 해. 대중교통으로 갈 만한 곳 세 군데를 이유와 함께 추천해 줘."}
+{"prompt": "I just moved to a new city and want to make friends. What are some practical ways to meet people as an adult?"}
+{"prompt": "Review this Python code and point out bugs and improvements:\n\ndef average(xs):\n    total = 0\n    for i in range(len(xs)):\n        total += xs[i]\n    return total / len(xs)\n\nprint(average([]))"}
+{"prompt": "Summarize the following in three sentences: Speculative decoding speeds up autoregressive generation by letting a cheap draft model propose several tokens that the target model verifies in a single forward pass. Accepted tokens are kept and the first rejected position is replaced with the target model's own token, so the output distribution is unchanged. The speedup depends on how often drafts are accepted and on whether decoding is memory-bound."}
+{"prompt": "Write a Python function that parses a log line like '2026-11-22T10:00:00Z level=error msg=\"timeout\"' into a dict with keys time, level and msg. Include a few test cases."}
