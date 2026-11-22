@@ -52,11 +52,14 @@ One file, `$AIMEMORY_HOME/data/aimemory.db` (`src/store.ts`).
 
 `src/mcp/server.ts`, started with `aimem mcp` over stdio (`@modelcontextprotocol/sdk`). Exposes `search`, `recent`, `show_session`, and `add_note` with responses matching CLI `--json` (including `degraded: true` spool fallback on `search`). Delete is omitted so only humans delete memories.
 
+## Desktop shell
+
+`workspace/desktop/` wraps the bundled `aimem` binary in a Tauri v2 window (`src-tauri/src/lib.rs`, `src-tauri/crates/launch/`). It runs `aimem serve --port 0`, navigates the window to the loopback URL, handles external links and SQLite backup downloads, and checks for updates via `tauri-plugin-updater` from the native app menu (**Check for Updates…**).
+
 ## Planned directories
 
 Each directory holds only a README until its issue is done.
 
 | Directory | Issue |
 |---|---|
-| `workspace/desktop/` | Tauri desktop app (#1592) |
 | `workspace/scripts/` | Binary build for release (#1593) |

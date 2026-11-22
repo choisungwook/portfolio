@@ -1,0 +1,15 @@
+:root { --bg: #f6f6f4; --fg: #1c1d20; --muted: #6a6d75; --panel: #ffffff; --border: #e3e3e0; --accent: #1c1d20; --error: #c62828; }
+@media (prefers-color-scheme: dark) {
+  :root { --bg: #16171a; --fg: #ececee; --muted: #9a9da6; --panel: #202226; --border: #33353a; --accent: #ececee; --error: #ff8a80; }
+}
+body { margin: 0; min-height: 100vh; display: grid; place-items: center; background: var(--bg); color: var(--fg); font: 17px/1.6 system-ui, sans-serif; }
+main { width: min(720px, calc(100vw - 48px)); padding: 24px; }
+h1 { margin: 0 0 20px; font-size: 34px; letter-spacing: -0.01em; }
+#status { margin: 0 0 14px; font-size: 20px; font-weight: 600; }
+.muted { color: var(--muted); }
+.error { margin: 0 0 6px; font-size: 20px; font-weight: 600; color: var(--error); }
+.log { position: relative; margin-top: 16px; }
+.log pre { margin: 0; max-height: 50vh; overflow: auto; padding: 16px; padding-top: 44px; background: var(--panel); border: 1px solid var(--border); border-radius: 10px; }
+.log code { font: 13px/1.55 ui-monospace, Menlo, monospace; white-space: pre-wrap; word-break: break-word; user-select: text; }
+#copy { position: absolute; top: 8px; right: 8px; font: inherit; font-size: 14px; padding: 4px 12px; border-radius: 6px; border: 1px solid var(--border); background: var(--bg); color: var(--fg); cursor: pointer; }
+#copy:hover { border-color: var(--muted); }
