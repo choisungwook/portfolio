@@ -1,0 +1,7 @@
+apiVersion: 1
+providers:
+  - name: model-performance
+    type: file
+    allowUiUpdates: false
+    options:
+      path: /etc/grafana/dashboards

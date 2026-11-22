@@ -7,3 +7,6 @@ model_list:
 litellm_settings:
   drop_params: true
   request_timeout: 120
+  callbacks:
+    - prometheus
+  prometheus_emit_stream_label: true

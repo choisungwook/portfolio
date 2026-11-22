@@ -1,14 +1,31 @@
 name: litellm-sse-load-test
 services:
+  db:
+    image: postgres:16
+    environment:
+      POSTGRES_DB: litellm
+      POSTGRES_USER: litellm
+      POSTGRES_PASSWORD: litellm-local-db
+    volumes:
+      - spend-logs:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD", "pg_isready", "-h", "localhost", "-U", "litellm", "-d", "litellm"]
+      interval: 2s
+      timeout: 3s
+      retries: 15
   litellm:
     image: ghcr.io/berriai/litellm:v1.110.2
     ports:
-      - "4000:4000"
+      - "127.0.0.1:4000:4000"
     volumes:
       - ./config/litellm-config.yaml:/app/config.yaml:ro
     command: ["--config", "/app/config.yaml", "--port", "4000"]
     environment:
       LITELLM_MASTER_KEY: sk-local-litellm-test
+      DATABASE_URL: postgresql://litellm:litellm-local-db@db:5432/litellm
+    depends_on:
+      db:
+        condition: service_healthy
     extra_hosts:
       - "host.docker.internal:host-gateway"
     healthcheck:
@@ -17,3 +34,6 @@ services:
       timeout: 3s
       retries: 20
       start_period: 15s
+
+volumes:
+  spend-logs:

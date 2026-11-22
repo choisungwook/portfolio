@@ -1,0 +1,21 @@
+Hand-drawn technical diagram sketch on a plain white canvas, landscape 16:9, flat 2D, like a quick whiteboard-app drawing made with a mouse.
+
+LAYOUT: Two side-by-side halves compare two situations (before and after, or A and B), each half with its own shapes; an empty white vertical gap with no dividing line separates them.
+
+SUBJECT: A production chat request can finish successfully in eight seconds while the user sees no text for the first seven seconds.
+
+TITLES: The left half has the title "HTTP dashboard" written in #1E1E1E, slightly larger than the shape names, at its top-left corner, left-aligned, above and clear of its shapes and group outlines. The right half has the title "User experience" written in #1E1E1E, slightly larger than the shape names, at its top-left corner, left-aligned, above and clear of its shapes and group outlines.
+
+SHAPES (4): 1. a rectangle in the left half named "Model server". 2. a rectangle in the left half named "Status" over "200 OK" on two lines, filled flat pale yellow #FFF5C9. 3. a rectangle in the right half named "Model server". 4. a rectangle in the right half named "First text" over "7 s" on two lines, filled flat pale yellow #F8E9A7.
+
+ARROWS (2): 1. from shape 1 ("Model server") to shape 2 ("Status 200 OK"): a straight dashed #1E1E1E line with a hollow #1E1E1E triangle head, labeled "HTTP metrics" in small #1E1E1E lettering beside the line. 2. from shape 3 ("Model server") to shape 4 ("First text 7 s"): a straight dashed #1E1E1E line with a hollow #1E1E1E triangle head, labeled "SSE event" in small #1E1E1E lettering beside the line.
+
+NOTES: Just below shape 2 ("Status 200 OK"), a small note in #1E1E1E lettering reads "Response ends at 8 s". Just below shape 4 ("First text 7 s"), a small note in #1E1E1E lettering reads "Blank screen until then".
+
+TEXT: The only words in the image are the quoted texts above, spelled exactly.
+
+COLOR PALETTE: background #FFFFFF; ink #1E1E1E; accent #1E1E1E; pale yellow fills #FFF5C9, #F8E9A7 only on the shapes named with them. Use no other colors.
+
+STYLE: Every shape is outlined once in near-black ink (#1E1E1E), about 2 px at 1280 px width, even weight, drawn freehand yet nearly straight; corners are sharp or barely rounded. No doubled strokes, no sketch hatching, no brush texture. Shapes are empty inside, white like the canvas, except the shapes given a flat pale yellow fill above: no other colored fills, no gradients, no drop shadows, no 3D depth. All text is casual rounded hand-lettering, slightly uneven, like a marker font in a sketch app. Shape names sit centered inside their shape in #1E1E1E; arrow labels and notes are smaller and written in #1E1E1E. Write every quoted text exactly, letter for letter. Every arrow, line and head, every arrow label and every step number is drawn in black (#1E1E1E). Arrowheads are small hollow (outlined, unfilled) triangles. Solid and dashed arrows keep the same thin weight. Arrows are straight lines; an arrow bends, in one shallow curve, only when a straight line would cross another shape, to pass around that shape. Each arrow ends exactly on the target outline and never crosses through a shape or through any shape name, group name or panel title. Labels and step circles sit beside their arrow with clear white space, never on top of a line, a group outline or a panel outline. Two arrows between the same two shapes in opposite directions run as two parallel straight lines, slightly apart, each with its own head, label and step on its outer side. The whole diagram, taken as one group of shapes, arrows and text, is centered on the canvas both horizontally and vertically: the empty margin on the left equals the margin on the right, and the margin above equals the margin below. Generous white space covers more than half of the canvas; shapes are well separated and never overlap. No frame, no background pattern, no grid.
+
+DO NOT: no colored fills other than the pale yellow fills named above, no 3D, no drop shadows, no gradients, no real product logos or brand marks, no icons or pictograms, no characters, mascots or decorative doodles, no title or heading that is not quoted above, no legend, no question or result cards, no watermark.

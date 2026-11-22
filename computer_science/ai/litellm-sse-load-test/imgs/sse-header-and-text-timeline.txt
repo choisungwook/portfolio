@@ -1,0 +1,13 @@
+Wide 16:9 educational diagram on pure white. Haru whiteboard style: single thin near-black #1E1E1E strokes, almost straight and gently hand-drawn; white hollow component boxes, slightly rounded edges, rounded handwritten legible text, straight arrow shafts with small hollow outlined triangle heads, ample whitespace. No logos, icons, gradients, decorations, or shadows. Use the exact short labels stated.
+
+Use the supplied screenshot as the reference for sequence composition: two vertical lifelines and short notes on the right. Discard the reference's explanatory text. Put the protocol sequence on the left two-thirds and simple text notes in the right third. Put outlined white boxes "Client" on the left and "Server" on the right at equal height. Time descends. All message arrows are thin near-black horizontal lines joining those lifelines. Hollow left/right triangle head clearly denotes actual direction. Only one arrow goes Client to Server (toward the right), the remaining four arrows go Server to Client (toward the left).
+
+From top to bottom:
+- Client to Server: label "GET /events" on a pastel blue #B7DDF8 chip.
+- Server to Client: label "200 OK" and "text/event-stream" on one pastel yellow #F8E9A7 chip. This arrow is immediate after request.
+- A noticeably large vertical gap, twice the space between subsequent events. There is no horizontal message arrow in this gap. Put the text "Wait 2 s" in the gap.
+- Server to Client: label "2.0 s · hello / world" on a pastel pink #F6C5CE chip.
+- Server to Client: label "2.5 s · next" on the same pink.
+- Server to Client: label "3.0 s · last" on the same pink.
+
+On the right immediately adjacent to the Server lifeline and not crossing it, place one tall open grouping bracket spanning the yellow response header row and the three pink event rows, excluding the blue request. Label it "One HTTP response". Farther right, place two lines "Headers first" and "Send each event as ready". This draws one response streamed over time: no extra request arrows or additional client/server shapes. Keep the labels large and clear with no overlap. All color confined to those small label chips.

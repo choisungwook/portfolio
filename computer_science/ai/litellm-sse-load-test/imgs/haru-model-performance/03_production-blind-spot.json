@@ -1,0 +1,71 @@
+{
+  "palette": "mono-yellow",
+  "layout": "split",
+  "subject": "A production chat request can finish successfully in eight seconds while the user sees no text for the first seven seconds.",
+  "titles": {
+    "left": "HTTP dashboard",
+    "right": "User experience"
+  },
+  "nodes": [
+    {
+      "id": "m1",
+      "label": [
+        "Model server"
+      ],
+      "shape": "box",
+      "half": "left"
+    },
+    {
+      "id": "h1",
+      "label": [
+        "Status",
+        "200 OK"
+      ],
+      "shape": "box",
+      "half": "left",
+      "focus": true
+    },
+    {
+      "id": "m2",
+      "label": [
+        "Model server"
+      ],
+      "shape": "box",
+      "half": "right"
+    },
+    {
+      "id": "h2",
+      "label": [
+        "First text",
+        "7 s"
+      ],
+      "shape": "box",
+      "half": "right",
+      "focus": true
+    }
+  ],
+  "edges": [
+    {
+      "from": "m1",
+      "to": "h1",
+      "kind": "sync",
+      "label": "HTTP metrics"
+    },
+    {
+      "from": "m2",
+      "to": "h2",
+      "kind": "sync",
+      "label": "SSE event"
+    }
+  ],
+  "notes": [
+    {
+      "node": "h1",
+      "text": "Response ends at 8 s"
+    },
+    {
+      "node": "h2",
+      "text": "Blank screen until then"
+    }
+  ]
+}

@@ -1,0 +1,92 @@
+{
+  "palette": "mono-yellow",
+  "layout": "stack",
+  "subject": "Two model API load tests reveal whole HTTP response latency and the timing of individual events as the answer streams.",
+  "titles": {
+    "top": "HTTP metrics",
+    "bottom": "SSE event metrics"
+  },
+  "nodes": [
+    {
+      "id": "l1",
+      "label": [
+        "Load tester"
+      ],
+      "shape": "box",
+      "panel": "top",
+      "focus": true
+    },
+    {
+      "id": "m1",
+      "label": [
+        "Model server"
+      ],
+      "shape": "box",
+      "panel": "top"
+    },
+    {
+      "id": "l2",
+      "label": [
+        "Load tester"
+      ],
+      "shape": "box",
+      "panel": "bottom",
+      "focus": true
+    },
+    {
+      "id": "m2",
+      "label": [
+        "Model server"
+      ],
+      "shape": "box",
+      "panel": "bottom"
+    }
+  ],
+  "edges": [
+    {
+      "from": "l1",
+      "to": "m1",
+      "kind": "call",
+      "label": "POST",
+      "step": 1
+    },
+    {
+      "from": "m1",
+      "to": "l1",
+      "kind": "sync",
+      "label": "Response end",
+      "step": 2
+    },
+    {
+      "from": "l2",
+      "to": "m2",
+      "kind": "call",
+      "label": "POST",
+      "step": 1
+    },
+    {
+      "from": "m2",
+      "to": "l2",
+      "kind": "sync",
+      "label": "First text",
+      "step": 2
+    },
+    {
+      "from": "m2",
+      "to": "l2",
+      "kind": "sync",
+      "label": "More text",
+      "step": 3
+    }
+  ],
+  "notes": [
+    {
+      "node": "l1",
+      "text": "Latency, errors, req/s"
+    },
+    {
+      "node": "l2",
+      "text": "TTFT and chunk gaps"
+    }
+  ]
+}

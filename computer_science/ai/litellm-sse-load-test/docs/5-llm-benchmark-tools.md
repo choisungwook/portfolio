@@ -66,12 +66,16 @@ flowchart LR
 
 ### 1. AIPerf 실행
 
+실행 전에 [2.3의 SSE curl 응답](2.3-sse-vs-http.md#1-curl로-sse-응답-한-건-확인)을 확인합니다. AIPerf도 같은 Chat Completions API의 `data:` 이벤트를 받습니다. 아래 스크립트에서는 합성 프롬프트와 토큰 길이 목표가 적용됩니다.
+
 [run-aiperf.sh](../benchmarks/run-aiperf.sh)는 오프라인 `builtin` 토크나이저(tiktoken)를 사용해 HuggingFace 다운로드 없이 워밍업 2건, 본 측정 10건을 실행합니다.
 
 ```bash
 cd computer_science/ai/litellm-sse-load-test
 ./benchmarks/run-aiperf.sh
 ```
+
+AIPerf는 Chat Completions를 SSE로 호출합니다. 워밍업 두 건과 본 측정 열 건을 따로 요청하고, 입력·출력 길이 목표와 동시성을 CLI에 넘깁니다. [스트리밍과 부하 조건](../benchmarks/run-aiperf.sh#L7-L20)
 
 실행이 끝나면 `benchmarks/output/aiperf/profile_export_aiperf.csv`와 `.json`이 자동 저장됩니다. 핵심 지표 실측 결과는 다음과 같습니다.
 
@@ -93,12 +97,16 @@ cd computer_science/ai/litellm-sse-load-test
 
 ### 1. GuideLLM 실행
 
+GuideLLM의 요청·응답 형식도 [같은 SSE curl 예제](2.3-sse-vs-http.md#1-curl로-sse-응답-한-건-확인)에서 확인할 수 있습니다. AIPerf 실행 전에 응답을 이미 확인했다면 해당 결과를 사용합니다.
+
 [run-guidellm.sh](../benchmarks/run-guidellm.sh)는 LiteLLM의 모델 별칭(`local-qwen`)과 별도로 실제 HuggingFace 토크나이저(`Qwen/Qwen2.5-1.5B-Instruct`)를 명시해 실행합니다.
 
 ```bash
 cd computer_science/ai/litellm-sse-load-test
 ./benchmarks/run-guidellm.sh
 ```
+
+GuideLLM은 OpenAI 호환 백엔드의 `local-qwen`과 토큰 계산에 쓸 Qwen 토크나이저를 각각 지정합니다. 합성 입력 길이를 맞춘 뒤 동시성 두 건을 유지하며 열 건을 요청합니다. [백엔드·토크나이저·부하 조건](../benchmarks/run-guidellm.sh#L7-L14)
 
 콘솔 요약 표에서 실제 Qwen 토크나이저 기준의 TTFT, ITL, TPOT, 토큰 처리량이 한 번에 출력됩니다.
 
@@ -114,7 +122,7 @@ cd computer_science/ai/litellm-sse-load-test
 ```
 
 > [!TIP]
-> 동시성 한계점을 자동으로 탐색하려면 `--profile kind=concurrent,streams=2` 대신 `--profile kind=sweep`으로 바꾸고 `--output kind=html,path=benchmarks/output/guidellm.html`을 추가해 그래프 리포트를 생성합니다.
+기본 스크립트는 콘솔 표와 함께 `benchmarks/output/guidellm/concurrent-2.html`을 저장합니다. 동시성을 단계별로 높여 비교하려면 [시나리오 6의 동시성 스윕](6-guidellm-handson.md)을 실행합니다. [기본 스크립트의 출력 설정](../benchmarks/run-guidellm.sh#L15-L17)
 
 ## k6 · xk6-sse · AIPerf · GuideLLM 실측 비교
 
@@ -129,18 +137,26 @@ cd computer_science/ai/litellm-sse-load-test
 | NVIDIA AIPerf | 동시성 2, 10건 (워밍업 2건 제외) | `1355.2 ms` | `18.2 ms` | `2.42s` | `51.5 tokens/s` | ISL 128 / OSL 64 + 경고 |
 | GuideLLM | 동시성 2, 10건 | `1230.7 ms` | `16.5 ms` (ITL) | `2.30s` | `52.9 tokens/s` | ISL 128 / OSL 64 (Qwen 토크나이저) |
 
-`xk6-sse`의 TTFT(`234.9 ms`)보다 AIPerf(`1355.2 ms`)와 GuideLLM(`1230.7 ms`)의 TTFT가 높게 나온 이유는 명확합니다. `xk6-sse`는 2초에 1건씩 보내 동시 요청이 거의 겹치지 않았고, AIPerf와 GuideLLM은 동시성 2를 유지하며 128토큰 프롬프트가 연달아 들어와 Ollama의 Prefill 대기열이 생겼기 때문입니다. **같은 모델이라도 동시성과 입력 토큰 길이에 따라 TTFT가 5배 이상 달라지므로, 항상 조건을 고정하고 메타데이터와 함께 기록해야 합니다.**
+`xk6-sse`는 Open loop로 2초마다 요청 시작을 예약합니다. 이 실행에서 E2E P95는 `1.92s`였으므로 대부분의 요청은 다음 예약 시각 전에 완료됐습니다. AIPerf와 GuideLLM은 이 표의 실행에서 Closed loop로 동시성 2를 유지했습니다. 입력 생성과 토큰 길이 조건도 달랐으므로 TTFT 차이에는 여러 요인이 섞여 있습니다. Provider 내부의 Prefill 대기 시간은 이 결과로 확인하기 어렵습니다. TTFT를 비교할 때는 입력 데이터, 출력 상한, 부하 방식과 워밍업 조건을 맞춥니다. [xk6-sse 도착률 설정](../k6/04-xk6-sse-ttft.js#L14-L25) · [AIPerf 설정](../benchmarks/run-aiperf.sh#L14-L18) · [GuideLLM 설정](../benchmarks/run-guidellm.sh#L7-L14)
+
+### 관리형 API의 분당 quota와 응답 성능
+
+Bedrock의 quota는 사용하는 endpoint, 모델 또는 inference profile, Region 기준으로 확인합니다. `bedrock-runtime`은 입력과 출력을 합산하고 모델별 output burndown과 일부 모델의 RPM을 적용합니다. `bedrock-mantle`은 공개 quota가 있는 모델에서 입력·출력 TPM을 따로 적용합니다. 요청 수락 시에는 `max_tokens`도 토큰 예약에 영향을 주므로 입력 길이, 출력 상한, 실제 사용량을 함께 기록합니다. [Amazon Bedrock quota와 throttle 동작](https://docs.aws.amazon.com/bedrock/latest/userguide/scaling-throughput-best-practices.html)
+
+quota 검증에는 Open loop로 요청 도착률을 여러 단계로 올리고 각 단계에서 여러 분 동안 실제 전송량, 분당 토큰 사용량, 응답의 오류 유형을 확인합니다. `429 ThrottlingException`은 quota나 rate limit에 도달했을 때의 신호이고, `503`은 일시적인 서비스 용량 문제로 해석합니다. k6의 `dropped_iterations`는 부하 생성기에서 시작하지 못한 반복입니다. 성능 검증에는 같은 실행에서 TTFT P95, 전체 완료 P95, 성공 처리량을 함께 봅니다. [Amazon Bedrock 부하 검증 가이드](https://docs.aws.amazon.com/bedrock/latest/userguide/scaling-throughput-best-practices.html)
+
+AIPerf는 `--request-rate`와 `--arrival-pattern constant`, GuideLLM은 `--profile kind=constant,rate=…`로 Open loop 부하를 줄 수 있습니다. 이 실습 스크립트는 로컬 Chat Completions를 호출하므로 Bedrock을 시험할 때는 사용하는 API 형식과 인증에 맞춰 호출 경로를 구성해야 합니다. Gateway를 거친다면 Provider가 반환한 오류 유형과 재시도 횟수를 확인할 수 있어야 합니다. [AIPerf 부하 옵션](https://docs.nvidia.com/aiperf/benchmark-modes/load-generator-options-reference) · [GuideLLM 프로필](https://vllm-project.github.io/guidellm/latest/getting-started/benchmark/)
 
 ## 부록. 실무 결과 판정 및 액션 가이드
 
-벤치마크에서 시나리오 1의 SLO 기준을 초과(Fail)했을 때 인프라 유형에 따라 취할 조치입니다.
+벤치마크에서 [1.1의 SLO 기준](1.1-overview.md#실습용-성능-목표-예시-slo)을 초과(Fail)했을 때 인프라 유형에 따라 취할 조치입니다.
 
 | 테스트 결과 증상 | Bedrock / Vertex (관리형 API) 조치 | 자체 서빙 vLLM 조치 |
 | --- | --- | --- |
-| 429 에러 발생 / RPS 정체 | RPM·TPM 쿼터 증설 요청, 일정 트래픽이면 Provisioned Throughput(PT) 검토 | 타임아웃·OOM 로그 확인 |
+| 429 에러 발생 / RPS 정체 | 오류 유형과 적용 RPM·TPM, 실제 전송률을 확인하고 quota 증설 필요 여부 판단 | 타임아웃·OOM 로그 확인 |
 | TTFT만 1초 이상 급증 | Cross-Region Inference 활성화, Prompt Caching 적용 | `max-num-batched-tokens` 조정, Prefix Caching·Chunked Prefill 튜닝 |
 | TPOT가 50ms 초과로 저하 | 더 가벼운 모델(Flash/Haiku/Mini 계열)로 라우팅 분리 | Concurrency Cap 설정, FP8/AWQ 양자화, GPU 증설 |
-| Goodput 95% 미만 도달 | 직전 통과 구간의 RPS를 현재 쿼터의 정격 용량으로 확정하고 증설 규모 산정 | 직전 통과 구간의 RPS를 서버 1대 정격 용량으로 확정하고 HPA 기준치로 설정 |
+| SLO 충족률 95% 미만 도달 | 직전 통과 부하를 해당 워크로드의 성능 기준으로 기록하고 quota 소진 여부는 별도 확인 | 직전 통과 부하를 해당 워크로드의 성능 기준으로 기록하고 HPA 기준치 검토 |
 
 지속적인 부하테스트를 운영할 때는 세 가지 원칙을 고정합니다.
 

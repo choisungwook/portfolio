@@ -1,6 +1,6 @@
-# LiteLLM Chat SSE 부하테스트 핸즈온
+# 로컬 AI 모델 성능테스트 핸즈온
 
-LiteLLM Proxy(`v1.110.2`)와 로컬 Ollama(`qwen2.5:1.5b`) 환경에서 일반 HTTP와 SSE의 차이, 기본 `k6/http`로 Chat SSE를 부하테스트할 때 발생하는 지표 왜곡, `xk6-sse` 보완과 LLM 전용 벤치마크 도구(AIPerf, GuideLLM) 비교를 실험하는 핸즈온이다.
+Ollama에서 실행하는 AI 모델을 기본 HTTP 부하테스트로 측정한 뒤 SSE 지연, 토큰 처리량, 동시성 한계까지 확인하는 핸즈온이다. LiteLLM은 OpenAI 호환 게이트웨이로 사용한다.
 
 @../../../AGENTS.md
 
