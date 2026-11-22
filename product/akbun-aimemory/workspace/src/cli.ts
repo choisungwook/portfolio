@@ -1,6 +1,7 @@
 import { readFileSync } from 'node:fs'
 import { basename } from 'node:path'
 import { parseArgs } from 'node:util'
+import pkg from '../package.json' with { type: 'json' }
 import { loadConfig } from './config.ts'
 import { contextText, runHook, searchSpool } from './hook.ts'
 import { indexSession } from './indexer/index.ts'
@@ -8,7 +9,7 @@ import { installAgent, isSupportedAgent, SUPPORTED_AGENTS } from './install/inde
 import { addMemory, deleteMemory, deleteSession, exportDb, importDb, invalidateMemory, listSessions, openStore, recent, reindex, search, sessionMemories } from './store.ts'
 import { serve } from './server.ts'
 
-const VERSION = JSON.parse(readFileSync(new URL('../package.json', import.meta.url), 'utf8')).version
+const VERSION = pkg.version
 
 const HELP = `aimem ${VERSION} - local memory for AI coding agents (Claude Code, Codex, Kiro, Antigravity)
 

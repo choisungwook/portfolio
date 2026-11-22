@@ -2,11 +2,11 @@ import { createServer, type IncomingMessage, type ServerResponse } from 'node:ht
 import { randomBytes } from 'node:crypto'
 import { readFileSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
-import { extname, join, normalize } from 'node:path'
+import { extname, join, posix } from 'node:path'
 import { caBundleInfo, clearCaBundle, saveCaBundle } from './connection/ca-bundle.ts'
+import { resourcePath } from './resources.ts'
 import { deleteMemory, deleteSession, exportDb, listSessions, search, sessionMemories, type Store } from './store.ts'
 
-const UI = join(import.meta.dirname, '..', 'ui')
 const TYPES: Record<string, string> = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css' }
 const MAX_BODY_BYTES = 1_500_000
 
@@ -86,10 +86,12 @@ function readJsonBody(req: IncomingMessage): Promise<Record<string, unknown>> {
 async function handle(s: Store, token: string, req: IncomingMessage, res: ServerResponse): Promise<void> {
   const url = new URL(req.url ?? '/', 'http://x')
   if (!url.pathname.startsWith('/api/')) {
-    const file = normalize(join(UI, url.pathname === '/' ? 'index.html' : url.pathname))
-    if (!file.startsWith(UI)) { send(res, 404, { error: 'not found' }); return }
+    const clean = posix.normalize(url.pathname === '/' ? '/index.html' : url.pathname)
+    if (!clean.startsWith('/') || clean.includes('..')) { send(res, 404, { error: 'not found' }); return }
+    const file = resourcePath(`ui${clean}`)
+    if (!file) { send(res, 404, { error: 'not found' }); return }
     try {
-      res.writeHead(200, { 'content-type': TYPES[extname(file)] ?? 'text/plain' }).end(readFileSync(file))
+      res.writeHead(200, { 'content-type': TYPES[extname(clean)] ?? 'text/plain' }).end(readFileSync(file))
     } catch {
       send(res, 404, { error: 'not found' })
     }

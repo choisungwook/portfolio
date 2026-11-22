@@ -1,6 +1,7 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { homedir } from 'node:os'
 import { dirname, join } from 'node:path'
+import { resourcePath } from '../resources.ts'
 
 export type AgentName = 'claude' | 'codex' | 'kiro' | 'antigravity'
 export const SUPPORTED_AGENTS: readonly AgentName[] = ['claude', 'codex', 'kiro', 'antigravity']
@@ -24,7 +25,9 @@ export function isSupportedAgent(value: string): value is AgentName {
 }
 
 function defaultSkillSource(): string {
-  return join(import.meta.dirname, '..', '..', 'skills', 'aimemory', 'SKILL.md')
+  const path = resourcePath('skills/aimemory/SKILL.md')
+  if (!path) throw new Error('bundled SKILL.md is missing from this build')
+  return path
 }
 
 function readJsonObject(file: string): Record<string, unknown> {

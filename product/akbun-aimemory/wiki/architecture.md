@@ -56,10 +56,6 @@ One file, `$AIMEMORY_HOME/data/aimemory.db` (`src/store.ts`).
 
 `workspace/desktop/` wraps the bundled `aimem` binary in a Tauri v2 window (`src-tauri/src/lib.rs`, `src-tauri/crates/launch/`). It runs `aimem serve --port 0`, navigates the window to the loopback URL, handles external links and SQLite backup downloads, and checks for updates via `tauri-plugin-updater` from the native app menu (**Check for Updates…**).
 
-## Planned directories
+## Release packaging
 
-Each directory holds only a README until its issue is done.
-
-| Directory | Issue |
-|---|---|
-| `workspace/scripts/` | Binary build for release (#1593) |
+`workspace/scripts/build-binary.ts` compiles a standalone `aimem` binary with `bun build --compile` embedding `ui/` and `skills/` through `src/resources.ts`. `.github/workflows/release-akbun-aimemory.yml` builds and smoke-tests the binary without Node on PATH, packages the macOS Apple silicon dmg and updater manifest, and publishes the release only after the build succeeds.

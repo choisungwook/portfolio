@@ -47,4 +47,4 @@ aimem serve
 
 ## Status
 
-Version 0.1.0 is a skeleton: CLI, storage, search, fallback and web UI work. The desktop app, MCP server, LLM indexer, TLS settings and binary release are open GitHub issues labelled `akbun-aimemory`.
+Version 0.2.0 includes the CLI, SQLite/FTS5 + `sqlite-vec` ANN hybrid search with access-aware decay and `valid_until` invalidation, open-source HuggingFace/SentencePiece tokenizers, custom CA bundle settings, detached LLM session indexer, stdio MCP server (`aimem mcp`), multi-agent hook/skill installer (`aimem install`), `akbun-taskq` integration, Tauri desktop app with self-update, and macOS Apple silicon binary/dmg releases.
