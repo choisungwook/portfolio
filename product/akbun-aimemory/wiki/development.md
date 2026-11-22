@@ -18,9 +18,10 @@ AIMEMORY_HOME=$(mktemp -d) node src/cli.ts serve
 
 `test/core.test.ts` holds only the invariants whose failure loses data or breaks an agent: CJK tokenization, multilingual hybrid search with dedup, export/import round trip, spool fallback and replay, hook exit code 0. All are tagged `[critical]`. Add a test only when a bug would cost the same.
 
-## CI
+## CI and Release
 
-`.github/workflows/verify-akbun-aimemory.yml` runs the type check and tests on pull requests. There is no release job yet, so the version in `package.json` does not create a tag.
+- `.github/workflows/verify-akbun-aimemory.yml` runs type check, Node tests, and desktop launch crate tests on pull requests.
+- `.github/workflows/release-akbun-aimemory.yml` builds and smoke-tests the standalone `aimem` binary (without Node on PATH) on pull requests, and on `master` pushes tags `akbun-aimemory-v<version>` and publishes the macOS Apple silicon CLI archive, desktop `.dmg`, and updater manifest (`akbun-aimemory-updater`) only after the build passes. Bump `workspace/package.json` whenever changing shipped files.
 
 ## Reindex performance
 

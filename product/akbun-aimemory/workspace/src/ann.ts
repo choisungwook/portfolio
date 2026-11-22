@@ -10,7 +10,8 @@ const ANN_BACKEND = 'sqlite-vec'
 export function tryLoadSqliteVec(db: DatabaseSync): boolean {
   try {
     const req = createRequire(import.meta.url)
-    const mod = req('sqlite-vec') as { load?: (database: DatabaseSync) => void }
+    const pkg = 'sqlite-vec'
+    const mod = req(pkg) as { load?: (database: DatabaseSync) => void }
     if (typeof mod.load !== 'function') return false
     mod.load(db)
     return true

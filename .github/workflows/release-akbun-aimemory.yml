@@ -1,0 +1,197 @@
+name: release-akbun-aimemory
+
+# Builds a single aimem executable for Apple silicon with bun (embedding ui/ and skills/) and wraps it in the Tauri
+# desktop app (workspace/desktop) as a signed-updater dmg. Pull requests build and smoke test without Node on PATH;
+# master pushes tag and release only after the build succeeds.
+on:
+  pull_request:
+    paths:
+      - 'product/akbun-aimemory/workspace/**'
+      - '.github/workflows/release-akbun-aimemory.yml'
+  push:
+    branches:
+      - master
+    paths:
+      - 'product/akbun-aimemory/workspace/src/**'
+      - 'product/akbun-aimemory/workspace/ui/**'
+      - 'product/akbun-aimemory/workspace/skills/**'
+      - 'product/akbun-aimemory/workspace/package.json'
+      - 'product/akbun-aimemory/workspace/package-lock.json'
+      - 'product/akbun-aimemory/workspace/scripts/build-binary.ts'
+      - 'product/akbun-aimemory/workspace/desktop/**'
+      - '.github/workflows/release-akbun-aimemory.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+defaults:
+  run:
+    working-directory: product/akbun-aimemory/workspace
+
+jobs:
+  build:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: product/akbun-aimemory/workspace/package-lock.json
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: '1.4.4'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Type check and test
+        run: |
+          npm run build
+          npm test
+
+      - name: Build single-file binary
+        run: node scripts/build-binary.ts dist/aimem
+
+      # Without Node on PATH: hook stores a memory and exits 0, search reads it back via SQLite/FTS5.
+      - name: Smoke test without Node on PATH
+        run: |
+          home=$(mktemp -d)
+          printf '{"session_id":"smoke","cwd":"/tmp/demo","hook_event_name":"UserPromptSubmit","prompt":"smoke test memory item"}\n' \
+            | env -i HOME="$home" AIMEMORY_HOME="$home" PATH=/usr/bin:/bin dist/aimem hook --agent claude
+          env -i HOME="$home" AIMEMORY_HOME="$home" PATH=/usr/bin:/bin dist/aimem search "smoke test" --json | grep -q 'smoke test memory item'
+          env -i HOME="$home" AIMEMORY_HOME="$home" PATH=/usr/bin:/bin dist/aimem version
+
+      - name: Package CLI archive
+        if: github.event_name != 'pull_request'
+        run: tar -czf aimem-darwin-arm64.tar.gz -C dist aimem
+
+      - uses: dtolnay/rust-toolchain@stable
+        if: github.event_name != 'pull_request'
+
+      - uses: swatinem/rust-cache@v2
+        if: github.event_name != 'pull_request'
+        with:
+          workspaces: product/akbun-aimemory/workspace/desktop/src-tauri
+
+      - name: Build desktop dmg and updater artifacts
+        if: github.event_name != 'pull_request'
+        working-directory: product/akbun-aimemory/workspace/desktop
+        env:
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+        run: |
+          mkdir -p src-tauri/binaries ../updater
+          cp ../dist/aimem src-tauri/binaries/aimem-aarch64-apple-darwin
+          npm ci
+          npm test
+          npx tauri build --bundles app,dmg
+          cp src-tauri/target/release/bundle/dmg/*.dmg ../aimemory-desktop-darwin-arm64.dmg
+          cp src-tauri/target/release/bundle/macos/*.app.tar.gz ../updater/
+          cp src-tauri/target/release/bundle/macos/*.app.tar.gz.sig ../updater/
+
+      - uses: actions/upload-artifact@v7
+        if: github.event_name != 'pull_request'
+        with:
+          name: aimemory-darwin-arm64
+          path: |
+            product/akbun-aimemory/workspace/aimem-darwin-arm64.tar.gz
+            product/akbun-aimemory/workspace/aimemory-desktop-darwin-arm64.dmg
+            product/akbun-aimemory/workspace/updater/*
+          retention-days: 1
+
+  # Build must pass before the tag exists, and the tag must exist before the release.
+  # Version comes from workspace/package.json; merging an existing version fails at git tag.
+  release:
+    if: github.event_name != 'pull_request'
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    defaults:
+      run:
+        working-directory: .
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '24'
+
+      - uses: actions/download-artifact@v8
+        with:
+          path: dist
+          merge-multiple: true
+
+      - name: Read version from package.json
+        id: version
+        run: |
+          version=$(node -p "require('./product/akbun-aimemory/workspace/package.json').version")
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "tag=akbun-aimemory-v$version" >> "$GITHUB_OUTPUT"
+
+      - name: Prepare release notes
+        env:
+          TAG: ${{ steps.version.outputs.tag }}
+        run: |
+          cat > release-notes.md <<EOF
+          ## Install
+
+          - \`aimemory-desktop-darwin-arm64.dmg\` is the macOS desktop app for Apple silicon. Drag it to Applications and run \`xattr -cr /Applications/akbun-aimemory.app\` once; the build is unsigned.
+          - After that, **Check for Updates…** in the app menu fetches newer versions automatically.
+          - \`aimem-darwin-arm64.tar.gz\` is the standalone CLI executable for Apple silicon (no Node required). Extract it onto PATH and run \`xattr -d com.apple.quarantine aimem\` once after a browser download.
+          EOF
+          bash .github/scripts/release-notes.sh "$TAG" product/akbun-aimemory >> release-notes.md
+
+      - name: Create tag
+        env:
+          TAG: ${{ steps.version.outputs.tag }}
+        run: |
+          git tag "$TAG"
+          git push origin "$TAG"
+
+      - name: Create release with binary, dmg, and updater bundle
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ steps.version.outputs.tag }}
+        run: |
+          gh release create "$TAG" --verify-tag --title "$TAG" --notes-file release-notes.md \
+            dist/aimem-darwin-arm64.tar.gz \
+            dist/aimemory-desktop-darwin-arm64.dmg \
+            dist/updater/*.app.tar.gz \
+            dist/updater/*.app.tar.gz.sig
+
+      # Several products release from this repository, so releases/latest is repository-wide.
+      # The desktop app polls this fixed tag instead.
+      - name: Publish updater manifest to the fixed tag
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ steps.version.outputs.version }}
+          TAG: ${{ steps.version.outputs.tag }}
+          REPO: ${{ github.repository }}
+        run: |
+          tarball=$(basename dist/updater/*.app.tar.gz)
+          sig=$(cat dist/updater/*.app.tar.gz.sig)
+          SIG="$sig" TARBALL="$tarball" node -e '
+            const manifest = {
+              version: process.env.VERSION,
+              pub_date: new Date().toISOString(),
+              platforms: {
+                "darwin-aarch64": {
+                  signature: process.env.SIG.trim(),
+                  url: `https://github.com/${process.env.REPO}/releases/download/${process.env.TAG}/${process.env.TARBALL}`,
+                },
+              },
+            };
+            process.stdout.write(JSON.stringify(manifest, null, 2) + "\n");
+          ' > latest.json
+          gh release create akbun-aimemory-updater \
+            --title "akbun-aimemory updater manifest" \
+            --notes "Fixed tag the installed akbun-aimemory app polls for updates. Do not delete." \
+            --latest=false || true
+          gh release upload akbun-aimemory-updater latest.json --clobber
