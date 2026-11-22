@@ -178,19 +178,19 @@ jobs:
         run: |
           tarball=$(basename dist/updater/*.app.tar.gz)
           sig=$(cat dist/updater/*.app.tar.gz.sig)
-          SIG="$sig" TARBALL="$tarball" node -e '
-            const manifest = {
-              version: process.env.VERSION,
-              pub_date: new Date().toISOString(),
-              platforms: {
-                "darwin-aarch64": {
-                  signature: process.env.SIG.trim(),
-                  url: `https://github.com/${process.env.REPO}/releases/download/${process.env.TAG}/${process.env.TARBALL}`,
-                },
+          SIG="$sig" TARBALL="$tarball" node <<'NODE' > latest.json
+          const manifest = {
+            version: process.env.VERSION,
+            pub_date: new Date().toISOString(),
+            platforms: {
+              'darwin-aarch64': {
+                signature: process.env.SIG.trim(),
+                url: `https://github.com/${process.env.REPO}/releases/download/${process.env.TAG}/${process.env.TARBALL}`,
               },
-            };
-            process.stdout.write(JSON.stringify(manifest, null, 2) + "\n");
-          ' > latest.json
+            },
+          }
+          process.stdout.write(`${JSON.stringify(manifest, null, 2)}\n`)
+          NODE
           gh release create akbun-aimemory-updater \
             --title "akbun-aimemory updater manifest" \
             --notes "Fixed tag the installed akbun-aimemory app polls for updates. Do not delete." \
