@@ -1,0 +1,26 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>akbun-aimemory</title>
+  <link rel="stylesheet" href="main.css">
+</head>
+<body>
+  <main>
+    <h1>akbun-aimemory</h1>
+    <section id="starting" aria-live="polite">
+      <p id="status" role="status">Starting aimemory…</p>
+    </section>
+    <section id="failed" role="alert" hidden>
+      <p class="error" id="failed-title">aimemory did not start.</p>
+      <p class="muted" id="failed-hint">The log below is what aimem printed last. Copy it to inspect the cause.</p>
+      <div class="log">
+        <button type="button" id="copy">Copy log</button>
+        <pre><code id="log"></code></pre>
+      </div>
+    </section>
+  </main>
+  <script src="main.js"></script>
+</body>
+</html>

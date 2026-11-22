@@ -1,5 +1,8 @@
-# desktop
+# Desktop Shell (`akbun-aimemory`)
 
-Tauri window around `aimem serve`, with the official updater plugin. Reuse `product/akbun-taskq/workspace/desktop`.
+Tauri v2 macOS desktop window around `aimem serve --port 0`, reusing the `product/akbun-taskq/workspace/desktop` architecture.
 
-Issue: https://github.com/choisungwook/portfolio/issues/1592
+- Launches the bundled `aimem` sidecar binary (`binaries/aimem`) inside the user's login shell and navigates the main window to the printed loopback URL (`http://127.0.0.1:<port>/?token=...`).
+- Self-update uses `tauri-plugin-updater` + `tauri-plugin-dialog`, triggered from the native macOS menu item **Check for Updates…** and polling the fixed `akbun-aimemory-updater` release tag.
+- Version is read from `../../package.json` (`workspace/package.json`) so there is only one version to bump.
+- Pure launch logic lives in `src-tauri/crates/launch` (`aimemory-launch`) with no Tauri dependency, so `npm test` runs without a webview or GTK/WebKit.

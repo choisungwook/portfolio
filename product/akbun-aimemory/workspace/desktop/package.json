@@ -1,0 +1,13 @@
+{
+  "name": "akbun-aimemory-desktop",
+  "private": true,
+  "description": "The macOS desktop window around the aimem binary. The version is ../package.json's.",
+  "scripts": {
+    "start": "tauri dev",
+    "dist": "tauri build",
+    "test": "cargo test --manifest-path src-tauri/Cargo.toml -p aimemory-launch"
+  },
+  "devDependencies": {
+    "@tauri-apps/cli": "^2.12.6"
+  }
+}

@@ -1,0 +1,7 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "default",
+  "description": "Only the bundled start page calls the app. The aimemory page is a remote loopback origin (http://127.0.0.1) and gets no IPC capability; updates run from the native app menu.",
+  "windows": ["main"],
+  "permissions": ["core:default"]
+}
