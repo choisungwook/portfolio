@@ -1,0 +1,26 @@
+[
+  {
+    "hook_event_name": "agentSpawn",
+    "cwd": "/workspace/infra",
+    "session_id": "kiro-sess-77"
+  },
+  {
+    "hook_event_name": "userPromptSubmit",
+    "cwd": "/workspace/infra",
+    "session_id": "kiro-sess-77",
+    "prompt": "Add VPC flow logs to the production Terraform module"
+  },
+  {
+    "hook_event_name": "postToolUse",
+    "cwd": "/workspace/infra",
+    "session_id": "kiro-sess-77",
+    "tool_name": "write",
+    "tool_input": { "path": "vpc.tf", "content": "resource \"aws_flow_log\" \"main\" {}" },
+    "tool_response": { "success": true, "output": "File successfully written." }
+  },
+  {
+    "hook_event_name": "stop",
+    "cwd": "/workspace/infra",
+    "session_id": "kiro-sess-77"
+  }
+]

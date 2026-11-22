@@ -1,0 +1,53 @@
+[
+  {
+    "conversationId": "ec33ebf9-0cba-4100-8142-c61503f6c587",
+    "workspacePaths": ["/workspace/search-engine"],
+    "transcriptPath": "/workspace/search-engine/.gemini/antigravity/transcript.jsonl",
+    "artifactDirectoryPath": "/workspace/search-engine/.gemini/antigravity/artifacts",
+    "modelName": "auto",
+    "lastUserInput": "",
+    "hookEventName": "SessionStart",
+    "cwd": "/workspace/search-engine"
+  },
+  {
+    "conversationId": "ec33ebf9-0cba-4100-8142-c61503f6c587",
+    "workspacePaths": ["/workspace/search-engine"],
+    "transcriptPath": "/workspace/search-engine/.gemini/antigravity/transcript.jsonl",
+    "artifactDirectoryPath": "/workspace/search-engine/.gemini/antigravity/artifacts",
+    "modelName": "auto",
+    "lastUserInput": "Benchmark sqlite-vec recall on 100k rows",
+    "hookEventName": "PreInvocation",
+    "cwd": "/workspace/search-engine",
+    "invocationNum": 1,
+    "initialNumSteps": 2
+  },
+  {
+    "conversationId": "ec33ebf9-0cba-4100-8142-c61503f6c587",
+    "workspacePaths": ["/workspace/search-engine"],
+    "transcriptPath": "/workspace/search-engine/.gemini/antigravity/transcript.jsonl",
+    "artifactDirectoryPath": "/workspace/search-engine/.gemini/antigravity/artifacts",
+    "modelName": "auto",
+    "lastUserInput": "Benchmark sqlite-vec recall on 100k rows",
+    "hookEventName": "PostToolUse",
+    "cwd": "/workspace/search-engine",
+    "stepIdx": 5,
+    "toolCall": {
+      "id": "toolu_01",
+      "name": "run_command",
+      "args": { "CommandLine": "node bench/benchmark.ts 100000" }
+    }
+  },
+  {
+    "conversationId": "ec33ebf9-0cba-4100-8142-c61503f6c587",
+    "workspacePaths": ["/workspace/search-engine"],
+    "transcriptPath": "/workspace/search-engine/.gemini/antigravity/transcript.jsonl",
+    "artifactDirectoryPath": "/workspace/search-engine/.gemini/antigravity/artifacts",
+    "modelName": "auto",
+    "lastUserInput": "Benchmark sqlite-vec recall on 100k rows",
+    "hookEventName": "Stop",
+    "cwd": "/workspace/search-engine",
+    "executionNum": 1,
+    "terminationReason": "NO_TOOL_CALL",
+    "fullyIdle": true
+  }
+]

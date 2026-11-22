@@ -4,6 +4,7 @@ import { parseArgs } from 'node:util'
 import { loadConfig } from './config.ts'
 import { contextText, runHook, searchSpool } from './hook.ts'
 import { indexSession } from './indexer/index.ts'
+import { installAgent, isSupportedAgent, SUPPORTED_AGENTS } from './install/index.ts'
 import { serveMcp } from './mcp/server.ts'
 import { addMemory, deleteMemory, deleteSession, exportDb, importDb, invalidateMemory, listSessions, openStore, recent, reindex, search, sessionMemories } from './store.ts'
 import { serve } from './server.ts'
@@ -38,6 +39,7 @@ Maintenance:
   aimem index <session-id>    summarize a session and reconcile memories with the configured indexer
   aimem reindex               rebuild token index and vectors after changing the tokenizer
   aimem mcp                   run stdio MCP server (search, recent, show_session, add_note; responses match --json)
+  aimem install --agent <claude|codex|kiro|antigravity> [--json]  install hooks and skill idempotently
   aimem serve [--port N]      web UI on 127.0.0.1 (prints a URL with a token)
   aimem config                print the effective config as JSON
 
@@ -77,7 +79,7 @@ const limit = o.limit ? Number(o.limit) : undefined
 const out = (data: unknown, text: () => string) => process.stdout.write(o.json ? JSON.stringify(data, null, 2) + '\n' : text())
 const line = (m: { id?: number; created_at: number; kind: string; content: string }) =>
   `${m.id ?? '-'}\t${new Date(m.created_at).toISOString().slice(0, 16)}\t${m.kind}\t${m.content.replace(/\s+/g, ' ').slice(0, 160)}\n`
-const usage = (msg: string) => { process.stderr.write(`aimem: ${msg}\n\n${HELP}`); process.exit(2) }
+const usage = (msg: string): never => { process.stderr.write(`aimem: ${msg}\n\n${HELP}`); process.exit(2) }
 
 if (o.help || !cmd || cmd === 'help') { process.stdout.write(HELP); process.exit(0) }
 if (cmd === 'version' || cmd === '--version') { console.log(VERSION); process.exit(0) }
@@ -133,6 +135,12 @@ const commands: Record<string, () => void | Promise<void>> = {
   },
   reindex: () => { const n = reindex(openStore(config)); out({ reindexed: n }, () => `reindexed ${n}\n`) },
   mcp: async () => { await serveMcp(config, VERSION) },
+  install: () => {
+    const target = o.agent ?? ''
+    if (!isSupportedAgent(target)) return usage(`install requires --agent <${SUPPORTED_AGENTS.join('|')}>`)
+    const res = installAgent(target)
+    out(res, () => `installed ${res.agent}: hooks (+${res.hooksAdded}) -> ${res.hookConfigPath}, skill -> ${res.skillPath}\n`)
+  },
   serve: async () => { console.log(await serve(openStore(config), Number(o.port))) },
 }
 

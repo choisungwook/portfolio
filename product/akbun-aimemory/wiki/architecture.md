@@ -60,4 +60,3 @@ Each directory holds only a README until its issue is done.
 |---|---|
 | `workspace/desktop/` | Tauri desktop app (#1592) |
 | `workspace/scripts/` | Binary build for release (#1593) |
-| `workspace/src/install/` | Hook installation and akbun-taskq integration (#1598) |
