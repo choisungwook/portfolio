@@ -1,6 +1,6 @@
 # 커밋 개인정보 검사
 
-저장소 루트에서 아래 명령을 한 번 실행하면 Claude Code, Codex, Antigravity, 일반 터미널의 `git commit`에 같은 검사가 적용된다. 이미 다른 `core.hooksPath`를 쓰고 있다면 그 훅 구성에 통합한다.
+저장소 루트에서 아래 명령을 한 번 실행하면 Claude Code, Codex, Antigravity, 일반 터미널의 `git commit`에 같은 검사가 적용된다. 세 에이전트의 도구 훅은 이 저장소의 Git 훅 활성화도 확인한다. 다른 `core.hooksPath`를 사용하는 작업 사본에서는 전환 전에 기존 훅을 확인한다.
 
 ```bash
 git config --local core.hooksPath .githooks

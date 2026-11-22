@@ -1,7 +1,7 @@
 #!/bin/bash
 # Antigravity PreToolUse(run_command) 어댑터.
 # 심볼릭 링크(.agents/hooks/claude-hooks -> ../../.claude/hooks)를 통해
-# Claude Code의 guardrail.sh와 prepush-scan.sh를 그대로 실행하고
+# 공용 명령, 커밋, 게시 검사를 실행하고
 # 결과를 Antigravity JSON 계약({"decision": "allow"|"deny", "reason": ...})으로 반환한다.
 set -o pipefail
 
@@ -50,6 +50,7 @@ run_claude_hook() {
 }
 
 run_claude_hook "$CLAUDE_HOOKS_DIR/guardrail.sh"
+run_claude_hook "$CLAUDE_HOOKS_DIR/require-commit-hooks.sh"
 run_claude_hook "$CLAUDE_HOOKS_DIR/prepush-scan.sh"
 
 allow
