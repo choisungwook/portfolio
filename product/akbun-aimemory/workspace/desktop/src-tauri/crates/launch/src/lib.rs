@@ -1,16 +1,17 @@
 //! What the desktop shell needs to know about `aimem serve`, without Tauri, so `cargo test -p aimemory-launch`
 //! compiles nothing else and runs without a webview or system GTK/WebKit packages.
 
-/// Extracts the loopback address printed by `aimem serve --port 0`.
-/// Only `http://127.0.0.1:<digits>/...` counts so arbitrary lines from a login shell profile can never redirect the window.
+/// Extracts the loopback address printed by `aimem serve --port 0` (`http://127.0.0.1:<port>/?token=<hex>`).
+/// Requires a valid u16 port and a non-empty `/?token=` parameter so proxy URLs printed by `.zshrc` are ignored.
 pub fn ready_url(line: &str) -> Option<&str> {
     let trimmed = line.trim();
     let idx = trimmed.find("http://127.0.0.1:")?;
     let url = trimmed[idx..].split_whitespace().next()?;
     let after = url.strip_prefix("http://127.0.0.1:")?;
-    let port = after.split('/').next()?;
-    // Reject `http://127.0.0.1:@evil.com/` by ensuring the port is strictly ASCII digits followed by `/`.
-    (after.contains('/') && !port.is_empty() && port.bytes().all(|b| b.is_ascii_digit())).then_some(url)
+    let (port, rest) = after.split_once("/?token=")?;
+    let valid_port = !port.is_empty() && port.parse::<u16>().is_ok();
+    let valid_token = !rest.is_empty() && rest.bytes().all(|b| b.is_ascii_hexdigit());
+    (valid_port && valid_token).then_some(url)
 }
 
 /// The login shell used to launch `aimem`. Finder-launched apps have a minimal PATH, so using the user's
@@ -32,7 +33,7 @@ mod tests {
     use super::*;
 
     #[test]
-    fn ready_url_accepts_only_loopback_with_numeric_port() {
+    fn ready_url_accepts_only_loopback_with_valid_port_and_token() {
         assert_eq!(
             ready_url("http://127.0.0.1:7788/?token=abcd1234"),
             Some("http://127.0.0.1:7788/?token=abcd1234")
@@ -41,10 +42,12 @@ mod tests {
             ready_url("aimemory running at http://127.0.0.1:51234/?token=ff00"),
             Some("http://127.0.0.1:51234/?token=ff00")
         );
+        assert_eq!(ready_url("http://127.0.0.1:7890/"), None);
+        assert_eq!(ready_url("http://127.0.0.1:99999/?token=abcd"), None);
+        assert_eq!(ready_url("http://127.0.0.1:7788/?token="), None);
         assert_eq!(ready_url("hello from .zshrc"), None);
         assert_eq!(ready_url("https://example.com/?token=ab"), None);
-        assert_eq!(ready_url("http://127.0.0.1:@example.com/"), None);
-        assert_eq!(ready_url("http://127.0.0.1:notaport/"), None);
+        assert_eq!(ready_url("http://127.0.0.1:@example.com/?token=ab"), None);
     }
 
     #[test]

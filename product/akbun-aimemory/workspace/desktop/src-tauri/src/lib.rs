@@ -4,6 +4,7 @@
 
 use std::io::{BufRead, BufReader};
 use std::process::{Child, ChildStdout, Command, Stdio};
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Mutex;
 use std::time::{Duration, Instant};
 
@@ -14,6 +15,7 @@ use tauri_plugin_dialog::{DialogExt, MessageDialogButtons, MessageDialogKind};
 use tauri_plugin_updater::UpdaterExt;
 
 const MENU_CHECK_UPDATES: &str = "check-for-updates";
+static UPDATING: AtomicBool = AtomicBool::new(false);
 
 #[derive(Default)]
 struct Server {
@@ -54,11 +56,11 @@ fn follow(app: AppHandle) {
     for line in BufReader::new(stdout).lines().map_while(Result::ok) {
         if !ready {
             if let Some(url) = aimemory_launch::ready_url(&line) {
-                ready = true;
                 if let (Some(window), Ok(parsed)) = (app.get_webview_window("main"), url.parse()) {
+                    ready = true;
                     let _ = window.navigate(parsed);
+                    continue;
                 }
-                continue;
             }
         }
         tail.push(line);
@@ -103,6 +105,9 @@ fn message(app: &AppHandle, kind: MessageDialogKind, title: &str, text: String) 
 }
 
 fn check_for_updates(app: AppHandle) {
+    if UPDATING.swap(true, Ordering::SeqCst) {
+        return;
+    }
     tauri::async_runtime::spawn(async move {
         let checked = match app.updater() {
             Ok(updater) => updater.check().await,
@@ -111,10 +116,12 @@ fn check_for_updates(app: AppHandle) {
         let update = match checked {
             Ok(Some(update)) => update,
             Ok(None) => {
+                UPDATING.store(false, Ordering::SeqCst);
                 let text = format!("Current version {}", app.package_info().version);
                 return message(&app, MessageDialogKind::Info, "You are on the latest version", text);
             }
             Err(error) => {
+                UPDATING.store(false, Ordering::SeqCst);
                 return message(&app, MessageDialogKind::Error, "Cannot check for updates", error.to_string());
             }
         };
@@ -128,12 +135,16 @@ fn check_for_updates(app: AppHandle) {
             .buttons(MessageDialogButtons::OkCancelCustom("Update Now".into(), "Later".into()))
             .show(move |accepted| {
                 if !accepted {
+                    UPDATING.store(false, Ordering::SeqCst);
                     return;
                 }
                 tauri::async_runtime::spawn(async move {
                     match update.download_and_install(|_, _| {}, || {}).await {
                         Ok(()) => handle.restart(),
-                        Err(error) => message(&handle, MessageDialogKind::Error, "Update failed", error.to_string()),
+                        Err(error) => {
+                            UPDATING.store(false, Ordering::SeqCst);
+                            message(&handle, MessageDialogKind::Error, "Update failed", error.to_string());
+                        }
                     }
                 });
             });
@@ -172,7 +183,16 @@ fn build_menu(app: &tauri::App) -> tauri::Result<Menu<tauri::Wry>> {
             &PredefinedMenuItem::select_all(app, None)?,
         ],
     )?;
-    Menu::with_items(app, &[&app_submenu, &edit_submenu])
+    let window_submenu = Submenu::with_items(
+        app,
+        "Window",
+        true,
+        &[
+            &PredefinedMenuItem::minimize(app, None)?,
+            &PredefinedMenuItem::close_window(app, None)?,
+        ],
+    )?;
+    Menu::with_items(app, &[&app_submenu, &edit_submenu, &window_submenu])
 }
 
 fn open_window(app: &tauri::App) -> tauri::Result<()> {
