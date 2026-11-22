@@ -1,0 +1,13 @@
+#!/bin/bash
+set -o pipefail
+
+HOOK_DIR=$(cd "$(dirname "$0")" && pwd) || exit 2
+{
+  git diff --cached --diff-filter=ACMR --name-only -z | tr '\000' '\n' || exit 2
+  git diff --cached --diff-filter=ACMR --text --no-color --no-ext-diff --no-textconv --unified=0 |
+    LC_ALL=C perl -ne '
+      BEGIN { $/ = "\ndiff --git " }
+      next if /\x00/;
+      print "$_\n" for grep { /^\+/ } split /\n/;
+    '
+} | bash "$HOOK_DIR/scan-commit-material.sh"

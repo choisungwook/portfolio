@@ -184,37 +184,9 @@ fi
 MATERIAL_BYTES=$(printf '%s' "$MATERIAL" | wc -c)
 [ "$MATERIAL_BYTES" -le "$MAX_BYTES" ] || block "too much material to review in one go."
 
-# --- 1. patterns -------------------------------------------------------------
-
-PATTERNS=(
-  'AWS access key id|(AKIA|ASIA)[0-9A-Z]{16}'
-  'AWS secret access key|aws_secret_access_key[[:space:]]*[=:][[:space:]]*[A-Za-z0-9/+]{40}'
-  'Anthropic key|sk-ant-[A-Za-z0-9_-]{20,}'
-  'GitHub token|gh[pousr]_[A-Za-z0-9]{36,}'
-  'GitHub fine-grained token|github_pat_[A-Za-z0-9_]{22,}'
-  'Slack token|xox[baprs]-[A-Za-z0-9-]{10,}'
-  'Google API key|AIza[0-9A-Za-z_-]{35}'
-  'private key block|-----BEGIN [A-Z ]*PRIVATE KEY-----'
-)
-# Account ids in ARNs, except the placeholders AWS documentation uses.
-ARN='arn:aws[a-z-]*:[a-z0-9-]*:[a-z0-9-]*:[0-9]{12}:'
-ARN_OK='arn:aws[a-z-]*:[a-z0-9-]*:[a-z0-9-]*:(111122223333|123456789012|000000000000|999999999999):'
-
-# Only the two sample credentials from the AWS documentation are exempt.
-SCAN=$(echo "$MATERIAL" | LC_ALL=C sed -e 's/AKIAIOSFODNN7EXAMPLE//g' -e 's#wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY##g')
-HITS=()
-for entry in "${PATTERNS[@]}"; do
-  name="${entry%%|*}"; pat="${entry#*|}"
-  n=$(echo "$SCAN" | grep -acE -e "$pat")
-  [ "$n" -gt 0 ] && HITS+=("- $name: $n line(s)")
-done
-n=$(echo "$SCAN" | grep -aE -e "$ARN" | grep -acvE -e "$ARN_OK")
-[ "$n" -gt 0 ] && HITS+=("- real-looking AWS account id in an ARN: $n line(s)")
-
-# The values are deliberately not printed; this output lands in a transcript.
-[ ${#HITS[@]} -gt 0 ] && block "this would publish what looks like a secret." "${HITS[@]}" \
-  "Find it with: git log -p HEAD --not --remotes" \
-  "Remove it from the commits themselves (a follow-up commit still publishes the value)." \
-  "In a test, build a fake value by concatenation so the source holds no key-shaped literal."
+HOOK_DIR=$(cd "$(dirname "$0")" && pwd) || block "cannot resolve the hook directory."
+printf '%s\n' "$MATERIAL" | bash "$HOOK_DIR/scan-known-secrets.sh" ||
+  block "remove sensitive material from the outgoing commits and retry." \
+    "A follow-up commit still publishes the earlier value."
 
 printf '%s\n' "$MATERIAL"
