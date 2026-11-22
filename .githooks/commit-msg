@@ -1,0 +1,5 @@
+#!/bin/bash
+set -e
+
+HOOK_DIR=$(cd "$(dirname "$0")" && pwd) || exit 2
+bash "$HOOK_DIR/scan-commit-material.sh" < "$1"

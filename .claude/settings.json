@@ -10,6 +10,12 @@
           },
           {
             "type": "command",
+            "command": "bash ${CLAUDE_PROJECT_DIR}/.claude/hooks/require-commit-hooks.sh",
+            "onFailure": "block",
+            "timeout": 10
+          },
+          {
+            "type": "command",
             "command": "bash ${CLAUDE_PROJECT_DIR}/.claude/hooks/prepush-scan.sh",
             "onFailure": "block",
             "statusMessage": "Checking what this command publishes",
@@ -20,6 +26,12 @@
       {
         "matcher": "mcp__terminal__run_in_terminal",
         "hooks": [
+          {
+            "type": "command",
+            "command": "bash ${CLAUDE_PROJECT_DIR}/.claude/hooks/require-commit-hooks.sh",
+            "onFailure": "block",
+            "timeout": 10
+          },
           {
             "type": "command",
             "command": "bash ${CLAUDE_PROJECT_DIR}/.claude/hooks/prepush-scan.sh",

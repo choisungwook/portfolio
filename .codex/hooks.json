@@ -6,6 +6,12 @@
         "hooks": [
           {
             "type": "command",
+            "command": "bash \"$(git rev-parse --show-toplevel)/.claude/hooks/require-commit-hooks.sh\"",
+            "statusMessage": "Checking that Git commit privacy hooks are active",
+            "timeout": 10
+          },
+          {
+            "type": "command",
             "command": "node \"$(git rev-parse --show-toplevel)/.codex/hooks/taskq-changelog.mjs\"",
             "timeout": 10
           },
