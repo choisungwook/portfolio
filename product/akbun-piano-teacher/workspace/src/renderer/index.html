@@ -1,0 +1,89 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self' https://tonejs.github.io; media-src 'self' blob:; worker-src 'self' blob:">
+  <title>akbun-piano-teacher</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <header>
+    <nav id="nav">
+      <button data-view="library">Library</button>
+      <button data-view="practice">Practice</button>
+      <button data-view="review" id="nav-review" hidden>Review</button>
+      <button data-view="settings">Settings</button>
+    </nav>
+    <div id="task" hidden>
+      <span id="task-message"></span>
+      <progress id="task-bar" max="1" value="0"></progress>
+      <button id="task-cancel">Cancel</button>
+    </div>
+    <div id="notice" role="status"></div>
+  </header>
+
+  <main>
+    <section id="view-library">
+      <div class="toolbar">
+        <button id="import" class="primary">Import…</button>
+        <button id="open-folder">Open library folder</button>
+      </div>
+      <div id="song-list"></div>
+    </section>
+
+    <section id="view-practice" hidden>
+      <div class="toolbar">
+        <button id="play" class="play" data-icon="play" data-icon-size="24" aria-label="Play"></button>
+        <strong id="song-title"></strong>
+        <span id="position"></span>
+        <label>Tempo <input id="tempo" type="range" min="0.25" max="1.5" step="0.05" value="1"><span id="tempo-label">1.00×</span></label>
+        <span class="group">
+          <button id="loop-on" class="icon-toggle" data-icon="repeat" aria-pressed="false" aria-label="Repeat measures" title="Repeat these measures"></button>
+          <input id="loop-from" type="number" min="1" value="1" aria-label="Repeat from measure"> – <input id="loop-to" type="number" min="1" value="8" aria-label="Repeat to measure">
+        </span>
+        <label><input id="hand-r" type="checkbox" checked> R</label>
+        <label><input id="hand-l" type="checkbox" checked> L</label>
+        <button id="metronome" class="icon-toggle" data-icon="metronome" aria-pressed="false" aria-label="Metronome" title="Metronome"></button>
+        <button id="keys-toggle" class="icon-toggle" data-icon="keys" aria-pressed="true" aria-label="Piano panel" title="Show or hide the piano"></button>
+        <button id="hands-toggle" class="icon-toggle" data-icon="hand" aria-pressed="true" aria-label="Hide hands" title="Show or hide the hands" hidden></button>
+        <select id="view-mode">
+          <option value="2d">2D keyboard</option>
+          <option value="3d">3D piano</option>
+        </select>
+        <label title="USB-MIDI piano whose keys light up as you play">MIDI <select id="midi-device"><option value="">Connecting…</option></select></label>
+      </div>
+      <div id="score"></div>
+      <canvas id="keyboard"></canvas>
+      <div id="piano3d" hidden></div>
+    </section>
+
+    <section id="view-review" hidden>
+      <p class="hint">Measures read from photos. Fix one by editing its piano-notation v1 text, e.g. {"1":{"1":"E5/q D5/8 C5/8 D5/h"},"2":{"1":"C3/w"}}, then Apply.</p>
+      <div id="omr-list"></div>
+    </section>
+
+    <section id="view-settings" hidden>
+      <form id="settings-form">
+        <label>Score recognition
+          <select id="set-vision">
+            <option value="codex">Codex (ChatGPT plan)</option>
+            <option value="claude-api">Claude API (API key)</option>
+          </select>
+        </label>
+        <p>Status: <span id="set-status"></span></p>
+        <label>Codex CLI path <input id="set-codex-path" type="text"></label>
+        <label>Codex model (empty: Codex default) <input id="set-codex-model" type="text"></label>
+        <label>Claude model <input id="set-claude-model" type="text"></label>
+        <label>Claude API key <input id="set-api-key" type="password" autocomplete="off"></label>
+        <div class="toolbar">
+          <button id="settings-save" type="button" class="primary">Save</button>
+          <button id="settings-clear-key" type="button">Remove API key</button>
+        </div>
+        <p class="hint">Library: <span id="set-root"></span></p>
+        <p class="hint">Piano samples: Salamander Grand Piano by Alexander Holm, CC-BY 3.0.</p>
+      </form>
+    </section>
+  </main>
+  <script src="app.js"></script>
+</body>
+</html>

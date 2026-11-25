@@ -1,0 +1,114 @@
+:root {
+  --bg: #f7f6f3;
+  --panel: #ffffff;
+  --fg: #1d1d1f;
+  --muted: #6b6b70;
+  --border: #dedcd6;
+  --accent: #2f6fdf;
+  --right: #2f6fdf;
+  --left: #1f9d6b;
+  --played: #e8892b;
+  --wrong: #d64545;
+  --missed: #9a9aa0;
+  --white-key: #ffffff;
+  --black-key: #222226;
+  --key-border: #b9b7b0;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #17191d;
+    --panel: #20232a;
+    --fg: #e8e8ea;
+    --muted: #9b9ca3;
+    --border: #353943;
+    --accent: #6c9cff;
+    --right: #5a8dff;
+    --left: #39c08a;
+    --white-key: #e9e9ec;
+    --black-key: #0c0c0e;
+    --key-border: #555a66;
+  }
+}
+
+* { box-sizing: border-box; }
+[hidden] { display: none !important; }
+
+body {
+  margin: 0;
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+  background: var(--bg);
+  color: var(--fg);
+  font: 14px/1.4 system-ui, -apple-system, "Segoe UI", sans-serif;
+}
+
+header {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+  align-items: center;
+  padding: 8px 16px;
+  border-bottom: 1px solid var(--border);
+  background: var(--panel);
+}
+
+main { flex: 1; overflow: hidden; display: flex; flex-direction: column; }
+main > section { flex: 1; overflow: auto; padding: 12px 16px; display: flex; flex-direction: column; gap: 8px; }
+
+button, select, input, textarea {
+  font: inherit;
+  color: inherit;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 4px 10px;
+}
+button { cursor: pointer; }
+button.primary, #nav button[aria-current="page"] { background: var(--accent); border-color: var(--accent); color: #fff; }
+#nav { display: flex; gap: 4px; }
+input[type="number"] { width: 64px; }
+
+/* The play button is the control the eye looks for: large, round, filled, an icon that says what a click does. */
+button.play {
+  width: 44px; height: 44px; padding: 0; display: inline-flex; align-items: center; justify-content: center;
+  border-radius: 50%; background: var(--accent); border-color: var(--accent); color: #fff;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.2); transition: transform 120ms;
+}
+button.play:hover { transform: scale(1.06); }
+button.play.playing { background: var(--played); border-color: var(--played); }
+
+/* Icon toggles: filled while on. */
+button.icon-toggle { width: 34px; height: 30px; padding: 0; display: inline-flex; align-items: center; justify-content: center; }
+button.icon-toggle[aria-pressed="true"] { background: var(--accent); border-color: var(--accent); color: #fff; }
+
+.group { display: inline-flex; align-items: center; gap: 6px; }
+
+.toolbar { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+#notice { color: var(--muted); margin-left: auto; cursor: pointer; }
+#notice[data-kind="error"] { color: var(--wrong); }
+#task { display: flex; gap: 8px; align-items: center; }
+.hint, .empty { color: var(--muted); }
+
+#song-list { display: flex; flex-direction: column; gap: 6px; max-width: 720px; }
+.song { display: flex; flex-direction: column; align-items: flex-start; text-align: left; padding: 10px 12px; }
+.song span { color: var(--muted); }
+
+#view-practice { overflow: hidden; }
+#score { flex: 1; min-height: 0; overflow: auto; background: #fff; border-radius: 6px; border: 1px solid var(--border); }
+#keyboard { width: 100%; height: 120px; flex: none; }
+#piano3d { width: 100%; height: 38vh; min-height: 220px; flex: none; border-radius: 6px; overflow: hidden; background: linear-gradient(#2a2a2e, #101012); }
+#piano3d canvas { display: block; }
+
+#omr-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 8px; }
+.omr-measure { border-left: 4px solid var(--missed); padding: 4px 8px; display: flex; flex-direction: column; gap: 4px; background: var(--panel); }
+.omr-measure textarea { width: 100%; font-family: ui-monospace, monospace; font-size: 12px; }
+.omr-measure button { align-self: flex-end; }
+.status-ok { border-color: var(--left); }
+.status-invalid { border-color: var(--wrong); }
+.status-uncertain, .status-disagree { border-color: var(--played); }
+.status-user-edited { border-color: var(--accent); }
+
+#settings-form { display: flex; flex-direction: column; gap: 10px; max-width: 520px; }
+#settings-form label { display: flex; flex-direction: column; gap: 4px; }

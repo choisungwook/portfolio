@@ -1,7 +1,21 @@
 {
   "repoBase": "https://github.com/choisungwook/portfolio/tree/master/product",
-  "updated": "2026-11-21",
+  "updated": "2026-11-25",
   "products": [
+    {
+      "id": "akbun-piano-teacher",
+      "name": "akbun-piano-teacher",
+      "description": "악보 사진·MusicXML·MIDI를 가져와 악보 커서와 함께 재생하고, 2D 건반이나 손가락이 따라 치는 3D 피아노로 보여 주는 피아노 연습 Electron 데스크톱 앱",
+      "kind": "desktop",
+      "tags": [
+        "electron",
+        "typescript",
+        "music",
+        "midi",
+        "llm"
+      ],
+      "released": "2026-11-25"
+    },
     {
       "id": "akbun-aimemory",
       "name": "akbun-aimemory",

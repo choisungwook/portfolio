@@ -176,6 +176,7 @@
 - [AI 에이전트 hook이 남긴 대화를 모델 없이 검색하는 로컬 AI 메모리 (akbun-aimemory)](./product/akbun-aimemory/) (26.11.21)
 - [여러 Claude 세션이 태스크를 병렬로 처리하는 개인용 에이전트 태스크 큐 (akbun-taskq)](./product/akbun-taskq/) (26.11.15)
 - [AI agent가 값을 보지 않고 쓰는 로컬 비밀 값 관리 도구 (akbun-keychain)](./product/akbun-keychain/) (26.11.17)
+- [악보를 재생하고 3D 피아노의 손이 따라 치는 피아노 연습 데스크톱 앱 (akbun-piano-teacher)](./product/akbun-piano-teacher/) (26.11.25)
 
 ## Dockerfile
 

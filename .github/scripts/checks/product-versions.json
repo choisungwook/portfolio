@@ -104,5 +104,10 @@
     "version_file": "product/akbun-storyboard/workspace/Cargo.toml",
     "tag_prefix": "akbun-storyboard-v",
     "existing_tag": "fail"
+  },
+  "release-akbun-piano-teacher.yml": {
+    "version_file": "product/akbun-piano-teacher/workspace/package.json",
+    "tag_prefix": "akbun-piano-teacher-v",
+    "existing_tag": "fail"
   }
 }

@@ -1,0 +1,74 @@
+{
+  "name": "akbun-piano-teacher",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Piano practice coach: score import, playback, MIDI recording and rule-based correction",
+  "author": "akbun",
+  "license": "MIT",
+  "main": "dist/main.cjs",
+  "engines": {
+    "node": ">=24"
+  },
+  "scripts": {
+    "build": "node scripts/build.mjs",
+    "typecheck": "tsc --noEmit",
+    "start": "npm run build && electron .",
+    "test": "node --test \"test/*.test.ts\"",
+    "omr-eval": "node scripts/omr-eval.ts",
+    "dist": "npm run build && electron-builder --publish never"
+  },
+  "dependencies": {
+    "electron-updater": "^6.8.11"
+  },
+  "devDependencies": {
+    "@anthropic-ai/sdk": "^1.14.0",
+    "@tonejs/midi": "^2.0.28",
+    "@types/node": "^24.10.0",
+    "@types/three": "^0.187.0",
+    "@xmldom/xmldom": "^0.9.12",
+    "electron": "^45.5.0",
+    "electron-builder": "^26.18.0",
+    "esbuild": "^0.28.2",
+    "jszip": "^3.10.2",
+    "opensheetmusicdisplay": "^3.0.0",
+    "three": "^0.187.0",
+    "tone": "^15.1.22",
+    "typescript": "^7.0.2"
+  },
+  "build": {
+    "appId": "io.akbun.pianoteacher",
+    "productName": "akbun-piano-teacher",
+    "files": [
+      "dist/**/*"
+    ],
+    "directories": {
+      "output": "release"
+    },
+    "publish": {
+      "provider": "generic",
+      "url": "https://github.com/choisungwook/portfolio/releases/latest/download"
+    },
+    "mac": {
+      "target": [
+        {
+          "target": "dmg",
+          "arch": [
+            "arm64",
+            "x64"
+          ]
+        }
+      ],
+      "category": "public.app-category.music"
+    },
+    "win": {
+      "target": "nsis",
+      "verifyUpdateCodeSignature": false
+    },
+    "nsis": {
+      "artifactName": "${productName}-Setup-${version}.${ext}",
+      "oneClick": true,
+      "perMachine": false
+    }
+  }
+}
