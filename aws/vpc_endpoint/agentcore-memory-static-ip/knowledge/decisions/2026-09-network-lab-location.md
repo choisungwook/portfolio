@@ -3,7 +3,7 @@ type: Decision
 title: AWS API 연결 실습을 VPC endpoint 아래에 분류
 description: 네트워크 실습은 VPC endpoint 아래에 두고 연결 그림과 실험은 시나리오별 문서에서 함께 관리한다.
 tags: [aws, vpc-endpoint, documentation, architecture]
-timestamp: 2026-09-05T15:00:00Z
+generated: { by: claude-code/unknown, at: 2026-09-05T15:00:00Z }
 ---
 
 ## 결정

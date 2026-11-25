@@ -3,7 +3,7 @@ type: Decision
 title: Program Monitor 전체 화면은 편집 레이아웃을 숨겨 보존한다
 description: 앱 안의 Program Monitor 전체 화면은 레이아웃 상태를 바꾸지 않고 CSS 표시만 전환한다.
 tags: [makevideo, program-monitor, layout]
-timestamp: 2026-09-04T00:00:00Z
+generated: { by: claude-code/unknown, at: 2026-09-04T00:00:00Z }
 ---
 
 # Program Monitor 전체 화면은 편집 레이아웃을 숨겨 보존한다

@@ -3,7 +3,20 @@ type: Decision
 title: 렌더링은 LSP 없이 외부 엔진에 위임
 description: 구문 강조와 Markdown 표현은 외부 엔진에 맡기고 HTML 실행은 시스템 브라우저에 맡긴다.
 tags: [macos, syntax-highlighting, markdown, webkit, security]
-timestamp: 2026-08-21T00:00:00Z
+generated: { by: claude-code/unknown, at: 2026-08-21T00:00:00Z }
+sources:
+  - id: src-1
+    resource: "https://code.visualstudio.com/api/language-extensions/language-server-extension-guide"
+    title: "VS Code Language Server Extension Guide"
+  - id: src-2
+    resource: "https://code.visualstudio.com/api/language-extensions/syntax-highlight-guide"
+    title: "VS Code Syntax Highlight Guide"
+  - id: src-3
+    resource: "https://github.com/smittytone/HighlighterSwift"
+    title: "HighlighterSwift"
+  - id: src-4
+    resource: "https://github.com/markdown-it/markdown-it"
+    title: "markdown-it"
 ---
 
 ## 결정
@@ -22,10 +35,3 @@ timestamp: 2026-08-21T00:00:00Z
 - LSP를 넣어도 문법 정의와 렌더러는 별도로 필요하다.
 - Markdown은 범용 파서와 확장 생태계가 필요하지만, 문서 코드를 앱 권한으로 실행할 이유는 없다.
 - HTML 실행은 브라우저의 격리와 사용자 보안 설정 안에서 수행하는 편이 책임 경계가 명확하다.
-
-## Citations
-
-1. VS Code Language Server Extension Guide: https://code.visualstudio.com/api/language-extensions/language-server-extension-guide
-2. VS Code Syntax Highlight Guide: https://code.visualstudio.com/api/language-extensions/syntax-highlight-guide
-3. HighlighterSwift: https://github.com/smittytone/HighlighterSwift
-4. markdown-it: https://github.com/markdown-it/markdown-it

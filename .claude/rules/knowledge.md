@@ -1,6 +1,6 @@
 # Knowledge 규칙
 
-`knowledge/` 디렉터리는 Open Knowledge Format(OKF) 0.2를 따르는 지식 번들이다. 스펙 원문은 [templates/knowledge/references/okf-spec-0.2.md](../../templates/knowledge/references/okf-spec-0.2.md)에 사본으로 있다. 이 규칙 파일만으로 기록에 충분하며, 형식이 모호할 때만 스펙 사본을 참조한다. agent는 작업하면서 얻은 지속 가치가 있는 컨텍스트를 여기에 기록한다.
+`knowledge/` 디렉터리는 Open Knowledge Format(OKF) 0.3을 따르는 지식 번들이다. 스펙 원문은 [templates/okf-spec-0.3.md](../../templates/okf-spec-0.3.md)에 사본으로 하나만 있다. 번들마다 복사하면 사본 수십 개가 push 전 검사 용량(1.5MB)을 넘기므로 복사하지 않는다. 이 규칙 파일만으로 기록에 충분하며, 형식이 모호할 때만 스펙 사본을 참조한다. agent는 작업하면서 얻은 지속 가치가 있는 컨텍스트를 여기에 기록한다.
 
 ## 읽는 시점
 
@@ -57,8 +57,8 @@ tags: [kubernetes, workflow]
 generated: { by: claude-code/claude-opus-5-5, at: 2026-07-10T00:00:00Z }
 sources:                  # 근거가 있을 때만
   - id: okf-spec
-    resource: /references/okf-spec-0.2.md   # bundle root 기준
-    title: OKF 0.2 스펙 사본
+    resource: /references/foo.md   # bundle root 기준
+    title: 외부 자료 사본
 ---
 ```
 
@@ -67,22 +67,25 @@ frontmatter 규칙:
 - `generated`는 내용을 마지막으로 의미 있게 바꾼 주체와 시각이다. 내용을 고칠 때마다 함께 갱신한다.
 - `by`는 actor 형식으로 쓴다. agent는 `<도구>/<모델>`, 사람은 `human:<id>`, 자동화는 `process:<id>`다.
 - `verified`는 사람이 내용을 확인했을 때만 `{ by: human:<id>, at: ... }`로 붙인다. agent가 자기 글에 붙이지 않는다. 신뢰 등급이 이 값의 `human:` 접두사로 정해지기 때문이다.
-- 더 이상 맞지 않지만 링크 때문에 남겨야 하는 concept는 `status: deprecated`로 표시한다. 그 외에는 `status`를 생략한다(생략하면 `stable`).
+- 0.3부터 `verified.at`이 `generated.at`보다 이르면 그 확인은 신뢰 등급에 반영되지 않는다. 사람이 확인한 concept의 내용을 고치면 `generated`만 갱신되므로 등급이 내려간다. 다시 확인받기 전까지 그 상태로 둔다.
+- 더 이상 맞지 않지만 링크 때문에 남겨야 하는 concept는 `status: deprecated`로 표시하고, 대체하는 concept가 있으면 `superseded_by`에 그 경로를 적는다. 그 외에는 `status`를 생략한다(생략하면 `stable`).
 - 시각은 UTC offset을 붙인 ISO 8601로 쓴다. 예: `2026-07-10T00:00:00Z`
+- 경로 값(`sources[].resource`, `superseded_by` 등)은 번들 안 파일이면 bundle root 기준으로 `/`를 붙여 쓰고, 번들 밖 workspace 파일이면 그 concept 파일 기준 상대 경로(예: `../../terraform/iam.tf`)로 쓴다. 0.3부터 `/`가 없는 경로는 그 파일이 있는 디렉터리 기준으로 해석되기 때문이다.
 
 본문 규칙:
 
 - Decision은 `## 결정`과 `## 이유` 섹션을 쓴다.
 - 외부 근거(PR, 블로그, 공식 문서)는 본문 목록이 아니라 frontmatter `sources`에 남긴다. 특정 문장의 근거는 `[^id]` 각주로 달고 라벨을 `sources[].id`와 맞춘다.
 - 관련 concept는 markdown 상대 링크로 연결한다. 링크 대상이 아직 없어도 괜찮다.
-- 외부 웹 링크에 의존하지 않는다. agent가 다시 읽어야 할 외부 자료는 `knowledge/references/`에 사본으로 저장하고 `sources[].resource`에 `/`로 시작하는 bundle root 기준 경로(예: `/references/foo.md`)를 쓴다. 외부 URL은 provenance 기록용으로만 `sources[].resource`에 남긴다.
-- 0.1 형식(`timestamp`, `## Citations`)으로 쓰인 기존 concept는 그대로 읽힌다. 0.2는 0.1에 선택 필드만 더한 버전이라 번들 `index.md`의 `okf_version`은 0.1 형식 concept가 남아 있어도 `"0.2"`로 적는다. 0.1 형식 concept를 고칠 때 그 파일만 새 형식으로 옮긴다.
+- 외부 웹 링크에 의존하지 않는다. agent가 다시 읽어야 할 외부 자료는 `knowledge/references/`에 사본으로 저장하고 `sources[].resource`에 그 경로(예: `/references/foo.md`)를 쓴다. 외부 URL은 provenance 기록용으로만 `sources[].resource`에 남긴다.
+- 번들 `index.md`의 `okf_version`은 `"0.3"`처럼 따옴표로 감싸 문자열로 적는다.
+- 0.1 형식인 `timestamp`와 본문 `## Citations`는 쓰지 않는다. 0.3 스펙 §12.1이 이 둘의 대체 해석을 `okf_version` 0.2 이하 번들에만 허용해서, `"0.3"` 번들에서는 소비자가 무시할 수 있기 때문이다.
 - 분량은 A4 반 장 이내로 짧게 쓴다.
 
 ## 기록 후 갱신할 파일
 
 1. 해당 디렉터리의 `index.md` 목록에 항목을 추가한다.
-2. 같은 `knowledge/`의 `log.md` 맨 위에 오늘 날짜(`## YYYY-MM-DD`) 섹션을 만들어 변경 내역을 남긴다.
+2. 같은 `knowledge/`의 `log.md` 맨 위에 오늘 날짜(`## YYYY-MM-DD`) 섹션을 만들어 변경 내역을 남긴다. `log.md`에는 frontmatter를 붙이지 않는다.
 
 ## 파일명 규칙
 

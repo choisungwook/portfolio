@@ -3,7 +3,7 @@ type: Decision
 title: UI 시안의 시각 중심은 슬라이드
 description: macOS 도구의 익숙한 배치와 절제된 장식으로 편집 내용에 집중한다.
 tags: [ui, design-proposal]
-timestamp: 2026-09-06T00:00:00Z
+generated: { by: claude-code/unknown, at: 2026-09-06T00:00:00Z }
 ---
 
 ## 결정

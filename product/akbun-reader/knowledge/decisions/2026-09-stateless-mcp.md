@@ -3,7 +3,7 @@ type: Decision
 title: 요청 단위 MCP와 기존 문서 API 재사용
 description: SDK 전송과 Bearer 인증으로 도구 실행을 격리하고 기존 버전 검사를 유지
 tags: [reader, mcp]
-timestamp: 2026-09-07T00:00:00Z
+generated: { by: claude-code/unknown, at: 2026-09-07T00:00:00Z }
 ---
 
 ## 결정

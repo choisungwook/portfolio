@@ -3,7 +3,7 @@ type: Decision
 title: Terraform으로 최초 생성, 추출한 JSON을 Git에서 관리
 description: 이미지 태그를 뺀 ECS 설정은 Git JSON, 태그는 필수 실행 입력
 tags: [ecs, codebuild, terraform, gitops]
-timestamp: 2026-10-05T00:00:00Z
+generated: { by: claude-code/unknown, at: 2026-10-05T00:00:00Z }
 ---
 
 # Terraform으로 최초 생성, 추출한 JSON을 Git에서 관리

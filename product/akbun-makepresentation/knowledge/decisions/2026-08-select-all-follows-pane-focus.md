@@ -3,7 +3,7 @@ type: Decision
 title: 전체 선택 단축키는 패널 포커스를 따름
 description: 편집 영역과 슬라이드 패널이 각자 자신의 전체 선택 범위를 소유.
 tags: [desktop, editor, focus, keyboard]
-timestamp: 2026-08-16T00:00:00Z
+generated: { by: claude-code/unknown, at: 2026-08-16T00:00:00Z }
 ---
 
 ## 결정

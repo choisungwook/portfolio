@@ -3,7 +3,7 @@ type: Decision
 title: .app은 번들이 아니라 실행파일에 서명한다
 description: SwiftPM resource bundle이 .app 루트에 있어야 하므로 번들 단위 codesign을 포기하고 실행파일만 ad-hoc 서명한다.
 tags: [macos, swiftpm, codesign, release]
-timestamp: 2026-09-11T00:00:00Z
+generated: { by: claude-code/unknown, at: 2026-09-11T00:00:00Z }
 ---
 
 ## 결정

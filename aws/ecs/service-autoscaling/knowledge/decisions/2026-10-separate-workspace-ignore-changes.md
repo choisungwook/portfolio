@@ -3,7 +3,7 @@ type: Decision
 title: desired-count 예제를 복사해 새 workspace로 만들고 desired_count는 ignore_changes한다
 description: drift 실습과 Auto Scaling 실습은 desired_count 소유자가 달라서 같은 코드에 둘 수 없다
 tags: [ecs, terraform, autoscaling]
-timestamp: 2026-10-11T00:00:00Z
+generated: { by: claude-code/unknown, at: 2026-10-11T00:00:00Z }
 ---
 
 ## 결정

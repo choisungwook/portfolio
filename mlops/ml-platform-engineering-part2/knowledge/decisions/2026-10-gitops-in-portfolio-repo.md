@@ -3,7 +3,7 @@ type: Decision
 title: GitOps 저장소를 새로 만들지 않고 이 저장소의 workspace를 Argo CD가 읽는다
 description: 플래닝의 별도 저장소(mlops-part2-handson, main)를 portfolio 저장소 master와 manifests/argocd로 바꿨다
 tags: [argocd, gitops, plan-change]
-timestamp: 2026-10-25T00:00:00Z
+generated: { by: claude-code/unknown, at: 2026-10-25T00:00:00Z }
 ---
 
 ## 결정

@@ -3,7 +3,7 @@ type: Decision
 title: PPTX 표는 셀별 도형으로 가져온다
 description: 표 모델이 없는 편집기에서는 DrawingML 표의 각 셀을 편집 가능한 사각형으로 변환한다.
 tags: [pptx, import, table, editor]
-timestamp: 2026-09-20T00:00:00Z
+generated: { by: claude-code/unknown, at: 2026-09-20T00:00:00Z }
 ---
 
 ## 결정

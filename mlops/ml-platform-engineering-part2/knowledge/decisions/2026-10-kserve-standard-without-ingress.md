@@ -3,7 +3,7 @@ type: Decision
 title: 배포판 KServe를 Standard 모드로 바꾸고 Ingress 생성을 끈다
 description: Knative를 설치하지 않고 predictor Service에 port-forward로 접근하는 최소 구성
 tags: [kserve, serving, kubeflow]
-timestamp: 2026-10-31T00:00:00Z
+generated: { by: claude-code/unknown, at: 2026-10-31T00:00:00Z }
 ---
 
 ## 결정

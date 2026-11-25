@@ -3,7 +3,7 @@ type: Decision
 title: 타임라인 드래그 중 compositor 상태 전환을 미룬다
 description: clip pointer-down은 선택만 바꾸고 exact frame 재합성과 레인 배치 읽기는 드래그 시작 경로에서 제외한다.
 tags: [makevideo, timeline, drag, diagnostics]
-timestamp: 2026-09-04T00:00:00Z
+generated: { by: claude-code/unknown, at: 2026-09-04T00:00:00Z }
 ---
 
 # 타임라인 드래그 중 compositor 상태 전환을 미룬다

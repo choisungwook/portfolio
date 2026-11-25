@@ -3,7 +3,7 @@ type: Decision
 title: password에서 IAM 인증으로의 전환은 새 IAM 사용자와 설정 스위치로 한다
 description: 기존 사용자를 ALTER USER로 바꾸지 않고 app_iam을 새로 만들어 SSM 스위치로 전환한다
 tags: [aurora, mysql, iam, migration]
-timestamp: 2026-11-07T00:00:00Z
+generated: { by: claude-code/unknown, at: 2026-11-07T00:00:00Z }
 ---
 
 ## 결정

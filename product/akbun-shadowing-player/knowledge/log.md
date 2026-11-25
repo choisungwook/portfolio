@@ -1,5 +1,9 @@
 # Knowledge Update Log
 
+## 2026-11-25
+
+* **Update**: 번들 index의 okf_version을 0.3으로 변경. 0.1 형식 concept 10개의 `timestamp`와 `## Citations`를 `generated`와 `sources`로 변환. 작성자를 알 수 없어 `generated.by`는 `claude-code/unknown`으로 둠.
+
 ## 2026-08-23
 
 * **Creation**: [릴리스는 빌드 성공 뒤에 tag, tag 뒤에 release](decisions/2026-07-build-before-tag-and-release.md) 결정을 루트 knowledge에서 옮겨 옴. 이 workspace의 릴리스 workflow에서 나온 판단이라 여기에 둠.

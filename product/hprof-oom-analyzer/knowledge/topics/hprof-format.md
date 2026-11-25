@@ -3,7 +3,7 @@ type: Topic
 title: hprof 포맷 요약
 description: 파서(src/core/parser.ts)가 해석하는 HPROF 1.0.2 레코드 구조와 참조 그래프 구성 방식.
 tags: [jvm, hprof, binary-format]
-timestamp: 2026-07-18T00:00:00Z
+generated: { by: claude-code/unknown, at: 2026-07-18T00:00:00Z }
 ---
 
 ## 파일 구조

@@ -3,7 +3,7 @@ type: Decision
 title: Kubeflow로 할 수 있는 구성요소는 Kubeflow 배포판에서 가져온다
 description: KFP standalone과 일반 JupyterLab 대신 Community Distribution 26.03.1의 구성요소를 ApplicationSet으로 설치한다
 tags: [kubeflow, argocd, plan-change]
-timestamp: 2026-10-31T00:00:00Z
+generated: { by: claude-code/unknown, at: 2026-10-31T00:00:00Z }
 ---
 
 ## 결정

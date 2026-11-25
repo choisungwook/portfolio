@@ -3,7 +3,7 @@ type: Decision
 title: 주석 화살표는 viewport가 아니라 content 좌표에 그린다
 description: 스크롤되는 도형에 SVG 화살표를 붙일 때 overlay 대신 스크롤 콘텐츠 안에 SVG를 두기로 한 결정.
 tags: [visualizellm, web, svg, layout]
-timestamp: 2026-08-18T00:00:00Z
+generated: { by: claude-code/unknown, at: 2026-08-18T00:00:00Z }
 ---
 
 # 주석 화살표는 viewport가 아니라 content 좌표에 그린다

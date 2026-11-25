@@ -3,7 +3,7 @@ type: Topic
 title: 실습 hosted zone은 등록기관 네임서버 기준으로 권한이 있어야 한다
 description: Route 53에 위임 레코드가 있어도 등록기관 NS가 다른 사업자를 가리키면 인터넷에서 조회되지 않는다.
 tags: [aws, route53, dns, acm]
-timestamp: 2026-09-06T18:30:00Z
+generated: { by: claude-code/unknown, at: 2026-09-06T18:30:00Z }
 ---
 
 ## 통찰

@@ -3,7 +3,11 @@ type: Decision
 title: monitor는 패널을 채우고 source monitor는 에셋 비율로 맞춘다
 description: stage 여백을 없애고 source monitor의 fit 기준을 프로젝트에서 에셋으로 바꾸고 두 monitor가 subgrid로 같은 행을 쓰게 한 결정.
 tags: [makevideo, preview, layout, css]
-timestamp: 2026-08-22T00:00:00Z
+generated: { by: claude-code/unknown, at: 2026-08-22T00:00:00Z }
+sources:
+  - id: src-1
+    resource: "./2026-08-one-geometry-in-points-for-the-monitor.md"
+    title: "preview 배치는 한 곳에서 계산하고 point 단위로 넘긴다"
 ---
 
 # monitor는 패널을 채우고 source monitor는 에셋 비율로 맞춘다
@@ -22,7 +26,3 @@ timestamp: 2026-08-22T00:00:00Z
 * subgrid를 모르는 WebView는 두 선언을 버리고 per-panel 행으로 되돌아감. 예전 레이아웃이지 깨진 레이아웃이 아님
 
 남는 trade off 하나. 에셋 비율이 프로젝트 비율과 다르면 두 monitor의 박스는 같아도 안쪽 레터박스가 달라 그림의 끝 행이 어긋남. [첫 영상이 canvas 비율을 정하는 규칙](./2026-08-first-video-defines-default-canvas-shape.md) 덕에 보통은 같음.
-
-## Citations
-
-1. [preview 배치는 한 곳에서 계산하고 point 단위로 넘긴다](./2026-08-one-geometry-in-points-for-the-monitor.md)

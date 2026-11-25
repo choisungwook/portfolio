@@ -2,7 +2,7 @@
 type: Reference
 title: AWS STS·Memory·NLB 공식 문서 발췌
 description: 고정 IP 실험의 설계 제약을 재확인하는 짧은 원문 발췌와 해석.
-timestamp: 2026-09-05T00:00:00Z
+generated: { by: claude-code/unknown, at: 2026-09-05T00:00:00Z }
 ---
 
 ## STS endpoint

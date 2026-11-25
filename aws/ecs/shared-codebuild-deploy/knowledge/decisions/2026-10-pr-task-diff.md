@@ -3,7 +3,7 @@ type: Decision
 title: task definition 변경 미리 보기는 PR comment로
 description: Pipeline 승인 단계 대신 GitHub Actions가 운영 상태와 Git JSON의 diff를 PR에 남김
 tags: [ecs, github-actions, oidc]
-timestamp: 2026-10-05T00:00:00Z
+generated: { by: claude-code/unknown, at: 2026-10-05T00:00:00Z }
 ---
 
 # task definition 변경 미리 보기는 PR comment로

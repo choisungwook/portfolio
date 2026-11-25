@@ -3,7 +3,7 @@ type: Decision
 title: native monitor는 window overlay에서 AppKit 좌표 변환을 사용한다
 description: Metal view를 WebKit 내부가 아닌 window content view에 두고 WKWebView 좌표를 AppKit API로 변환하는 결정.
 tags: [makevideo, viewport, macos, appkit, gpu]
-timestamp: 2026-08-12T00:00:00Z
+generated: { by: claude-code/unknown, at: 2026-08-12T00:00:00Z }
 ---
 
 # native monitor는 window overlay에서 AppKit 좌표 변환을 사용한다

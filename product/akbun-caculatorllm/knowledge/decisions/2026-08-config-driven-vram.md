@@ -3,7 +3,7 @@ type: Decision
 title: config.json 기반 단일 GPU VRAM 예측
 description: 모델 가중치, KV 캐시, 추가 메모리를 합산해 한 GPU에 적재 가능한지 먼저 판단한다.
 tags: [llm-serving, vram, hugging-face]
-timestamp: 2026-08-30T00:00:00Z
+generated: { by: claude-code/unknown, at: 2026-08-30T00:00:00Z }
 ---
 
 ## 결정

@@ -3,7 +3,7 @@ type: Decision
 title: MLflow 모델은 배포판 MLServer 대신 모델의 requirements.txt를 설치하는 런타임으로 서빙한다
 description: 고정된 라이브러리 버전의 런타임은 새 버전으로 저장한 모델을 오류 없이 틀리게 예측한다
 tags: [kserve, mlflow, serving, xgboost]
-timestamp: 2026-11-01T00:00:00Z
+generated: { by: claude-code/unknown, at: 2026-11-01T00:00:00Z }
 ---
 
 ## 결정

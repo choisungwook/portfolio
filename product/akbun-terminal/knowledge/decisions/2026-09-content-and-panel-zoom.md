@@ -3,7 +3,7 @@ type: Decision
 title: 콘텐츠 확대와 주변 패널 크기 분리
 description: 단축키는 읽는 콘텐츠에만 적용하고 주변 UI 크기는 General 설정으로 저장
 tags: [swift, appkit, settings]
-timestamp: 2026-09-18T00:00:00Z
+generated: { by: claude-code/unknown, at: 2026-09-18T00:00:00Z }
 ---
 
 ## 결정

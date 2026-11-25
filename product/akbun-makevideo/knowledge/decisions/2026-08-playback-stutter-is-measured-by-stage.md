@@ -3,7 +3,7 @@ type: Decision
 title: 재생 끊김은 경로별 계측으로 원인을 분리
 description: native playback의 공급 부족, 재동기화, 표시 지연, A/V 지연을 별도 수치로 본다.
 tags: [makevideo, playback, diagnostics]
-timestamp: 2026-08-09T00:00:00Z
+generated: { by: claude-code/unknown, at: 2026-08-09T00:00:00Z }
 ---
 
 # 재생 끊김은 경로별 계측으로 원인을 분리

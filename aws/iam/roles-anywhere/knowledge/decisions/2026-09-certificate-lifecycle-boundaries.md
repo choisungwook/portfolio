@@ -3,7 +3,11 @@ type: Decision
 title: 인증서 수명과 AWS 세션 수명을 분리
 description: 인증·권한·네트워크를 각각 관찰하도록 독립 기본 실습을 구성한다.
 tags: [aws, roles-anywhere, pki, credentials]
-timestamp: 2026-09-05T00:00:00Z
+generated: { by: claude-code/unknown, at: 2026-09-05T00:00:00Z }
+sources:
+  - id: src-1
+    resource: "../references/roles-anywhere-lifecycle.md"
+    title: "공식 인증·운영 근거"
 ---
 
 ## 결정
@@ -26,7 +30,3 @@ timestamp: 2026-09-05T00:00:00Z
 - SDK가 만료 시 helper를 다시 실행할 수 있어야 장시간 애플리케이션 동작을 검증할 수 있음.
 - 로컬 실습에서도 관리 자격증명과 인증서 기반 client provider의 선택을 분리해 관찰할 수 있음.
 - 관리 명령에 프로파일을 강제하지 않아 A·B 중 선택한 인증을 Terraform과 CRL 스크립트에서 함께 사용 가능.
-
-## Citations
-
-1. [공식 인증·운영 근거](../references/roles-anywhere-lifecycle.md)

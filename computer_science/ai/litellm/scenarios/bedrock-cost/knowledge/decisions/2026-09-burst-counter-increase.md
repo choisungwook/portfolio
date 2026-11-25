@@ -3,7 +3,7 @@ type: Decision
 title: 버스트 트래픽 counter는 increase 대신 offset 차분으로 센다
 description: 요청이 몇 초 안에 몰리는 실험에서 increase()의 추정이 실제 건수와 어긋난다.
 tags: [prometheus, grafana, litellm]
-timestamp: 2026-09-20T00:00:00Z
+generated: { by: claude-code/unknown, at: 2026-09-20T00:00:00Z }
 ---
 
 # 버스트 트래픽 counter는 increase 대신 offset 차분으로 센다

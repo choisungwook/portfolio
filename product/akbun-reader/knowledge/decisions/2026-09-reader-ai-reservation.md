@@ -3,7 +3,14 @@ type: Decision
 title: AI 비용 선예약과 문서 단위 태그 변경
 description: 모델 호출 비용을 먼저 예약하고 문서 태그를 한 행에서 교체해 상한과 버전 검사를 원자적으로 처리
 tags: [reader, d1, ai]
-timestamp: 2026-09-07T00:00:00Z
+generated: { by: claude-code/unknown, at: 2026-09-07T00:00:00Z }
+sources:
+  - id: src-1
+    resource: "https://github.com/choisungwook/portfolio/issues/1213"
+    title: "웹 UI"
+  - id: src-2
+    resource: "https://github.com/choisungwook/portfolio/issues/1215"
+    title: "AI 요약"
 ---
 
 ## 결정
@@ -23,8 +30,3 @@ timestamp: 2026-09-07T00:00:00Z
 - 한 문서의 태그·위치·읽음 변경을 한 UPDATE로 처리해 충돌 시 일부만 반영되는 상황 방지
 - 유출 API 토큰으로 추가 토큰을 발급해 폐기를 우회하는 상황 방지
 - Access 정책 변경 시 다른 계정의 개인 데이터 접근 방지
-
-## Citations
-
-1. [웹 UI](https://github.com/choisungwook/portfolio/issues/1213)
-2. [AI 요약](https://github.com/choisungwook/portfolio/issues/1215)

@@ -3,7 +3,7 @@ type: Decision
 title: AI 퀵 버튼은 입력창을 채우지 않고 토글로 남는다
 description: 버튼 클릭이 textarea를 건드리지 않고, Send 시점에만 프롬프트로 조립되며, 전송 후에도 켜진 상태를 유지함.
 tags: [desktop, ai, ux, javascript]
-timestamp: 2026-08-24T00:00:00Z
+generated: { by: claude-code/unknown, at: 2026-08-24T00:00:00Z }
 ---
 
 ## 결정

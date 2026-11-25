@@ -3,7 +3,12 @@ type: Decision
 title: 계측 하네스는 자기 지연과 재시작 지연을 대상의 실패로 세지 않는다
 description: 재생 공급 하네스에서 sleep 오차와 seek 직후 재충전을 늦은 프레임에서 제외하고 각각 별도 지표로 분리한 결정.
 tags: [measurement, playback, akbun-makevideo]
-timestamp: 2026-08-04T00:00:00Z
+generated: { by: claude-code/unknown, at: 2026-08-04T00:00:00Z }
+sources:
+  - id: src-1
+    resource: "../../adr/2026-08-prefetch-frame-source.md"
+  - id: src-2
+    resource: "../../quality/README.md"
 ---
 
 ## 결정
@@ -22,8 +27,3 @@ timestamp: 2026-08-04T00:00:00Z
 - 같은 지연을 늦은 프레임과 startup delay 양쪽에 세면 한 번의 대기를 두 번 청구하게 된다.
 - 개수만으로는 4 ms 늦은 7 프레임과 200 ms 늦은 7 프레임이 구분되지 않는다. 앞은 여유가 줄어든 상태고 뒤는 끊김이다.
 - 판정 기준이 개선을 판정하지 못하면 이후 단계는 계측이 있는데도 체감으로 돌아간다. [재생 품질 계측 하네스](../../product/akbun-makevideo/quality/README.md)를 먼저 만든 이유가 이것이다.
-
-## Citations
-
-1. product/akbun-makevideo/adr/2026-08-prefetch-frame-source.md
-2. product/akbun-makevideo/quality/README.md

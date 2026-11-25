@@ -3,7 +3,12 @@ type: Decision
 title: EC2 application status check는 awscc와 terraform_data로 만든다
 description: hashicorp/aws에 리소스가 없어 검사는 awscc, 인스턴스 연결은 local-exec CLI로 관리한다
 tags: [terraform, ec2, awscc]
-timestamp: 2026-11-07T00:00:00Z
+generated: { by: claude-code/unknown, at: 2026-11-07T00:00:00Z }
+sources:
+  - id: src-1
+    resource: "https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/application-status-checks.html"
+  - id: src-2
+    resource: "https://github.com/hashicorp/terraform-provider-aws/pull/49487"
 ---
 
 ## 결정
@@ -18,8 +23,3 @@ timestamp: 2026-11-07T00:00:00Z
 - 연결(association)은 CloudFormation 타입도 없어 선언형으로 만들 방법이 없다.
 - source를 생략하면 AWS가 고른 security group에서 probe가 오므로 inbound 규칙을 미리 좁힐 수 없다.
 - hashicorp/aws에 리소스가 들어오면 awscc와 local-exec를 그 리소스로 바꾼다.
-
-## Citations
-
-1. <https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/application-status-checks.html>
-2. <https://github.com/hashicorp/terraform-provider-aws/pull/49487>

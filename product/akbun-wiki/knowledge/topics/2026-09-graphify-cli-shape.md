@@ -3,7 +3,7 @@ type: Topic
 title: graphify CLI의 입력과 출력 형태
 description: 스크립트에서 graphify를 호출할 때 필요한 명령 순서, 출력 경로, LLM 의존 여부
 tags: [graphify, wiki, llm]
-timestamp: 2026-09-09T00:00:00Z
+generated: { by: claude-code/unknown, at: 2026-09-09T00:00:00Z }
 ---
 
 ## 확인한 사실

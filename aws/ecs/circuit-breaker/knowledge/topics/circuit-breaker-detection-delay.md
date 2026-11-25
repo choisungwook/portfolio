@@ -3,7 +3,7 @@ type: Topic
 title: circuit breaker의 FAILED 선언은 임계치 도달 직후가 아니라 다음 태스크 실행 뒤에 온다
 description: 1단계 실패가 반복되면 ECS가 실행 간격을 늘리고, 그만큼 배포가 FAILED가 되는 시점도 늦어진다
 tags: [ecs, circuit-breaker, blue-green]
-timestamp: 2026-10-18T00:00:00Z
+generated: { by: claude-code/unknown, at: 2026-10-18T00:00:00Z }
 ---
 
 이미지 pull 실패(1단계)를 COUNT 2로 두 번 실행한 실측이다.

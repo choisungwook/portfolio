@@ -3,7 +3,7 @@ type: Decision
 title: 문서 순서는 EC2 단독을 EKS보다 앞에 두고, 실습 문서는 원리·실습·트러블슈팅·정리 구조로 쓴다
 description: 입문자가 Bottlerocket 자체와 클러스터 문제를 분리해 익히도록 EC2 단독 실습을 먼저 두고, 실습 문서마다 같은 구조를 유지한다.
 tags: [bottlerocket, docs, structure]
-timestamp: 2026-09-24T00:00:00Z
+generated: { by: claude-code/unknown, at: 2026-09-24T00:00:00Z }
 ---
 
 # 문서 순서는 EC2 단독을 EKS보다 앞에 두고, 실습 문서는 원리·실습·트러블슈팅·정리 구조로 쓴다

@@ -3,7 +3,7 @@ type: Decision
 title: 삭제 단축키의 대상은 편집 영역 포커스로 결정
 description: 편집 영역에 포커스가 있으면 도형을, 그 밖에서는 현재 슬라이드를 삭제.
 tags: [desktop, editor, focus, keyboard]
-timestamp: 2026-08-15T17:40:00Z
+generated: { by: claude-code/unknown, at: 2026-08-15T17:40:00Z }
 ---
 
 ## 결정

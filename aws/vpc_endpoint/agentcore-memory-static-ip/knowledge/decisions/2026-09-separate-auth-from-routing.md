@@ -3,7 +3,14 @@ type: Decision
 title: DNS 변경 불가와 인증 방식 분리
 description: 인증 방식은 최초 자격증명을, CONNECT proxy는 네트워크 경로를 해결한다. 둘을 섞지 않는다.
 tags: [aws, proxy, tls, roles-anywhere]
-timestamp: 2026-09-05T00:00:00Z
+generated: { by: claude-code/unknown, at: 2026-09-05T00:00:00Z }
+sources:
+  - id: src-1
+    resource: "https://docs.aws.amazon.com/boto3/latest/guide/configuration.html#using-proxies"
+    title: "boto3 proxy 설정"
+  - id: src-2
+    resource: "2026-09-poc-scope-s01-s05-s07.md"
+    title: "PoC 범위 축소"
 ---
 
 ## 결정
@@ -18,8 +25,3 @@ timestamp: 2026-09-05T00:00:00Z
 - X.509 요청 인증은 HTTPS 서버 인증서의 이름 검증과 독립적.
 - HTTP Host를 재작성하는 reverse proxy는 서명 검증까지 영향을 줄 수 있음.
 - boto3는 HTTPS CONNECT proxy를 지원하며 forwarding 모드를 쓰지 않으면 AWS TLS를 터널 안에서 유지.
-
-## Citations
-
-1. [boto3 proxy 설정](https://docs.aws.amazon.com/boto3/latest/guide/configuration.html#using-proxies)
-2. [PoC 범위 축소](2026-09-poc-scope-s01-s05-s07.md)

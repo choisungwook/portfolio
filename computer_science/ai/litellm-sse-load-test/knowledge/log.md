@@ -1,5 +1,9 @@
 # Knowledge Update Log
 
+## 2026-11-25
+
+* **Update**: 번들의 OKF 0.2 스펙 사본을 지우고 저장소 루트의 `templates/okf-spec-0.3.md`를 참조하도록 바꾸고, 번들 index의 okf_version을 0.3으로 변경.
+
 ## 2026-11-22
 
 * **Update**: [로컬 스택 구성과 도구 버전 고정](decisions/2026-11-local-stack-and-tool-versions.md)에 PostgreSQL, 요청 태그, Call ID를 사용한 로그 추적 결정을 추가했다.

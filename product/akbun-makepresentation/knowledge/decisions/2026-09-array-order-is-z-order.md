@@ -3,7 +3,7 @@ type: Decision
 title: 슬라이드의 배열 순서가 곧 z 순서다
 description: 도형 배열의 뒤쪽이 화면 앞쪽이고, 순서 변경은 배열을 재배치하는 순수 함수 하나로 처리한다.
 tags: [desktop, editor, javascript]
-timestamp: 2026-09-06T00:00:00Z
+generated: { by: claude-code/unknown, at: 2026-09-06T00:00:00Z }
 ---
 
 ## 결정

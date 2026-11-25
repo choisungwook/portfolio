@@ -1,3 +1,7 @@
+---
+okf_version: "0.3"
+---
+
 # Knowledge
 
 akbun-visualizellm의 구현 판단과 반복 절차 기록.

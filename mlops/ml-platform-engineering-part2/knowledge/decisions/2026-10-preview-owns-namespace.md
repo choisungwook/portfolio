@@ -3,7 +3,7 @@ type: Decision
 title: PR 미리보기 Application이 namespace 리소스를 직접 소유한다
 description: CreateNamespace로 만든 namespace는 Application 삭제 후 남으므로 kustomize namespace 덮어쓰기로 소유권을 준다
 tags: [argocd, applicationset, preview]
-timestamp: 2026-10-25T00:00:00Z
+generated: { by: claude-code/unknown, at: 2026-10-25T00:00:00Z }
 ---
 
 ## 결정

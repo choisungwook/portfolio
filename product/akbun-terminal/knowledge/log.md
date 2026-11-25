@@ -1,5 +1,9 @@
 # Knowledge Update Log
 
+## 2026-11-25
+
+* **Update**: 번들 index의 okf_version을 0.3으로 변경. 0.1 형식 concept 7개의 `timestamp`와 `## Citations`를 `generated`와 `sources`로 변환. 작성자를 알 수 없어 `generated.by`는 `claude-code/unknown`으로 둠.
+
 ## 2026-11-15
 
 - **Creation**: [core는 daemon이고 desktop과 tui는 그 client다](decisions/2026-11-core-is-a-daemon-with-two-clients.md) 결정 기록. `adr/2026-08-typed-boundary-before-a-process-boundary.md`의 결정이 바뀌어 그 파일은 삭제

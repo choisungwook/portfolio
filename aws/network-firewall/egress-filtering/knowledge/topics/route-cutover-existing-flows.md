@@ -3,7 +3,7 @@ type: Topic
 title: route 전환 시 열린 연결은 유지됐지만, 응답 경로만 먼저 들어간 비대칭 구간의 새 연결은 실패했다
 description: midstream 연결은 유지됐지만 응답 경로만 들어간 비대칭 구간에서는 새 연결이 실패했고 firewall metric에는 드러나지 않았다.
 tags: [aws, network-firewall, rollout]
-timestamp: 2026-10-31T00:00:00Z
+generated: { by: claude-code/unknown, at: 2026-10-31T00:00:00Z }
 ---
 
 2026-10-31 ap-northeast-2 실측:

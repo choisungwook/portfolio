@@ -3,7 +3,7 @@ type: Decision
 title: 릴리스 버전의 단일 출처를 package.json으로 되돌림
 description: tag에서 버전을 자동 계산하던 방식을 버리고 package.json version을 유일한 출처로 쓴다.
 tags: [github-actions, release, akbun-shadowing-player]
-timestamp: 2026-07-25T00:00:00Z
+generated: { by: claude-code/unknown, at: 2026-07-25T00:00:00Z }
 ---
 
 ## 결정

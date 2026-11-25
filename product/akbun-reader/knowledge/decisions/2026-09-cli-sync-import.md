@@ -3,7 +3,7 @@ type: Decision
 title: CLI 자동화 경로와 재실행 가능한 export·import
 description: 브라우저 인증과 토큰 경로를 분리하고 DB 원본·메모·이관 메타데이터 보존
 tags: [reader, cli, sync, import]
-timestamp: 2026-09-07T00:00:00Z
+generated: { by: claude-code/unknown, at: 2026-09-07T00:00:00Z }
 ---
 
 ## 결정

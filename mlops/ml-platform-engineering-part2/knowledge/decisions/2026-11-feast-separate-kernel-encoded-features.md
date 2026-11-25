@@ -3,7 +3,7 @@ type: Decision
 title: Feast는 노트북 안 전용 커널에서 쓰고, one-hot 인코딩한 피처를 저장한다
 description: 피처 스토어 시나리오에서 환경 충돌을 피하고 서빙 쪽 인코딩 코드를 없애려는 선택
 tags: [feast, feature-store, redis, notebook]
-timestamp: 2026-11-01T00:00:00Z
+generated: { by: claude-code/unknown, at: 2026-11-01T00:00:00Z }
 ---
 
 ## 결정

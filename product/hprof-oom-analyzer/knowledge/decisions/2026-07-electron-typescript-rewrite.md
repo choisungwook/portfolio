@@ -3,7 +3,7 @@ type: Decision
 title: TypeScript + Electron 전환
 description: Python/Tkinter 구현을 TypeScript + Electron 데스크톱 앱으로 다시 만들고, 분석 로직은 Electron 비의존 core 모듈로 분리했다.
 tags: [typescript, electron, architecture]
-timestamp: 2026-07-18T00:00:00Z
+generated: { by: claude-code/unknown, at: 2026-07-18T00:00:00Z }
 ---
 
 ## 결정

@@ -3,7 +3,7 @@ type: Decision
 title: 테마는 CSS 변수와 light-dark()로 두되 canvas 색만 예외로 둔다
 description: 색을 :root 변수 한 곳에 모으고 light-dark()로 두 테마를 함께 쓰지만, JS가 읽어 가는 --wave-* 변수만 선택자로 값을 나눈다.
 tags: [css, theme, canvas, akbun-shadowing-player]
-timestamp: 2026-07-25T00:00:00Z
+generated: { by: claude-code/unknown, at: 2026-07-25T00:00:00Z }
 ---
 
 ## 결정

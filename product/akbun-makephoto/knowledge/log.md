@@ -1,5 +1,9 @@
 # Knowledge Update Log
 
+## 2026-11-25
+
+* **Update**: 번들 index의 okf_version을 0.3으로 변경.
+
 ## 2026-10-31
 
 * **Update**: 편집 화면 배치와 4색 팔레트 결정을 [adr](../adr/2026-10-darkroom-layout-and-palette.md)에 기록. 사용자 매뉴얼 추가.

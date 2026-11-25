@@ -2,6 +2,10 @@
 
 concept를 추가·수정·삭제할 때마다 오늘 날짜 섹션을 맨 위에 만들고 한 줄 남긴다. 구분은 `**Creation**`, `**Update**`, `**Deletion**`이다.
 
+## 2026-11-25
+
+* **Update**: 번들의 OKF 0.2 스펙 사본을 지우고 저장소 루트의 `templates/okf-spec-0.3.md`를 참조하도록 바꾸고, 번들 index의 okf_version을 0.3으로 변경.
+
 ## 2026-11-14
 
 * **Creation**: [판정 모델은 로컬 Ollama gemma2:2b를 CPU 전용으로](decisions/2026-11-local-judge-model.md) 결정 기록. JEV를 쓰지 않은 이유와 CPU 판정 시간 실측을 남긴다.

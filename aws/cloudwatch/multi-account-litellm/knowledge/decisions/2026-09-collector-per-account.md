@@ -3,7 +3,14 @@ type: Decision
 title: LiteLLM 수집기는 replica sidecar가 아니라 계정당 task 1개로 둔다
 description: sidecar는 모든 replica를 localhost로 긁어 instance label이 같아지므로, 계정당 수집기 1개가 Cloud Map A 레코드로 replica를 하나씩 찾는다.
 tags: [litellm, ecs, opentelemetry, prometheus]
-timestamp: 2026-09-23T00:00:00Z
+generated: { by: claude-code/unknown, at: 2026-09-23T00:00:00Z }
+sources:
+  - id: src-1
+    resource: "../../terraform/modules/litellm-ecs/collector.yaml.tftpl"
+    title: "terraform/modules/litellm-ecs/collector.yaml.tftpl"
+  - id: src-2
+    resource: "../../local/vmagent/scrape-prod.yml"
+    title: "local/vmagent/scrape-prod.yml"
 ---
 
 # LiteLLM 수집기는 replica sidecar가 아니라 계정당 task 1개로 둔다
@@ -24,8 +31,3 @@ timestamp: 2026-09-23T00:00:00Z
 
 - DNS TTL(10초) 동안 교체된 task를 못 찾거나 사라진 task를 긁어 `up=0`이 잠깐 생긴다
 - 수집기가 내려가면 그 계정의 LiteLLM metric 전체가 끊긴다. 수집기 자체의 `up`은 중앙에서 알 수 없으므로 "살아 있는 replica 수" 패널이 0이 되는 것으로 알아챈다
-
-## Citations
-
-1. [terraform/modules/litellm-ecs/collector.yaml.tftpl](../../terraform/modules/litellm-ecs/collector.yaml.tftpl)
-2. [local/vmagent/scrape-prod.yml](../../local/vmagent/scrape-prod.yml)

@@ -3,7 +3,7 @@ type: Decision
 title: 파형은 256샘플 블록 min/max를 사전 계산해 그린다
 description: 확대·축소·스크롤 시 원본 샘플을 다시 읽지 않도록 peak를 한 번만 계산한다.
 tags: [audio, canvas, akbun-shadowing-player]
-timestamp: 2026-07-25T00:00:00Z
+generated: { by: claude-code/unknown, at: 2026-07-25T00:00:00Z }
 ---
 
 ## 결정

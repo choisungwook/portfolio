@@ -3,7 +3,7 @@ type: Decision
 title: 업데이트는 dmg를 직접 받아 앱 번들을 교체한다
 description: 서명이 없어 electron-updater를 못 쓰므로, fetch로 받은 dmg에 quarantine이 붙지 않는 점을 이용해 외부 스크립트가 .app을 통째로 바꾸고 재실행한다.
 tags: [electron, release, update, gatekeeper, akbun-shadowing-player]
-timestamp: 2026-07-25T00:00:00Z
+generated: { by: claude-code/unknown, at: 2026-07-25T00:00:00Z }
 ---
 
 ## 결정

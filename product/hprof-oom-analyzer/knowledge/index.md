@@ -1,10 +1,10 @@
 ---
-okf_version: "0.1"
+okf_version: "0.3"
 ---
 
 # Knowledge
 
-hprof-oom-analyzer 프로젝트의 지식 번들이다. [Open Knowledge Format(OKF) 0.2](../../../templates/knowledge/references/okf-spec-0.2.md)를 따르며, 작성 규칙은 [.claude/rules/knowledge.md](../../../.claude/rules/knowledge.md)와 같다. 이 프로젝트에서 얻은 지식만 여기에 남긴다.
+hprof-oom-analyzer 프로젝트의 지식 번들이다. Open Knowledge Format(OKF) 0.3(스펙 사본: 저장소 루트의 `templates/okf-spec-0.3.md`)를 따르며, 작성 규칙은 [.claude/rules/knowledge.md](../../../.claude/rules/knowledge.md)와 같다. 이 프로젝트에서 얻은 지식만 여기에 남긴다.
 
 ## 디렉터리
 

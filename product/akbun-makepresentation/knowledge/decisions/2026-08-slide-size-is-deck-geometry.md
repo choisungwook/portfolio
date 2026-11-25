@@ -3,7 +3,7 @@ type: Decision
 title: 슬라이드 크기는 덱의 픽셀 좌표계
 description: 슬라이드 크기를 덱 단위 픽셀 값으로 저장하고 cm와 PPTX 단위를 경계에서 변환.
 tags: [desktop, editor, slide-size, pptx]
-timestamp: 2026-08-16T00:00:00Z
+generated: { by: claude-code/unknown, at: 2026-08-16T00:00:00Z }
 ---
 
 ## 결정

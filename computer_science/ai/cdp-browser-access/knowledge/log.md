@@ -2,6 +2,10 @@
 
 concept를 추가·수정·삭제할 때마다 오늘 날짜 섹션을 맨 위에 만들고 한 줄 남긴다. 구분은 `**Creation**`, `**Update**`, `**Deletion**`이다.
 
+## 2026-11-25
+
+* **Update**: 번들의 OKF 0.2 스펙 사본을 지우고 저장소 루트의 `templates/okf-spec-0.3.md`를 참조하도록 바꾸고, 번들 index의 okf_version을 0.3으로 변경.
+
 ## 2026-11-14
 
 * **Creation**: [블로그 업로드 시나리오는 실습 없이 설계 검토로 둔다](decisions/2026-11-blog-upload-as-theory.md) 결정 기록. 계정 없이 재현할 수 없는 시나리오를 이론으로 둔 이유와 확인한 사실의 범위를 남긴다.

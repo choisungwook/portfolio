@@ -2,6 +2,10 @@
 
 concept를 추가·수정·삭제할 때마다 오늘 날짜 섹션을 맨 위에 만들고 한 줄 남긴다. 구분은 `**Creation**`, `**Update**`, `**Deletion**`이다.
 
+## 2026-11-25
+
+* **Update**: 번들의 OKF 0.2 스펙 사본을 지우고 저장소 루트의 `templates/okf-spec-0.3.md`를 참조하도록 바꾸고, 번들 index의 okf_version을 0.3으로 변경.
+
 ## 2026-11-21
 
 * **Update**: [bots execute tasks](decisions/2026-11-bots-execute-tasks.md)에 초안에 owner를 정할 때 알림이 bot을 깨우지 않는다는 결정을 더했다 (0.40.0).

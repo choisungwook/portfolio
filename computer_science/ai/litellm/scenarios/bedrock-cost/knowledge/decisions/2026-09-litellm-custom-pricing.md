@@ -3,7 +3,7 @@ type: Decision
 title: LiteLLM custom pricing은 네 단가를 모두 적는다
 description: config에 단가를 하나라도 주면 기본 가격표와 병합되지 않아 빠뜨린 항목이 0으로 청구된다.
 tags: [litellm, bedrock, cost]
-timestamp: 2026-09-20T00:00:00Z
+generated: { by: claude-code/unknown, at: 2026-09-20T00:00:00Z }
 ---
 
 # LiteLLM custom pricing은 네 단가를 모두 적는다

@@ -3,7 +3,7 @@ type: Decision
 title: mac 배포는 서명 없이 xattr 안내로 대응
 description: 코드 서명과 notarization 없이 GitHub Release로 배포하고, Gatekeeper의 damaged 오류는 release notes의 xattr 안내로 해결한다.
 tags: [macos, electron-builder, release]
-timestamp: 2026-07-19T00:00:00Z
+generated: { by: claude-code/unknown, at: 2026-07-19T00:00:00Z }
 ---
 
 ## 결정

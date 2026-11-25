@@ -3,7 +3,11 @@ type: Decision
 title: 실습은 콘솔, API, LiteLLM 순서로 같은 guardrail을 호출한다
 description: 각 단계가 부르는 API를 문서에 명시하고, 콘솔 테스트에서 ApplyGuardrail 직접 호출을 거쳐 LiteLLM 연동으로 넘어간다
 tags: [bedrock, guardrails, litellm, docs]
-timestamp: 2026-11-07T00:00:00Z
+generated: { by: claude-code/unknown, at: 2026-11-07T00:00:00Z }
+sources:
+  - id: src-1
+    resource: "https://docs.aws.amazon.com/bedrock/latest/userguide/guardrails-test.html"
+    title: "AWS Bedrock 사용자 가이드, Test your guardrail"
 ---
 
 ## 결정
@@ -19,7 +23,3 @@ timestamp: 2026-11-07T00:00:00Z
 - 콘솔에서 눈으로 본 판정을 CLI의 ApplyGuardrail 응답 필드로 다시 읽고, 마지막에 LiteLLM이 같은 API를 부르는 모습을 본다. 같은 판정을 콘솔 → API → LiteLLM 순서로 보면, 결과가 달라졌을 때 원인을 새로 추가된 계층 하나로 좁힐 수 있다.
 - 콘솔 테스트 창에는 **Use ApplyGuardrail API** 선택지가 있어 모델 없이 판정할 수 있다. 공식 문서의 테스트 절차 페이지에는 모델을 고르는 방식만 나와 있어 처음에는 빠뜨렸고, 사용자가 실제 화면에서 확인해 고쳤다. 콘솔 단계는 모델 없이 판정 → 모델을 붙인 최종 응답 순서로 둔다.
 - 나머지 콘솔 메뉴 이름은 공식 문서를 따랐으므로 실제 화면과 다르면 고친다.
-
-## Citations
-
-1. AWS Bedrock 사용자 가이드, Test your guardrail (guardrails-test)

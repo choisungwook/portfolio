@@ -3,7 +3,7 @@ type: Decision
 title: 편집 기본값은 객체 종류별 로컬 설정으로 관리
 description: 새 객체의 폰트와 테두리를 문서가 아닌 파일별 로컬 설정으로 관리.
 tags: [desktop, editor, settings, fonts]
-timestamp: 2026-08-16T00:00:00Z
+generated: { by: claude-code/unknown, at: 2026-08-16T00:00:00Z }
 ---
 
 ## 결정

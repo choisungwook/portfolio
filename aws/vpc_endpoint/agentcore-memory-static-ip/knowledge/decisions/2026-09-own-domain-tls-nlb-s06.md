@@ -3,7 +3,17 @@ type: Decision
 title: 자체 도메인 TLS 재암호화 직결(S06)은 root state의 opt-in 실험으로 둔다
 description: S05가 클라이언트 TLS에서 끝낸 질문을 NLB TLS 종료로 AWS 쪽에 넘겨 확인한다. 판정은 실제 실행 뒤에 적고, PASS여도 기본 권장은 S01이다.
 tags: [aws, nlb, tls, acm, route53, sigv4]
-timestamp: 2026-09-08T00:00:00Z
+generated: { by: claude-code/unknown, at: 2026-09-08T00:00:00Z }
+sources:
+  - id: src-1
+    resource: "../../docs/scenarios/s06/2-experiment.md"
+    title: "S06 실험 문서"
+  - id: src-2
+    resource: "2026-09-preserve-aws-hostname.md"
+    title: "AWS 호스트명과 TLS 유지"
+  - id: src-3
+    resource: "2026-09-separate-auth-from-routing.md"
+    title: "DNS 변경 불가와 인증 방식 분리"
 ---
 
 ## 결정
@@ -21,9 +31,3 @@ timestamp: 2026-09-08T00:00:00Z
 - 8443은 방화벽 허용 목록(443)과 실제 사용 형태가 달라져 실험 의미가 흐려진다. NLB 하나 추가 비용은 실습 규모에서 감수한다.
 - TLS listener → TLS target 구간에서 NLB는 SNI를 전달하지 않고 target 인증서를 검증하지 않는다. 종단 간 검증이 아니고, Host 수용은 공개 문서에 없는 동작이라 PASS여도 운영 기본값으로 삼기 어렵다.
 - 이 세션에는 AWS 자격증명이 없어 실제 실행을 못 했다. 모의 검증만 끝난 상태를 검증 완료로 적으면 다음 세션이 믿는다.
-
-## Citations
-
-1. [S06 실험 문서](../../docs/scenarios/s06/2-experiment.md)
-2. [AWS 호스트명과 TLS 유지](2026-09-preserve-aws-hostname.md)
-3. [DNS 변경 불가와 인증 방식 분리](2026-09-separate-auth-from-routing.md)

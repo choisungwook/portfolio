@@ -1,12 +1,12 @@
 ---
-okf_version: "0.2"
+okf_version: "0.3"
 ---
 
 # Knowledge
 
 SSM Inventory 핸즈온의 지식 번들이다.
 
-AI agent가 작업하면서 축적하는 지식 번들이다. Google이 제안한 [Open Knowledge Format(OKF) 0.2](references/okf-spec-0.2.md)를 따른다. 코드와 git history가 기록하지 못하는 의사결정의 이유, 반복 절차, 도메인 통찰을 markdown + YAML frontmatter로 남긴다.
+AI agent가 작업하면서 축적하는 지식 번들이다. Google이 제안한 Open Knowledge Format(OKF) 0.3(스펙 사본: 저장소 루트의 `templates/okf-spec-0.3.md`)을 따른다. 코드와 git history가 기록하지 못하는 의사결정의 이유, 반복 절차, 도메인 통찰을 markdown + YAML frontmatter로 남긴다.
 
 ## 디렉터리
 

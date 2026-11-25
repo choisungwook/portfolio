@@ -3,7 +3,11 @@ type: Decision
 title: scaling 알림은 alarm 상태 변화와 scaled-to-max 두 EventBridge rule로 SNS에 보낸다
 description: Application Auto Scaling은 max에 막혔을 때만 이벤트를 내고 target tracking alarm에는 action을 붙일 수 없다
 tags: [ecs, autoscaling, eventbridge, sns]
-timestamp: 2026-10-11T00:00:00Z
+generated: { by: claude-code/unknown, at: 2026-10-11T00:00:00Z }
+sources:
+  - id: src-1
+    resource: "https://docs.aws.amazon.com/eventbridge/latest/ref/events-ref-application-autoscaling.html"
+    title: "Application Auto Scaling events, Amazon EventBridge reference"
 ---
 
 ## 결정
@@ -18,7 +22,3 @@ timestamp: 2026-10-11T00:00:00Z
 - target tracking alarm은 Application Auto Scaling 소유라 직접 alarm action을 붙이면 policy 갱신 때 덮어써진다.
 - 버린 대안: CloudTrail `UpdateService` API 호출 이벤트. EventBridge로 받으려면 CloudTrail trail이 필요해 실습 리소스가 늘어난다.
 - 실측: scale-out 때 두 rule 모두 `Invocations` 1, `FailedInvocations` 0, SNS `NumberOfMessagesPublished` 2.
-
-## Citations
-
-1. Application Auto Scaling events, Amazon EventBridge reference (docs.aws.amazon.com/eventbridge/latest/ref/events-ref-application-autoscaling.html)

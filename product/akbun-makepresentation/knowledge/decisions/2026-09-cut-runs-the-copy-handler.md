@@ -3,7 +3,7 @@ type: Decision
 title: 잘라내기는 시스템 복사 성공 후 원본을 지운다
 description: 네이티브 클립보드에 PNG·텍스트·개체 JSON을 함께 기록하고 성공한 뒤에만 변경되지 않은 원본을 삭제.
 tags: [desktop, editor, clipboard, javascript]
-timestamp: 2026-09-06T00:00:00Z
+generated: { by: claude-code/unknown, at: 2026-09-06T00:00:00Z }
 ---
 
 ## 결정
