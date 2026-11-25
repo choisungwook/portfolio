@@ -6,6 +6,7 @@
 
 | 디렉터리 | 설명 |
 |---|---|
+| [akbun-piano-teacher](./akbun-piano-teacher/) | 악보 사진·MusicXML·MIDI를 가져와 악보 커서와 함께 재생하고, 2D 건반이나 손가락이 따라 치는 3D 피아노로 보여 주는 피아노 연습 Electron 데스크톱 앱 |
 | [akbun-keychain](./akbun-keychain/) | AI agent가 값을 보지 않고 쓰도록 비밀 값을 암호화해 로컬 JSON 파일에 보관하는 CLI, MCP, 로컬 페이지 키 관리 도구 |
 | [akbun-aimemory](./akbun-aimemory/) | Claude Code·Codex·Kiro·Antigravity hook이 남긴 대화를 SQLite에 모아 AI 모델 없이 하이브리드 검색하고 CLI와 웹 UI로 관리하는 AI 메모리 |
 | [akbun-taskq](./akbun-taskq/) | Claude 세션이 태스크를 처리하고, 역할을 가진 Claude·OpenAI·Kiro 상주 bot이 태스크와 workflow를 나눠 맡아 대화하듯 일하며, 실행·알림·인계 기록을 화면, CLI, MCP로 관리하는 개인용 에이전트 태스크 큐 |

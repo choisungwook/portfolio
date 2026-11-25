@@ -1,0 +1,137 @@
+name: release-akbun-piano-teacher
+
+on:
+  push:
+    branches:
+      - master
+    paths:
+      - 'product/akbun-piano-teacher/workspace/**'
+  pull_request:
+    paths:
+      - 'product/akbun-piano-teacher/workspace/**'
+      - '.github/workflows/release-akbun-piano-teacher.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+defaults:
+  run:
+    working-directory: product/akbun-piano-teacher/workspace
+
+jobs:
+  # PR check: typecheck and tests only. Tests import the .ts sources directly, so no Electron binary is needed.
+  verify:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: product/akbun-piano-teacher/workspace/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+        env:
+          ELECTRON_SKIP_BINARY_DOWNLOAD: '1'
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Test
+        run: npm test
+
+  # Build on each OS first. The tag and the release are made only after every build succeeded,
+  # so a failed build leaves no dangling tag.
+  build:
+    if: github.event_name != 'pull_request'
+    strategy:
+      fail-fast: true
+      matrix:
+        os: [macos-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: product/akbun-piano-teacher/workspace/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build installer
+        run: npm run dist
+        env:
+          CSC_IDENTITY_AUTO_DISCOVERY: 'false'
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: installer-${{ matrix.os }}
+          path: |
+            product/akbun-piano-teacher/workspace/release/*.dmg
+            product/akbun-piano-teacher/workspace/release/*.exe
+            product/akbun-piano-teacher/workspace/release/*.exe.blockmap
+            product/akbun-piano-teacher/workspace/release/latest.yml
+          if-no-files-found: error
+
+  release:
+    if: github.event_name != 'pull_request'
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/download-artifact@v8
+        with:
+          path: artifacts
+          merge-multiple: true
+
+      - name: Read version
+        id: version
+        run: |
+          version=$(node -p "require('./package.json').version")
+          echo "tag=akbun-piano-teacher-v$version" >> "$GITHUB_OUTPUT"
+
+      - name: Create tag
+        working-directory: .
+        env:
+          TAG: ${{ steps.version.outputs.tag }}
+        run: |
+          git tag "$TAG"
+          git push origin "$TAG"
+
+      - name: Create release
+        working-directory: .
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ steps.version.outputs.tag }}
+        run: |
+          cat > release-notes.md <<'EOF'
+          ## About
+
+          - Piano practice coach: import MusicXML, MIDI or photos of the score, play it back with a cursor and keyboard, record your playing over USB-MIDI and see wrong notes, stops and tempo per measure.
+
+          ## Install
+
+          - macOS: download the dmg for your Mac (`-arm64` for Apple Silicon, the other for Intel). The build is unsigned, so the first launch says the app is damaged. Remove the quarantine attribute after copying it to Applications:
+
+            ```bash
+            xattr -cr /Applications/akbun-piano-teacher.app
+            ```
+
+          - Windows: run `akbun-piano-teacher-Setup-<version>.exe`. SmartScreen warns because the build is unsigned: choose "More info", then "Run anyway".
+          - Later versions install from "Check for Updates…" in the app menu (macOS) or the File menu (Windows).
+          EOF
+          bash "$GITHUB_WORKSPACE/.github/scripts/release-notes.sh" "$TAG" product/akbun-piano-teacher >> release-notes.md
+          gh release create "$TAG" \
+            --title "$TAG" \
+            --notes-file release-notes.md \
+            artifacts/*
