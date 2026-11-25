@@ -12,7 +12,7 @@ sources:
     resource: "../../docs/9-streaming-output-guardrail.md"
     title: "측정값: docs/9-streaming-output-guardrail.md"
   - id: src-3
-    resource: "https://github.com/BerriAI/litellm/blob/main/litellm/types/guardrails.py"
+    resource: "https://github.com/BerriAI/litellm/blob/v1.108.2/litellm/types/guardrails.py"
     title: "LiteLLM 1.108.2 litellm/types/guardrails.py의 unreachable_fallback 설명(구현 대상 목록에 bedrock 없음)"
 ---
 

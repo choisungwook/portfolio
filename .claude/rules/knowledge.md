@@ -70,7 +70,7 @@ frontmatter 규칙:
 - 0.3부터 `verified.at`이 `generated.at`보다 이르면 그 확인은 신뢰 등급에 반영되지 않는다. 사람이 확인한 concept의 내용을 고치면 `generated`만 갱신되므로 등급이 내려간다. 다시 확인받기 전까지 그 상태로 둔다.
 - 더 이상 맞지 않지만 링크 때문에 남겨야 하는 concept는 `status: deprecated`로 표시하고, 대체하는 concept가 있으면 `superseded_by`에 그 경로를 적는다. 그 외에는 `status`를 생략한다(생략하면 `stable`).
 - 시각은 UTC offset을 붙인 ISO 8601로 쓴다. 예: `2026-07-10T00:00:00Z`
-- 경로 값(`sources[].resource`, `superseded_by` 등)은 번들 안 파일이면 bundle root 기준으로 `/`를 붙여 쓰고, 번들 밖 workspace 파일이면 그 concept 파일 기준 상대 경로(예: `../../terraform/iam.tf`)로 쓴다. 0.3부터 `/`가 없는 경로는 그 파일이 있는 디렉터리 기준으로 해석되기 때문이다.
+- 경로 값(`sources[].resource`, `superseded_by` 등)은 번들 안 파일이면 bundle root 기준으로 `/`를 붙여 쓰고, 번들 밖 workspace 파일이면 그 concept 파일 기준 상대 경로(예: `../../terraform/iam.tf`)로 쓴다. 번들 밖 경로는 스펙상 external이라 OKF 소비자는 따라가지 않고 출처 기록으로만 본다. 0.3부터 `/`가 없는 경로는 그 파일이 있는 디렉터리 기준으로 해석되기 때문이다.
 
 본문 규칙:
 
