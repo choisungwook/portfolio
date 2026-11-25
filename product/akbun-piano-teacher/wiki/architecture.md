@@ -68,4 +68,3 @@ Layout of the user's data folder:
 ## Self update
 
 `src/main/update.ts` lists the repository releases and picks the first tag with prefix `akbun-piano-teacher-v`. macOS downloads the dmg for `process.arch` and swaps the bundle with a detached script. Windows sets electron-updater's feed to that tag's download folder and installs the NSIS build. Only packaged builds install; development builds open the release page.
-

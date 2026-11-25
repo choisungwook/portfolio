@@ -175,7 +175,7 @@ function noteType(ticks: number): { type: string; dots: number } {
   return { type: 'quarter', dots: 0 }
 }
 
-function escape(value: string): string {
+function escapeXml(value: string): string {
   return value.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
 }
 
@@ -184,7 +184,7 @@ export function writeMusicXml(score: Score): string {
   const out: string[] = []
   out.push('<?xml version="1.0" encoding="UTF-8"?>')
   out.push('<score-partwise version="4.0">')
-  out.push(`<work><work-title>${escape(score.title)}</work-title></work>`)
+  out.push(`<work><work-title>${escapeXml(score.title)}</work-title></work>`)
   out.push('<part-list><score-part id="P1"><part-name>Piano</part-name></score-part></part-list>')
   out.push('<part id="P1">')
   let previous: Measure | undefined

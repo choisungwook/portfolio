@@ -26,7 +26,7 @@ export function drawKeyboard(canvas: HTMLCanvasElement, marks: KeyMark[]): void 
   const whites = Array.from({ length: HIGH - LOW + 1 }, (_, i) => LOW + i).filter((p) => !isBlackKey(p))
   const keyWidth = width / whites.length
   const x = new Map<number, number>()
-  whites.forEach((p, i) => x.set(p, i * keyWidth))
+  for (const [i, p] of whites.entries()) x.set(p, i * keyWidth)
   const color = (mark: KeyMark) =>
     mark.tone === 'wrong' ? cssVar('--wrong') : mark.tone === 'missed' ? cssVar('--missed') : mark.tone === 'played' ? cssVar('--played') : mark.hand === 'L' ? cssVar('--left') : cssVar('--right')
   const byPitch = new Map<number, KeyMark[]>()

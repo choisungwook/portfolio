@@ -6,8 +6,6 @@ tags: [intent, architecture, omr, midi]
 generated: { by: claude-code/claude-opus-5-5, at: 2026-11-25T00:00:00Z }
 ---
 
-# Piano Coach — Intent & Architecture v0.3
-
 > 다른 구현 세션에 넘기는 의도·아키텍처 문서다. 결정마다 이유를 적었으니, 바꿀 때는 이유가 아직 유효한지 먼저 확인한다.
 > v0.3 변경: 독립 검토(Fable 5.2) 반영, Gemini 제외, OMR을 LLM 기반으로 직접 구현, 공개 GitHub repo·비상업 방침 확정.
 > 저장소 사본 메모: 제품 이름은 akbun-piano-teacher이고, 3장의 참조 codebase는 product/akbun-taskq다. 구현과 다른 점은 [../decisions/](../decisions/index.md)에 있다.

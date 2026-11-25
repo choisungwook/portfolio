@@ -83,7 +83,7 @@ export function analyze(score: Score, session: Session, config: AnalysisConfig):
     const beatTicks = (score.ticksPerQuarter * 4) / measure.time.beatType
     expected.push({ t, raw: t, pitches: [note.pitch], measure: note.measure, beat: 1 + (note.tick - measure.startTick) / beatTicks })
   }
-  expected.forEach((g) => g.pitches.sort((a, b) => a - b))
+  for (const g of expected) g.pitches.sort((a, b) => a - b)
 
   const ons = session.events.filter((e) => e.kind === 'on' && e.pitch !== undefined).sort((a, b) => a.tMs - b.tMs)
   const played: Group[] = []
