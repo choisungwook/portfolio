@@ -8,7 +8,7 @@
 | --- | --- |
 | 기능 | 프록시 풀의 평소 상한(`default_pool_size`)과 급증 상한(`reserve_pool_size`) |
 | 쓰는 도구 | PgBouncer(`pool_mode=transaction`), HikariCP, PostgreSQL |
-| 입력 | `min_pool_size=2`, `default_pool_size=5`, `reserve_pool_size=5`, `reserve_pool_timeout=3` |
+| 입력 | 부하 `load.sh 8 5 30`, `min_pool_size=2`, `default_pool_size=5`, `reserve_pool_size=5`, `reserve_pool_timeout=3` |
 | 작업 | 1. PgBouncer 경유로 앱 재생성 2. 동시 요청 8개에서 reserve 사용 확인 |
 | 달성할 것 | min/desired/max 직관에 가장 가까운 풀 구성을 HikariCP와 같은 부하로 비교한다 |
 
@@ -56,11 +56,18 @@ docker compose --profile pgbouncer --env-file profiles/pgbouncer.env up -d --for
 
 ### 2. 동시 요청 8개에서 서버 커넥션 수 확인
 
-부하를 넣고 PgBouncer 관리 콘솔의 `SHOW POOLS`로 클라이언트와 서버 커넥션 수를 봅니다.
+`reserve_pool_timeout`(3초)보다 오래 기다리는 클라이언트가 있어야 reserve가 열리므로, hold를 5초로 잡습니다. hold가 2초면 서버 커넥션이 2초마다 풀려 대기가 3초를 넘지 않고 reserve가 열리지 않습니다.
+
+왼쪽 터미널에서 PgBouncer 관리 콘솔의 `SHOW POOLS`를 1초마다 조회해 둡니다.
 
 ```bash
-scripts/load.sh 8 2 30
-docker compose exec -T pgbouncer psql -p 6432 -U pgbouncer pgbouncer -c 'SHOW POOLS;'
+watch -n 1 "docker compose exec -T pgbouncer psql -p 6432 -U pgbouncer pgbouncer -c 'SHOW POOLS;'"
+```
+
+오른쪽 터미널에서 부하를 넣습니다.
+
+```bash
+scripts/load.sh 8 5 30
 ```
 
 예상 관측입니다. 처음 3초는 `sv_active=5`, `cl_waiting=3`이고, 그 뒤 reserve가 열리며 `sv_active=8`, `cl_waiting=0`이 됩니다.

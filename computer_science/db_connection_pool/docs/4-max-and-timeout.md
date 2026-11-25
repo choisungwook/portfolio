@@ -54,38 +54,38 @@ time      active idle pending total db
 00:00:03  10     0    10      10    10
 ```
 
-k6 결과의 예상값입니다. 성공 건수는 5건/초 × 30초 = 약 150건입니다. 503 건수는 실패한 VU가 1초 만에 돌아와 다시 요청하므로 성공 건수보다 많아질 수 있습니다.
+k6 결과의 예상값입니다. 성공 건수는 5건/초 × 30초 = 약 150건입니다. 503 건수는 실패한 VU가 1초 만에 돌아와 다시 요청하므로 성공 건수보다 많아질 수 있습니다. HikariCP는 반납된 커넥션을 기다리는 스레드에게 먼저 넘기므로, 성공한 요청은 0~1초를 기다린 뒤 2초를 점유해 2~3초가 걸립니다. 503은 정확히 1초에 돌아오고 전체의 약 2/3라서 p50은 1초 근처, p95와 max는 3초 근처입니다.
 
 ```text
 requests  success  503   p50     p95     max
-약 450    약 150   약 300 1.0s    2.0s    2.1s
+약 450    약 150   약 300 1.0s    3.0s    3.1s
 ```
 
 - 503 응답 본문에 `Connection is not available, request timed out after 1000ms`가 들어 있어야 합니다.
 
-### 2. 타임아웃 30초 프로필에서 같은 부하 실행
+### 2. 타임아웃 누적 횟수와 대기 시간 지표 확인
+
+앱을 재생성하기 전, 1단계 직후에 실행합니다. 누적 타임아웃 횟수가 k6의 503 건수와 같아야 합니다. 다음 단계에서 앱을 재생성하면 Micrometer 카운터가 0으로 초기화되므로 순서를 바꾸지 않습니다.
+
+```bash
+curl -s localhost:8080/actuator/prometheus | grep -E 'hikaricp_connections_(timeout_total|pending|acquire_seconds_max)'
+```
+
+### 3. 타임아웃 30초 프로필에서 같은 부하 실행
 
 ```bash
 docker compose --env-file profiles/grow.env up -d --force-recreate app
 scripts/load.sh 20 2 30
 ```
 
-예상 관측입니다. 503은 사라지지만 성공 건수는 1단계와 같은 약 150건이고, 요청의 절반은 2초를 기다린 뒤 2초를 점유해 약 4초가 걸립니다.
+예상 관측입니다. 503은 사라지지만 성공 건수는 1단계와 같은 약 150건이고, 커넥션 10개를 VU 20개가 번갈아 쓰므로 정상 상태에서 요청마다 약 2초를 기다린 뒤 2초를 점유해 약 4초가 걸립니다.
 
 ```text
 requests  success  503   p50     p95     max
 약 150    약 150   0     4.0s    4.0s    4.1s
 ```
 
-- 1단계와 2단계의 success가 같으면 `connectionTimeout`이 처리량에 영향을 주지 않는다는 것을 확인한 것입니다.
-
-### 3. 타임아웃 누적 횟수와 대기 시간 지표 확인
-
-1단계 직후에 실행하면 누적 타임아웃 횟수가 k6의 503 건수와 같아야 합니다.
-
-```bash
-curl -s localhost:8080/actuator/prometheus | grep -E 'hikaricp_connections_(timeout_total|pending|acquire_seconds_max)'
-```
+- 1단계와 3단계의 success가 같으면 `connectionTimeout`이 처리량에 영향을 주지 않는다는 것을 확인한 것입니다.
 
 ## 부록. 실무에서 얻는 것
 

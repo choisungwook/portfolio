@@ -54,15 +54,18 @@ sequenceDiagram
 
 ```bash
 docker compose --env-file profiles/shrink.env up -d --force-recreate app
-scripts/load.sh 8 2 20
+scripts/load.sh 8 2 60
 ```
 
-예상 관측입니다.
+예상 관측입니다. 기다리는 스레드만큼 생성되어 total 8이 되고, 다음 housekeeper 주기에 idle 2개가 보충되어 10이 됩니다. 부하를 60초 거는 이유는 housekeeper가 적어도 한 번 돌게 하기 위해서입니다. total이 10이 되기 전에 부하가 끝나면 2단계에서 닫히는 커넥션 수가 8개보다 적어집니다.
 
 ```text
 time      active idle pending total db
-00:00:05  8      2    0       10    10
+00:00:01  8      0    0       8     8
+00:00:25  8      2    0       10    10
 ```
+
+- `maxLifetime`이 60초라 부하 중에도 커넥션이 교체될 수 있습니다. 교체는 total을 바꾸지 않으므로 이 단계의 관측에는 영향이 없습니다.
 
 ### 2. 부하 종료 후 total이 줄어드는 시점 측정
 

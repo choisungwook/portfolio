@@ -4,7 +4,7 @@ okf_version: "0.3"
 
 # Knowledge
 
-workspace마다 두는 지식 번들의 템플릿이다. 새 workspace를 만들 때 이 디렉터리를 통째로 복사해 그 workspace의 `knowledge/`로 쓴다. 여기에는 concept를 쌓지 않는다.
+DB 커넥션풀 크기 조절 핸즈온(HikariCP, PostgreSQL, PgBouncer)의 지식 번들이다. 도구 선택과 범위 같은 결정의 이유를 여기에 남긴다.
 
 AI agent가 작업하면서 축적하는 지식 번들이다. Google이 제안한 Open Knowledge Format(OKF) 0.3(스펙 사본: 저장소 루트의 `templates/okf-spec-0.3.md`)을 따른다. 코드와 git history가 기록하지 못하는 의사결정의 이유, 반복 절차, 도메인 통찰을 markdown + YAML frontmatter로 남긴다.
 

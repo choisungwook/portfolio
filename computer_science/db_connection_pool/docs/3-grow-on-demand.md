@@ -14,9 +14,9 @@
 
 ## 풀이 늘어나는 기준은 두 가지다
 
-[1. 기능 지도](./1-feature-map.md#커넥션풀은-auto-scaling-group과-비슷하지만-목표값이-없다)에서 정리한 대로 HikariCP가 커넥션을 만드는 경우는 두 가지입니다. 하나는 `getConnection()`에서 idle을 찾지 못한 스레드가 기다릴 때이고, 다른 하나는 housekeeper가 idle이 `minimumIdle`보다 적다고 판단할 때입니다. 앞의 것은 요청 경로에서 즉시, 뒤의 것은 커넥션 반납이나 housekeeper 주기에 일어납니다.
+[1. 기능 지도](./1-feature-map.md#커넥션풀은-auto-scaling-group과-비슷하지만-목표값이-없다)에서 정리한 대로 HikariCP가 커넥션을 만드는 경우는 두 가지입니다. 하나는 `getConnection()`에서 idle을 찾지 못한 스레드가 기다릴 때이고, 다른 하나는 housekeeper가 idle이 `minimumIdle`보다 적다고 판단할 때입니다. 앞의 것은 요청 경로에서 기다리는 스레드 1개당 커넥션 1개를 즉시 만들고, 뒤의 것은 30초마다 도는 housekeeper나 커넥션을 닫은 직후에만 `minimumIdle`까지 채웁니다. 커넥션 반납은 보충을 일으키지 않습니다.
 
-두 기준이 합쳐지면 부하가 안정된 상태의 total은 `min(maximumPoolSize, active + minimumIdle)`로 수렴합니다. 동시 요청이 4개면 6, 8개면 10입니다. `minimumIdle`을 "평소 최소 2개"로 이해했다면, 동시 요청 4개에서 total 4를 예상하고 6을 보게 됩니다.
+두 기준이 합쳐지면 housekeeper가 한 번 이상 돈 뒤 부하가 안정된 상태의 total은 `min(maximumPoolSize, active + minimumIdle)`로 수렴합니다. 동시 요청이 4개면 6, 8개면 10입니다. `minimumIdle`을 "평소 최소 2개"로 이해했다면, 동시 요청 4개에서 total 4를 예상하고 6을 보게 됩니다.
 
 ### 용어
 
@@ -44,8 +44,9 @@ sequenceDiagram
   A-->>T: 요청 3에게 전달
   A->>P: 커넥션 4 생성
   A-->>T: 요청 4에게 전달
-  Note over H: active 4 / idle 0 → idle < minIdle
-  H->>A: idle 2개 보충 요청
+  Note over H: active 4 / idle 0 / total 4 → idle < minIdle
+  Note over H: 다음 housekeeper 주기까지 total 4 유지
+  H->>A: housekeeper (최대 30초 후) idle 2개 보충 요청
   A->>P: 커넥션 5, 6 생성
   Note over H: active 4 / idle 2 / total 6
 ```
@@ -70,31 +71,32 @@ time      active idle pending total db
 ### 2. 동시 요청 4개로 total 증가 확인
 
 ```bash
-scripts/load.sh 4 2 30
+scripts/load.sh 4 2 60
 ```
 
-예상 관측입니다. total은 4가 아니라 6에서 멈춥니다.
+예상 관측입니다. total은 먼저 4가 되고, 다음 housekeeper 주기(부하 시작 후 최대 30초)에 6이 됩니다. 부하를 60초 동안 거는 이유는 housekeeper가 적어도 한 번 돌게 하기 위해서입니다. 6이 되는 시각은 housekeeper 주기와의 위상에 따라 실행마다 달라집니다.
 
 ```text
 time      active idle pending total db
 00:00:01  4      0    0       4     4
-00:00:02  4      2    0       6     6
+00:00:20  4      2    0       6     6
 ```
 
-- 첫 줄에서 idle이 0이 된 뒤 housekeeper나 반납 시점의 보충으로 idle 2개가 더 생깁니다.
+- 4에서 6으로 바뀌는 시각에 앱 로그의 `After cleanup stats`가 함께 찍혀야 합니다. 보충 주체가 요청 경로가 아니라 housekeeper라는 증거입니다.
 - pending은 커넥션 생성 시간(수십 ms) 동안만 0보다 크므로 1초 간격 샘플에는 잡히지 않을 수 있습니다. 대기 여부는 4단계의 acquire 시간으로 확인합니다.
 
 ### 3. 동시 요청 8개로 상한까지 증가 확인
 
 ```bash
-scripts/load.sh 8 2 30
+scripts/load.sh 8 2 60
 ```
 
-예상 관측입니다. `active + minimumIdle` = 10이 `maximumPoolSize`와 같아서 상한에서 멈춥니다.
+예상 관측입니다. 2단계에서 남은 total 6에 기다리는 스레드 2개만큼 생성되어 8이 되고, 다음 housekeeper 주기에 `active + minimumIdle` = 10이 `maximumPoolSize`와 같아 상한에서 멈춥니다.
 
 ```text
 time      active idle pending total db
-00:00:02  8      2    0       10    10
+00:00:01  8      0    0       8     8
+00:00:25  8      2    0       10    10
 ```
 
 - 부하를 끝내도 total은 10으로 남습니다. `idleTimeout` 기본값이 600000ms(10분)이기 때문이며, 축소는 [5. 유휴 축소와 수명 교체](./5-shrink-and-lifetime.md)에서 다룹니다.
