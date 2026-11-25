@@ -3,7 +3,7 @@ type: Decision
 title: deprecated transitive 의존성은 scoped overrides로 교체
 description: electron-builder가 끌어오는 glob 7(inflight 포함)과 rimraf 2를 npm overrides로 상위 패키지 아래에서만 최신 버전으로 교체한다.
 tags: [npm, electron-builder, ci]
-timestamp: 2026-07-19T00:00:00Z
+generated: { by: claude-code/unknown, at: 2026-07-19T00:00:00Z }
 ---
 
 ## 결정

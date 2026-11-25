@@ -3,7 +3,11 @@ type: Decision
 title: 3계정 terraform은 mock provider plan 테스트로 먼저 검증한다
 description: AWS 계정 3개가 있어야 apply할 수 있어, 자격 증명 없이 도는 terraform test로 방안 조합별 표현식을 확인한다.
 tags: [terraform, testing, aws]
-timestamp: 2026-09-23T00:00:00Z
+generated: { by: claude-code/unknown, at: 2026-09-23T00:00:00Z }
+sources:
+  - id: src-1
+    resource: "../../terraform/tests/plan.tftest.hcl"
+    title: "terraform/tests/plan.tftest.hcl"
 ---
 
 # 3계정 terraform은 mock provider plan 테스트로 먼저 검증한다
@@ -25,7 +29,3 @@ timestamp: 2026-09-23T00:00:00Z
 
 - `aws_iam_policy_document`는 mock이 임의 문자열을 만들어 IAM 리소스 검증에 걸린다. `mock_data`로 빈 정책 JSON을 기본값으로 준다
 - plan 단계에서 값이 정해지지 않는 ARN·ID로 assert하면 "Unknown condition value"로 실패한다. plan에서 알 수 있는 값으로 assert한다
-
-## Citations
-
-1. [terraform/tests/plan.tftest.hcl](../../terraform/tests/plan.tftest.hcl)

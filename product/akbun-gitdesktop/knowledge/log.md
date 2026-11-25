@@ -1,5 +1,9 @@
 # Knowledge Update Log
 
+## 2026-11-25
+
+* **Update**: 번들 index의 okf_version을 0.3으로 변경. 0.1 형식 concept 3개의 `timestamp`와 `## Citations`를 `generated`와 `sources`로 변환. 작성자를 알 수 없어 `generated.by`는 `claude-code/unknown`으로 둠.
+
 ## 2026-08-29
 
 * **Creation**: [Tauri updater로 서명 검증과 다중 플랫폼 업데이트 통합](decisions/2026-08-tauri-signed-updater.md) 결정 기록. Electron 수동 dmg 교체를 Tauri 서명 검증 updater로 대체.

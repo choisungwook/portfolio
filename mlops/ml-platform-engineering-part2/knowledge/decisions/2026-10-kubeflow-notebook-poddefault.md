@@ -3,7 +3,7 @@ type: Decision
 title: 노트북은 Kubeflow Notebook으로 만들고 접속 정보는 PodDefault로 넣는다
 description: 일반 JupyterLab Deployment를 버리고 Kubeflow Notebooks의 PodDefault로 MLflow와 object storage 접속 정보를 주입한다
 tags: [kubeflow, notebooks, mlflow]
-timestamp: 2026-10-31T00:00:00Z
+generated: { by: claude-code/unknown, at: 2026-10-31T00:00:00Z }
 ---
 
 ## 결정

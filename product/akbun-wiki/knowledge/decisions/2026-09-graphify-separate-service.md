@@ -3,7 +3,11 @@ type: Decision
 title: graphify 빌더를 reader 밖의 별도 서비스로 분리
 description: Worker에서 실행할 수 없는 graphify를 Python 서비스에 두고 reader는 읽기 전용 토큰과 변경 번호 API로만 연결
 tags: [wiki, graphify, reader, auth]
-timestamp: 2026-09-09T00:00:00Z
+generated: { by: claude-code/unknown, at: 2026-09-09T00:00:00Z }
+sources:
+  - id: src-1
+    resource: "../../../akbun-reader/knowledge/decisions/2026-09-read-only-token-scope.md"
+    title: "akbun-reader 읽기 전용 토큰 결정"
 ---
 
 ## 결정
@@ -20,7 +24,3 @@ timestamp: 2026-09-09T00:00:00Z
 - 파일이 기준이면 LLM·Obsidian·git이 서비스 없이도 읽을 수 있고, DB는 언제든 재생성 가능
 - Access는 호스트가 정해진 서비스에만 걸 수 있어 Bearer 키 하나로 검증하는 편이 작음
 - 유출 시 피해 범위: reader 토큰은 조회, wiki read 키는 조회, admin 키만 LLM 비용 발생
-
-## Citations
-
-1. [akbun-reader 읽기 전용 토큰 결정](../../../akbun-reader/knowledge/decisions/2026-09-read-only-token-scope.md)

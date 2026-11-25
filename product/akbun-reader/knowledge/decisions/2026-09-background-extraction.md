@@ -3,7 +3,14 @@ type: Decision
 title: URL 선저장과 경량 본문 추출
 description: 링크 저장 성공을 추출 실패와 분리하고 로컬 workerd 측정으로 경량 파서 선택
 tags: [reader, workers, extraction]
-timestamp: 2026-09-07T00:00:00Z
+generated: { by: claude-code/unknown, at: 2026-09-07T00:00:00Z }
+sources:
+  - id: src-1
+    resource: "https://github.com/choisungwook/portfolio/issues/1212"
+    title: "공유 저장 이슈"
+  - id: src-2
+    resource: "../../wiki/url-extraction.md"
+    title: "측정·제약 기록"
 ---
 
 ## 결정
@@ -20,8 +27,3 @@ timestamp: 2026-09-07T00:00:00Z
 - 로컬 workerd에서 긴 HTML 추출의 회당 평균 CPU가 약 1.1~1.8ms로 측정됨
 - Node에서는 허용되는 redirect error가 workerd에서는 TypeError를 발생시킴
 - Node 테스트만으로 런타임 호환성을 보장할 수 없어 workerd 통합 테스트 추가
-
-## Citations
-
-1. [공유 저장 이슈](https://github.com/choisungwook/portfolio/issues/1212)
-2. [측정·제약 기록](../../wiki/url-extraction.md)

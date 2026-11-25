@@ -3,7 +3,11 @@ type: Decision
 title: 고정 IP 실험에서 AWS 호스트명과 TLS를 유지
 description: DNS 변경이 가능한 직접 NLB 통과 시나리오에서 AWS 호스트명을 유지한다.
 tags: [aws, nlb, sts, agentcore, tls]
-timestamp: 2026-09-05T00:00:00Z
+generated: { by: claude-code/unknown, at: 2026-09-05T00:00:00Z }
+sources:
+  - id: src-1
+    resource: "../references/aws-networking-excerpts.md"
+    title: "AWS 공식 문서 발췌와 확인 사항"
 ---
 
 ## 결정
@@ -27,7 +31,3 @@ timestamp: 2026-09-05T00:00:00Z
 - NLB 경유 호출 성공과 방화벽의 허용 외 목적지 차단은 별도의 검증 대상.
 - 장기기억의 모델 추출·cross-region inference는 네트워크 인증 실험과 독립적인 변수.
 - DNS 변경 불가 경로는 [별도 결정](2026-09-separate-auth-from-routing.md)의 CONNECT proxy 사용.
-
-## Citations
-
-1. [AWS 공식 문서 발췌와 확인 사항](../references/aws-networking-excerpts.md)

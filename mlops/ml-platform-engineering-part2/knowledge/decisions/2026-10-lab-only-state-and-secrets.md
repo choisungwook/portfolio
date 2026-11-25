@@ -3,7 +3,7 @@ type: Decision
 title: Redis는 PVC 없이, PostgreSQL 비밀번호는 Git에 실습 값으로 둔다
 description: 단일 노드 실습에서 미리보기 namespace가 Secret 없이 뜨지 못하는 문제를 피한다
 tags: [mlflow, redis, secrets]
-timestamp: 2026-10-25T00:00:00Z
+generated: { by: claude-code/unknown, at: 2026-10-25T00:00:00Z }
 ---
 
 ## 결정

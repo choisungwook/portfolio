@@ -2,6 +2,10 @@
 
 concept를 추가·수정·삭제할 때마다 오늘 날짜 섹션을 맨 위에 만들고 한 줄 남긴다. 구분은 `**Creation**`, `**Update**`, `**Deletion**`이다.
 
+## 2026-11-25
+
+* **Update**: 번들의 OKF 0.2 스펙 사본을 지우고 저장소 루트의 `templates/okf-spec-0.3.md`를 참조하도록 바꾸고, 번들 index의 okf_version을 0.3으로 변경.
+
 ## 2026-11-11
 
 * **Creation**: [isolated sandbox는 노드를 지키지만 SA 토큰과 Container Insights 메트릭은 그대로가 아니다](topics/sandbox-boundary-and-observability.md) 실측 기록. sandbox를 넣었다고 RBAC와 관측을 생략하지 않게 한다.

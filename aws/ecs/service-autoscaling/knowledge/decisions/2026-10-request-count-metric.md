@@ -3,7 +3,7 @@ type: Decision
 title: 기본 지표는 ALBRequestCountPerTarget, CPU는 ECS Exec 시나리오로 따로 둔다
 description: 고정 응답 nginx로는 CPU가 오르지 않아 요청 수 지표를 쓰고, k6 요청률로 도달 개수를 미리 계산한다
 tags: [ecs, autoscaling, k6]
-timestamp: 2026-10-11T00:00:00Z
+generated: { by: claude-code/unknown, at: 2026-10-11T00:00:00Z }
 ---
 
 ## 결정

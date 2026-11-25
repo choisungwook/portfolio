@@ -3,7 +3,7 @@ type: Decision
 title: 발표자 노트는 PPTX notes page로 저장
 description: 노트는 슬라이드의 평문 필드이고, 노트가 있는 슬라이드만 notes page와 전용 테마를 가진 notes master를 함께 쓴다.
 tags: [pptx, ooxml, rust, presentation]
-timestamp: 2026-09-28T00:00:00Z
+generated: { by: claude-code/unknown, at: 2026-09-28T00:00:00Z }
 ---
 
 ## 결정

@@ -3,7 +3,7 @@ type: Decision
 title: Bottlerocket EC2는 저장소 terraform 규칙의 AMI, 볼륨 기본값을 따르지 않는다
 description: Bottlerocket은 AMI 조회 방법과 볼륨 구조가 AL2023과 달라 aws_ami 필터, 30GB 루트 볼륨 규칙을 그대로 쓰면 틀린다.
 tags: [bottlerocket, terraform, ec2]
-timestamp: 2026-09-23T00:00:00Z
+generated: { by: claude-code/unknown, at: 2026-09-23T00:00:00Z }
 ---
 
 # Bottlerocket EC2는 저장소 terraform 규칙의 AMI, 볼륨 기본값을 따르지 않는다

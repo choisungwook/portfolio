@@ -3,7 +3,7 @@ type: Decision
 title: Source monitor의 in-out은 재생 경계다
 description: asset preview의 재생과 timeline 드롭을 Source monitor 선택 구간으로 제한한다.
 tags: [makevideo, source-monitor, playback]
-timestamp: 2026-09-04T00:00:00Z
+generated: { by: claude-code/unknown, at: 2026-09-04T00:00:00Z }
 ---
 
 # Source monitor의 in-out은 재생 경계다

@@ -3,7 +3,7 @@ type: Decision
 title: public NLB 진입과 AWS API 권한을 분리
 description: 공개 NLB TCP 443은 모든 IPv4에 허용하고 IAM·backend 경계는 유지한다.
 tags: [aws, nlb, security-group, iam]
-timestamp: 2026-09-06T00:00:00Z
+generated: { by: claude-code/unknown, at: 2026-09-06T00:00:00Z }
 ---
 
 ## 결정

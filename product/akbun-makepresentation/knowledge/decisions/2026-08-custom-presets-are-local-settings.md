@@ -3,7 +3,7 @@ type: Decision
 title: 사용자 프리셋은 로컬 설정으로 저장
 description: 사용자 도형 프리셋을 문서가 아닌 장치별 설정으로 관리.
 tags: [desktop, editor, presets, storage]
-timestamp: 2026-08-16T00:00:00Z
+generated: { by: claude-code/unknown, at: 2026-08-16T00:00:00Z }
 ---
 
 ## 결정

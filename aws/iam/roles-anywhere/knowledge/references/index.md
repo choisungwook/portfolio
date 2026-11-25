@@ -4,5 +4,5 @@
 
 ## 목록
 
-* [OKF v0.2 스펙 사본](okf-spec-0.2.md) - knowledge 번들이 따르는 Open Knowledge Format 스펙 원문.
+* OKF v0.3 스펙 사본은 이 번들에 두지 않고 저장소 루트의 `templates/okf-spec-0.3.md`에 하나만 둔다.
 * [Roles Anywhere 수명·운영 근거](roles-anywhere-lifecycle.md) - 인증·세션 갱신·CRL·감사 지원 조건.

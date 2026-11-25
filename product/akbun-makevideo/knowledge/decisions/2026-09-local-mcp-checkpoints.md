@@ -3,7 +3,14 @@ type: Decision
 title: 외부 AI 편집은 로컬 MCP와 영속 복구 지점을 사용한다
 description: 클라이언트 중립 도구를 기존 Document에 연결하고 변경 전 스냅샷을 디스크에 보관한다.
 tags: [makevideo, mcp, editing, recovery]
-timestamp: 2026-09-17T00:00:00Z
+generated: { by: claude-code/unknown, at: 2026-09-17T00:00:00Z }
+sources:
+  - id: src-1
+    resource: "../../wiki/architecture/local-mcp.md"
+    title: "로컬 MCP 구조"
+  - id: src-2
+    resource: "../../docs/02-mcp-editing.md"
+    title: "복구 사용법"
 ---
 
 # 로컬 MCP와 복구 지점
@@ -26,8 +33,3 @@ timestamp: 2026-09-17T00:00:00Z
 - 앱 종료 후에도 이전 편집 상태 복구
 - UI와 외부 AI가 다른 편집 모델을 갖는 문제 방지
 - 복구 파일은 미디어 사본이 아니므로 원본 파일 생명주기와 분리
-
-## Citations
-
-1. [로컬 MCP 구조](../../wiki/architecture/local-mcp.md)
-2. [복구 사용법](../../docs/02-mcp-editing.md)

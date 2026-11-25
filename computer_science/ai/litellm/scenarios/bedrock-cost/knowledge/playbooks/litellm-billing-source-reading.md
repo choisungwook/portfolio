@@ -3,7 +3,7 @@ type: Playbook
 title: LiteLLM 과금 로직은 컨테이너 안 소스로 확인한다
 description: 과금 결과가 예상과 다르면 실행 중인 컨테이너의 site-packages에서 과금 경로 네 파일을 읽는다.
 tags: [litellm, cost, debugging]
-timestamp: 2026-09-20T00:00:00Z
+generated: { by: claude-code/unknown, at: 2026-09-20T00:00:00Z }
 ---
 
 # LiteLLM 과금 로직은 컨테이너 안 소스로 확인한다

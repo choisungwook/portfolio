@@ -3,7 +3,7 @@ type: Decision
 title: 회전은 상자 중심의 렌더 변환이고 선택 오버레이도 같이 돈다
 description: 회전을 좌표 재계산이 아니라 상자 중심 transform으로 두고 선택 박스·핸들을 함께 회전시킨 이유.
 tags: [desktop, editor, geometry, interaction, pptx]
-timestamp: 2026-08-16T12:20:00Z
+generated: { by: claude-code/unknown, at: 2026-08-16T12:20:00Z }
 ---
 
 ## 결정

@@ -3,7 +3,7 @@ type: Decision
 title: 릴리스 버전은 tag에서 마이너 +1로 자동 계산
 description: master push마다 가장 최근 tag의 마이너 버전을 +1 해서 새 tag와 release를 만든다.
 tags: [github-actions, release, akbun-shadowing-player]
-timestamp: 2026-07-25T00:00:00Z
+generated: { by: claude-code/unknown, at: 2026-07-25T00:00:00Z }
 ---
 
 ## 결정

@@ -3,7 +3,7 @@ type: Decision
 title: 실습 DB는 Aurora Serverless v2 0.5~2 ACU로 둔다
 description: provisioned 최저 사양보다 싸고, IAM 인증의 여유 메모리 요구를 최대 ACU로 받는다
 tags: [aurora, cost]
-timestamp: 2026-11-07T00:00:00Z
+generated: { by: claude-code/unknown, at: 2026-11-07T00:00:00Z }
 ---
 
 ## 결정

@@ -3,7 +3,7 @@ type: Decision
 title: GPU 한 장을 DRA 대신 NVIDIA device plugin time-slicing으로 나눈다
 description: Kubeflow Notebook UI와 KServe가 nvidia.com/gpu limit으로 GPU를 요청하므로 그 방식과 맞는 공유 방법을 골랐다
 tags: [gpu, k3s, kserve, kubeflow]
-timestamp: 2026-10-31T00:00:00Z
+generated: { by: claude-code/unknown, at: 2026-10-31T00:00:00Z }
 ---
 
 ## 결정

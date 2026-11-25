@@ -3,7 +3,7 @@ type: Topic
 title: guardrail 비용은 검사 횟수 × 누적 문자 수로 커진다
 description: text unit은 문자 기준이라 멀티턴 전체 검사와 스트리밍 반복 검사가 비용을 배수로 키운다
 tags: [bedrock, guardrails, cost]
-timestamp: 2026-11-07T00:00:00Z
+generated: { by: claude-code/unknown, at: 2026-11-07T00:00:00Z }
 ---
 
 - text unit은 1,000자 단위 올림이고 유료 정책마다 따로 과금된다. 토큰과 모델 가격은 무관하다.

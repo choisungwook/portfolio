@@ -3,7 +3,14 @@ type: Decision
 title: Roles Anywhere 실습을 30분 컨셉 범위로 축소
 description: 원리·구성 요소·운영·폐기·네트워크 다섯 주제와 실제 AWS 흐름 한 바퀴만 남기고, 코드는 자기완결 파일 4개로 통합한다.
 tags: [aws, roles-anywhere, scope, pki]
-timestamp: 2026-09-06T22:40:00Z
+generated: { by: claude-code/unknown, at: 2026-09-06T22:40:00Z }
+sources:
+  - id: src-1
+    resource: "2026-09-certificate-lifecycle-boundaries.md"
+    title: "인증서 수명과 AWS 세션 수명 분리"
+  - id: src-2
+    resource: "2026-09-crl-management-ownership.md"
+    title: "실습 CRL 관리와 정리 범위"
 ---
 
 ## 결정
@@ -25,8 +32,3 @@ timestamp: 2026-09-06T22:40:00Z
 - 같은 CA·다른 CN은 CreateSession 403 "Unable to assume role" — Role trust의 PrincipalTag 조건이 막음.
 - CRL import 직후 첫 시도부터 "Certificate revoked". 전파 대기 없음.
 - 세션 이름은 인증서 serial(1000, 1002). 교체 뒤 값이 바뀌므로 serial 기준 추적표가 필요.
-
-## Citations
-
-1. [인증서 수명과 AWS 세션 수명 분리](2026-09-certificate-lifecycle-boundaries.md)
-2. [실습 CRL 관리와 정리 범위](2026-09-crl-management-ownership.md)

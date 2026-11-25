@@ -3,7 +3,7 @@ type: Decision
 title: object storage NetworkPolicy는 지우지 않고 label 기반 허용 정책을 더한다
 description: Kubeflow 배포판은 namespace 단위로 통신을 막아서 정책 하나를 지워도 풀리지 않는다
 tags: [kubeflow, seaweedfs, networkpolicy, k3s]
-timestamp: 2026-10-31T00:00:00Z
+generated: { by: claude-code/unknown, at: 2026-10-31T00:00:00Z }
 ---
 
 ## 결정

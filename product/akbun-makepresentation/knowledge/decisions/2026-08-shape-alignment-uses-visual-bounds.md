@@ -3,7 +3,7 @@ type: Decision
 title: 도형 정렬과 자석은 보이는 바깥 경계를 사용
 description: 선택 묶음과 대상 도형의 회전 후 바깥 경계를 같은 방향끼리 맞춤.
 tags: [editor, alignment, snapping, geometry]
-timestamp: 2026-08-16T00:00:00Z
+generated: { by: claude-code/unknown, at: 2026-08-16T00:00:00Z }
 ---
 
 ## 결정

@@ -3,7 +3,7 @@ type: Decision
 title: 로그는 macOS 관례 위치에 자체 rotation 로거로 기록
 description: 의존성 없이 ~/Library/Logs/앱이름/main.log에 쓰고 1MB 크기 기준으로 5개까지 rotation한다.
 tags: [electron, logging, akbun-shadowing-player]
-timestamp: 2026-07-25T00:00:00Z
+generated: { by: claude-code/unknown, at: 2026-07-25T00:00:00Z }
 ---
 
 ## 결정

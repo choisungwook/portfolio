@@ -3,7 +3,7 @@ type: Decision
 title: 모델 로드와 워크로드 실행 분리
 description: 모델 가중치 적재와 요청 처리에 필요한 메모리를 같은 모델과 GPU를 사용하는 두 계산으로 구분한다.
 tags: [llm-serving, vram, oom, user-interface]
-timestamp: 2026-08-30T00:00:00Z
+generated: { by: claude-code/unknown, at: 2026-08-30T00:00:00Z }
 ---
 
 ## 결정

@@ -3,7 +3,7 @@ type: Decision
 title: 코드 블록은 편집 모델과 PPTX 표현을 분리
 description: 앱에서는 구조화된 코드 객체로 편집하고 PPTX에서는 SVG 그림과 원본 메타데이터를 함께 저장.
 tags: [editor, code-block, pptx, round-trip]
-timestamp: 2026-08-16T00:00:00Z
+generated: { by: claude-code/unknown, at: 2026-08-16T00:00:00Z }
 ---
 
 ## 결정

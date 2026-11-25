@@ -3,7 +3,7 @@ type: Decision
 title: 슬라이드는 측정해서 문장으로 알려주고 그림도 같이 보낸다
 description: AI가 슬라이드를 인식하지 못하던 원인은 원본 JSON만 넘긴 것이었고, 측정한 판독문과 렌더 이미지를 함께 보내는 방식으로 바꿈.
 tags: [desktop, ai, prompt, javascript]
-timestamp: 2026-08-24T00:00:00Z
+generated: { by: claude-code/unknown, at: 2026-08-24T00:00:00Z }
 ---
 
 ## 결정

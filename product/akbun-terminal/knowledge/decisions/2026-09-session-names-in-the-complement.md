@@ -3,7 +3,7 @@ type: Decision
 title: 세션 이름은 테마 파랑의 보색으로, 대비를 채울 때까지 명도를 옮긴다
 description: 사이드바 workspace 이름 색을 테마마다 계산하는 규칙과 패널 접기 버튼을 타이틀바에 둔 이유
 tags: [swift, appkit, theme, accessibility]
-timestamp: 2026-09-23T00:00:00Z
+generated: { by: claude-code/unknown, at: 2026-09-23T00:00:00Z }
 ---
 
 ## 결정

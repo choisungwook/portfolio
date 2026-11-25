@@ -3,7 +3,17 @@ type: Decision
 title: AI 인증은 Codex를 재사용하고 대화는 앱이 소유
 description: ChatGPT 인증만 Codex CLI에서 재사용하고 세션 수명과 자산은 앱에서 독립 관리.
 tags: [desktop, ai, codex, storage, authentication]
-timestamp: 2026-08-16T00:00:00Z
+generated: { by: claude-code/unknown, at: 2026-08-16T00:00:00Z }
+sources:
+  - id: src-1
+    resource: "https://learn.chatgpt.com/docs/app-server"
+    title: "Codex App Server"
+  - id: src-2
+    resource: "https://learn.chatgpt.com/docs/auth"
+    title: "Codex authentication"
+  - id: src-3
+    resource: "https://learn.chatgpt.com/docs/image-generation"
+    title: "Image generation"
 ---
 
 ## 결정
@@ -21,9 +31,3 @@ timestamp: 2026-08-16T00:00:00Z
 - Codex와 앱의 대화 기록·용량·삭제 정책을 분리.
 - 세션 단위 디렉터리가 JSON과 이미지의 용량 계산 및 일괄 삭제에 적합.
 - 읽기 전용 복원과 원본 슬라이드 보존으로 비정상 종료와 AI 결과 오류에서 복구 가능.
-
-## Citations
-
-1. [Codex App Server](https://learn.chatgpt.com/docs/app-server)
-2. [Codex authentication](https://learn.chatgpt.com/docs/auth)
-3. [Image generation](https://learn.chatgpt.com/docs/image-generation)

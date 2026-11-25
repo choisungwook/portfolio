@@ -3,7 +3,7 @@ type: Decision
 title: 시안의 화면 언어는 영어 기본과 한국어 선택
 description: 화면 언어를 문서 내용과 분리하고 영어·한국어 전환을 제공한다.
 tags: [ui, localization, design-proposal]
-timestamp: 2026-09-06T00:00:00Z
+generated: { by: claude-code/unknown, at: 2026-09-06T00:00:00Z }
 ---
 
 ## 결정

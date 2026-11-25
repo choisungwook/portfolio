@@ -3,7 +3,7 @@ type: Decision
 title: clip 속도는 source 범위를 바꾸지 않고 timeline 길이를 결정한다
 description: clip의 in-out은 유지하고 timeline duration을 source span과 speed에서 계산한다.
 tags: [makevideo, timeline, audio, render]
-timestamp: 2026-09-05T00:00:00Z
+generated: { by: claude-code/unknown, at: 2026-09-05T00:00:00Z }
 ---
 
 # clip 속도는 source 범위를 바꾸지 않고 timeline 길이를 결정한다

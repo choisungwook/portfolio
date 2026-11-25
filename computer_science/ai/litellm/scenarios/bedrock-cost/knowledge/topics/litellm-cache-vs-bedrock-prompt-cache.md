@@ -3,7 +3,7 @@ type: Topic
 title: LiteLLM 응답 캐시와 Bedrock prompt cache는 다른 것이다
 description: 같은 "캐시"가 단가를 매길 수 없는 LiteLLM 응답 캐시와 spend에 잡히는 Bedrock prompt cache 둘을 가리킨다.
 tags: [litellm, bedrock, cache, cost]
-timestamp: 2026-09-20T00:00:00Z
+generated: { by: claude-code/unknown, at: 2026-09-20T00:00:00Z }
 ---
 
 # LiteLLM 응답 캐시와 Bedrock prompt cache는 다른 것이다

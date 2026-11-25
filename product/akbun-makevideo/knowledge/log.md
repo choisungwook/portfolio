@@ -1,5 +1,9 @@
 # Knowledge Update Log
 
+## 2026-11-25
+
+* **Update**: 번들 index의 okf_version을 0.3으로 변경. 0.1 형식 concept 20개의 `timestamp`와 `## Citations`를 `generated`와 `sources`로 변환. 작성자를 알 수 없어 `generated.by`는 `claude-code/unknown`으로 둠.
+
 ## 2026-11-14
 
 * [Inspector는 타임라인에서 선택한 대상의 속성만 표시한다](decisions/2026-08-inspector-follows-timeline-media.md) 갱신. 선택이 가진 묶음만 tab으로 만들고 Effects, Image, File tab을 삭제. 0.2 형식으로 옮김.

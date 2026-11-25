@@ -3,7 +3,17 @@ type: Decision
 title: LiteLLM에 붙일 Bedrock guardrail 기본 구성
 description: Bedrock guardrail 하나를 가리키는 LiteLLM guardrail 여섯 개(검사 시점, 검사 범위, 스트리밍 방식별)로 입력은 pre_call + 마스킹, 출력은 buffered post_call, PII는 방향별 action 명시
 tags: [bedrock, guardrails, litellm]
-timestamp: 2026-11-07T00:00:00Z
+generated: { by: claude-code/unknown, at: 2026-11-07T00:00:00Z }
+sources:
+  - id: src-1
+    resource: "../../docs/3-litellm-guardrail-modes.md"
+    title: "측정값: docs/3-litellm-guardrail-modes.md"
+  - id: src-2
+    resource: "../../docs/9-streaming-output-guardrail.md"
+    title: "측정값: docs/9-streaming-output-guardrail.md"
+  - id: src-3
+    resource: "https://github.com/BerriAI/litellm/blob/v1.108.2/litellm/types/guardrails.py"
+    title: "LiteLLM 1.108.2 litellm/types/guardrails.py의 unreachable_fallback 설명(구현 대상 목록에 bedrock 없음)"
 ---
 
 ## 결정
@@ -36,8 +46,3 @@ timestamp: 2026-11-07T00:00:00Z
 - 처음에는 1:1 하나만 두고 시나리오마다 `mode`와 스트리밍 옵션을 바꿔 LiteLLM을 다시 띄웠다. Docker Desktop에서 재기동이 멈추는 일이 반복됐고, 시나리오마다 되돌리기 단계가 필요했다. LiteLLM guardrail은 이름만 다른 호출 설정이라 여러 개를 둬도 Bedrock 비용은 호출 수로만 정해지므로, 나눠 두고 재기동을 없앴다(2026-11-07).
 - Bedrock 쪽을 나누지 않은 것은 이 실습의 정책이 input과 output에 같기 때문이다. 방향별로 정책이 다르면(예: output에만 grounding) Bedrock guardrail을 나눈다. 같은 Bedrock guardrail을 공유하면 CloudWatch 메트릭이 LiteLLM guardrail별로 나뉘지 않는다. 방향은 `GuardrailContentSource` 차원으로만 구분된다.
 - LiteLLM 1.108.2 Bedrock hook은 fail-open 옵션(`unreachable_fallback`)이 없어 guardrail 오류가 곧 요청 실패다.
-
-## Citations
-
-1. 측정값: [docs/3-litellm-guardrail-modes.md](../../docs/3-litellm-guardrail-modes.md), [docs/9-streaming-output-guardrail.md](../../docs/9-streaming-output-guardrail.md)
-2. LiteLLM 1.108.2 `litellm/types/guardrails.py`의 `unreachable_fallback` 설명(구현 대상 목록에 bedrock 없음)

@@ -3,7 +3,20 @@ type: Decision
 title: 컨테이너에 로컬 자격 증명을 넣지 않고 컴포넌트마다 IAM role을 둔다
 description: 로컬 AWS profile은 terraform apply와 사람의 CLI 조회에만 쓰고, 수집기·Grafana·AMG는 각자 role로 서명한다.
 tags: [aws, iam, amp, cloudwatch, grafana]
-timestamp: 2026-09-23T00:00:00Z
+generated: { by: claude-code/unknown, at: 2026-09-23T00:00:00Z }
+sources:
+  - id: src-1
+    resource: "https://aws.amazon.com/grafana/faqs/"
+    title: "Amazon Managed Grafana FAQs"
+  - id: src-2
+    resource: "../../terraform/iam.tf"
+    title: "terraform/iam.tf"
+  - id: src-3
+    resource: "../../terraform/grafana.tf"
+    title: "terraform/grafana.tf"
+  - id: src-4
+    resource: "../../terraform/amg.tf"
+    title: "terraform/amg.tf"
 ---
 
 # 컨테이너에 로컬 자격 증명을 넣지 않고 컴포넌트마다 IAM role을 둔다
@@ -21,8 +34,3 @@ timestamp: 2026-09-23T00:00:00Z
 - 처음에는 로컬 compose에서 `~/.aws`를 mount해 수집기와 Grafana를 돌렸다. 저장·조회는 AWS였지만 운영과 달리 개인 자격 증명이 컨테이너에 들어가고 IAM 권한 경계를 검증하지 못했다
 - terraform grafana provider나 `aws_grafana_workspace_service_account_token`으로 datasource를 만들면 token이 state에 남는다
 - AMG는 service account도 API 사용자로 과금한다(Admin 월 9 USD). 스크립트를 같은 달에 여러 번 돌리면 license가 더 붙을 수 있다
-
-## Citations
-
-1. [Amazon Managed Grafana FAQs](https://aws.amazon.com/grafana/faqs/)
-2. [terraform/iam.tf](../../terraform/iam.tf), [terraform/grafana.tf](../../terraform/grafana.tf), [terraform/amg.tf](../../terraform/amg.tf)

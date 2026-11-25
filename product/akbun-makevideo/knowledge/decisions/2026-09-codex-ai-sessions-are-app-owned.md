@@ -3,7 +3,11 @@ type: Decision
 title: Codex AI 세션은 앱이 제한된 로컬 데이터로 소유한다
 description: Codex thread는 일회성으로 사용하고 대화와 생성 이미지는 앱 데이터에 제한해 저장한다.
 tags: [makevideo, codex, ai, session]
-timestamp: 2026-09-05T00:00:00Z
+generated: { by: claude-code/unknown, at: 2026-09-05T00:00:00Z }
+sources:
+  - id: src-1
+    resource: "../../adr/2026-09-codex-app-server-ai.md"
+    title: "Codex App Server AI ADR"
 ---
 
 # Codex AI 세션은 앱이 제한된 로컬 데이터로 소유한다
@@ -24,7 +28,3 @@ timestamp: 2026-09-05T00:00:00Z
 * Codex 기록 정책과 무관하게 삭제와 용량 제한을 보장함
 * 세션 이미지 경로를 프로젝트가 참조하면 세션 삭제 시 프로젝트가 깨지므로 자동 import하지 않음
 * 타임라인 편집은 모델 응답을 직접 실행하지 않고 Rust 검증과 사용자 검토를 거침
-
-## Citations
-
-1. [Codex App Server AI ADR](../../adr/2026-09-codex-app-server-ai.md)

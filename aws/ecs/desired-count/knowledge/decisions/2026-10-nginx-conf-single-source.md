@@ -3,7 +3,7 @@ type: Decision
 title: nginx default.conf를 파일 하나로 두고 Terraform과 compose가 공유한다
 description: task definition command는 file()로 conf를 heredoc에 끼워 넣고, compose는 같은 파일을 mount한다
 tags: [ecs, terraform, nginx]
-timestamp: 2026-10-11T00:00:00Z
+generated: { by: claude-code/unknown, at: 2026-10-11T00:00:00Z }
 ---
 
 ## 결정

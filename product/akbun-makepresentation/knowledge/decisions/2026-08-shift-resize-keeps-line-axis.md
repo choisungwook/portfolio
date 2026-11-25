@@ -3,7 +3,7 @@ type: Decision
 title: Shift 리사이즈는 비율과 선의 축을 유지
 description: Shift 리사이즈를 정사각형 변환에서 현재 비율 유지로 바꾼 이유와 선의 축 유지 규칙.
 tags: [desktop, editor, geometry, interaction]
-timestamp: 2026-08-16T12:00:00Z
+generated: { by: claude-code/unknown, at: 2026-08-16T12:00:00Z }
 ---
 
 ## 결정

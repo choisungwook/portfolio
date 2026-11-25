@@ -3,7 +3,17 @@ type: Decision
 title: Astra 편집은 검토 가능한 명령 제안과 표본 B-roll 설명을 사용한다
 description: 모델 출력을 Rust 편집 경계에서 검증하고 재사용 디자인은 파일 참조 없이 저장한다.
 tags: [makevideo, astra, ai, editing]
-timestamp: 2026-09-17T00:00:00Z
+generated: { by: claude-code/unknown, at: 2026-09-17T00:00:00Z }
+sources:
+  - id: src-1
+    resource: "../../wiki/architecture/astra-editing.md"
+    title: "편집 스튜디오 구조"
+  - id: src-2
+    resource: "https://www.youtube.com/watch?v=mePPNdZ9lP0"
+    title: "참고 영상"
+  - id: src-3
+    resource: "https://learn.chatgpt.com/docs/app-server"
+    title: "Codex App Server"
 ---
 
 # Astra 편집 제안과 표본 B-roll 설명
@@ -23,9 +33,3 @@ timestamp: 2026-09-17T00:00:00Z
 - 기존 compositor와 편집 불변식을 재사용해 미리보기·렌더 일관성 유지
 - 샘플 사이의 움직임과 음성을 확인된 사실로 취급하지 않음
 - 원본 경로와 대화 저장 수명에 디자인 재사용이 종속되지 않음
-
-## Citations
-
-1. [편집 스튜디오 구조](../../wiki/architecture/astra-editing.md)
-2. [참고 영상](https://www.youtube.com/watch?v=mePPNdZ9lP0)
-3. [Codex App Server](https://learn.chatgpt.com/docs/app-server)

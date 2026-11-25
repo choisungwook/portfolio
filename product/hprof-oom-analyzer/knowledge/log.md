@@ -1,5 +1,9 @@
 # Knowledge Update Log
 
+## 2026-11-25
+
+* **Update**: 번들 index의 okf_version을 0.3으로 변경. 0.1 형식 concept 7개의 `timestamp`와 `## Citations`를 `generated`와 `sources`로 변환. 작성자를 알 수 없어 `generated.by`는 `claude-code/unknown`으로 둠.
+
 ## 2026-07-19
 
 * **Creation**: [deprecated transitive 의존성은 scoped overrides로 교체](decisions/2026-07-npm-overrides-deprecated-deps.md) 결정 기록.

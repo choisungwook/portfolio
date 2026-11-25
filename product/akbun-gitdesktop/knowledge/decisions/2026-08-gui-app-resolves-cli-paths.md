@@ -3,7 +3,7 @@ type: Decision
 title: GUI 앱은 CLI의 알려진 설치 경로를 직접 탐색
 description: GUI 프로세스의 PATH 밖에 설치된 git과 gh를 절대 경로로 찾아 실행한다.
 tags: [desktop, cli, macos, github]
-timestamp: 2026-08-23T00:00:00Z
+generated: { by: claude-code/unknown, at: 2026-08-23T00:00:00Z }
 ---
 
 # GUI 앱은 CLI의 알려진 설치 경로를 직접 탐색

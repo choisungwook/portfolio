@@ -3,7 +3,7 @@ type: Decision
 title: 숨긴 패널의 constraint는 살아 있으므로 헤더의 hugging을 명시한다
 description: 한 헤더 아래에 여러 패널을 겹쳐 두고 isHidden으로 바꾸는 구조에서, 숨긴 패널의 constraint가 헤더 높이를 끌어당겨 헤더가 패널 전체를 채운 버그의 원인과 규칙.
 tags: [swift, appkit, autolayout, verification]
-timestamp: 2026-09-16T00:00:00Z
+generated: { by: claude-code/unknown, at: 2026-09-16T00:00:00Z }
 ---
 
 ## 결정

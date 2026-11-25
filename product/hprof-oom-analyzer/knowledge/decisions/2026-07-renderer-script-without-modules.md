@@ -3,7 +3,7 @@ type: Decision
 title: renderer는 모듈 없는 스크립트로 작성
 description: 렌더러 TypeScript를 import/export 없이 작성하고 tsconfig.renderer.json에서 module none으로 컴파일해 script 태그로 로드한다.
 tags: [electron, typescript, build]
-timestamp: 2026-07-18T00:00:00Z
+generated: { by: claude-code/unknown, at: 2026-07-18T00:00:00Z }
 ---
 
 ## 결정

@@ -3,7 +3,11 @@ type: Decision
 title: 배포 완료는 rolloutState를 직접 조회해 판정
 description: wait services-stable 대신 PRIMARY의 rolloutState가 IN_PROGRESS를 벗어날 때까지 조회
 tags: [ecs, codebuild]
-timestamp: 2026-10-05T00:00:00Z
+generated: { by: claude-code/unknown, at: 2026-10-05T00:00:00Z }
+sources:
+  - id: src-1
+    resource: "../references/deployment-contract.md"
+    title: "AWS 배포 동작 근거"
 ---
 
 # 배포 완료는 rolloutState를 직접 조회해 판정
@@ -20,7 +24,3 @@ timestamp: 2026-10-05T00:00:00Z
 - 2026-10-05 실제 배포에서 `wait services-stable`이 deployments=1·running=desired 시점에 끝났지만 rolloutState는 IN_PROGRESS. 설계 원안의 6단계가 정상 배포를 실패로 판정.
 - circuit breaker 롤백 뒤 PRIMARY는 이전 ARN이므로 ARN 비교만으로 성공 오판 방지.
 - 사전 검사는 Pipeline마다 TASK_FILE이 고정이라 실익이 적음.
-
-## Citations
-
-1. [AWS 배포 동작 근거](../references/deployment-contract.md).

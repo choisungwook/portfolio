@@ -3,7 +3,7 @@ type: Decision
 title: 첫 영상은 빈 기본 프로젝트의 canvas 비율을 정한다
 description: 첫 영상 clip이 기본 해상도 프로젝트의 비율을 정하되 긴 변 해상도는 유지하는 결정.
 tags: [makevideo, preview, aspect-ratio, timeline]
-timestamp: 2026-08-10T00:00:00Z
+generated: { by: claude-code/unknown, at: 2026-08-10T00:00:00Z }
 ---
 
 # 첫 영상은 빈 기본 프로젝트의 canvas 비율을 정한다

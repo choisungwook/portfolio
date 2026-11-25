@@ -3,7 +3,10 @@ type: Decision
 title: 그래픽 장치를 쓰는지 하나로 preview와 playback과 render를 함께 정한다
 description: compositor 설정을 GPU와 CPU 둘로 줄이고 playback 설정을 없앤다.
 tags: [makevideo, settings, playback, compositor]
-timestamp: 2026-08-09T00:00:00Z
+generated: { by: claude-code/unknown, at: 2026-08-09T00:00:00Z }
+sources:
+  - id: src-1
+    resource: "https://github.com/choisungwook/portfolio/pull/851"
 ---
 
 # 그래픽 장치를 쓰는지 하나로 preview와 playback과 render를 함께 정한다
@@ -20,7 +23,3 @@ timestamp: 2026-08-09T00:00:00Z
 * native monitor가 graphics surface에 그리므로 cpu와 native는 사용자가 고를 수 있으나 얻을 수 없는 조합이었고, 조용히 폴백되어 고장으로 읽힘
 * 전체 render를 소프트웨어 합성기로 돌리면 filter graph가 분 단위로 끝내는 일을 시간 단위로 함
 * 설정 3 x 2에 불가능한 칸이 섞인 상태보다, 축 하나가 세 곳을 정하는 편이 설명과 검증 모두 짧음
-
-## Citations
-
-1. <https://github.com/choisungwook/portfolio/pull/851>

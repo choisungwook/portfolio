@@ -3,7 +3,7 @@ type: Decision
 title: 릴리스는 빌드 성공 뒤에 tag, tag 뒤에 release
 description: 빌드 결과물이 나온 뒤에만 tag를 만들고, tag가 만들어진 뒤에만 release를 만든다.
 tags: [github-actions, electron, release]
-timestamp: 2026-07-25T00:00:00Z
+generated: { by: claude-code/unknown, at: 2026-07-25T00:00:00Z }
 ---
 
 ## 결정

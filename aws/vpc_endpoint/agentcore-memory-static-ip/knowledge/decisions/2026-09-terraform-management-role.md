@@ -3,7 +3,11 @@ type: Decision
 title: Terraform 관리 인증과 실험 인증 분리
 description: Terraform 관리 인증은 프로세스 자격증명 또는 STS 임시 키로 선택하고 실험 클라이언트 인증은 분리한다.
 tags: [aws, terraform, sts, credentials]
-timestamp: 2026-09-06T00:00:00Z
+generated: { by: claude-code/unknown, at: 2026-09-06T00:00:00Z }
+sources:
+  - id: src-1
+    resource: "../../docs/7-terraform-setup.md"
+    title: "Terraform 관리 인증 준비"
 ---
 
 ## 결정
@@ -25,7 +29,3 @@ timestamp: 2026-09-06T00:00:00Z
 - B에서 실행 중인 Terraform은 부모 셸의 키 변경을 받지 못하므로 새 키 적재만으로 진행 중 apply의 갱신 문제를 해결할 수 없음.
 - 원격 backend를 추가하면 해당 인증 설정도 확인.
 - 같은 셸에서 클라이언트 프로파일을 바꾸면 후속 Terraform 관리 명령의 원본 주체가 달라질 수 있음.
-
-## Citations
-
-1. [Terraform 관리 인증 준비](../../docs/7-terraform-setup.md)

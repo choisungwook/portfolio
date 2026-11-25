@@ -3,7 +3,7 @@ type: Decision
 title: Tauri updater로 서명 검증과 다중 플랫폼 업데이트 통합
 description: 수동 dmg 교체를 제거하고 Tauri updater와 제품 전용 키로 업데이트를 검증한다.
 tags: [tauri, updater, release, security]
-timestamp: 2026-08-29T00:00:00Z
+generated: { by: claude-code/unknown, at: 2026-08-29T00:00:00Z }
 ---
 
 # Tauri updater로 서명 검증과 다중 플랫폼 업데이트 통합

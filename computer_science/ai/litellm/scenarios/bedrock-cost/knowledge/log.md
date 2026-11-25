@@ -2,6 +2,10 @@
 
 concept를 추가·수정·삭제할 때마다 오늘 날짜 섹션을 맨 위에 만들고 한 줄 남긴다. 구분은 `**Creation**`, `**Update**`, `**Deletion**`이다.
 
+## 2026-11-25
+
+* **Update**: 번들 index의 okf_version을 0.3으로 변경. 0.1 형식 concept 5개의 `timestamp`와 `## Citations`를 `generated`와 `sources`로 변환. 작성자를 알 수 없어 `generated.by`는 `claude-code/unknown`으로 둠.
+
 ## 2026-09-20
 
 * **Creation**: [LiteLLM custom pricing은 네 단가를 모두 적는다](decisions/2026-09-litellm-custom-pricing.md) 결정 기록. cache 단가만 지정했다가 input/output이 0으로 청구되는 것을 측정으로 확인해 남긴다.

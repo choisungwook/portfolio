@@ -3,7 +3,7 @@ type: Playbook
 title: 분석 기능 추가 절차
 description: core 분석 함수부터 IPC, 렌더러 탭까지 새 분석 기능을 추가하는 순서.
 tags: [electron, workflow]
-timestamp: 2026-07-18T00:00:00Z
+generated: { by: claude-code/unknown, at: 2026-07-18T00:00:00Z }
 ---
 
 ## 절차

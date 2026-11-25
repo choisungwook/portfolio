@@ -3,7 +3,7 @@ type: Decision
 title: release 빌드만 깨지는 Swift 컴파일러 크래시는 표현을 바꿔 피한다
 description: Swift 6.2.3의 CopyPropagation 패스가 특정 표현에서 죽고 debug 빌드는 통과하므로, 검증은 release 빌드로 한다.
 tags: [swift, compiler, release, verification]
-timestamp: 2026-09-11T00:00:00Z
+generated: { by: claude-code/unknown, at: 2026-09-11T00:00:00Z }
 ---
 
 ## 결정

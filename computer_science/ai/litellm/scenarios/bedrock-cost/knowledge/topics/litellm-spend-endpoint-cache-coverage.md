@@ -3,7 +3,7 @@ type: Topic
 title: LiteLLM 집계 엔드포인트별 캐시 노출 범위
 description: /spend/* 계열은 spend만 더하고 캐시 토큰은 /*/daily/activity 계열에서만 나온다.
 tags: [litellm, cost, api]
-timestamp: 2026-09-20T00:00:00Z
+generated: { by: claude-code/unknown, at: 2026-09-20T00:00:00Z }
 ---
 
 # LiteLLM 집계 엔드포인트별 캐시 노출 범위

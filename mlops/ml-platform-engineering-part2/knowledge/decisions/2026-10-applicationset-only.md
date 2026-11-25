@@ -3,7 +3,7 @@ type: Decision
 title: Argo CD Application은 app-of-apps 없이 ApplicationSet으로만 만든다
 description: 구성요소 Application이 경로와 namespace만 달라 list generator 템플릿 하나로 묶었다
 tags: [argocd, applicationset, gitops]
-timestamp: 2026-10-31T00:00:00Z
+generated: { by: claude-code/unknown, at: 2026-10-31T00:00:00Z }
 ---
 
 ## 결정

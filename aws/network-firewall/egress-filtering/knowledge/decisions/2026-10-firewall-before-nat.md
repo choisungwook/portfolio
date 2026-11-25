@@ -3,7 +3,7 @@ type: Decision
 title: firewall은 NAT 앞에 두고, app subnet은 VPC 모듈 밖에서 AZ별 route table로 만든다
 description: 로그에 서버 IP를 남기려고 NAT 앞에 두고, single NAT에서도 AZ별 대칭 라우팅을 하려고 app subnet을 직접 만든다.
 tags: [aws, network-firewall, terraform, vpc]
-timestamp: 2026-10-31T00:00:00Z
+generated: { by: claude-code/unknown, at: 2026-10-31T00:00:00Z }
 ---
 
 ## 결정

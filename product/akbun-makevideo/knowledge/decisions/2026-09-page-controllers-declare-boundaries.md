@@ -3,7 +3,7 @@ type: Decision
 title: page controller는 의존성과 공개 경계를 선언한다
 description: no-build classic script를 factory controller로 나누고 생성 시 의존성과 반환 API를 명시한다.
 tags: [makevideo, javascript, architecture, testing]
-timestamp: 2026-09-04T00:00:00Z
+generated: { by: claude-code/unknown, at: 2026-09-04T00:00:00Z }
 ---
 
 # page controller는 의존성과 공개 경계를 선언한다

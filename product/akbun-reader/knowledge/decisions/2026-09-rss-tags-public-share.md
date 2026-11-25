@@ -3,7 +3,14 @@ type: Decision
 title: RSS 수집·태그 일괄 변경·공개 링크
 description: RSS 항목을 문서와 분리 저장하고 태그 변경을 SQL 한 문장으로 처리하며 공개 링크는 Access 우회 경로 하나로 제공
 tags: [reader, rss, tags, share, d1]
-timestamp: 2026-09-07T00:00:00Z
+generated: { by: claude-code/unknown, at: 2026-09-07T00:00:00Z }
+sources:
+  - id: src-1
+    resource: "../../adr/2026-09-public-share-path.md"
+    title: "ADR: Public share pages bypass Access on one path"
+  - id: src-2
+    resource: "../../wiki/rss-tags-share.md"
+    title: "wiki: RSS 구독·태그 관리·공개 링크"
 ---
 
 ## 결정
@@ -23,8 +30,3 @@ timestamp: 2026-09-07T00:00:00Z
 - 문서별 UPDATE를 배치로 보내면 태그가 붙은 문서 수만큼 statement가 늘어 D1 batch 한도에 걸릴 수 있음
 - Access가 호스트 단위라 두 번째 호스트를 두는 것보다 경로 하나를 우회하는 편이 배포가 단순함
 - 유출된 API 토큰으로 개인 목록을 공개하는 경로를 막기 위해 토큰 관리와 같은 규칙 적용
-
-## Citations
-
-1. [ADR: Public share pages bypass Access on one path](../../adr/2026-09-public-share-path.md)
-2. [wiki: RSS 구독·태그 관리·공개 링크](../../wiki/rss-tags-share.md)

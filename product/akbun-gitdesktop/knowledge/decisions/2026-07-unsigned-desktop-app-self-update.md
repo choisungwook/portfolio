@@ -3,7 +3,7 @@ type: Decision
 title: 서명 없는 데스크톱 앱의 자동 업데이트는 dmg를 받아 번들을 교체한다
 description: electron-updater 대신 dmg를 직접 받아 .app 번들을 바꾸는 방식을 모든 데스크톱 product의 기본으로 둔다.
 tags: [electron, macos, release, product]
-timestamp: 2026-07-31T00:00:00Z
+generated: { by: claude-code/unknown, at: 2026-07-31T00:00:00Z }
 ---
 
 2026-08-29부터 [Tauri updater 전환](./2026-08-tauri-signed-updater.md)이 이 결정을 대체한다.

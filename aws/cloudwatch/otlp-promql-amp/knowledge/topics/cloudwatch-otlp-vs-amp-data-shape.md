@@ -3,7 +3,7 @@ type: Topic
 title: 같은 Prometheus metric이 CloudWatch OTLP와 AMP에서 다른 모양으로 저장된다
 description: counter와 rate는 같지만 replica label, histogram, 시작 시각, selector 제약이 달라 쿼리를 옮길 때 고쳐야 한다.
 tags: [cloudwatch, otlp, promql, amp, opentelemetry]
-timestamp: 2026-09-23T00:00:00Z
+generated: { by: claude-code/unknown, at: 2026-09-23T00:00:00Z }
 ---
 
 # 같은 Prometheus metric이 CloudWatch OTLP와 AMP에서 다른 모양으로 저장된다

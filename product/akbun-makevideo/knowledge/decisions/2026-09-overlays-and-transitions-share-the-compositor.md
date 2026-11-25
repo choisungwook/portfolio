@@ -3,7 +3,7 @@ type: Decision
 title: PIP와 디졸브는 기존 compositor placement로 합성한다
 description: PIP는 VisualItem, 디졸브는 clip 경계 객체로 저장하고 둘 다 FrameSource placement로 변환한다.
 tags: [makevideo, pip, transition, compositor]
-timestamp: 2026-09-05T00:00:00Z
+generated: { by: claude-code/unknown, at: 2026-09-05T00:00:00Z }
 ---
 
 # PIP와 디졸브는 기존 compositor placement로 합성한다

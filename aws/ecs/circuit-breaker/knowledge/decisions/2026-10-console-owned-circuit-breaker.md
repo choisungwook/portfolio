@@ -3,7 +3,7 @@ type: Decision
 title: revision과 circuit breaker는 콘솔이 소유하고 Terraform은 ignore_changes한다
 description: 실습이 콘솔에서 바꾸는 값과 ECS가 바꾸는 가중치를 다음 apply가 되돌리지 않게 한다
 tags: [ecs, terraform, blue-green, circuit-breaker]
-timestamp: 2026-10-18T00:00:00Z
+generated: { by: claude-code/unknown, at: 2026-10-18T00:00:00Z }
 ---
 
 ## 결정

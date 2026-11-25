@@ -3,7 +3,7 @@ type: Decision
 title: 브라우저 편집기 파일은 변경 이유별로 분리
 description: 공개 API와 실행 순서를 유지하면서 편집 모델과 화면 제어 코드를 기능별 파일로 분리.
 tags: [desktop, editor, javascript, architecture]
-timestamp: 2026-08-16T00:00:00Z
+generated: { by: claude-code/unknown, at: 2026-08-16T00:00:00Z }
 ---
 
 ## 결정

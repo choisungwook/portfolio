@@ -3,7 +3,14 @@ type: Decision
 title: AWS 안의 CONNECT proxy(S07)는 권장 구성이 아니다
 description: IAM이 이미 인증·인가를 제공하므로 AWS 쪽에 별도 인증이 필요한 프록시 홉을 두지 않는다. 프록시가 필요하면 애플리케이션 네트워크 쪽에 둔다.
 tags: [aws, proxy, nlb, iam, architecture]
-timestamp: 2026-09-06T21:00:00Z
+generated: { by: claude-code/unknown, at: 2026-09-06T21:00:00Z }
+sources:
+  - id: src-1
+    resource: "2026-09-poc-scope-s01-s05-s07.md"
+    title: "PoC 범위 축소"
+  - id: src-2
+    resource: "2026-09-preserve-aws-hostname.md"
+    title: "AWS 호스트명과 TLS 유지"
 ---
 
 ## 결정
@@ -19,8 +26,3 @@ timestamp: 2026-09-06T21:00:00Z
 - 해결할 문제는 "클라이언트가 AWS 이름을 어떤 IP로 보내느냐"이며, 이는 클라이언트 네트워크 안에서 풀어야 할 DNS 문제다. AWS 쪽 구성 요소를 늘려서 풀 이유가 없다.
 
 - 프록시는 AWS API 클라이언트에만 지정한다. 전역 HTTPS_PROXY는 자격증명 체인의 외부 호출(aws login 갱신, SSO)까지 프록시로 보내 허용 목록에 막힌다. 실무에서는 그 호스트를 허용 목록에 넣거나 NO_PROXY로 뺀다.
-
-## Citations
-
-1. [PoC 범위 축소](2026-09-poc-scope-s01-s05-s07.md)
-2. [AWS 호스트명과 TLS 유지](2026-09-preserve-aws-hostname.md)

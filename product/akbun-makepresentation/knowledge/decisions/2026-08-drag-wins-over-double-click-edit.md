@@ -3,7 +3,7 @@ type: Decision
 title: 드래그는 더블클릭 편집보다 우선
 description: 두 번째 누름이 이동되면 객체 드래그로 처리하고 이동이 없을 때만 편집 진입.
 tags: [desktop, editor, pointer, drag]
-timestamp: 2026-08-16T09:15:00Z
+generated: { by: claude-code/unknown, at: 2026-08-16T09:15:00Z }
 ---
 
 ## 결정

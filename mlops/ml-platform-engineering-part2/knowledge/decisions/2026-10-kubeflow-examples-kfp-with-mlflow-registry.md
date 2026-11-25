@@ -3,7 +3,7 @@ type: Decision
 title: Lab 1의 Kubeflow 예제는 KFP 파이프라인으로 만들고 모델 버전은 MLflow 레지스트리에 둔다
 description: Katib와 Kubeflow Model Registry 없이 KFP만으로 EDA, 실험 비교, 등록 자동화를 보여 준다
 tags: [kubeflow, kfp, mlflow]
-timestamp: 2026-10-31T00:00:00Z
+generated: { by: claude-code/unknown, at: 2026-10-31T00:00:00Z }
 ---
 
 ## 결정

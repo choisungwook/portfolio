@@ -3,7 +3,7 @@ type: Decision
 title: EKS addon 버전을 넘기지 않고 self-managed 기본 설치에 맡긴다
 description: 1.36 addon 버전을 조회할 수 없는 상태에서 버전을 추측해 박지 않고, EKS가 클러스터 버전에 맞춰 설치하는 self-managed addon을 쓴다.
 tags: [eks, terraform, addon]
-timestamp: 2026-09-23T00:00:00Z
+generated: { by: claude-code/unknown, at: 2026-09-23T00:00:00Z }
 ---
 
 # EKS addon 버전을 넘기지 않고 self-managed 기본 설치에 맡긴다
