@@ -136,6 +136,7 @@
 122. 로컬 AI 모델 성능테스트 핸즈온. 기본 HTTP 부하테스트에서 SSE 지연, 토큰 처리량, 모델 동시성 측정까지 (26.11.20) - [링크](./computer_science/ai/litellm-sse-load-test/)
 123. (실습안함) PostgreSQL RBAC 인증·인가 핸즈온: MySQL vs PostgreSQL 권한 비교, Flyway 소유권 장애·롤백(`SET ROLE app_owner`), 비밀번호 로테이션 `DROP ROLE` 장애와 Blue/Green Role 패턴, HTML 슬라이드 학습지 (26.11.21) - [링크](./computer_science/postgresql-rbac/)
 124. (실습안함) EXAONE 4.5 MTP와 reasoning 모드 이론 핸즈온: speculative decoding 속도 공식과 손익분기 수용률, reasoning을 끄면 MTP 수용률이 0.8%로 떨어져 0.85배가 되는 이유, vLLM MTP on/off 구성과 GuideLLM 합성 sweep·Mooncake trace replay 비교 테스트 설계 (26.11.22) - [링크](./computer_science/ai/exaone-mtp-reasoning/)
+125. (실습안함) DB 커넥션풀 크기 조절 이론·핸즈온 설계: HikariCP에 desired가 없는 이유, `minimumIdle`이 idle 기준이라 total이 `active + minimumIdle`로 커지는 동작, 단일 스레드 직렬 생성, `connectionTimeout`과 처리량(Little's Law), housekeeper 주기로 늦어지는 축소, PgBouncer min/default/reserve 비교 (26.11.25) - [링크](./computer_science/db_connection_pool/)
 
 ## 직접 만든 제품
 
